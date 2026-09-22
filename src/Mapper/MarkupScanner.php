@@ -201,6 +201,28 @@ class MarkupScanner
             }
         }
 
+        foreach ($xpath->query('//*[@data-edit-bg]') as $node) {
+            $value = $node->getAttribute('data-edit-bg');
+            if (! str_starts_with($value, 'setting:')) {
+                continue;
+            }
+            $key = substr($value, strlen('setting:'));
+            if (! array_key_exists($key, $overrides) || $overrides[$key] === '') {
+                continue;
+            }
+            $url = $overrides[$key];
+            // Feed both the JS lazy-bg attributes and an inline fallback.
+            foreach (['data-background', 'data-bg', 'data-background-image'] as $attr) {
+                if ($node->hasAttribute($attr)) {
+                    $node->setAttribute($attr, $url);
+                }
+            }
+            $node->setAttribute('data-edit-preview', $url);
+            $style = $node->getAttribute('style');
+            $style = trim(preg_replace('/background-image\s*:[^;]*;?/i', '', $style), '; ');
+            $node->setAttribute('style', trim($style.";background-image:url('".$url."')", '; '));
+        }
+
         return $this->serialize();
     }
 
@@ -275,9 +297,39 @@ class MarkupScanner
             $el->setAttribute('data-style', 's'.$this->autoKey($el));
             $el->setAttribute('data-style-props', self::STYLE_PROPS);
             $tagged++;
+
+            // A background image — inline or a slider-style data-* attribute —
+            // is itself editable.
+            $bgUrl = $this->backgroundImageUrl($el);
+            if ($bgUrl !== null && ! $el->hasAttribute('data-edit-bg')) {
+                $el->setAttribute('data-edit-bg', 'setting:auto:'.substr(hash('sha256', $this->structuralPath($el).'#bg'), 0, 12));
+                $el->setAttribute('data-edit-preview', $bgUrl);
+                $el->setAttribute('data-edit-kind', 'background');
+            }
         }
 
         return $tagged;
+    }
+
+    /**
+     * The background image URL of an element, whether set inline
+     * (style="background-image:url()") or via a common lazy-bg data attribute
+     * (data-background / data-bg / data-background-image) that theme JS applies.
+     */
+    protected function backgroundImageUrl(DOMElement $el): ?string
+    {
+        foreach (['data-background', 'data-bg', 'data-background-image'] as $attr) {
+            if ($el->hasAttribute($attr) && $el->getAttribute($attr) !== '') {
+                return $el->getAttribute($attr);
+            }
+        }
+
+        $style = $el->getAttribute('style');
+        if (stripos($style, 'background') !== false && preg_match('/url\(\s*[\'"]?([^\'")]+)/i', $style, $m)) {
+            return $m[1];
+        }
+
+        return null;
     }
 
     protected function serialize(): string
