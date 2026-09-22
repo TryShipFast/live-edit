@@ -1,0 +1,37 @@
+{
+    "name": "shipfast/live-edit",
+    "description": "Config-driven, in-place live-edit CMS for Laravel sites: tag HTML elements, edit content, images, links, icons, styles, collections and nav in place.",
+    "type": "library",
+    "license": "MIT",
+    "require": {
+        "php": "^8.3",
+        "illuminate/support": "^11.0 || ^12.0 || ^13.0",
+        "illuminate/database": "^11.0 || ^12.0 || ^13.0",
+        "illuminate/http": "^11.0 || ^12.0 || ^13.0"
+    },
+    "autoload": {
+        "psr-4": {
+            "ShipFast\\LiveEdit\\": "src/"
+        }
+    },
+    "extra": {
+        "laravel": {
+            "providers": [
+                "ShipFast\\LiveEdit\\LiveEditServiceProvider"
+            ]
+        }
+    },
+    "minimum-stability": "stable",
+    "require-dev": {
+        "orchestra/testbench": "^10.0",
+        "laravel/pint": "^1.0"
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "ShipFast\\LiveEdit\\Tests\\": "tests/"
+        }
+    },
+    "scripts": {
+        "test": "phpunit"
+    }
+}
