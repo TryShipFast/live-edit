@@ -82,6 +82,10 @@ class MarkupScanner
             $applied++;
         }
 
+        if ($this->autoMode) {
+            $applied += $this->applyStyles();
+        }
+
         return ['html' => $this->serialize(), 'applied' => $applied, 'skipped' => $skipped];
     }
 
@@ -122,10 +126,17 @@ class MarkupScanner
                 'data-edit-preview' => $node->getAttribute('src'),
                 'data-edit-label' => $this->humanise($candidate['key']),
             ]),
-            'link' => $this->setAttrs($node, [
-                'data-edit-href' => $key,
-                'data-edit-label' => $this->humanise($candidate['key']),
-            ]),
+            'link' => $this->setAttrs($node, $this->autoMode
+                // Auto: a link's TEXT and its href are both editable.
+                ? [
+                    'data-edit' => 'setting:'.$key,
+                    'data-edit-href' => 'auto:'.substr(hash('sha256', $this->structuralPath($node).'#href'), 0, 12),
+                    'data-edit-label' => $this->humanise($candidate['key']),
+                ]
+                : [
+                    'data-edit-href' => $key,
+                    'data-edit-label' => $this->humanise($candidate['key']),
+                ]),
             default => null,
         };
     }
@@ -183,6 +194,13 @@ class MarkupScanner
             }
         }
 
+        foreach ($xpath->query('//*[@data-edit-href]') as $node) {
+            $key = $node->getAttribute('data-edit-href');
+            if ($key !== '' && array_key_exists($key, $overrides) && $overrides[$key] !== '') {
+                $node->setAttribute('href', $overrides[$key]);
+            }
+        }
+
         return $this->serialize();
     }
 
@@ -227,6 +245,39 @@ class MarkupScanner
         foreach ($attributes as $name => $value) {
             $node->setAttribute($name, $value);
         }
+    }
+
+    /** Style props every element exposes to the editor. */
+    protected const STYLE_PROPS = 'background,textColor,fontSize,paddingY,paddingX,radius,hidden';
+
+    /**
+     * Auto mode: make EVERY element styleable. Each gets a stable `data-style`
+     * key + its editable props; the runtime opens the style editor when the
+     * element is clicked in edit mode (no per-element chip). Skips only tags
+     * with no visual box or that belong to the editing chrome.
+     */
+    protected function applyStyles(): int
+    {
+        $tagged = 0;
+
+        $skip = ['html', 'head', 'body', 'script', 'style', 'meta', 'link', 'title', 'br', 'hr', 'source', 'template'];
+
+        foreach (iterator_to_array($this->doc->getElementsByTagName('*')) as $el) {
+            if (! $el instanceof DOMElement) {
+                continue;
+            }
+
+            $tag = strtolower($el->tagName);
+            if (in_array($tag, $skip, true) || $el->hasAttribute('data-style')) {
+                continue;
+            }
+
+            $el->setAttribute('data-style', 's'.$this->autoKey($el));
+            $el->setAttribute('data-style-props', self::STYLE_PROPS);
+            $tagged++;
+        }
+
+        return $tagged;
     }
 
     protected function serialize(): string

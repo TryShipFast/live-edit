@@ -47,6 +47,38 @@ class MarkupScannerTest extends TestCase
         $this->assertStringContainsString('>World</p>', $rendered);
     }
 
+    public function test_auto_apply_makes_every_element_styleable(): void
+    {
+        $html = (new MarkupScanner)->apply('<section><div class="card"><h1>Hi</h1></div></section>', ['text'], true)['html'];
+
+        // The band, the container div, and the heading are all styleable.
+        $this->assertMatchesRegularExpression('/<section[^>]*data-style="s[a-f0-9]{12}"/', $html);
+        $this->assertMatchesRegularExpression('/<div[^>]*data-style="s[a-f0-9]{12}"/', $html);
+        $this->assertMatchesRegularExpression('/<h1[^>]*data-style="s[a-f0-9]{12}"/', $html);
+        // No chips — clicking the element in edit mode opens the editor.
+        $this->assertStringNotContainsString('data-le-chip', $html);
+        $this->assertStringContainsString('data-style-props="background,textColor,fontSize,paddingY,paddingX,radius,hidden"', $html);
+    }
+
+    public function test_auto_apply_makes_a_links_text_and_href_editable(): void
+    {
+        $html = (new MarkupScanner)->apply('<nav><a href="/go">Get a quote</a></nav>', ['text', 'link'], true)['html'];
+
+        // The anchor carries both a text key and a distinct href key.
+        $this->assertMatchesRegularExpression('/<a [^>]*data-edit="setting:auto:[a-f0-9]{12}"/', $html);
+        $this->assertMatchesRegularExpression('/data-edit-href="auto:[a-f0-9]{12}"/', $html);
+    }
+
+    public function test_apply_overrides_updates_a_link_href(): void
+    {
+        $tagged = (new MarkupScanner)->apply('<nav><a href="/go">Quote</a></nav>', ['text', 'link'], true)['html'];
+        preg_match('/data-edit-href="(auto:[a-f0-9]+)"/', $tagged, $m);
+
+        $rendered = (new MarkupScanner)->applyOverrides($tagged, [$m[1] => 'https://example.com/new']);
+
+        $this->assertStringContainsString('href="https://example.com/new"', $rendered);
+    }
+
     public function test_it_recognises_headings_and_paragraphs_as_text(): void
     {
         $result = $this->scan('<section><h1>Welcome home</h1><p>We build things for people.</p></section>');

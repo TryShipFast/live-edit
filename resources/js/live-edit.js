@@ -580,11 +580,19 @@ if (document.body.hasAttribute('data-admin')) {
 
     const editStyle = (element) => {
         current = { kind: 'style' };
-        drawerTitle.textContent = element.dataset.editLabel ?? 'Section';
+        // A chip carries data-style-edit; a styleable element carries data-style.
+        const styleKey = element.dataset.styleEdit ?? element.dataset.style;
+        const roles = {
+            SECTION: 'Section', HEADER: 'Header', FOOTER: 'Footer', ARTICLE: 'Article',
+            ASIDE: 'Aside', MAIN: 'Main', NAV: 'Navigation', FIGURE: 'Figure',
+            UL: 'List', OL: 'List', LI: 'List item', DIV: 'Block', A: 'Link',
+            H1: 'Heading', H2: 'Heading', H3: 'Heading', H4: 'Heading', P: 'Text', SPAN: 'Text',
+        };
+        drawerTitle.textContent = element.dataset.editLabel ?? roles[element.tagName] ?? 'Block';
         drawerFields.replaceChildren();
         drawerDelete.classList.add('hidden');
-        addStyleFields(element.dataset.styleEdit, (element.dataset.styleProps ?? '').split(','));
-        setTrail(element.closest('[data-style]') ?? element.parentElement);
+        addStyleFields(styleKey, (element.dataset.styleProps ?? '').split(','));
+        setTrail(element.dataset.styleEdit ? (element.closest('[data-style]') ?? element.parentElement) : element);
         openDrawer();
     };
 
@@ -804,13 +812,17 @@ if (document.body.hasAttribute('data-admin')) {
             const image = event.target.closest('[data-edit-img], [data-edit-bg]');
             const text = event.target.closest('[data-edit]');
             const linkOnly = event.target.closest('[data-edit-href]:not([data-edit])');
-            if (!styleChip && !image && !text && !linkOnly) return;
+            // Any styleable element — clicking its own box (not a text child)
+            // opens the style editor. Checked last so text/image/link win.
+            const styleBox = event.target.closest('[data-style]:not([data-style-edit])');
+            if (!styleChip && !image && !text && !linkOnly && !styleBox) return;
             event.preventDefault();
             event.stopPropagation();
             if (styleChip) editStyle(styleChip);
             else if (image) editImage(image);
             else if (text) editText(text);
-            else editLink(linkOnly);
+            else if (linkOnly) editLink(linkOnly);
+            else editStyle(styleBox);
         },
         true
     );
