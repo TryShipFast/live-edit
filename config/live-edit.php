@@ -1,5 +1,7 @@
 <?php
 
+use App\Models\Setting;
+
 /*
  * ShipFast live-edit CMS — example configuration.
  *
@@ -10,7 +12,7 @@
 return [
 
     // The Eloquent model backing key/value settings (must have key + value).
-    'setting_model' => App\Models\Setting::class,
+    'setting_model' => Setting::class,
 
     // Translations. A non-default locale stores each text setting under a
     // "<locale>:<key>" row and falls back to the default locale's bare key.
