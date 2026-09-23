@@ -293,6 +293,14 @@ if (document.body.hasAttribute('data-admin')) {
         return wrap;
     };
 
+    /** A computed colour as a hex the picker understands; '' when transparent. */
+    const rgbToHex = (value) => {
+        const parts = String(value).match(/^rgba?\((\d+),\s*(\d+),\s*(\d+)(?:,\s*([\d.]+))?/);
+        if (!parts || (parts[4] !== undefined && Number(parts[4]) === 0)) return '';
+
+        return '#' + [1, 2, 3].map((i) => Number(parts[i]).toString(16).padStart(2, '0')).join('');
+    };
+
     /** The image an element is actually showing right now, theme or override. */
     const currentImageOf = (element) => {
         if (!element) return '';
@@ -341,7 +349,10 @@ if (document.body.hasAttribute('data-admin')) {
             row.className = 'le-row';
             const input = document.createElement('input');
             input.type = 'color';
-            input.value = value || '#ffffff';
+            // With no override stored, show the colour the element is actually
+            // painted, rather than a white swatch that tells the editor nothing.
+            const painted = element ? rgbToHex(getComputedStyle(element)[name === 'textColor' ? 'color' : 'backgroundColor']) : '';
+            input.value = value || painted || '#ffffff';
             input.dataset.styleProp = name;
             input.className = 'le-color';
             const defaultLabel = document.createElement('label');
@@ -816,8 +827,9 @@ if (document.body.hasAttribute('data-admin')) {
      */
     const appendListControls = (element) => {
         const item = element.closest?.('[data-edit-item]');
-        const list = item?.parentElement;
-        if (!item || !list?.dataset?.editList) return;
+        // Either an item was clicked, or the list itself was.
+        const list = item?.parentElement?.dataset?.editList ? item.parentElement : element.closest?.('[data-edit-list]');
+        if (!list?.dataset?.editList) return;
 
         const currentOrder = () =>
             [...list.children].filter((child) => child.dataset.editItem).map((child) => child.dataset.editItem);
@@ -845,24 +857,26 @@ if (document.body.hasAttribute('data-admin')) {
         const add = document.createElement('button');
         add.type = 'button';
         add.className = 'le-chip-btn';
-        add.textContent = '+ Add another';
+        add.textContent = item ? '+ Add another' : '+ Add item';
         add.addEventListener('click', () => {
             const ids = currentOrder();
-            const at = ids.indexOf(item.dataset.editItem);
+            const at = item ? ids.indexOf(item.dataset.editItem) : ids.length - 1;
             ids.splice(at + 1, 0, 'n' + Date.now().toString(36));
             saveOrder(ids, 'Added \u2713');
         });
+        row.append(add);
 
-        const remove = document.createElement('button');
-        remove.type = 'button';
-        remove.className = 'le-btn-danger';
-        remove.textContent = 'Delete this item';
-        remove.addEventListener('click', () => {
-            if (!window.confirm('Delete this item?')) return;
-            saveOrder(currentOrder().filter((id) => id !== item.dataset.editItem), 'Deleted \u2713');
-        });
-
-        row.append(add, remove);
+        if (item) {
+            const remove = document.createElement('button');
+            remove.type = 'button';
+            remove.className = 'le-btn-danger';
+            remove.textContent = 'Delete this item';
+            remove.addEventListener('click', () => {
+                if (!window.confirm('Delete this item?')) return;
+                saveOrder(currentOrder().filter((id) => id !== item.dataset.editItem), 'Deleted \u2713');
+            });
+            row.append(remove);
+        }
         drawerFields.append(heading, row);
     };
 

@@ -663,8 +663,10 @@ class MarkupScanner
             $shared = array_intersect($shared, $set);
         }
 
-        // Bare same-tag links (a nav) also count even without shared classes.
-        return $shared !== [] || $tags[0] === 'a';
+        // Bare same-tag links (a nav) count without shared classes, and so do
+        // list items: a menu is <ul><li>Home</li><li>About</li></ul>, whose
+        // items carry no classes at all but are plainly a list to an editor.
+        return $shared !== [] || $tags[0] === 'a' || $tags[0] === 'li';
     }
 
     protected function firstElementChild(DOMElement $element): ?DOMElement
