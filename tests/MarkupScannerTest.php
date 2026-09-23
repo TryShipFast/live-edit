@@ -444,4 +444,29 @@ class MarkupScannerTest extends TestCase
             $this->assertContains($t, $texts, "Missed: {$t}");
         }
     }
+
+    public function test_a_variant_choice_replaces_the_classes_but_keeps_the_theme_styling(): void
+    {
+        // Several names mean the editor moved the icon to another of the
+        // theme's variants, which needs that variant's classes to render.
+        $tagged = (new MarkupScanner)->apply('<span class="icon fa-gem major"></span>', ['text'], true)['html'];
+        preg_match('/data-edit-icon="setting:(auto:[a-f0-9]+)"/', $tagged, $m);
+
+        $rendered = (new MarkupScanner)->applyOverrides($tagged, [$m[1] => 'icon solid major fa-rocket']);
+
+        $this->assertStringContainsString('class="icon solid major fa-rocket"', $rendered);
+        $this->assertStringContainsString('data-edit-icon-current="fa-rocket"', $rendered);
+    }
+
+    public function test_a_variant_choice_cannot_smuggle_anything_into_the_class(): void
+    {
+        $tagged = (new MarkupScanner)->apply('<span class="icon fa-gem"></span>', ['text'], true)['html'];
+        preg_match('/data-edit-icon="setting:(auto:[a-f0-9]+)"/', $tagged, $m);
+
+        $rendered = (new MarkupScanner)->applyOverrides($tagged, [$m[1] => 'icon fa-x" onload="alert(1)']);
+
+        $this->assertStringNotContainsString('onload=', $rendered);
+        $this->assertStringNotContainsString('alert(1)', $rendered);
+        $this->assertMatchesRegularExpression('/class="[A-Za-z0-9 _-]*"/', $rendered);
+    }
 }

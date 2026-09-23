@@ -324,17 +324,31 @@ class MarkupScanner
             if (! array_key_exists($key, $overrides) || $overrides[$key] === '') {
                 continue;
             }
-            // A class name lands in an attribute, so nothing but a class name
-            // is allowed through.
-            $chosen = preg_replace('/[^A-Za-z0-9_-]/', '', $overrides[$key]);
+            // Class names land in an attribute, so nothing but class names is
+            // allowed through.
+            $chosen = array_values(array_filter(preg_split('/\s+/', (string) preg_replace('/[^A-Za-z0-9_\- ]/', '', $overrides[$key]))));
             $was = $node->getAttribute('data-edit-icon-current');
-            if ($chosen === '' || $was === '') {
+            if ($chosen === [] || $was === '') {
                 continue;
             }
-            $classes = preg_split('/\s+/', trim($node->getAttribute('class'))) ?: [];
-            $classes = array_map(fn (string $class) => $class === $was ? $chosen : $class, $classes);
+
+            if (count($chosen) === 1) {
+                // One name: swap it for the old one and leave the theme's own
+                // classes exactly as they are.
+                $classes = preg_split('/\s+/', trim($node->getAttribute('class'))) ?: [];
+                $classes = array_map(fn (string $class) => $class === $was ? $chosen[0] : $class, $classes);
+            } else {
+                // Several: the editor moved this icon to another of the theme's
+                // variants, which takes different classes, so the list it built
+                // stands in for the whole attribute.
+                $classes = $chosen;
+            }
+
             $node->setAttribute('class', implode(' ', $classes));
-            $node->setAttribute('data-edit-icon-current', $chosen);
+            $name = $this->iconTokenOf($node);
+            if ($name !== null) {
+                $node->setAttribute('data-edit-icon-current', $name);
+            }
         }
 
         foreach ($xpath->query('//*[@data-edit-bg]') as $node) {

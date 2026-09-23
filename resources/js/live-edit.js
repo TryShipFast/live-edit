@@ -600,6 +600,7 @@ const bootLiveEdit = () => {
         };
         const closeDrawer = (force = false) => {
             if (!force && current?.dirty && !window.confirm('Discard unsaved changes?')) return;
+            current?.restore?.();
             clearStylePreview();
             drawer.classList.remove('is-open');
             current = null;
@@ -720,6 +721,9 @@ const bootLiveEdit = () => {
         };
 
         const setEditing = (on) => {
+            // Before anything counts an element as editable, since this decides
+            // which of them are icons at all.
+            if (on) markRealIcons();
             document.body.classList.toggle('editing', on);
             editables().forEach((el) => {
                 if (on) el.setAttribute('tabindex', '0');
@@ -731,7 +735,6 @@ const bootLiveEdit = () => {
             ui.toolbar.classList.toggle('is-editing', on);
             toggleButton.textContent = on ? 'Done editing' : 'Edit site';
             if (on) {
-                markRealIcons();
                 markLiveBackgrounds();
                 // Read the theme's icons now, so the picker opens instantly later.
                 if (document.querySelector('[data-edit-icon]')) void iconCatalogue();
@@ -1095,6 +1098,55 @@ const bootLiveEdit = () => {
          * is measured first and only those that actually put ink down are
          * offered.
          */
+        /** The face an element's ::before actually draws with. */
+        const iconFontOf = (element) => {
+            const before = getComputedStyle(element, '::before');
+
+            return `${before.fontStyle} ${before.fontWeight} 20px ${before.fontFamily}`;
+        };
+
+        /**
+         * Which of an element's classes decide the face it draws with.
+         *
+         * Found by experiment rather than by knowing the theme: each class is
+         * taken off a hidden copy in turn, and the ones that change the face are
+         * the ones that chose it. That is what lets an icon be moved between a
+         * theme's own variants without naming any of them.
+         */
+        const faceClassesOf = (element, nameToken) => {
+            const probe = element.cloneNode(false);
+            probe.removeAttribute('data-edit-icon');
+            Object.assign(probe.style, { position: 'absolute', visibility: 'hidden', pointerEvents: 'none' });
+            (element.parentNode ?? document.body).append(probe);
+
+            const face = iconFontOf(probe);
+            const responsible = [];
+            [...probe.classList].forEach((name) => {
+                if (name === nameToken) return;
+                probe.classList.remove(name);
+                if (iconFontOf(probe) !== face) responsible.push(name);
+                probe.classList.add(name);
+            });
+            probe.remove();
+
+            return responsible;
+        };
+
+        /**
+         * The class list that puts `name` on this element using another
+         * variant's face: the element's own face classes give way to theirs,
+         * and everything the theme used for decoration stays.
+         */
+        const classListUsing = (element, variant, name, was) => {
+            const mine = faceClassesOf(element, was);
+            const theirs = faceClassesOf(variant, variant.dataset.editIconCurrent);
+            const kept = [...element.classList].filter((cls) => cls !== was && !mine.includes(cls));
+            theirs.forEach((cls) => kept.includes(cls) || kept.push(cls));
+            kept.push(name);
+
+            return kept.join(' ');
+        };
+
         const drawableIn = (icons, font) => {
             const context = document.createElement('canvas').getContext('2d');
             context.font = font;
@@ -1121,11 +1173,30 @@ const bootLiveEdit = () => {
             drawerFields.replaceChildren();
             drawerDelete.classList.add('le-hidden');
 
-            const before = getComputedStyle(element, '::before');
-            const font = `${before.fontStyle} ${before.fontWeight} 20px ${before.fontFamily}`;
-            const icons = drawableIn(await iconCatalogue(), font);
+            const font = iconFontOf(element);
+            const catalogue = await iconCatalogue();
             // The drawer may have moved on while the stylesheets were read.
             if (current?.element !== element) return;
+
+            // A theme often pins one face of its icon font to each class it
+            // uses, so the page itself shows what else is reachable: every
+            // distinct face among its icons is offered, and choosing from one
+            // brings that variant's classes along.
+            const faces = new Map([[font, null]]);
+            document.querySelectorAll('[data-edit-icon]').forEach((other) => {
+                const face = iconFontOf(other);
+                if (!faces.has(face)) faces.set(face, other);
+            });
+
+            const icons = [];
+            const seen = new Set();
+            faces.forEach((variant, face) => {
+                drawableIn(catalogue, face).forEach((icon) => {
+                    if (seen.has(icon.name)) return;
+                    seen.add(icon.name);
+                    icons.push({ ...icon, face, variant });
+                });
+            });
 
             if (icons.length === 0) {
                 const hint = document.createElement('div');
@@ -1150,6 +1221,14 @@ const bootLiveEdit = () => {
                 return;
             }
 
+            // What the theme had here, to rebuild from on every pick and to put
+            // back if the panel is closed without saving.
+            const untouched = element.className;
+            current.restore = () => {
+                element.className = untouched;
+                element.dataset.editIconCurrent = was;
+            };
+
             const search = document.createElement('input');
             search.type = 'search';
             search.className = 'le-input';
@@ -1162,19 +1241,25 @@ const bootLiveEdit = () => {
                 const term = filter.trim().toLowerCase().replace(/\s+/g, '-');
                 const shown = term ? icons.filter(({ name }) => name.includes(term)) : icons;
                 grid.replaceChildren();
-                shown.slice(0, 400).forEach(({ name, glyph }) => {
+                shown.slice(0, 400).forEach(({ name, glyph, face, variant }) => {
                     const choice = document.createElement('button');
                     choice.type = 'button';
                     choice.className = 'le-icon-choice';
                     choice.title = name.replace(/^[a-z]+-/, '').replace(/-/g, ' ');
-                    choice.classList.toggle('is-current', name === current.value);
-                    choice.style.font = font;
+                    choice.classList.toggle('is-current', name === was);
+                    choice.style.font = face;
                     choice.textContent = glyph;
                     choice.addEventListener('click', () => {
+                        // Always build from the theme's own classes, so picking
+                        // twice does not stack one variant on top of another.
+                        element.className = untouched;
+                        element.dataset.editIconCurrent = was;
                         // Show the change on the page straight away.
-                        element.classList.replace(element.dataset.editIconCurrent, name);
+                        const value = variant ? classListUsing(element, variant, name, was) : name;
+                        if (variant) element.className = value;
+                        else element.classList.replace(was, name);
                         element.dataset.editIconCurrent = name;
-                        current.value = name;
+                        current.value = value;
                         current.dirty = true;
                         grid.querySelectorAll('.le-icon-choice').forEach((other) => other.classList.remove('is-current'));
                         choice.classList.add('is-current');
