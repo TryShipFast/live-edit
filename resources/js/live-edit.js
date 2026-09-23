@@ -687,7 +687,14 @@ const bootLiveEdit = () => {
                     formData.append('target', current.target);
                     const file = drawerFields.querySelector('input[type=file]').files[0];
                     const url = drawerFields.querySelector('input[type=url]').value.trim();
-                    const attrInputs = [...drawerFields.querySelectorAll('[data-img-attr]')];
+                    // The size the theme designed this image to occupy: the
+                // replacement is fitted to it so the layout still holds.
+                const box = current.element?.getBoundingClientRect?.();
+                if (box && box.width >= 1 && box.height >= 1) {
+                    formData.append('fitWidth', String(Math.round(box.width)));
+                    formData.append('fitHeight', String(Math.round(box.height)));
+                }
+                const attrInputs = [...drawerFields.querySelectorAll('[data-img-attr]')];
                     if (file) formData.append('file', file);
                     else if (url) formData.append('url', url.startsWith('http') ? url : `https://${url}`);
                     attrInputs.forEach((input) => formData.append(input.dataset.imgAttr, input.value));
@@ -896,8 +903,44 @@ const bootLiveEdit = () => {
             drawerFields.append(heading, row);
         };
 
+        /**
+         * Run an element's own click with editing suspended for that moment.
+         * A "Menu" toggle opens a panel; while every click edits, whatever it
+         * reveals can never be reached. This lets the control do its job.
+         */
+        let passingThrough = false;
+        const passThroughClick = (element) => {
+            passingThrough = true;
+            element.click();
+            window.setTimeout(() => {
+                passingThrough = false;
+            }, 0);
+        };
+
+        /** Controls that reveal something rather than navigate somewhere. */
+        const interactiveTarget = (element) =>
+            element.closest?.('a[href^="#"], [aria-controls], [aria-expanded], [data-toggle], [role="button"]') ?? null;
         /** Editing swallows the click, so offer the trip explicitly. */
         const appendVisitLink = (element) => {
+            // A control that reveals something gets a way to run itself, so the
+            // editor can reach what it opens.
+            const control = interactiveTarget(element);
+            if (control) {
+                const row = document.createElement('div');
+                row.className = 'le-row';
+                const open = document.createElement('button');
+                open.type = 'button';
+                open.className = 'le-chip-btn';
+                open.textContent = 'Open this menu';
+                open.title = 'Runs the control so you can edit what it reveals';
+                open.addEventListener('click', () => {
+                    closeDrawer(true);
+                    passThroughClick(control);
+                });
+                row.append(open);
+                drawerFields.append(row);
+            }
+
             const anchor = element.closest?.('a[href]');
             const href = anchor?.getAttribute('href');
             if (!href || href === '#' || href.startsWith('javascript:')) return;
@@ -933,7 +976,7 @@ const bootLiveEdit = () => {
             // rendered as a CSS background rather than an <img>. It skips the alt/
             // title fields (a background isn't a content image).
             const isBackground = element.dataset.editKind === 'background';
-            current = { kind: 'image', target: element.dataset.editImg ?? element.dataset.editBg };
+            current = { kind: 'image', target: element.dataset.editImg ?? element.dataset.editBg, element };
             drawerTitle.textContent = element.dataset.editLabel ?? (isBackground ? 'Background image' : 'Image');
             drawerFields.replaceChildren();
             drawerDelete.classList.add('le-hidden');
@@ -1201,6 +1244,8 @@ const bootLiveEdit = () => {
             'click',
             (event) => {
                 if (!document.body.classList.contains('editing')) return;
+                // A control was asked to run itself; leave this click alone.
+                if (passingThrough) return;
                 // Clicks inside the overlay retarget to its shadow host.
                 if (event.target === ui.root || ui.root.contains(event.target)) return;
                 if (event.target.closest('[data-live-create]')) return;

@@ -11,6 +11,7 @@ use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use ShipFast\LiveEdit\Models\EditRevision;
 use ShipFast\LiveEdit\Models\ElementStyle;
+use ShipFast\LiveEdit\Support\ImageFitter;
 
 /**
  * ShipFast live-edit CMS: generic, config-driven endpoints for editing a
@@ -186,6 +187,8 @@ class LiveEditController extends Controller
             // No SVG: it can embed scripts and would be served from our origin.
             'file' => ['nullable', 'image', 'mimes:jpeg,jpg,png,gif,webp,avif', 'max:6144'],
             'url' => ['nullable', 'url:http,https', 'max:2000'],
+            'fitWidth' => ['nullable', 'integer', 'min:1', 'max:4000'],
+            'fitHeight' => ['nullable', 'integer', 'min:1', 'max:4000'],
             'alt' => ['nullable', 'string', 'max:300'],
             'imgTitle' => ['nullable', 'string', 'max:300'],
             'remove' => ['nullable', 'boolean'],
@@ -215,7 +218,7 @@ class LiveEditController extends Controller
                 $this->writeSetting($key.'Href', '');
             } elseif ($hasImage) {
                 $value = $request->hasFile('file')
-                    ? $request->file('file')->store(config('live-edit.directory'), config('live-edit.disk'))
+                    ? $this->storeImage($request)
                     : $validated['url'];
                 $this->writeSetting($key, $value);
                 $this->writeSetting($key.'Credit', '');
@@ -259,16 +262,39 @@ class LiveEditController extends Controller
     {
         $request->validate([
             'file' => ['required', 'image', 'max:8192'],
+            'fitWidth' => ['nullable', 'integer', 'min:1', 'max:4000'],
+            'fitHeight' => ['nullable', 'integer', 'min:1', 'max:4000'],
         ]);
 
+        $path = $this->storeImage($request);
+
+        return response()->json([
+            'url' => Storage::disk(config('live-edit.disk'))->url($path),
+        ]);
+    }
+
+    /**
+     * Store an uploaded image, sized to the box it is replacing.
+     *
+     * A client rarely has a picture the same shape as the one in the template.
+     * Dropped in untouched it stretches the section it sits in and the design
+     * they bought is spoiled, so the file is fitted to the original's box.
+     */
+    protected function storeImage(Request $request): string
+    {
         $path = $request->file('file')->store(
             config('live-edit.directory'),
             config('live-edit.disk')
         );
 
-        return response()->json([
-            'url' => Storage::disk(config('live-edit.disk'))->url($path),
-        ]);
+        $width = (int) $request->input('fitWidth', 0);
+        $height = (int) $request->input('fitHeight', 0);
+
+        if ($width > 0 && $height > 0) {
+            ImageFitter::fit(Storage::disk(config('live-edit.disk'))->path($path), $width, $height);
+        }
+
+        return $path;
     }
 
     public function updateStyle(Request $request): JsonResponse

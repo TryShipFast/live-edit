@@ -105,6 +105,43 @@ class LiveEditControllerTest extends TestCase
         $this->assertDatabaseHas('settings', ['key' => 'auto:be3a6ddd0725', 'value' => 'https://x.test/a.jpg']);
     }
 
+    public function test_it_fits_an_uploaded_image_to_the_box_it_replaces(): void
+    {
+        Storage::fake('public');
+
+        // A tall portrait dropped into a wide banner would wreck the layout.
+        $response = $this->post('/live-edit/upload', [
+            'file' => UploadedFile::fake()->image('portrait.jpg', 400, 1200),
+            'fitWidth' => 800,
+            'fitHeight' => 300,
+        ]);
+
+        $response->assertOk();
+
+        $stored = Storage::disk('public')->path(
+            str_replace(Storage::disk('public')->url(''), '', $response->json('url'))
+        );
+        [$width, $height] = getimagesize($stored);
+
+        $this->assertSame(800, $width);
+        $this->assertSame(300, $height);
+    }
+
+    public function test_an_upload_without_a_box_keeps_its_own_size(): void
+    {
+        Storage::fake('public');
+
+        $response = $this->post('/live-edit/upload', [
+            'file' => UploadedFile::fake()->image('as-is.jpg', 640, 480),
+        ]);
+
+        $stored = Storage::disk('public')->path(
+            str_replace(Storage::disk('public')->url(''), '', $response->json('url'))
+        );
+
+        $this->assertSame([640, 480], array_slice(getimagesize($stored), 0, 2));
+    }
+
     public function test_it_stores_an_uploaded_image_and_returns_its_url(): void
     {
         Storage::fake('public');
