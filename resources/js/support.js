@@ -125,3 +125,27 @@ export const ownTextOf = (element) =>
             .map((node) => node.textContent)
             .join(' ')
         : element.textContent;
+
+/**
+ * One ordered list of icons from the faces a theme uses.
+ *
+ * Groups are given in preference order, the element's own face first, so a name
+ * it can already draw needs no change of classes. The result is ordered by
+ * name, not by face: collected face by face it came out in blocks — every
+ * regular icon, then every solid one, then the brands — so a screenful was a
+ * wall of one style and the last face never appeared at all.
+ */
+export const orderedIcons = (groups) => {
+    const seen = new Set();
+    const merged = [];
+
+    for (const group of groups) {
+        for (const icon of group.icons) {
+            if (seen.has(icon.name)) continue;
+            seen.add(icon.name);
+            merged.push({ ...icon, face: group.face, variant: group.variant });
+        }
+    }
+
+    return merged.sort((a, b) => a.name.localeCompare(b.name));
+};

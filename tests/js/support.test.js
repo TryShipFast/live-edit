@@ -4,6 +4,7 @@ import {
     displayedValue,
     iconNamesIn,
     isJsonResponse,
+    orderedIcons,
     parseEditKey,
     requestInit,
 } from '../../resources/js/support.js';
@@ -169,5 +170,36 @@ describe('displayedValue', () => {
 
     it('is empty only when there is genuinely nothing there', () => {
         expect(displayedValue({ editValue: '', ownText: '', fullText: '' })).toBe('');
+    });
+});
+
+describe('orderedIcons', () => {
+    const solid = { face: 'solid', variant: {}, icons: [{ name: 'fa-zoo' }, { name: 'fa-apple' }] };
+    const regular = { face: 'regular', variant: null, icons: [{ name: 'fa-apple' }, { name: 'fa-book' }] };
+
+    it('mixes the faces instead of listing them in blocks', () => {
+        // Face by face, a screenful was a wall of one style and the last face
+        // never appeared at all.
+        expect(orderedIcons([regular, solid]).map((i) => i.name)).toEqual(['fa-apple', 'fa-book', 'fa-zoo']);
+    });
+
+    it('keeps a name from the face offered first', () => {
+        // The element's own face comes first, so a name it can already draw
+        // needs no change of classes.
+        const [apple] = orderedIcons([regular, solid]).filter((i) => i.name === 'fa-apple');
+
+        expect(apple.face).toBe('regular');
+        expect(apple.variant).toBeNull();
+    });
+
+    it('offers each name once', () => {
+        const names = orderedIcons([regular, solid]).map((i) => i.name);
+
+        expect(names).toHaveLength(new Set(names).size);
+    });
+
+    it('copes with a theme that uses one face', () => {
+        expect(orderedIcons([solid]).map((i) => i.name)).toEqual(['fa-apple', 'fa-zoo']);
+        expect(orderedIcons([])).toEqual([]);
     });
 });

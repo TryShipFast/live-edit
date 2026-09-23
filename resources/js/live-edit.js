@@ -1,5 +1,5 @@
 import { createChrome } from './chrome.js';
-import { classListWith, displayedValue, iconNamesIn, isJsonResponse, ownTextOf, parseEditKey, requestInit } from './support.js';
+import { classListWith, displayedValue, iconNamesIn, isJsonResponse, orderedIcons, ownTextOf, parseEditKey, requestInit } from './support.js';
 
 /**
  * Start only once the host page has finished loading.
@@ -1191,15 +1191,9 @@ const bootLiveEdit = () => {
                 if (!faces.has(face)) faces.set(face, other);
             });
 
-            const icons = [];
-            const seen = new Set();
-            faces.forEach((variant, face) => {
-                drawableIn(catalogue, face).forEach((icon) => {
-                    if (seen.has(icon.name)) return;
-                    seen.add(icon.name);
-                    icons.push({ ...icon, face, variant });
-                });
-            });
+            const icons = orderedIcons(
+                [...faces].map(([face, variant]) => ({ face, variant, icons: drawableIn(catalogue, face) }))
+            );
 
             if (icons.length === 0) {
                 const hint = document.createElement('div');
@@ -1240,11 +1234,15 @@ const bootLiveEdit = () => {
             const grid = document.createElement('div');
             grid.className = 'le-icon-grid';
 
+            const more = document.createElement('div');
+            more.className = 'le-hint';
+
+            const LIMIT = 400;
             const draw = (filter) => {
                 const term = filter.trim().toLowerCase().replace(/\s+/g, '-');
                 const shown = term ? icons.filter(({ name }) => name.includes(term)) : icons;
                 grid.replaceChildren();
-                shown.slice(0, 400).forEach(({ name, glyph, face, variant }) => {
+                shown.slice(0, LIMIT).forEach(({ name, glyph, face, variant }) => {
                     const choice = document.createElement('button');
                     choice.type = 'button';
                     choice.className = 'le-icon-choice';
@@ -1275,11 +1273,16 @@ const bootLiveEdit = () => {
                     empty.textContent = 'No icon matches that name.';
                     grid.append(empty);
                 }
+                // Say so rather than stopping silently, which reads as "that is
+                // all there is".
+                more.textContent = shown.length > LIMIT
+                    ? `Showing ${LIMIT} of ${shown.length}. Type to narrow it down.`
+                    : '';
             };
 
             search.addEventListener('input', () => draw(search.value));
             draw('');
-            drawerFields.append(search, grid);
+            drawerFields.append(search, grid, more);
             setTrail(element);
             openDrawer();
         };
