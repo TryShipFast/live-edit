@@ -791,7 +791,14 @@ const bootLiveEdit = () => {
                     await request('/live-edit/setting', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ key: current.key, value: drawerFields.querySelector('textarea').value, locale: window.liveEditLocale }),
+                        // Words come from a textarea, an icon from the picker's
+                        // hidden field. Reading only the textarea threw on
+                        // every icon setting.
+                        body: JSON.stringify({
+                            key: current.key,
+                            value: drawerFields.querySelector('textarea, input[name=icon]').value,
+                            locale: window.liveEditLocale,
+                        }),
                     });
                 } else if (current.kind === 'record') {
                     const fields = {};
@@ -914,7 +921,15 @@ const bootLiveEdit = () => {
                     fullText: element.textContent,
                 });
                 const text = richSetting ? raw.trim() : raw.replace(/\s+/g, ' ').trim();
-                drawerFields.append(fieldInput('value', 'Text', text, 6, richSetting));
+                // A setting can say its value is an icon name rather than
+                // words. The picker already exists for a record's icon field;
+                // this lets a plain setting reach it, so an icon that is part
+                // of the content rather than the furniture can be chosen the
+                // same way.
+                const asIcon = element.dataset.editAs === 'icon';
+                drawerFields.append(asIcon
+                    ? fieldInput('icon', 'Icon', element.dataset.editValue ?? '', 1, false)
+                    : fieldInput('value', 'Text', text, 6, richSetting));
             } else {
                 const [type, id] = rest;
                 current = { kind: 'record', type, id: Number(id) };
