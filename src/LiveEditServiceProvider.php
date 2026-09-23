@@ -3,6 +3,7 @@
 namespace ShipFast\LiveEdit;
 
 use Illuminate\Support\ServiceProvider;
+use ShipFast\LiveEdit\Console\Commands\ImportTheme;
 use ShipFast\LiveEdit\Console\Commands\PruneOrphanedUploads;
 use ShipFast\LiveEdit\Console\Commands\ScanForEditables;
 
@@ -20,7 +21,7 @@ class LiveEditServiceProvider extends ServiceProvider
         $this->loadViewsFrom(__DIR__.'/../resources/views', 'live-edit');
 
         if ($this->app->runningInConsole()) {
-            $this->commands([PruneOrphanedUploads::class, ScanForEditables::class]);
+            $this->commands([ImportTheme::class, PruneOrphanedUploads::class, ScanForEditables::class]);
 
             $this->publishes([
                 __DIR__.'/../config/live-edit.php' => config_path('live-edit.php'),
