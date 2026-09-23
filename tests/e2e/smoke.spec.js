@@ -22,7 +22,7 @@ const LOGIN_PATH = process.env.LIVE_EDIT_LOGIN ?? '/dev-login';
  */
 const openEditableText = async (page) => {
     const candidates = await page.evaluate(() =>
-        [...document.querySelectorAll('[data-edit^="setting:auto:"]')]
+        [...document.querySelectorAll('[data-edit^="setting:"]')]
             .filter((element) => {
                 if (element.closest('[data-style-edit], [data-edit-img], [data-edit-bg]')) return false;
                 if (element.querySelector('[data-edit-img], [data-edit-bg]')) return false;
@@ -81,11 +81,23 @@ test.describe('a site running the editor', () => {
         });
     });
 
+    /**
+     * Whether this site is a scanned third-party theme rather than a bespoke
+     * application. Auto keys say so: they are what the scanner writes when
+     * nobody hand-authored the markup.
+     */
+    const isBoughtTheme = async (page) =>
+        (await page.locator('[data-edit^="setting:auto:"]').count()) > 0;
+
     test('does not load the host application stylesheet over its theme', async ({ page }) => {
         // Tailwind's .collapse is visibility:collapse, and it landed on
         // Bootstrap's .collapse: the entire navigation disappeared. A theme
         // brings its own stylesheet; the editor styles itself at runtime.
+        //
+        // A bespoke application is the opposite case: its own stylesheet IS the
+        // design, and it is supposed to be there.
         await page.goto('/');
+        test.skip(!(await isBoughtTheme(page)), 'bespoke app: its stylesheet is its design');
 
         const hostSheets = await page.evaluate(() =>
             [...document.styleSheets].map((sheet) => sheet.href).filter((href) => /\/build\/assets\/.*\.css/.test(href ?? ''))
@@ -98,6 +110,7 @@ test.describe('a site running the editor', () => {
         // A sheet left on the vendor's server cannot be read, and the icon
         // picker takes its list from the theme's own CSS.
         await page.goto('/');
+        test.skip(!(await isBoughtTheme(page)), 'bespoke app: it serves its own stylesheets');
 
         const unreadable = await page.evaluate(() =>
             [...document.styleSheets]
@@ -219,7 +232,7 @@ test.describe('a site running the editor', () => {
         await startEditing(page);
 
         const empties = await page.evaluate(() =>
-            [...document.querySelectorAll('[data-edit^="setting:auto:"]')]
+            [...document.querySelectorAll('[data-edit^="setting:"]')]
                 .filter((element) => {
                     if (element.closest('[data-style-edit], [data-edit-img], [data-edit-bg]')) return false;
                     if (element.querySelector('[data-edit-img], [data-edit-bg]')) return false;
@@ -230,15 +243,9 @@ test.describe('a site running the editor', () => {
                     const box = element.getBoundingClientRect();
                     if (element.textContent.trim() === '' || box.width < 2 || box.height < 2) return false;
 
-                    const own = [...element.childNodes]
-                        .filter((node) => node.nodeType === Node.TEXT_NODE)
-                        .map((node) => node.nodeValue)
-                        .join('')
-                        .trim();
-
-                    // The panel shows the recorded value, or the element's own
-                    // words. If both are empty the client is handed a blank.
-                    return (element.dataset.editValue ?? '') === '' && own === '';
+                    // Ask the editor what it would show, rather than keeping a
+                    // copy of its rule here and drifting from it.
+                    return window.liveEditDisplayedValue(element).trim() === '';
                 })
                 .map((element) => ({
                     key: element.dataset.edit,

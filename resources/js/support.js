@@ -99,3 +99,29 @@ export const classListWith = (classes, name, replacing, ownFaceClasses, otherFac
 
     return kept.join(' ');
 };
+
+/**
+ * What the panel shows for a piece of editable text.
+ *
+ * Three sources, in order. A recorded value wins: a counter's words are a
+ * placeholder ("00") that the theme's script replaces, so the markup cannot be
+ * asked. Otherwise the element's own words, which is what keeps replacing them
+ * from swallowing a nested link or button. And if it has none of its own — a
+ * button written as "<a data-edit><span>Request a Quote</span></a>" — the words
+ * it wraps, because there is nothing else in there to swallow.
+ */
+export const displayedValue = ({ editValue, ownText, fullText }) => {
+    if ((editValue ?? '') !== '') return editValue;
+    if ((ownText ?? '').trim() !== '') return ownText;
+
+    return fullText ?? '';
+};
+
+/** The words an element contributes itself, ignoring its children. */
+export const ownTextOf = (element) =>
+    element.children.length
+        ? [...element.childNodes]
+            .filter((node) => node.nodeType === 3)
+            .map((node) => node.textContent)
+            .join(' ')
+        : element.textContent;

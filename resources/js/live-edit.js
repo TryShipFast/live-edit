@@ -1,5 +1,5 @@
 import { createChrome } from './chrome.js';
-import { classListWith, iconNamesIn, isJsonResponse, parseEditKey, requestInit } from './support.js';
+import { classListWith, displayedValue, iconNamesIn, isJsonResponse, ownTextOf, parseEditKey, requestInit } from './support.js';
 
 /**
  * Start only once the host page has finished loading.
@@ -898,12 +898,11 @@ const bootLiveEdit = () => {
                 const richSetting = (window.liveEditRich?.settings ?? []).includes(rest[0]);
                 // Theme markup is full of tabs and newlines; collapse them so the
                 // field shows the sentence the editor actually sees on the page.
-                // Show only the element's own words when it wraps a child element,
-            // so replacing them cannot swallow a nested link or button.
-            const ownText = element.children.length
-                ? [...element.childNodes].filter((n) => n.nodeType === 3).map((n) => n.textContent).join(' ')
-                : element.textContent;
-            const raw = element.dataset.editValue ?? ownText ?? '';
+                const raw = displayedValue({
+                    editValue: element.dataset.editValue,
+                    ownText: ownTextOf(element),
+                    fullText: element.textContent,
+                });
                 const text = richSetting ? raw.trim() : raw.replace(/\s+/g, ' ').trim();
                 drawerFields.append(fieldInput('value', 'Text', text, 6, richSetting));
             } else {
@@ -1641,6 +1640,14 @@ const bootLiveEdit = () => {
  * event firing at all. Waiting for it outright left the editor absent on a page
  * that was otherwise usable, so this yields, then starts regardless.
  */
+// Exposed for the browser checks, which would otherwise keep their own copy of
+// the rule above and drift from it the next time it changes.
+window.liveEditDisplayedValue = (element) => displayedValue({
+    editValue: element.dataset.editValue,
+    ownText: ownTextOf(element),
+    fullText: element.textContent,
+});
+
 const startLiveEdit = (() => {
     let started = false;
 

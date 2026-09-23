@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
     classListWith,
+    displayedValue,
     iconNamesIn,
     isJsonResponse,
     parseEditKey,
@@ -146,5 +147,27 @@ describe('classListWith', () => {
         const result = classListWith(['icon', 'fa-gem'], 'fa-star', 'fa-gem', ['icon'], ['icon']);
 
         expect(result.split(' ').filter((cls) => cls === 'icon')).toHaveLength(1);
+    });
+});
+
+describe('displayedValue', () => {
+    it('prefers a recorded value over the words in the markup', () => {
+        // A counter's words are a placeholder its script replaces.
+        expect(displayedValue({ editValue: '3670', ownText: '00', fullText: '00' })).toBe('3670');
+    });
+
+    it('shows the element own words when it has them', () => {
+        // Not the children's: replacing them must not swallow a nested link.
+        expect(displayedValue({ editValue: undefined, ownText: 'Read ', fullText: 'Read more' })).toBe('Read ');
+    });
+
+    it('falls back to the words it wraps when it has none of its own', () => {
+        // "<a data-edit><span>Request a Quote</span></a>" opened a blank box.
+        expect(displayedValue({ editValue: undefined, ownText: '  ', fullText: 'Request a Quote' }))
+            .toBe('Request a Quote');
+    });
+
+    it('is empty only when there is genuinely nothing there', () => {
+        expect(displayedValue({ editValue: '', ownText: '', fullText: '' })).toBe('');
     });
 });
