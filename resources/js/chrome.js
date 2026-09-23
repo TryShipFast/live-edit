@@ -163,6 +163,66 @@ button, input, select, textarea { font: inherit; color: inherit; margin: 0; }
 .le-upload:hover { border-color: var(--le-accent); background: #fff; }
 .le-upload input[type=file] { cursor: pointer; font-size: 13px; font-weight: 400; letter-spacing: normal; text-transform: none; color: var(--le-body); }
 
+/* ---- form controls ---- */
+input[type=checkbox], input[type=radio] {
+  appearance: none; -webkit-appearance: none; width: 18px; height: 18px; flex: none;
+  cursor: pointer; border: 1.5px solid var(--le-field); background: #fff;
+  display: inline-grid; place-content: center;
+  transition: border-color .15s ease, background .15s ease;
+}
+input[type=checkbox] { border-radius: 6px; }
+input[type=radio] { border-radius: 999px; }
+input[type=checkbox]:hover, input[type=radio]:hover { border-color: var(--le-ink); }
+input[type=checkbox]::after {
+  content: ''; width: 10px; height: 10px; transform: scale(0); transition: transform .12s ease-in-out;
+  box-shadow: inset 1em 1em #fff;
+  clip-path: polygon(14% 44%, 0 65%, 50% 100%, 100% 16%, 80% 0%, 43% 62%);
+}
+input[type=radio]::after {
+  content: ''; width: 8px; height: 8px; border-radius: 999px; transform: scale(0);
+  transition: transform .12s ease-in-out; box-shadow: inset 1em 1em #fff;
+}
+input[type=checkbox]:checked, input[type=radio]:checked { background: var(--le-ink); border-color: var(--le-ink); }
+input[type=checkbox]:checked::after, input[type=radio]:checked::after { transform: scale(1); }
+input:focus-visible, select:focus-visible, button:focus-visible { outline: 2px solid var(--le-ink); outline-offset: 2px; }
+
+select.le-input {
+  appearance: none; -webkit-appearance: none; cursor: pointer; padding-right: 38px;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%237c8899' stroke-width='2.5' stroke-linecap='round'><path d='M6 9l6 6 6-6'/></svg>");
+  background-repeat: no-repeat; background-position: right 13px center; background-size: 13px;
+}
+
+/* radio pills, for short option sets */
+.le-choices { display: flex; flex-wrap: wrap; gap: 8px; }
+.le-choice {
+  display: inline-flex; align-items: center; gap: 8px; cursor: pointer;
+  border: 1px solid var(--le-field); border-radius: 999px; padding: 7px 14px;
+  font-size: 13px; font-weight: 500; letter-spacing: normal; text-transform: none;
+  color: var(--le-body); background: #fff; transition: border-color .15s ease, background .15s ease, color .15s ease;
+}
+.le-choice:hover { border-color: var(--le-ink); }
+.le-choice.is-selected { border-color: var(--le-ink); background: var(--le-ink); color: #fff; }
+.le-choice.is-selected input[type=radio] { background: #fff; border-color: #fff; }
+.le-choice.is-selected input[type=radio]::after { box-shadow: inset 1em 1em var(--le-ink); transform: scale(1); }
+
+/* upload widget */
+.le-upload input[type=file] { display: none; }
+.le-upload.is-dragover { border-color: var(--le-ink); background: #fff; }
+.le-upload-inner { display: flex; align-items: center; gap: 12px; }
+.le-upload-icon {
+  width: 36px; height: 36px; flex: none; border-radius: 10px; background: #fff;
+  border: 1px solid var(--le-line); display: grid; place-content: center; font-size: 15px; color: var(--le-body);
+}
+.le-upload-text { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.le-upload-title { font-size: 12px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--le-body); }
+.le-upload-hint { font-size: 11px; font-weight: 400; letter-spacing: normal; text-transform: none; color: var(--le-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.le-upload-btn {
+  margin-left: auto; flex: none; border: 1px solid var(--le-field); background: #fff;
+  border-radius: 999px; padding: 7px 14px; font-size: 12px; font-weight: 600; color: var(--le-ink);
+  transition: background .15s ease, color .15s ease, border-color .15s ease;
+}
+.le-upload:hover .le-upload-btn { background: var(--le-ink); color: #fff; border-color: var(--le-ink); }
+
 /* ---- floating pencil ---- */
 .le-handle {
   position: fixed; z-index: 2147483001; display: none; width: 26px; height: 26px;
@@ -171,7 +231,11 @@ button, input, select, textarea { font: inherit; color: inherit; margin: 0; }
   font-size: 12px; line-height: 1; cursor: pointer; box-shadow: 0 6px 16px -4px rgba(11,18,32,.6);
 }
 .le-handle.is-visible { display: flex; }
-.le-handle-bg { width: 28px; height: 28px; font-size: 13px; background: #0b1220; }
+.le-handle-bg {
+  width: auto; height: auto; padding: 7px 13px; border-radius: 999px;
+  font-size: 12px; font-weight: 600; letter-spacing: .01em; background: #0b1220; color: #fff;
+  box-shadow: 0 8px 20px -6px rgba(11,18,32,.7);
+}
 
 /* ---- toast ---- */
 .le-toast {
@@ -342,7 +406,7 @@ export function createChrome() {
     bgHandle.type = 'button';
     bgHandle.setAttribute('aria-label', 'Replace this background image');
     bgHandle.title = 'Replace background image';
-    bgHandle.innerHTML = '&#9635;';
+    bgHandle.textContent = 'Replace background';
 
     shadow.append(toolbar, drawer, linkHandle, bgHandle);
 

@@ -98,6 +98,35 @@ if (document.body.hasAttribute('data-admin')) {
             wrap.append(hidden, grid);
             return wrap;
         }
+        if (Array.isArray(options) && options.length <= 6) {
+            const hidden = document.createElement('input');
+            hidden.type = 'hidden';
+            hidden.name = name;
+            hidden.value = value ?? options[0];
+
+            const choices = document.createElement('div');
+            choices.className = 'le-choices';
+            options.forEach((choice) => {
+                const pill = document.createElement('label');
+                pill.className = 'le-choice' + (choice === hidden.value ? ' is-selected' : '');
+                const radio = document.createElement('input');
+                radio.type = 'radio';
+                radio.name = 'le-choice-' + name;
+                radio.checked = choice === hidden.value;
+                radio.addEventListener('change', () => {
+                    hidden.value = choice;
+                    choices.querySelectorAll('.le-choice').forEach((other) => other.classList.remove('is-selected'));
+                    pill.classList.add('is-selected');
+                    hidden.dispatchEvent(new Event('input', { bubbles: true }));
+                });
+                pill.append(radio, document.createTextNode(choice));
+                choices.append(pill);
+            });
+
+            wrap.append(hidden, choices);
+            return wrap;
+        }
+
         let input;
         if (Array.isArray(options)) {
             input = document.createElement('select');
@@ -161,6 +190,108 @@ if (document.body.hasAttribute('data-admin')) {
         return wrap;
     };
 
+    /** What this element is, in words a non-technical editor recognises. */
+    const describeElement = (element) => {
+        const tag = element.tagName;
+        if (tag === 'IMG') return 'Image';
+        if (tag === 'BUTTON') return 'Button';
+        if (tag === 'A') return /\b(btn|button)\b/i.test(String(element.className)) ? 'Button' : 'Link';
+        if (/^H[1-6]$/.test(tag)) return 'Heading';
+        if (tag === 'P') return 'Paragraph';
+        if (tag === 'LI') return 'List item';
+        if (tag === 'UL' || tag === 'OL') return 'List';
+        if (tag === 'NAV') return 'Menu';
+        if (tag === 'HEADER') return 'Header';
+        if (tag === 'FOOTER') return 'Footer';
+        if (tag === 'FORM') return 'Form';
+        if (element.hasAttribute('data-edit-item')) return 'Card';
+        if (element.hasAttribute('data-edit')) return 'Text';
+        if (element.hasAttribute('data-has-bg') || element.hasAttribute('data-edit-bg')) return 'Background';
+        if (tag === 'SECTION' || tag === 'MAIN' || tag === 'ARTICLE') return 'Section';
+        const rect = element.getBoundingClientRect();
+        return rect.width > window.innerWidth * 0.6 && rect.height > 180 ? 'Section' : 'Group';
+    };
+
+    /**
+     * A heading does not need padding and corner radius; a section does not
+     * need a font size. Show only what suits the thing that was clicked.
+     */
+    const stylePropsFor = (element, declared) => {
+        const tag = element.tagName;
+        let allowed;
+        if (tag === 'IMG') {
+            allowed = ['radius', 'hidden'];
+        } else if (tag === 'A' || tag === 'BUTTON') {
+            allowed = ['background', 'textColor', 'fontSize', 'radius', 'hidden'];
+        } else if (/^(H[1-6]|P|SPAN|LI|BLOCKQUOTE|FIGCAPTION|DT|DD|TD|TH|CAPTION|CITE|Q|LABEL|STRONG|EM)$/.test(tag)) {
+            allowed = ['textColor', 'fontSize', 'hidden'];
+        } else {
+            allowed = ['background', 'backgroundImage', 'paddingY', 'paddingX', 'radius', 'hidden'];
+        }
+
+        return declared.filter((name) => allowed.includes(name.trim()));
+    };
+
+    /** A styled file picker: click or drop, with the chosen name echoed back. */
+    const uploadWidget = ({ hint = 'PNG, JPG or WEBP, or drag one here', onFile } = {}) => {
+        const wrap = document.createElement('label');
+        wrap.className = 'le-upload';
+
+        const inner = document.createElement('div');
+        inner.className = 'le-upload-inner';
+        const icon = document.createElement('span');
+        icon.className = 'le-upload-icon';
+        icon.textContent = '\u2191';
+        const text = document.createElement('span');
+        text.className = 'le-upload-text';
+        const title = document.createElement('span');
+        title.className = 'le-upload-title';
+        title.textContent = 'Upload from your computer';
+        const hintEl = document.createElement('span');
+        hintEl.className = 'le-upload-hint';
+        hintEl.textContent = hint;
+        text.append(title, hintEl);
+        const button = document.createElement('span');
+        button.className = 'le-upload-btn';
+        button.textContent = 'Choose file';
+        inner.append(icon, text, button);
+
+        const input = document.createElement('input');
+        input.type = 'file';
+        input.accept = 'image/*';
+
+        const accept = (file) => {
+            if (!file) return;
+            hintEl.textContent = file.name;
+            onFile?.(file);
+        };
+        input.addEventListener('change', () => accept(input.files[0]));
+
+        ['dragenter', 'dragover'].forEach((type) =>
+            wrap.addEventListener(type, (event) => {
+                event.preventDefault();
+                wrap.classList.add('is-dragover');
+            })
+        );
+        ['dragleave', 'drop'].forEach((type) =>
+            wrap.addEventListener(type, (event) => {
+                event.preventDefault();
+                wrap.classList.remove('is-dragover');
+            })
+        );
+        wrap.addEventListener('drop', (event) => {
+            const file = event.dataTransfer?.files?.[0];
+            if (!file) return;
+            const transfer = new DataTransfer();
+            transfer.items.add(file);
+            input.files = transfer.files; // keep save() reading one place
+            accept(file);
+        });
+
+        wrap.append(inner, input);
+        return wrap;
+    };
+
     /** The image an element is actually showing right now, theme or override. */
     const currentImageOf = (element) => {
         if (!element) return '';
@@ -171,12 +302,22 @@ if (document.body.hasAttribute('data-admin')) {
         return match && !match[2].startsWith('data:') ? match[2] : '';
     };
 
+    const STYLE_LABELS = {
+        background: 'Background colour',
+        backgroundImage: 'Background image',
+        textColor: 'Text colour',
+        fontSize: 'Text size',
+        paddingY: 'Space above and below',
+        paddingX: 'Space left and right',
+        radius: 'Corner rounding',
+    };
+
     const styleField = (name, type, value, element) => {
         const wrap = document.createElement('label');
         wrap.className = 'le-field';
-        const title = name.replace(/([A-Z])/g, ' $1').toLowerCase();
-        const label = title.charAt(0).toUpperCase() + title.slice(1);
-        wrap.append(type === 'px' ? `${label} (px)` : label);
+        const fallback = name.replace(/([A-Z])/g, ' $1').toLowerCase();
+        const label = STYLE_LABELS[name] ?? fallback.charAt(0).toUpperCase() + fallback.slice(1);
+        wrap.append(label);
 
         if (type === 'toggle') {
             const row = document.createElement('div');
@@ -187,9 +328,10 @@ if (document.body.hasAttribute('data-admin')) {
             input.dataset.styleProp = name;
             const hint = document.createElement('span');
             hint.className = 'le-hint';
-            hint.textContent = 'Hidden from visitors; shown dimmed while editing.';
+            hint.textContent = 'Hidden from visitors. You still see it, dimmed, while editing.';
             row.append(input, hint);
-            wrap.replaceChildren('Hide this section', row);
+            const thing = element ? describeElement(element).toLowerCase() : 'section';
+            wrap.replaceChildren(`Hide this ${thing}`, row);
             wrap.className = 'le-field le-divided';
             return wrap;
         }
@@ -247,31 +389,24 @@ if (document.body.hasAttribute('data-admin')) {
                 describe(next || inherited, !next && Boolean(inherited));
             });
 
-            const upload = document.createElement('label');
-            upload.className = 'le-upload';
-            upload.append('Upload from your computer');
-            const file = document.createElement('input');
-            file.type = 'file';
-            file.accept = 'image/*';
-            file.addEventListener('change', async () => {
-                const chosen = file.files[0];
-                if (!chosen) return;
-                showThumb(URL.createObjectURL(chosen)); // instant feedback
-                const body = new FormData();
-                body.append('file', chosen);
-                try {
-                    const response = await request('/live-edit/upload', { method: 'POST', body });
-                    const data = await response.json();
-                    input.value = data.url;
-                    showThumb(data.url);
-                    describe(data.url, false);
-                    // Repaint the live preview with the stored URL.
-                    input.dispatchEvent(new Event('input', { bubbles: true }));
-                } catch (error) {
-                    window.alert(error.message);
-                }
+            const upload = uploadWidget({
+                onFile: async (chosen) => {
+                    showThumb(URL.createObjectURL(chosen)); // instant feedback
+                    const body = new FormData();
+                    body.append('file', chosen);
+                    try {
+                        const response = await request('/live-edit/upload', { method: 'POST', body });
+                        const data = await response.json();
+                        input.value = data.url;
+                        showThumb(data.url);
+                        describe(data.url, false);
+                        // Repaint the live preview with the stored URL.
+                        input.dispatchEvent(new Event('input', { bubbles: true }));
+                    } catch (error) {
+                        window.alert(error.message);
+                    }
+                },
             });
-            upload.append(file);
 
             wrap.append(input, upload, thumb, caption);
         } else {
@@ -295,7 +430,7 @@ if (document.body.hasAttribute('data-admin')) {
         heading.className = 'le-section-heading';
         heading.textContent = 'Style';
         drawerFields.append(heading);
-        propNames.forEach((name) => {
+        (element ? stylePropsFor(element, propNames) : propNames).forEach((name) => {
             const type = (window.liveEditStyleProps ?? {})[name];
             if (type) drawerFields.append(styleField(name, type, values[name], element));
         });
@@ -378,7 +513,8 @@ if (document.body.hasAttribute('data-admin')) {
     const labelForNode = (node) => {
         if (node.dataset.editLabel) return node.dataset.editLabel;
         const chip = node.querySelector(':scope > [data-style-edit]');
-        return chip?.dataset.editLabel ?? 'Section';
+
+        return chip?.dataset.editLabel ?? describeElement(node);
     };
 
     const openNode = (node) => {
@@ -405,13 +541,28 @@ if (document.body.hasAttribute('data-admin')) {
             }
             node = node.parentElement;
         }
+        // "Section > Section > Section" is noise: keep only the nearest few
+        // ancestors, and never repeat the same name twice in a row.
+        const trail = [];
+        items.forEach((node) => {
+            const label = labelForNode(node);
+            if (trail.length && trail[trail.length - 1].label === label) {
+                trail[trail.length - 1].node = node;
+
+                return;
+            }
+            trail.push({ node, label });
+        });
+        const shown = trail.slice(-3);
+
         drawerTrail.replaceChildren();
-        drawerTrail.classList.toggle('is-visible', items.length > 0);
-        items.forEach((ancestor, index) => {
+        drawerTrail.classList.toggle('is-visible', shown.length > 0);
+        shown.forEach((entry, index) => {
+            const ancestor = entry.node;
             if (index > 0) drawerTrail.append('\u203A');
             const crumb = document.createElement('button');
             crumb.type = 'button';
-            crumb.textContent = labelForNode(ancestor);
+            crumb.textContent = entry.label;
             crumb.className = 'le-crumb';
             crumb.addEventListener('click', () => switchToNode(ancestor));
             drawerTrail.append(crumb);
@@ -592,9 +743,13 @@ if (document.body.hasAttribute('data-admin')) {
 
         if (kind === 'setting') {
             current = { kind, key: rest[0] };
-            drawerTitle.textContent = element.dataset.editLabel ?? 'Text';
+            drawerTitle.textContent = element.dataset.editLabel ?? describeElement(element);
             const richSetting = (window.liveEditRich?.settings ?? []).includes(rest[0]);
-            drawerFields.append(fieldInput('value', 'Text', element.dataset.editValue ?? element.textContent.trim(), 6, richSetting));
+            // Theme markup is full of tabs and newlines; collapse them so the
+            // field shows the sentence the editor actually sees on the page.
+            const raw = element.dataset.editValue ?? element.textContent ?? '';
+            const text = richSetting ? raw.trim() : raw.replace(/\s+/g, ' ').trim();
+            drawerFields.append(fieldInput('value', 'Text', text, 6, richSetting));
         } else {
             const [type, id] = rest;
             current = { kind: 'record', type, id: Number(id) };
@@ -709,13 +864,7 @@ if (document.body.hasAttribute('data-admin')) {
         current = { kind: 'style' };
         // A chip carries data-style-edit; a styleable element carries data-style.
         const styleKey = element.dataset.styleEdit ?? element.dataset.style;
-        const roles = {
-            SECTION: 'Section', HEADER: 'Header', FOOTER: 'Footer', ARTICLE: 'Article',
-            ASIDE: 'Aside', MAIN: 'Main', NAV: 'Navigation', FIGURE: 'Figure',
-            UL: 'List', OL: 'List', LI: 'List item', DIV: 'Block', A: 'Link',
-            H1: 'Heading', H2: 'Heading', H3: 'Heading', H4: 'Heading', P: 'Text', SPAN: 'Text',
-        };
-        drawerTitle.textContent = element.dataset.editLabel ?? roles[element.tagName] ?? 'Block';
+        drawerTitle.textContent = element.dataset.editLabel ?? describeElement(element);
         drawerFields.replaceChildren();
         drawerDelete.classList.add('le-hidden');
         addStyleFields(styleKey, (element.dataset.styleProps ?? '').split(','), element);
@@ -752,20 +901,9 @@ if (document.body.hasAttribute('data-admin')) {
             previewImg.src = src;
         };
 
-        const fileWrap = document.createElement('label');
-        fileWrap.className = 'le-upload';
-        const fileWrapTitle = document.createElement('span');
-        fileWrapTitle.textContent = 'Upload from your computer';
-        fileWrap.append(fileWrapTitle);
-        const fileInput = document.createElement('input');
-        fileInput.type = 'file';
-        fileInput.accept = 'image/*';
-        fileInput.className = '';
-        fileInput.addEventListener('change', () => {
-            const file = fileInput.files[0];
-            if (file) showPreview(URL.createObjectURL(file));
+        const fileWrap = uploadWidget({
+            onFile: (file) => showPreview(URL.createObjectURL(file)),
         });
-        fileWrap.append(fileInput);
 
         const urlWrap = document.createElement('label');
         urlWrap.className = 'le-field';

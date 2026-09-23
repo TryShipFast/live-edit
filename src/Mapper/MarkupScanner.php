@@ -122,22 +122,24 @@ class MarkupScanner
 
         $key = $this->autoMode ? 'auto:'.$this->autoKey($node) : $candidate['key'];
 
+        // In auto mode the key is derived from the element's own words, which
+        // makes a poor label ("Magna primis lobortis"); the runtime names the
+        // element by its role instead. Hand-authored sites keep their labels.
+        $label = $this->autoMode ? [] : ['data-edit-label' => $this->humanise($candidate['key'])];
+
         match ($candidate['kind']) {
             'text' => $this->setAttrs($node, [
                 'data-edit' => 'setting:'.$key,
-                'data-edit-label' => $this->humanise($candidate['key']),
-            ]),
+            ] + $label),
             'image' => $this->setAttrs($node, [
                 'data-edit-img' => 'setting:'.$key,
                 'data-edit-preview' => $node->getAttribute('src'),
-                'data-edit-label' => $this->humanise($candidate['key']),
-            ]),
+            ] + $label),
             'link' => $this->setAttrs($node, $this->autoMode
                 // Auto: a link's TEXT and its href are both editable.
                 ? [
                     'data-edit' => 'setting:'.$key,
                     'data-edit-href' => 'auto:'.$this->autoKey($node, '#href'),
-                    'data-edit-label' => $this->humanise($candidate['key']),
                 ]
                 : [
                     'data-edit-href' => $key,
