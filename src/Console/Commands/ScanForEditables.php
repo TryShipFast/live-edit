@@ -6,6 +6,8 @@ use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Process;
 use ShipFast\LiveEdit\Mapper\AiRefiner;
 use ShipFast\LiveEdit\Mapper\MarkupScanner;
+use ShipFast\LiveEdit\Models\ElementStyle;
+use ShipFast\LiveEdit\Support\KeyMigrator;
 
 /**
  * Points the auto-mapper at a rendered HTML file (or a URL's saved output)
@@ -22,6 +24,7 @@ class ScanForEditables extends Command
                             {--apply : Write data-edit tags into the file (text/image/link)}
                             {--in-place : With --apply, overwrite the file instead of writing <name>.tagged.html}
                             {--auto : With --apply, write stable auto-keys (setting:auto:<hash>) instead of semantic keys — for the generic store, no per-element config}
+                            {--migrate : Carry saved content over to the new keys when re-tagging}
                             {--force : Allow --apply on a Blade/PHP template (unsafe — it will corrupt the source)}';
 
     protected $description = 'Scan an HTML file for editable elements — report a tagging plan or apply it';
@@ -245,13 +248,21 @@ class ScanForEditables extends Command
             }
         }
 
+        // Read what the previous tagging produced before it is overwritten:
+        // it is the only record of which key used to belong to which element.
+        $previous = ($this->option('migrate') && is_file($this->targetFor($path)))
+            ? (string) file_get_contents($this->targetFor($path))
+            : null;
+
         $result = $scanner->apply($html, ['text', 'image', 'link'], (bool) $this->option('auto'), $labeller);
 
-        $target = $this->option('in-place')
-            ? $path
-            : (preg_replace('/(\.[^.]+)$/', '.tagged$1', $path) ?: $path.'.tagged');
+        $target = $this->targetFor($path);
 
         file_put_contents($target, $result['html']);
+
+        if ($previous !== null) {
+            $this->migrate($previous, $result['html']);
+        }
 
         $this->components->info("Tagged {$result['applied']} elements → ".basename($target));
 
@@ -264,6 +275,54 @@ class ScanForEditables extends Command
         }
 
         return self::SUCCESS;
+    }
+
+    protected function targetFor(string $path): string
+    {
+        return $this->option('in-place')
+            ? $path
+            : (preg_replace('/(\.[^.]+)$/', '.tagged$1', $path) ?: $path.'.tagged');
+    }
+
+    /**
+     * Move stored content from the keys the previous tagging used to the ones
+     * this tagging produced, so a client's work survives a re-tag.
+     */
+    protected function migrate(string $previousHtml, string $currentHtml): void
+    {
+        $map = KeyMigrator::between($previousHtml, $currentHtml);
+
+        if ($map === []) {
+            $this->components->info('Keys are unchanged; nothing to migrate.');
+
+            return;
+        }
+
+        $settings = config('live-edit.setting_model');
+        $moved = 0;
+
+        // Two passes with a temporary prefix: a key being moved onto may itself
+        // still be in use by another row until that row has moved.
+        foreach ([true, false] as $parking) {
+            foreach ($map as $old => $new) {
+                [$from, $to] = $parking ? [$old, '~migrating~'.$new] : ['~migrating~'.$new, $new];
+
+                $moved += $settings::query()->where('key', $from)->update(['key' => $to]);
+
+                // Image settings carry siblings (Alt, Credit, Href) and each
+                // locale keeps its own copy, so those travel too.
+                foreach (['Alt', 'Credit', 'Href', 'Title'] as $suffix) {
+                    $settings::query()->where('key', $from.$suffix)->update(['key' => $to.$suffix]);
+                }
+                $settings::query()->where('key', 'like', '%:'.$from)->get()->each(function ($row) use ($from, $to) {
+                    $row->update(['key' => str_replace(':'.$from, ':'.$to, $row->key)]);
+                });
+
+                ElementStyle::query()->where('key', $from)->update(['key' => $to]);
+            }
+        }
+
+        $this->components->info("Carried {$moved} saved value(s) onto the new keys.");
     }
 
     /**

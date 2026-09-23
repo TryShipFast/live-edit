@@ -3,6 +3,7 @@
 namespace ShipFast\LiveEdit\Tests;
 
 use ShipFast\LiveEdit\Console\Commands\ScanForEditables;
+use ShipFast\LiveEdit\Tests\Fixtures\Setting;
 
 class ScanCommandTest extends TestCase
 {
@@ -58,6 +59,51 @@ class ScanCommandTest extends TestCase
 
         $tagged = file_get_contents($this->dir.'/page.tagged.html');
         $this->assertStringContainsString('data-edit="setting:', $tagged);
+    }
+
+    public function test_migrate_carries_saved_content_onto_the_new_keys(): void
+    {
+        $path = $this->dir.'/page.html';
+        file_put_contents($path, '<div id="hero"><h1>Welcome</h1></div>');
+        $this->artisan('live-edit:scan', ['path' => $path, '--apply' => true, '--auto' => true])->assertOk();
+
+        $keyOf = function (): string {
+            preg_match('/<h1 data-edit="setting:(auto:[a-f0-9]+)"/', (string) file_get_contents($this->dir.'/page.tagged.html'), $m);
+
+            return $m[1];
+        };
+        $oldKey = $keyOf();
+
+        // The client spends an afternoon writing their site.
+        Setting::create(['key' => $oldKey, 'value' => 'Words the client wrote']);
+
+        // Later a developer edits the template, moving the heading's key.
+        file_put_contents($path, '<div class="promo">Offer</div><div id="hero-band"><h1>Welcome</h1></div>');
+        $this->artisan('live-edit:scan', [
+            'path' => $path, '--apply' => true, '--auto' => true, '--migrate' => true,
+        ])->assertOk();
+
+        $newKey = $keyOf();
+
+        $this->assertNotSame($oldKey, $newKey, 'this edit should have moved the key');
+        $this->assertDatabaseHas('settings', ['key' => $newKey, 'value' => 'Words the client wrote']);
+        $this->assertDatabaseMissing('settings', ['key' => $oldKey]);
+    }
+
+    public function test_without_migrate_the_saved_content_is_left_behind(): void
+    {
+        $path = $this->dir.'/page.html';
+        file_put_contents($path, '<div id="hero"><h1>Welcome</h1></div>');
+        $this->artisan('live-edit:scan', ['path' => $path, '--apply' => true, '--auto' => true])->assertOk();
+        preg_match('/<h1 data-edit="setting:(auto:[a-f0-9]+)"/', (string) file_get_contents($this->dir.'/page.tagged.html'), $m);
+
+        Setting::create(['key' => $m[1], 'value' => 'Words the client wrote']);
+
+        file_put_contents($path, '<div class="promo">Offer</div><div id="hero-band"><h1>Welcome</h1></div>');
+        $this->artisan('live-edit:scan', ['path' => $path, '--apply' => true, '--auto' => true])->assertOk();
+
+        // The honest default: nothing moves unless migration is asked for.
+        $this->assertDatabaseHas('settings', ['key' => $m[1]]);
     }
 
     public function test_it_requires_a_path_or_url(): void
