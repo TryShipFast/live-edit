@@ -2,6 +2,7 @@
 
 use Illuminate\Support\Facades\Route;
 use ShipFast\LiveEdit\Http\Controllers\LiveEditController;
+use ShipFast\LiveEdit\Http\Controllers\ThemeController;
 
 Route::middleware(config('live-edit.middleware', ['web', 'auth', 'can:live-edit']))
     ->prefix('live-edit')
@@ -17,3 +18,18 @@ Route::middleware(config('live-edit.middleware', ['web', 'auth', 'can:live-edit'
         Route::post('/style', [LiveEditController::class, 'updateStyle'])->name('style');
         Route::post('/undo', [LiveEditController::class, 'undo'])->name('undo');
     });
+
+/*
+ * The theme's own pages. A bought template links between them with plain
+ * relative names ("about.html"), so serving them at exactly those paths means
+ * its navigation works untouched — no link rewriting, and the same markup
+ * still opens straight off disk.
+ */
+if (config('live-edit.theme')) {
+    Route::middleware(config('live-edit.view_middleware', ['web']))->group(function () {
+        Route::get('/', [ThemeController::class, 'show'])->name('live-edit.page.index');
+        Route::get('/{page}.html', [ThemeController::class, 'show'])
+            ->where('page', '[A-Za-z0-9_-]+')
+            ->name('live-edit.page');
+    });
+}

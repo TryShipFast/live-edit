@@ -18,7 +18,9 @@ class ImportTheme extends Command
 {
     protected $signature = 'live-edit:import-theme {url : URL of the theme page to import}
                             {--name= : Folder name under resources/themes (defaults to the host/dir name)}
-                            {--tag : Auto-tag the imported theme for editing}';
+                            {--tag : Auto-tag the imported theme for editing}
+                            {--pages=40 : Most pages to follow from the theme\'s own links}
+                            {--single : Import only the page given, not the rest of the theme}';
 
     protected $description = 'Download an HTML theme, point its assets at the origin, and prepare it for live editing';
 
@@ -39,39 +41,66 @@ class ImportTheme extends Command
     public function handle(): int
     {
         $url = $this->argument('url');
-
-        try {
-            $response = Http::timeout(30)->get($url);
-        } catch (\Throwable $e) {
-            $this->components->error('Could not fetch the theme: '.$e->getMessage());
-
-            return self::FAILURE;
-        }
-
-        if (! $response->successful()) {
-            $this->components->error("Could not fetch the theme: HTTP {$response->status()}");
-
-            return self::FAILURE;
-        }
-
         $base = $this->baseFor($url);
-        $html = $this->absolutiseAssets($response->body(), $base);
-
         $name = $this->option('name') ?: $this->nameFor($url);
-        $html = $this->mirrorStylesheets($html, $name);
+
         $dir = resource_path('themes/'.$name);
         if (! is_dir($dir)) {
             mkdir($dir, 0755, true);
         }
-        $path = $dir.'/index.html';
-        file_put_contents($path, $html);
 
-        $this->components->info("Imported {$url} → resources/themes/{$name}/index.html");
+        // A bought template is a set of pages that link to each other, so the
+        // theme's own navigation says which ones belong to it. Importing only
+        // the page named would leave every link in that navigation broken.
+        $limit = $this->option('single') ? 1 : max(1, (int) $this->option('pages'));
+        $queue = [$url];
+        $seen = [];
+        $imported = [];
+
+        while ($queue !== [] && count($imported) < $limit) {
+            $next = array_shift($queue);
+            if (isset($seen[$next])) {
+                continue;
+            }
+            $seen[$next] = true;
+
+            $body = $this->fetchPage($next);
+            if ($body === null) {
+                continue;
+            }
+
+            $html = $this->mirrorStylesheets($this->absolutiseAssets($body, $base), $name);
+            $slug = $imported === [] ? 'index' : $this->slugFor($next);
+            file_put_contents($dir.'/'.$slug.'.html', $html);
+            $imported[$slug] = $next;
+
+            if (! $this->option('single')) {
+                foreach ($this->pageLinksIn($body, $base) as $link) {
+                    if (! isset($seen[$link])) {
+                        $queue[] = $link;
+                    }
+                }
+            }
+        }
+
+        if ($imported === []) {
+            $this->components->error('Could not fetch the theme.');
+
+            return self::FAILURE;
+        }
+
+        $path = $dir.'/index.html';
+
+        $this->components->info('Imported '.count($imported).' page(s) → resources/themes/'.$name.'/');
+        $this->line('  '.implode(', ', array_map(fn (string $slug) => $slug.'.html', array_keys($imported))));
         $this->components->info('Assets load from '.$base.'; internal page links left as-is.');
         $this->components->info('Stylesheets are copied into public/theme-assets/'.$name.'.');
+        if (count($imported) >= $limit && $queue !== []) {
+            $this->components->warn('Stopped at '.$limit.' pages; raise --pages to take the rest.');
+        }
 
         if ($this->option('tag')) {
-            $this->call('live-edit:scan', ['path' => $path, '--apply' => true, '--auto' => true]);
+            $this->call('live-edit:scan', ['path' => $dir, '--apply' => true, '--auto' => true]);
         } else {
             $this->line("  Next: php artisan live-edit:scan {$path} --apply --auto");
         }
@@ -221,6 +250,61 @@ class ImportTheme extends Command
         $name = preg_replace('/[^A-Za-z0-9._-]/', '', $name) ?: 'style';
 
         return str_ends_with(strtolower($name), '.css') ? $name : $name.'.css';
+    }
+
+    /** Fetch one page, or null if it cannot be had. */
+    protected function fetchPage(string $url): ?string
+    {
+        try {
+            $response = Http::timeout(30)->get($url);
+        } catch (\Throwable $e) {
+            $this->components->warn('Skipped '.$url.': '.$e->getMessage());
+
+            return null;
+        }
+
+        if (! $response->successful()) {
+            $this->components->warn('Skipped '.$url.': HTTP '.$response->status());
+
+            return null;
+        }
+
+        return $response->body();
+    }
+
+    /**
+     * The theme's own pages linked from this one.
+     *
+     * Only siblings of the page imported: a theme keeps its pages together, and
+     * anything outside that directory belongs to the vendor's site rather than
+     * to the template.
+     */
+    protected function pageLinksIn(string $html, string $base): array
+    {
+        preg_match_all('/<a\b[^>]*\bhref=(["\'])([^"\']+)\1/i', $html, $matches);
+
+        $links = [];
+        foreach ($matches[2] as $href) {
+            $href = trim($href);
+            if ($href === '' || str_starts_with($href, '#') || preg_match('~^[a-z]+:~i', $href)) {
+                continue;
+            }
+            $path = strtok($href, '?#');
+            if (! preg_match('/^[A-Za-z0-9._-]+\.html?$/i', (string) $path)) {
+                continue;
+            }
+            $links[$base.$path] = true;
+        }
+
+        return array_keys($links);
+    }
+
+    /** A filename for an imported page, taken from its own address. */
+    protected function slugFor(string $url): string
+    {
+        $name = pathinfo((string) strtok($url, '?#'), PATHINFO_FILENAME);
+
+        return preg_replace('/[^A-Za-z0-9_-]/', '', $name) ?: 'page';
     }
 
     /** The directory URL a relative path resolves against. */

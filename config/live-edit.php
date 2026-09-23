@@ -14,6 +14,14 @@ return [
     // The Eloquent model backing key/value settings (must have key + value).
     'setting_model' => Setting::class,
 
+    /*
+     * The theme folder under resources/themes to serve, and the view holding
+     * the editor's own markup. Set 'theme' to null to serve nothing and route
+     * pages yourself.
+     */
+    'theme' => env('LIVE_EDIT_THEME'),
+    'chrome_view' => 'live-edit-chrome',
+
     // Translations. A non-default locale stores each text setting under a
     // "<locale>:<key>" row and falls back to the default locale's bare key.
     // No schema change — it's a key namespace over the settings table, so each

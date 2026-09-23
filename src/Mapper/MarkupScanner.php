@@ -62,8 +62,10 @@ class MarkupScanner
      * @param  array<int, string>  $kinds
      * @return array{html: string, applied: int, skipped: array<string, int>}
      */
-    public function apply(string $html, array $kinds = ['text', 'image', 'link'], bool $auto = false, ?callable $labeller = null): array
+    public function apply(string $html, array $kinds = ['text', 'image', 'link'], bool $auto = false, ?callable $labeller = null, string $page = ''): array
     {
+        $this->page = $page;
+
         $this->autoMode = $auto;
         $this->run($html);
 
@@ -396,8 +398,29 @@ class MarkupScanner
      * wrong element. Inside a list item we key relative to the item's stable
      * id instead, which survives insertion and removal.
      */
+    /**
+     * Whether this element's content belongs to one page or to all of them.
+     *
+     * A theme repeats its navigation and footer on every page, and a client who
+     * renames a menu entry means it renamed everywhere, not on the page they
+     * happened to be looking at. Everything else is that page's own: two pages
+     * built from the same layout would otherwise share a key and overwrite each
+     * other's words.
+     *
+     * The OUTERMOST sectioning ancestor decides it, so a <header class="major">
+     * heading inside a section stays the page's own.
+     */
+    protected function isShared(DOMElement $node): bool
+    {
+        $band = $this->bandFor($node);
+
+        return $band !== null && in_array(strtolower($band->tagName), ['header', 'footer', 'nav'], true);
+    }
+
     protected function keyPath(DOMElement $node): string
     {
+        $scope = ($this->page === '' || $this->isShared($node)) ? '' : 'page:'.$this->page.'/';
+
         // Inside a list, key relative to the item's own id. The id is only
         // unique within its list ("i0" is the first item of every list on the
         // page), so the list's own key has to be part of the path: without it
@@ -407,7 +430,7 @@ class MarkupScanner
             if ($el->hasAttribute('data-edit-item')) {
                 $list = $el->parentNode instanceof DOMElement ? $el->parentNode->getAttribute('data-edit-list') : '';
 
-                return 'list:'.$list.'/item:'.$el->getAttribute('data-edit-item').'/'.$this->structuralPath($node, $el);
+                return $scope.'list:'.$list.'/item:'.$el->getAttribute('data-edit-item').'/'.$this->structuralPath($node, $el);
             }
         }
 
@@ -418,11 +441,11 @@ class MarkupScanner
         for ($el = $node; $el instanceof DOMElement; $el = $el->parentNode) {
             $id = $el->getAttribute('id');
             if ($id !== '') {
-                return 'id:'.$id.'/'.$this->structuralPath($node, $el);
+                return $scope.'id:'.$id.'/'.$this->structuralPath($node, $el);
             }
         }
 
-        return $this->structuralPath($node);
+        return $scope.$this->structuralPath($node);
     }
 
     /**
@@ -432,6 +455,9 @@ class MarkupScanner
      * splits a single part of the page into several. <main> is excluded because
      * it wraps the whole document.
      */
+    /** The page being tagged, so its content does not collide with another's. */
+    protected string $page = '';
+
     protected function bandFor(DOMElement $node): ?DOMElement
     {
         $tags = ['section', 'header', 'footer', 'nav', 'article', 'aside'];

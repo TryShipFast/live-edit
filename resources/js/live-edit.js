@@ -155,6 +155,19 @@ const bootLiveEdit = () => {
             input.name = name;
             input.className = 'le-input';
 
+            if (input.tagName === 'TEXTAREA') {
+                // Words, not a form field: give them room and let the box grow
+                // with what is being written, so nobody edits a paragraph
+                // through a three-line slot.
+                input.classList.add('le-prose');
+                const grow = () => {
+                    input.style.height = 'auto';
+                    input.style.height = Math.min(input.scrollHeight + 2, 420) + 'px';
+                };
+                input.addEventListener('input', grow);
+                requestAnimationFrame(grow);
+            }
+
             if (rich && input.tagName === 'TEXTAREA') {
                 const bar = document.createElement('div');
                 bar.className = 'le-tools';
@@ -748,8 +761,11 @@ const bootLiveEdit = () => {
 
         const request = async (url, options) => {
             const response = await fetch(url, {
-                headers: { 'X-CSRF-TOKEN': csrf, Accept: 'application/json', ...(options.headers ?? {}) },
                 ...options,
+                // After the spread, or the caller's own headers replace these
+                // wholesale and the request goes out with no CSRF token and no
+                // Accept, which Laravel answers with a redirect to a page.
+                headers: { 'X-CSRF-TOKEN': csrf, Accept: 'application/json', ...(options.headers ?? {}) },
             });
             if (response.status === 419 || response.status === 401) {
                 window.alert('Your session expired. The page will reload — sign in and try again.');
@@ -760,6 +776,13 @@ const bootLiveEdit = () => {
                 const data = await response.json().catch(() => ({}));
                 throw new Error(data.message ?? 'Could not save. Try again.');
             }
+            // A redirect answered with a page still arrives as 200. Treating
+            // that as success is worse than failing: the editor says "Saved"
+            // and the client's words are gone.
+            if (!(response.headers.get('content-type') ?? '').includes('json')) {
+                throw new Error('That did not save. Reload the page and try again.');
+            }
+
             return response;
         };
 
@@ -887,7 +910,10 @@ const bootLiveEdit = () => {
             drawerDelete.classList.add('le-hidden');
 
             if (kind === 'setting') {
-                current = { kind, key: rest[0] };
+                // An auto key is "setting:auto:<hash>", so everything after the
+                // kind is the key. Taking one segment threw the hash away and
+                // saved every edit against a key called "auto".
+                current = { kind, key: rest.join(':') };
                 drawerTitle.textContent = element.dataset.editLabel ?? describeElement(element);
                 const richSetting = (window.liveEditRich?.settings ?? []).includes(rest[0]);
                 // Theme markup is full of tabs and newlines; collapse them so the

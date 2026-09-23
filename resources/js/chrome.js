@@ -126,6 +126,16 @@ button, input, select, textarea { font: inherit; color: inherit; margin: 0; }
   color: var(--le-ink); outline: none; resize: vertical; transition: border-color .15s ease, box-shadow .15s ease;
 }
 .le-input::placeholder { color: #aab4c2; }
+/* The text box holds the client's own words, so it reads like a page rather
+   than a form control: a longer measure, room to breathe, and a surface that
+   lifts to white as they type. */
+.le-prose {
+  font-size: 15px; line-height: 1.65; padding: 14px 16px; min-height: 76px;
+  background: var(--le-soft); border-radius: 14px; resize: none; overflow: hidden;
+  transition: border-color .15s ease, box-shadow .15s ease, background .15s ease;
+}
+.le-prose:hover { background: #fff; }
+.le-prose:focus { background: #fff; }
 .le-input:focus { border-color: var(--le-accent); box-shadow: 0 0 0 4px var(--le-accent-soft); }
 .le-icon-grid {
     display: grid;

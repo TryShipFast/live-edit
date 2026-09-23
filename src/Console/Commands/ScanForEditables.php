@@ -46,6 +46,13 @@ class ScanForEditables extends Command
             return $this->scanUrl($scanner, $refiner, $url);
         }
 
+        // A theme is a folder of pages, so pointing at the folder tags all of
+        // them: a client who has to be told which file to name has already
+        // lost.
+        if (is_dir($path)) {
+            return $this->scanTheme($scanner, $refiner, $path);
+        }
+
         if (! is_file($path)) {
             $this->error("File not found: {$path}");
 
@@ -254,7 +261,11 @@ class ScanForEditables extends Command
             ? (string) file_get_contents($this->targetFor($path))
             : null;
 
-        $result = $scanner->apply($html, ['text', 'image', 'link'], (bool) $this->option('auto'), $labeller);
+        // The page's own name scopes its keys, so two pages built from the
+        // same layout do not overwrite each other. index is the site's baseline
+        // and stays unscoped.
+        $page = pathinfo($path, PATHINFO_FILENAME);
+        $result = $scanner->apply($html, ['text', 'image', 'link'], (bool) $this->option('auto'), $labeller, $page === 'index' ? '' : $page);
 
         $target = $this->targetFor($path);
 
@@ -273,6 +284,36 @@ class ScanForEditables extends Command
             }
             $this->components->warn('Left for you to wire by hand (need a backing model): '.implode(', ', $lines).'.');
         }
+
+        return self::SUCCESS;
+    }
+
+    /** Tag every page of a theme, each scoped to its own name. */
+    protected function scanTheme(MarkupScanner $scanner, AiRefiner $refiner, string $dir): int
+    {
+        $pages = array_values(array_filter(
+            glob(rtrim($dir, '/').'/*.html') ?: [],
+            fn (string $file) => ! str_ends_with($file, '.tagged.html')
+        ));
+
+        if ($pages === []) {
+            $this->error("No pages found in {$dir}");
+
+            return self::FAILURE;
+        }
+
+        // index first, so its regions name the ones the other pages share.
+        usort($pages, fn (string $a, string $b) => (basename($b) === 'index.html') <=> (basename($a) === 'index.html'));
+
+        foreach ($pages as $page) {
+            $this->components->info('Tagging '.basename($page));
+            $status = $this->apply($scanner, $refiner, $page, (string) file_get_contents($page));
+            if ($status !== self::SUCCESS) {
+                return $status;
+            }
+        }
+
+        $this->components->info('Tagged '.count($pages).' page(s).');
 
         return self::SUCCESS;
     }
