@@ -57,7 +57,7 @@ class MarkupScannerTest extends TestCase
         $this->assertMatchesRegularExpression('/<h1[^>]*data-style="s[a-f0-9]{12}"/', $html);
         // No chips — clicking the element in edit mode opens the editor.
         $this->assertStringNotContainsString('data-le-chip', $html);
-        $this->assertStringContainsString('data-style-props="background,textColor,fontSize,paddingY,paddingX,radius,hidden"', $html);
+        $this->assertStringContainsString('data-style-props="background,backgroundImage,textColor,fontSize,paddingY,paddingX,radius,hidden"', $html);
     }
 
     public function test_auto_apply_makes_a_links_text_and_href_editable(): void

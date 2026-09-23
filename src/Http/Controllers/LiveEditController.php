@@ -249,7 +249,7 @@ class LiveEditController extends Controller
         $validated = $request->validate([
             'key' => ['required', 'string', 'max:120', 'regex:/^[A-Za-z0-9._-]+$/'],
             'props' => ['required', 'array'],
-            'props.*' => ['nullable', 'string', 'max:32'],
+            'props.*' => ['nullable', 'string', 'max:2000'],
         ]);
 
         $allowed = config('live-edit.style_props');
@@ -264,6 +264,9 @@ class LiveEditController extends Controller
                 'color' => (bool) preg_match('/^#[0-9A-Fa-f]{3,8}$/', $value),
                 'px' => ctype_digit($value) && (int) $value <= 400,
                 'toggle' => $value === '1',
+                // An image URL rendered into CSS url(): http(s) or a site-root
+                // path only, and no characters that could break out of url().
+                'url' => (bool) preg_match('#^(https?://|/)[^\s\'"()\\\\]+$#', $value),
                 default => false,
             };
 

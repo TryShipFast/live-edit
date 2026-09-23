@@ -270,7 +270,7 @@ class MarkupScanner
     }
 
     /** Style props every element exposes to the editor. */
-    protected const STYLE_PROPS = 'background,textColor,fontSize,paddingY,paddingX,radius,hidden';
+    protected const STYLE_PROPS = 'background,backgroundImage,textColor,fontSize,paddingY,paddingX,radius,hidden';
 
     /**
      * Auto mode: make EVERY element styleable. Each gets a stable `data-style`

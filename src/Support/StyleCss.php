@@ -32,6 +32,10 @@ class StyleCss
                 }
 
                 $rules .= match ($prop) {
+                    // Wins over a theme's own stylesheet rule, which is the only
+                    // way to restyle a background set by a CSS class.
+                    'backgroundImage' => "background-image:url('{$value}') !important;"
+                        .'background-size:cover !important;background-position:center !important;',
                     'background' => "background:{$value} !important;",
                     'textColor' => "color:{$value} !important;",
                     'fontSize' => "font-size:{$value}px !important;",

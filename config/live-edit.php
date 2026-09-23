@@ -62,6 +62,7 @@ return [
     // Types: 'color' (hex picker), 'px' (0-400), 'toggle' (hide).
     'style_props' => [
         'background' => 'color',
+        'backgroundImage' => 'url',
         'textColor' => 'color',
         'paddingY' => 'px',
         'paddingX' => 'px',

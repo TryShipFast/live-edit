@@ -213,6 +213,22 @@ if (document.body.hasAttribute('data-admin')) {
             defaultLabel.append(checkbox, 'Use default');
             row.append(input, defaultLabel);
             wrap.append(row);
+        } else if (type === 'url') {
+            const input = document.createElement('input');
+            input.type = 'text';
+            input.value = value ?? '';
+            input.placeholder = 'https://… (leave blank for the theme default)';
+            input.dataset.styleProp = name;
+            input.className =
+                'w-full rounded-[10px] border border-field bg-white px-3.5 py-3 text-sm font-normal text-navy outline-none focus:border-brand';
+            wrap.append(input);
+            if (value) {
+                const preview = document.createElement('img');
+                preview.src = value;
+                preview.alt = '';
+                preview.className = 'mt-2 h-24 w-full rounded-lg object-cover';
+                wrap.append(preview);
+            }
         } else {
             const input = document.createElement('input');
             input.type = 'number';
@@ -254,6 +270,7 @@ if (document.body.hasAttribute('data-admin')) {
             rules +=
                 {
                     hidden: 'opacity:.45 !important;',
+                    backgroundImage: `background-image:url('${value}') !important;background-size:cover !important;background-position:center !important;`,
                     background: `background:${value} !important;`,
                     textColor: `color:${value} !important;`,
                     fontSize: `font-size:${value}px !important;`,
@@ -273,7 +290,7 @@ if (document.body.hasAttribute('data-admin')) {
         const props = collectStyleProps();
         const key = current.styleKey;
         let css = styleCssFor(key, props);
-        const reverts = { background: 'background', textColor: 'color', fontSize: 'font-size', radius: 'border-radius' };
+        const reverts = { background: 'background', textColor: 'color', fontSize: 'font-size', radius: 'border-radius', backgroundImage: 'background-image' };
         for (const [prop, value] of Object.entries(props)) {
             if (value) continue;
             if (prop === 'hidden') css += `body.editing [data-style="${key}"]{opacity:1 !important}`;
