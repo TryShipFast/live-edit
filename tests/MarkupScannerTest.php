@@ -79,6 +79,70 @@ class MarkupScannerTest extends TestCase
         $this->assertStringContainsString('href="https://example.com/new"', $rendered);
     }
 
+    protected function faqList(): string
+    {
+        return '<div class="faqs">'
+            .'<div class="faq"><h3>One</h3></div>'
+            .'<div class="faq"><h3>Two</h3></div>'
+            .'<div class="faq"><h3>Three</h3></div>'
+            .'</div>';
+    }
+
+    public function test_auto_apply_gives_list_items_stable_ids(): void
+    {
+        $html = (new MarkupScanner)->apply($this->faqList(), ['text'], true)['html'];
+
+        $this->assertMatchesRegularExpression('/data-edit-list="auto:[a-f0-9]{12}"/', $html);
+        $this->assertStringContainsString('data-edit-item="i0"', $html);
+        $this->assertStringContainsString('data-edit-item="i2"', $html);
+    }
+
+    public function test_removing_a_list_item_leaves_the_other_items_keys_untouched(): void
+    {
+        // The point of item-relative keys: delete the second FAQ and the third
+        // one keeps the key its saved answer is stored against.
+        $tagged = (new MarkupScanner)->apply($this->faqList(), ['text'], true)['html'];
+        preg_match('/data-edit-list="(auto:[a-f0-9]+)"/', $tagged, $list);
+
+        $keyOfThird = function (string $html) {
+            preg_match('/data-edit-item="i2"[^>]*>\s*<h3 data-edit="setting:(auto:[a-f0-9]+)"/', $html, $m);
+
+            return $m[1] ?? null;
+        };
+
+        $rendered = (new MarkupScanner)->applyOverrides($tagged, [$list[1] => json_encode(['i0', 'i2'])]);
+
+        $this->assertNotNull($keyOfThird($tagged));
+        $this->assertSame($keyOfThird($tagged), $keyOfThird($rendered));
+    }
+
+    public function test_apply_overrides_removes_a_list_item(): void
+    {
+        $tagged = (new MarkupScanner)->apply($this->faqList(), ['text'], true)['html'];
+        preg_match('/data-edit-list="(auto:[a-f0-9]+)"/', $tagged, $m);
+
+        $rendered = (new MarkupScanner)->applyOverrides($tagged, [$m[1] => json_encode(['i0', 'i2'])]);
+
+        $this->assertStringContainsString('One', $rendered);
+        $this->assertStringContainsString('Three', $rendered);
+        $this->assertStringNotContainsString('Two', $rendered);
+    }
+
+    public function test_apply_overrides_adds_a_list_item_with_its_own_keys(): void
+    {
+        $tagged = (new MarkupScanner)->apply($this->faqList(), ['text'], true)['html'];
+        preg_match('/data-edit-list="(auto:[a-f0-9]+)"/', $tagged, $m);
+
+        $rendered = (new MarkupScanner)->applyOverrides($tagged, [$m[1] => json_encode(['i0', 'i1', 'i2', 'n7'])]);
+
+        $this->assertSame(4, substr_count($rendered, 'data-edit-item='));
+        $this->assertStringContainsString('data-edit-item="n7"', $rendered);
+        // The copy must not share the original's content key.
+        preg_match('/data-edit-item="i0"[^>]*>\s*<h3 data-edit="setting:(auto:[a-f0-9]+)"/', $rendered, $first);
+        preg_match('/data-edit-item="n7"[^>]*>\s*<h3 data-edit="setting:(auto:[a-f0-9]+)"/', $rendered, $copy);
+        $this->assertNotSame($first[1], $copy[1]);
+    }
+
     public function test_it_recognises_headings_and_paragraphs_as_text(): void
     {
         $result = $this->scan('<section><h1>Welcome home</h1><p>We build things for people.</p></section>');

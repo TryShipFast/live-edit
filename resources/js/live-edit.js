@@ -161,7 +161,17 @@ if (document.body.hasAttribute('data-admin')) {
         return wrap;
     };
 
-    const styleField = (name, type, value) => {
+    /** The image an element is actually showing right now, theme or override. */
+    const currentImageOf = (element) => {
+        if (!element) return '';
+        const attr = element.dataset.background || element.dataset.bg || element.dataset.backgroundImage;
+        if (attr) return attr;
+        const computed = getComputedStyle(element).backgroundImage || '';
+        const match = computed.match(/url\((['"]?)(.*?)\1\)/);
+        return match && !match[2].startsWith('data:') ? match[2] : '';
+    };
+
+    const styleField = (name, type, value, element) => {
         const wrap = document.createElement('label');
         wrap.className = 'le-field';
         const title = name.replace(/([A-Z])/g, ' $1').toLowerCase();
@@ -218,8 +228,24 @@ if (document.body.hasAttribute('data-admin')) {
                 thumb.src = src || '';
                 thumb.style.display = src ? '' : 'none';
             };
-            showThumb(value ?? '');
-            input.addEventListener('input', () => showThumb(input.value.trim()));
+            // With no override stored, show what the theme is displaying, so
+            // the editor can see what they are about to replace.
+            const inherited = value ? '' : currentImageOf(element);
+            const caption = document.createElement('span');
+            caption.className = 'le-hint';
+            const describe = (src, fromTheme) => {
+                caption.textContent = src
+                    ? (fromTheme ? 'Current image (from the theme) — upload or paste a link to replace it' : 'Replacing with this image')
+                    : 'No image set';
+                caption.title = src || '';
+            };
+            showThumb(value || inherited);
+            describe(value || inherited, !value && Boolean(inherited));
+            input.addEventListener('input', () => {
+                const next = input.value.trim();
+                showThumb(next || inherited);
+                describe(next || inherited, !next && Boolean(inherited));
+            });
 
             const upload = document.createElement('label');
             upload.className = 'le-upload';
@@ -238,6 +264,7 @@ if (document.body.hasAttribute('data-admin')) {
                     const data = await response.json();
                     input.value = data.url;
                     showThumb(data.url);
+                    describe(data.url, false);
                     // Repaint the live preview with the stored URL.
                     input.dispatchEvent(new Event('input', { bubbles: true }));
                 } catch (error) {
@@ -246,7 +273,7 @@ if (document.body.hasAttribute('data-admin')) {
             });
             upload.append(file);
 
-            wrap.append(input, upload, thumb);
+            wrap.append(input, upload, thumb, caption);
         } else {
             const input = document.createElement('input');
             input.type = 'number';
@@ -261,7 +288,7 @@ if (document.body.hasAttribute('data-admin')) {
         return wrap;
     };
 
-    const addStyleFields = (styleKey, propNames) => {
+    const addStyleFields = (styleKey, propNames, element) => {
         current.styleKey = styleKey;
         const values = (window.liveEditStyles ?? {})[styleKey] ?? {};
         const heading = document.createElement('div');
@@ -270,7 +297,7 @@ if (document.body.hasAttribute('data-admin')) {
         drawerFields.append(heading);
         propNames.forEach((name) => {
             const type = (window.liveEditStyleProps ?? {})[name];
-            if (type) drawerFields.append(styleField(name, type, values[name]));
+            if (type) drawerFields.append(styleField(name, type, values[name], element));
         });
     };
 
@@ -597,10 +624,67 @@ if (document.body.hasAttribute('data-admin')) {
             appendLinkFields(element);
         }
         if (element.dataset.style && element.dataset.styleProps) {
-            addStyleFields(element.dataset.style, element.dataset.styleProps.split(','));
+            addStyleFields(element.dataset.style, element.dataset.styleProps.split(','), element);
         }
+        appendListControls(element);
         setTrail(element);
         openDrawer();
+    };
+
+    /**
+     * Add / remove for a repeated block (FAQs, cards, list rows). The order of
+     * item ids is the stored value; the server rebuilds the list from it.
+     */
+    const appendListControls = (element) => {
+        const item = element.closest?.('[data-edit-item]');
+        const list = item?.parentElement;
+        if (!item || !list?.dataset?.editList) return;
+
+        const currentOrder = () =>
+            [...list.children].filter((child) => child.dataset.editItem).map((child) => child.dataset.editItem);
+
+        const saveOrder = async (ids, message) => {
+            try {
+                await request('/live-edit/setting', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ key: list.dataset.editList, value: JSON.stringify(ids) }),
+                });
+                reloadWithToast(message);
+            } catch (error) {
+                window.alert(error.message);
+            }
+        };
+
+        const heading = document.createElement('div');
+        heading.className = 'le-section-heading';
+        heading.textContent = 'List';
+
+        const row = document.createElement('div');
+        row.className = 'le-row';
+
+        const add = document.createElement('button');
+        add.type = 'button';
+        add.className = 'le-chip-btn';
+        add.textContent = '+ Add another';
+        add.addEventListener('click', () => {
+            const ids = currentOrder();
+            const at = ids.indexOf(item.dataset.editItem);
+            ids.splice(at + 1, 0, 'n' + Date.now().toString(36));
+            saveOrder(ids, 'Added \u2713');
+        });
+
+        const remove = document.createElement('button');
+        remove.type = 'button';
+        remove.className = 'le-btn-danger';
+        remove.textContent = 'Delete this item';
+        remove.addEventListener('click', () => {
+            if (!window.confirm('Delete this item?')) return;
+            saveOrder(currentOrder().filter((id) => id !== item.dataset.editItem), 'Deleted \u2713');
+        });
+
+        row.append(add, remove);
+        drawerFields.append(heading, row);
     };
 
     const editStyle = (element) => {
@@ -616,7 +700,8 @@ if (document.body.hasAttribute('data-admin')) {
         drawerTitle.textContent = element.dataset.editLabel ?? roles[element.tagName] ?? 'Block';
         drawerFields.replaceChildren();
         drawerDelete.classList.add('le-hidden');
-        addStyleFields(styleKey, (element.dataset.styleProps ?? '').split(','));
+        addStyleFields(styleKey, (element.dataset.styleProps ?? '').split(','), element);
+        appendListControls(element);
         setTrail(element.dataset.styleEdit ? (element.closest('[data-style]') ?? element.parentElement) : element);
         openDrawer();
     };

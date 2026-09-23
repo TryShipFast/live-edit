@@ -63,6 +63,12 @@ class MarkupScanner
         $this->autoMode = $auto;
         $this->run($html);
 
+        // Lists first: each item gets a stable id, so the keys of everything
+        // inside it stay put when items are added or removed around it.
+        if ($auto) {
+            $this->applyListTags();
+        }
+
         $applied = 0;
         $skipped = [];
 
@@ -130,7 +136,7 @@ class MarkupScanner
                 // Auto: a link's TEXT and its href are both editable.
                 ? [
                     'data-edit' => 'setting:'.$key,
-                    'data-edit-href' => 'auto:'.substr(hash('sha256', $this->structuralPath($node).'#href'), 0, 12),
+                    'data-edit-href' => 'auto:'.$this->autoKey($node, '#href'),
                     'data-edit-label' => $this->humanise($candidate['key']),
                 ]
                 : [
@@ -163,6 +169,47 @@ class MarkupScanner
         libxml_clear_errors();
 
         $xpath = new DOMXPath($this->doc);
+
+        // Lists first — an item added or removed changes what the content
+        // loops below have to fill in.
+        foreach ($xpath->query('//*[@data-edit-list]') as $container) {
+            $listKey = $container->getAttribute('data-edit-list');
+            if (! array_key_exists($listKey, $overrides)) {
+                continue;
+            }
+            $order = json_decode($overrides[$listKey], true);
+            if (! is_array($order)) {
+                continue;
+            }
+
+            $items = [];
+            foreach (iterator_to_array($container->childNodes) as $child) {
+                if ($child instanceof DOMElement && $child->hasAttribute('data-edit-item')) {
+                    $items[$child->getAttribute('data-edit-item')] = $child;
+                    $container->removeChild($child);
+                }
+            }
+            if ($items === []) {
+                continue;
+            }
+            $template = reset($items);
+
+            foreach ($order as $id) {
+                $id = (string) $id;
+                if (isset($items[$id])) {
+                    $container->appendChild($items[$id]);
+
+                    continue;
+                }
+                // An added item: copy the first one and give the copy its own
+                // keys, so editing it cannot disturb the original.
+                $clone = $template->cloneNode(true);
+                if ($clone instanceof DOMElement) {
+                    $this->rekeyItem($clone, $id);
+                    $container->appendChild($clone);
+                }
+            }
+        }
 
         foreach ($xpath->query('//*[@data-edit]') as $node) {
             $value = $node->getAttribute('data-edit');
@@ -235,16 +282,92 @@ class MarkupScanner
      * scanner can tag a whole theme with keys the generic store persists
      * against, no hand-authored config per element.
      */
-    protected function autoKey(DOMElement $node): string
+    protected function autoKey(DOMElement $node, string $salt = ''): string
     {
-        return substr(hash('sha256', $this->structuralPath($node)), 0, 12);
+        return substr(hash('sha256', $this->keyPath($node).$salt), 0, 12);
     }
 
-    protected function structuralPath(DOMElement $node): string
+    /**
+     * Position alone is not a safe identity inside a list: delete the second
+     * card and every later card shifts up, so saved content would follow the
+     * wrong element. Inside a list item we key relative to the item's stable
+     * id instead, which survives insertion and removal.
+     */
+    protected function keyPath(DOMElement $node): string
+    {
+        for ($el = $node; $el instanceof DOMElement; $el = $el->parentNode) {
+            if ($el->hasAttribute('data-edit-item')) {
+                return 'item:'.$el->getAttribute('data-edit-item').'/'.$this->structuralPath($node, $el);
+            }
+        }
+
+        return $this->structuralPath($node);
+    }
+
+    /**
+     * Point a duplicated item's keys at its own id, so its content is stored
+     * separately from the item it was copied from.
+     */
+    protected function rekeyItem(DOMElement $item, string $newId): void
+    {
+        $item->setAttribute('data-edit-item', $newId);
+
+        $nodes = [$item];
+        foreach ($item->getElementsByTagName('*') as $descendant) {
+            $nodes[] = $descendant;
+        }
+
+        foreach ($nodes as $node) {
+            if (! $node instanceof DOMElement) {
+                continue;
+            }
+            foreach (['data-edit' => 'setting:auto:', 'data-edit-img' => 'setting:auto:', 'data-edit-bg' => 'setting:auto:'] as $attr => $prefix) {
+                if (str_starts_with($node->getAttribute($attr), $prefix)) {
+                    $salt = $attr === 'data-edit-bg' ? '#bg' : '';
+                    $node->setAttribute($attr, $prefix.$this->autoKey($node, $salt));
+                }
+            }
+            if (str_starts_with($node->getAttribute('data-edit-href'), 'auto:')) {
+                $node->setAttribute('data-edit-href', 'auto:'.$this->autoKey($node, '#href'));
+            }
+            if (str_starts_with($node->getAttribute('data-style'), 's')) {
+                $node->setAttribute('data-style', 's'.$this->autoKey($node));
+            }
+        }
+    }
+
+    /**
+     * Give every repeated run of siblings a list id and each item a stable id.
+     */
+    protected function applyListTags(): void
+    {
+        foreach (iterator_to_array($this->doc->getElementsByTagName('*')) as $container) {
+            if (! $container instanceof DOMElement || $container->hasAttribute('data-edit-list')) {
+                continue;
+            }
+            if (! $this->isCollectionContainer($container)) {
+                continue;
+            }
+
+            $container->setAttribute('data-edit-list', 'auto:'.substr(hash('sha256', $this->structuralPath($container).'#list'), 0, 12));
+
+            $index = 0;
+            foreach ($container->childNodes as $child) {
+                if ($child instanceof DOMElement) {
+                    $child->setAttribute('data-edit-item', 'i'.$index++);
+                }
+            }
+        }
+    }
+
+    protected function structuralPath(DOMElement $node, ?DOMElement $stopAt = null): string
     {
         $segments = [];
 
         for ($el = $node; $el instanceof DOMElement; $el = $el->parentNode) {
+            if ($stopAt !== null && $el === $stopAt) {
+                break;
+            }
             $tag = strtolower($el->tagName);
             $index = 1;
             for ($sib = $el->previousSibling; $sib !== null; $sib = $sib->previousSibling) {
@@ -302,7 +425,7 @@ class MarkupScanner
             // is itself editable.
             $bgUrl = $this->backgroundImageUrl($el);
             if ($bgUrl !== null && ! $el->hasAttribute('data-edit-bg')) {
-                $el->setAttribute('data-edit-bg', 'setting:auto:'.substr(hash('sha256', $this->structuralPath($el).'#bg'), 0, 12));
+                $el->setAttribute('data-edit-bg', 'setting:auto:'.$this->autoKey($el, '#bg'));
                 $el->setAttribute('data-edit-preview', $bgUrl);
                 $el->setAttribute('data-edit-kind', 'background');
             }
