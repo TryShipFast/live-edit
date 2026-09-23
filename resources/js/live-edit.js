@@ -216,6 +216,7 @@ const bootLiveEdit = () => {
             if (tag === 'FORM') return 'Form';
             if (element.dataset.editRegion) return element.dataset.editRegion;
             if (element.hasAttribute('data-edit-item')) return 'Card';
+            if (element.hasAttribute('data-edit-icon')) return 'Icon';
             if (element.hasAttribute('data-edit')) return 'Text';
             if (element.hasAttribute('data-has-bg') || element.hasAttribute('data-edit-bg')) return 'Background';
             if (tag === 'SECTION' || tag === 'MAIN' || tag === 'ARTICLE') return 'Section';
@@ -604,23 +605,102 @@ const bootLiveEdit = () => {
             current = null;
         };
 
-        const editables = () => document.querySelectorAll('[data-edit], [data-edit-img], [data-edit-bg], [data-edit-href]');
+        const editables = () => document.querySelectorAll('[data-edit], [data-edit-img], [data-edit-bg], [data-edit-href], [data-edit-icon]');
 
         /**
-         * A background set in the theme's stylesheet exists nowhere in the markup,
-         * so the scanner cannot tag it. The browser can see it, though: mark such
-         * elements when editing starts so they get a hover handle of their own.
+         * Every icon name the theme's own stylesheets define.
+         *
+         * An icon font declares each glyph as a rule like `.fa-gem::before {
+         * content: "\f3a5" }`, so the theme is its own catalogue: whatever icons
+         * it shipped with are exactly the ones that will render. Nothing needs
+         * configuring per theme, and a theme using a different icon font than the
+         * last one just yields a different list.
+         *
+         * Returns the names plus the stylesheets they came from, because the
+         * picker lives in a shadow root and has to adopt those sheets to draw the
+         * glyphs.
          */
-        const markLiveBackgrounds = () => {
-            document.querySelectorAll('[data-style]').forEach((element) => {
-                if (element.hasAttribute('data-edit-bg')) return;
-                const computed = getComputedStyle(element).backgroundImage || '';
-                const match = computed.match(/url\((['"]?)(.*?)\1\)/);
-                const rect = element.getBoundingClientRect();
-                const worthEditing = match && !match[2].startsWith('data:') && rect.width >= 120 && rect.height >= 120;
-                element.toggleAttribute('data-has-bg', Boolean(worthEditing));
-            });
+        const ICON_NAME = /\.((?:fa|fas|far|fab|fal|fad|bi|ti|icon|flaticon|glyphicon|ion|mdi)-[a-z0-9][a-z0-9-]*)::?before/gi;
+
+        /**
+         * The icon names a stylesheet defines glyphs for.
+         *
+         * Only rules that actually set a `content` count: a name class with no
+         * glyph behind it is a layout helper, and offering it would hand the
+         * client an empty square.
+         */
+        const iconNamesIn = (css) => {
+            const found = [];
+            for (const block of css.split('}')) {
+                const brace = block.indexOf('{');
+                if (brace === -1) continue;
+                const declared = block.slice(brace + 1).match(/content\s*:\s*(["'])(.*?)\1/);
+                if (!declared || declared[2] === '') continue;
+                // A codepoint may arrive escaped ("\\f3a5") or already decoded,
+                // depending on whether it was parsed or fetched as text.
+                const escaped = declared[2].match(/^\\([0-9a-f]{1,6})\s*$/i);
+                const glyph = escaped ? String.fromCodePoint(parseInt(escaped[1], 16)) : declared[2];
+                if ([...glyph].length !== 1) continue;
+                for (const match of block.slice(0, brace).matchAll(ICON_NAME)) found.push({ name: match[1], glyph });
+            }
+
+            return found;
         };
+
+        /**
+         * A stylesheet's source text.
+         *
+         * A sheet served from another origin cannot be read through the CSSOM,
+         * and that is the normal case for a bought template: its icon font comes
+         * off a CDN. Such a sheet can almost always still be fetched, so falling
+         * back to the network is what makes the picker work on real themes
+         * rather than only on self-hosted ones.
+         */
+        const cssTextOf = async (sheet, depth = 0) => {
+            try {
+                if (sheet.cssRules) {
+                    const parts = [];
+                    for (const rule of sheet.cssRules) {
+                        // An @import rule: its own rules are what matter, and a
+                        // theme routinely keeps its icon font in one.
+                        if (rule.styleSheet && depth < 4) parts.push(await cssTextOf(rule.styleSheet, depth + 1));
+                        else parts.push(rule.cssText);
+                    }
+
+                    return parts.join('');
+                }
+            } catch {
+                // Cross-origin; fall through to fetching it.
+            }
+            if (!sheet.href) return '';
+            try {
+                const response = await fetch(sheet.href);
+                if (!response.ok) return '';
+                const css = await response.text();
+                if (depth >= 4) return css;
+                // Fetched text is just text, so its imports have to be followed
+                // by hand as well.
+                const imports = [...css.matchAll(/@import\s+(?:url\(\s*(["']?)([^"')]+)\1\s*\)|(["'])([^"']+)\3)/gi)]
+                    .map((match) => match[2] || match[4])
+                    .filter(Boolean);
+                const nested = await Promise.all(imports.map((href) =>
+                    cssTextOf({ href: new URL(href, sheet.href).href }, depth + 1)));
+
+                return css + nested.join('');
+            } catch {
+                return '';
+            }
+        };
+
+        let iconCataloguePromise = null;
+        const buildIconCatalogue = async () => {
+            const byName = new Map();
+            const sheets = await Promise.all([...document.styleSheets].map((sheet) => cssTextOf(sheet)));
+            sheets.forEach((css) => iconNamesIn(css).forEach((icon) => byName.set(icon.name, icon.glyph)));
+
+            return [...byName].map(([name, glyph]) => ({ name, glyph })).sort((a, b) => a.name.localeCompare(b.name));
+        };
+        const iconCatalogue = () => (iconCataloguePromise ??= buildIconCatalogue());
 
         const setEditing = (on) => {
             document.body.classList.toggle('editing', on);
@@ -633,7 +713,11 @@ const bootLiveEdit = () => {
             if (!on && typeof hideHandle === 'function') hideHandle();
             ui.toolbar.classList.toggle('is-editing', on);
             toggleButton.textContent = on ? 'Done editing' : 'Edit site';
-            if (on) markLiveBackgrounds();
+            if (on) {
+                markLiveBackgrounds();
+                // Read the theme's icons now, so the picker opens instantly later.
+                if (document.querySelector('[data-edit-icon]')) void iconCatalogue();
+            }
             else {
                 hideBgHandle();
                 hideHover();
@@ -681,6 +765,12 @@ const bootLiveEdit = () => {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({ type: current.type, id: current.id, fields }),
+                    });
+                } else if (current.kind === 'icon') {
+                    await request('/live-edit/setting', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ key: current.key, value: current.value }),
                     });
                 } else if (current.kind === 'image') {
                     const formData = new FormData();
@@ -971,6 +1061,123 @@ const bootLiveEdit = () => {
             openDrawer();
         };
 
+        /**
+         * Pick a new icon by looking at icons, not by typing a class name.
+         *
+         * Each choice is drawn with the element's own classes and only the name
+         * swapped, so what the grid shows is exactly what the page will show.
+         */
+        /**
+         * Which of the theme's icons this element's font can actually draw.
+         *
+         * A theme usually pins one face of an icon font to a class ("Font
+         * Awesome 5 Free" at weight 400, say), and that face holds only some of
+         * the names the stylesheet defines. Offering the rest would fill the
+         * picker with blank squares that stay blank once chosen, so each glyph
+         * is measured first and only those that actually put ink down are
+         * offered.
+         */
+        const drawableIn = (icons, font) => {
+            const context = document.createElement('canvas').getContext('2d');
+            context.font = font;
+
+            return icons.filter(({ glyph }) => {
+                const measured = context.measureText(glyph);
+                // A name the face does not draw still has an advance width, so
+                // only the ink the glyph actually puts down settles it.
+                return (measured.actualBoundingBoxAscent || 0) + (measured.actualBoundingBoxDescent || 0) > 0;
+            });
+        };
+
+        /**
+         * Pick a new icon by looking at icons, not by typing a class name.
+         *
+         * The glyphs are drawn with the element's own icon font rather than by
+         * borrowing the theme's stylesheet, which would drag the theme's
+         * styling into this panel along with it.
+         */
+        const editIcon = async (element) => {
+            const was = element.dataset.editIconCurrent;
+            current = { kind: 'icon', key: element.dataset.editIcon.replace(/^setting:/, ''), value: was, element };
+            drawerTitle.textContent = 'Icon';
+            drawerFields.replaceChildren();
+            drawerDelete.classList.add('le-hidden');
+
+            const before = getComputedStyle(element, '::before');
+            const font = `${before.fontStyle} ${before.fontWeight} 20px ${before.fontFamily}`;
+            const icons = drawableIn(await iconCatalogue(), font);
+            // The drawer may have moved on while the stylesheets were read.
+            if (current?.element !== element) return;
+
+            if (icons.length === 0) {
+                const hint = document.createElement('div');
+                hint.className = 'le-hint';
+                hint.textContent = 'This theme loads its icons from somewhere this page cannot read, so they cannot be listed. Type the icon name instead.';
+                const field = document.createElement('label');
+                field.className = 'le-field';
+                field.append('Icon name');
+                const input = document.createElement('input');
+                input.type = 'text';
+                input.className = 'le-input';
+                input.value = was ?? '';
+                input.addEventListener('input', () => {
+                    current.value = input.value.trim();
+                    current.dirty = true;
+                });
+                field.append(input, hint);
+                drawerFields.append(field);
+                setTrail(element);
+                openDrawer();
+
+                return;
+            }
+
+            const search = document.createElement('input');
+            search.type = 'search';
+            search.className = 'le-input';
+            search.placeholder = `Search ${icons.length} icons\u2026`;
+
+            const grid = document.createElement('div');
+            grid.className = 'le-icon-grid';
+
+            const draw = (filter) => {
+                const term = filter.trim().toLowerCase().replace(/\s+/g, '-');
+                const shown = term ? icons.filter(({ name }) => name.includes(term)) : icons;
+                grid.replaceChildren();
+                shown.slice(0, 400).forEach(({ name, glyph }) => {
+                    const choice = document.createElement('button');
+                    choice.type = 'button';
+                    choice.className = 'le-icon-choice';
+                    choice.title = name.replace(/^[a-z]+-/, '').replace(/-/g, ' ');
+                    choice.classList.toggle('is-current', name === current.value);
+                    choice.style.font = font;
+                    choice.textContent = glyph;
+                    choice.addEventListener('click', () => {
+                        // Show the change on the page straight away.
+                        element.classList.replace(element.dataset.editIconCurrent, name);
+                        element.dataset.editIconCurrent = name;
+                        current.value = name;
+                        current.dirty = true;
+                        grid.querySelectorAll('.le-icon-choice').forEach((other) => other.classList.remove('is-current'));
+                        choice.classList.add('is-current');
+                    });
+                    grid.append(choice);
+                });
+                if (shown.length === 0) {
+                    const empty = document.createElement('div');
+                    empty.className = 'le-hint';
+                    empty.textContent = 'No icon matches that name.';
+                    grid.append(empty);
+                }
+            };
+
+            search.addEventListener('input', () => draw(search.value));
+            draw('');
+            drawerFields.append(search, grid);
+            setTrail(element);
+            openDrawer();
+        };
+
         const editImage = (element) => {
             // A background reuses the image endpoint — it's a setting holding a URL,
             // rendered as a CSS background rather than an <img>. It skips the alt/
@@ -1122,6 +1329,8 @@ const bootLiveEdit = () => {
             if (chip) return { element: chip, kind: 'style' };
             const image = node.closest('[data-edit-img], [data-edit-bg]');
             if (image) return { element: image, kind: 'image' };
+            const icon = node.closest('[data-edit-icon]');
+            if (icon) return { element: icon, kind: 'icon' };
             const text = node.closest('[data-edit]');
             if (text) return { element: text, kind: 'text' };
             const link = node.closest('[data-edit-href]:not([data-edit])');
@@ -1135,6 +1344,7 @@ const bootLiveEdit = () => {
 
         const openTarget = ({ element, kind }) => {
             if (kind === 'image') editImage(element);
+            else if (kind === 'icon') void editIcon(element);
             else if (kind === 'text') editText(element);
             else if (kind === 'link') editLink(element);
             else editStyle(element);

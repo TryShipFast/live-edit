@@ -2,6 +2,7 @@
 
 namespace ShipFast\LiveEdit\Tests;
 
+use Illuminate\Support\Facades\Http;
 use ShipFast\LiveEdit\Console\Commands\ImportTheme;
 
 class ImportThemeTest extends TestCase
@@ -52,5 +53,55 @@ class ImportThemeTest extends TestCase
         $this->assertStringContainsString('src="https://other.test/a.png"', $html);
         $this->assertStringContainsString('src="/local/b.png"', $html);
         $this->assertStringContainsString('href="mailto:x@y.z"', $html);
+    }
+
+    public function test_it_copies_stylesheets_into_this_site_so_they_are_same_origin(): void
+    {
+        Http::fake([
+            'cdn.test/demo/index.html' => Http::response('<link rel="stylesheet" href="assets/css/main.css">'),
+            'cdn.test/demo/assets/css/main.css' => Http::response('@font-face{src:url(../fonts/fa.woff)}.fa-gem:before{content:"\\f3a5"}'),
+            'cdn.test/demo/assets/fonts/fa.woff' => Http::response('WOFF-BYTES'),
+        ]);
+
+        $this->artisan('live-edit:import-theme', ['url' => 'https://cdn.test/demo/index.html', '--name' => 'mirrored'])
+            ->assertSuccessful();
+
+        $html = file_get_contents(resource_path('themes/mirrored/index.html'));
+        $this->assertMatchesRegularExpression('#href="/theme-assets/mirrored/[a-f0-9]{8}-main\.css"#', $html);
+
+        $copies = glob(public_path('theme-assets/mirrored/*-main.css'));
+        $this->assertCount(1, $copies);
+        $css = file_get_contents($copies[0]);
+        // The font is copied too: a browser will not use a webfont from another
+        // origin, so a hot-linked icon font renders as empty boxes.
+        $this->assertMatchesRegularExpression('#url\(/theme-assets/mirrored/[a-f0-9]{8}-fa\.woff\)#', $css);
+        $this->assertSame('WOFF-BYTES', file_get_contents(glob(public_path('theme-assets/mirrored/*-fa.woff'))[0]));
+        $this->assertStringContainsString('.fa-gem:before', $css);
+    }
+
+    public function test_a_stylesheet_that_cannot_be_copied_keeps_loading_from_the_origin(): void
+    {
+        Http::fake([
+            'cdn.test/demo/index.html' => Http::response('<link rel="stylesheet" href="assets/css/main.css">'),
+            'cdn.test/demo/assets/css/main.css' => Http::response('', 404),
+        ]);
+
+        $this->artisan('live-edit:import-theme', ['url' => 'https://cdn.test/demo/index.html', '--name' => 'unreachable'])
+            ->assertSuccessful();
+
+        $this->assertStringContainsString(
+            'href="https://cdn.test/demo/assets/css/main.css"',
+            file_get_contents(resource_path('themes/unreachable/index.html'))
+        );
+    }
+
+    public function test_it_climbs_out_of_the_directory_for_parent_relative_assets(): void
+    {
+        // Font Awesome's css/ sheet points at ../webfonts/, so this is the
+        // difference between glyphs rendering and empty boxes.
+        $html = $this->rewrite('<img src="../images/hero.jpg"><link href="../../shared/main.css">');
+
+        $this->assertStringContainsString('src="https://cdn.test/images/hero.jpg"', $html);
+        $this->assertStringContainsString('href="https://cdn.test/shared/main.css"', $html);
     }
 }

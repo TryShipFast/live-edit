@@ -223,6 +223,43 @@ class MarkupScannerTest extends TestCase
         $this->assertStringContainsString('>Someone</a>', $rendered);
     }
 
+    public function test_it_tags_a_theme_icon_so_it_can_be_swapped(): void
+    {
+        // An icon is a class on an empty span, so nothing else would offer it.
+        $html = (new MarkupScanner)->apply('<span class="icon fa-gem major"></span>', ['text'], true)['html'];
+
+        $this->assertMatchesRegularExpression('/data-edit-icon="setting:auto:[a-f0-9]{12}"/', $html);
+        $this->assertStringContainsString('data-edit-icon-current="fa-gem"', $html);
+    }
+
+    public function test_apply_overrides_swaps_the_icon_class_and_leaves_the_rest(): void
+    {
+        $tagged = (new MarkupScanner)->apply('<span class="icon fa-gem major"></span>', ['text'], true)['html'];
+        preg_match('/data-edit-icon="setting:(auto:[a-f0-9]+)"/', $tagged, $m);
+
+        $rendered = (new MarkupScanner)->applyOverrides($tagged, [$m[1] => 'fa-compass']);
+
+        $this->assertStringContainsString('fa-compass', $rendered);
+        $this->assertStringNotContainsString('fa-gem', $rendered);
+        // The theme's own styling classes stay put.
+        $this->assertStringContainsString('icon', $rendered);
+        $this->assertStringContainsString('major', $rendered);
+    }
+
+    public function test_an_icon_choice_cannot_smuggle_anything_into_the_class(): void
+    {
+        $tagged = (new MarkupScanner)->apply('<span class="icon fa-gem"></span>', ['text'], true)['html'];
+        preg_match('/data-edit-icon="setting:(auto:[a-f0-9]+)"/', $tagged, $m);
+
+        $rendered = (new MarkupScanner)->applyOverrides($tagged, [$m[1] => 'fa-x" onload="alert(1)']);
+
+        // What matters is that nothing escapes the class attribute: the value
+        // is flattened to a class name, so no new attribute can be created.
+        $this->assertStringNotContainsString('onload=', $rendered);
+        $this->assertStringNotContainsString('alert(1)', $rendered);
+        $this->assertMatchesRegularExpression('/class="[A-Za-z0-9 _-]*"/', $rendered);
+    }
+
     public function test_it_recognises_images_and_links(): void
     {
         $result = $this->scan('<div><img src="/hero.jpg" alt="A hero"><a href="/contact">Contact us</a></div>');

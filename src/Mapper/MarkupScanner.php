@@ -315,6 +315,28 @@ class MarkupScanner
             }
         }
 
+        foreach ($xpath->query('//*[@data-edit-icon]') as $node) {
+            $value = $node->getAttribute('data-edit-icon');
+            if (! str_starts_with($value, 'setting:')) {
+                continue;
+            }
+            $key = substr($value, strlen('setting:'));
+            if (! array_key_exists($key, $overrides) || $overrides[$key] === '') {
+                continue;
+            }
+            // A class name lands in an attribute, so nothing but a class name
+            // is allowed through.
+            $chosen = preg_replace('/[^A-Za-z0-9_-]/', '', $overrides[$key]);
+            $was = $node->getAttribute('data-edit-icon-current');
+            if ($chosen === '' || $was === '') {
+                continue;
+            }
+            $classes = preg_split('/\s+/', trim($node->getAttribute('class'))) ?: [];
+            $classes = array_map(fn (string $class) => $class === $was ? $chosen : $class, $classes);
+            $node->setAttribute('class', implode(' ', $classes));
+            $node->setAttribute('data-edit-icon-current', $chosen);
+        }
+
         foreach ($xpath->query('//*[@data-edit-bg]') as $node) {
             $value = $node->getAttribute('data-edit-bg');
             if (! str_starts_with($value, 'setting:')) {
@@ -537,6 +559,14 @@ class MarkupScanner
             $el->setAttribute('data-style-props', self::STYLE_PROPS);
             $tagged++;
 
+            // An icon in a bought theme is a class on an empty element, not
+            // content, so nothing above would ever offer it for editing.
+            $icon = $this->iconTokenOf($el);
+            if ($icon !== null && ! $el->hasAttribute('data-edit-icon')) {
+                $el->setAttribute('data-edit-icon', 'setting:auto:'.$this->autoKey($el, '#icon'));
+                $el->setAttribute('data-edit-icon-current', $icon);
+            }
+
             // A background image — inline or a slider-style data-* attribute —
             // is itself editable.
             $bgUrl = $this->backgroundImageUrl($el);
@@ -548,6 +578,26 @@ class MarkupScanner
         }
 
         return $tagged;
+    }
+
+    /**
+     * The icon class an element is displaying, if it is showing one.
+     *
+     * Icon fonts all follow the same shape: a family class plus a name class
+     * such as "fa-gem" or "flaticon-shipped". The name is what an editor wants
+     * to change, so that token is what gets tagged.
+     */
+    protected function iconTokenOf(DOMElement $el): ?string
+    {
+        $classes = preg_split('/\s+/', trim($el->getAttribute('class'))) ?: [];
+
+        foreach ($classes as $class) {
+            if (preg_match('/^(fa|fas|far|fab|fal|fad|bi|ti|icon|flaticon|glyphicon|ion|mdi)-[a-z0-9][a-z0-9-]*$/i', $class)) {
+                return $class;
+            }
+        }
+
+        return null;
     }
 
     /**

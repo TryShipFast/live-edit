@@ -127,6 +127,30 @@ button, input, select, textarea { font: inherit; color: inherit; margin: 0; }
 }
 .le-input::placeholder { color: #aab4c2; }
 .le-input:focus { border-color: var(--le-accent); box-shadow: 0 0 0 4px var(--le-accent-soft); }
+.le-icon-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(52px, 1fr));
+    gap: 6px;
+    max-height: 320px;
+    overflow-y: auto;
+    padding: 4px 2px;
+}
+.le-icon-choice {
+    aspect-ratio: 1;
+    display: grid;
+    place-items: center;
+    font-size: 19px;
+    color: var(--le-ink);
+    background: #fff;
+    border: 1px solid var(--le-field);
+    border-radius: 8px;
+    cursor: pointer;
+    transition: border-color .12s, background .12s;
+}
+.le-icon-choice:hover { border-color: var(--le-accent); background: var(--le-soft); }
+.le-icon-choice.is-current { border-color: var(--le-accent); box-shadow: inset 0 0 0 1px var(--le-accent); }
+/* The glyph is drawn with the page's icon font, set inline per element. */
+.le-icon-choice { line-height: 1; }
 .le-hint { font-size: 11px; font-weight: 400; letter-spacing: normal; text-transform: none; color: var(--le-muted); }
 .le-section-heading {
   margin-top: 4px; border-top: 1px solid var(--le-line); padding-top: 18px;
