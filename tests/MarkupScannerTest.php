@@ -88,6 +88,36 @@ class MarkupScannerTest extends TestCase
             .'</div>';
     }
 
+    protected function autoKeyOfHeading(string $html): ?string
+    {
+        $tagged = (new MarkupScanner)->apply($html, ['text'], true)['html'];
+        preg_match('/<h1 data-edit="setting:(auto:[a-f0-9]+)"/', $tagged, $m);
+
+        return $m[1] ?? null;
+    }
+
+    public function test_keys_survive_an_unrelated_change_elsewhere_in_the_page(): void
+    {
+        // The risk this guards against: a developer edits one part of the
+        // template and silently orphans the client's saved content everywhere
+        // below it. Anchoring to the nearest id keeps the blast radius local.
+        $before = '<div id="hero"><h1>Welcome</h1></div>';
+        $after = '<div class="promo"><p>New band</p></div><div id="hero"><h1>Welcome</h1></div>';
+
+        $this->assertNotNull($this->autoKeyOfHeading($before));
+        $this->assertSame($this->autoKeyOfHeading($before), $this->autoKeyOfHeading($after));
+    }
+
+    public function test_a_key_with_no_id_to_anchor_to_still_depends_on_position(): void
+    {
+        // The honest boundary of the above: with no landmark id anywhere above
+        // it, an element is still identified by position.
+        $before = '<div class="hero"><h1>Welcome</h1></div>';
+        $after = '<div class="promo"><p>New band</p></div><div class="hero"><h1>Welcome</h1></div>';
+
+        $this->assertNotSame($this->autoKeyOfHeading($before), $this->autoKeyOfHeading($after));
+    }
+
     public function test_auto_apply_gives_list_items_stable_ids(): void
     {
         $html = (new MarkupScanner)->apply($this->faqList(), ['text'], true)['html'];

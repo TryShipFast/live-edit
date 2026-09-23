@@ -613,7 +613,10 @@ if (document.body.hasAttribute('data-admin')) {
         ui.toolbar.classList.toggle('is-editing', on);
         toggleButton.textContent = on ? 'Done editing' : 'Edit site';
         if (on) markLiveBackgrounds();
-        else hideBgHandle();
+        else {
+            hideBgHandle();
+            hideHover();
+        }
         if (!on) closeDrawer(true);
     };
 
@@ -1017,6 +1020,78 @@ if (document.body.hasAttribute('data-admin')) {
         handleTarget = null;
     };
 
+    /**
+     * What a click here will actually edit. The hover preview calls the same
+     * function, so the box it draws is exactly what you get when you click.
+     */
+    const resolveTarget = (node) => {
+        if (!node?.closest) return null;
+        const chip = node.closest('[data-style-edit]');
+        if (chip) return { element: chip, kind: 'style' };
+        const image = node.closest('[data-edit-img], [data-edit-bg]');
+        if (image) return { element: image, kind: 'image' };
+        const text = node.closest('[data-edit]');
+        if (text) return { element: text, kind: 'text' };
+        const link = node.closest('[data-edit-href]:not([data-edit])');
+        if (link) return { element: link, kind: 'link' };
+        // Any styleable box, checked last so content wins over its container.
+        const box = node.closest('[data-style]:not([data-style-edit])');
+        if (box) return { element: box, kind: 'style' };
+
+        return null;
+    };
+
+    const openTarget = ({ element, kind }) => {
+        if (kind === 'image') editImage(element);
+        else if (kind === 'text') editText(element);
+        else if (kind === 'link') editLink(element);
+        else editStyle(element);
+    };
+
+    // Outline what is under the pointer and name it, so choosing the right
+    // element is not guesswork.
+    let hoverFrame = null;
+    const hideHover = () => ui.hoverBox.classList.remove('is-visible');
+    const showHover = (element) => {
+        const rect = element.getBoundingClientRect();
+        if (rect.width < 4 || rect.height < 4) {
+            hideHover();
+
+            return;
+        }
+        Object.assign(ui.hoverBox.style, {
+            top: `${rect.top}px`,
+            left: `${rect.left}px`,
+            width: `${rect.width}px`,
+            height: `${rect.height}px`,
+        });
+        ui.hoverBox.classList.toggle('is-flipped', rect.top < 26);
+        ui.hoverLabel.textContent = element.dataset.editLabel ?? describeElement(element);
+        ui.hoverBox.classList.add('is-visible');
+    };
+
+    document.addEventListener('pointermove', (event) => {
+        if (!document.body.classList.contains('editing')) {
+            hideHover();
+
+            return;
+        }
+        if (event.target === ui.root || ui.root.contains(event.target)) {
+            hideHover();
+
+            return;
+        }
+        if (hoverFrame) return;
+        hoverFrame = requestAnimationFrame(() => {
+            hoverFrame = null;
+            const target = resolveTarget(event.target);
+            if (target) showHover(target.element);
+            else hideHover();
+        });
+    });
+    document.addEventListener('scroll', hideHover, true);
+    document.addEventListener('pointerleave', hideHover);
+
     let bgTarget = null;
     const hideBgHandle = () => {
         bgHandle.classList.remove('is-visible');
@@ -1085,21 +1160,11 @@ if (document.body.hasAttribute('data-admin')) {
             const anchor = editableAnchor(event.target);
             if (anchor && navigable(anchor)) return;
 
-            const styleChip = event.target.closest('[data-style-edit]');
-            const image = event.target.closest('[data-edit-img], [data-edit-bg]');
-            const text = event.target.closest('[data-edit]');
-            const linkOnly = event.target.closest('[data-edit-href]:not([data-edit])');
-            // Any styleable element — clicking its own box (not a text child)
-            // opens the style editor. Checked last so text/image/link win.
-            const styleBox = event.target.closest('[data-style]:not([data-style-edit])');
-            if (!styleChip && !image && !text && !linkOnly && !styleBox) return;
+            const target = resolveTarget(event.target);
+            if (!target) return;
             event.preventDefault();
             event.stopPropagation();
-            if (styleChip) editStyle(styleChip);
-            else if (image) editImage(image);
-            else if (text) editText(text);
-            else if (linkOnly) editLink(linkOnly);
-            else editStyle(styleBox);
+            openTarget(target);
         },
         true
     );

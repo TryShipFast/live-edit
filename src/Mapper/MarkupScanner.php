@@ -316,9 +316,21 @@ class MarkupScanner
      */
     protected function keyPath(DOMElement $node): string
     {
+        // Inside a list, key relative to the item's own id.
         for ($el = $node; $el instanceof DOMElement; $el = $el->parentNode) {
             if ($el->hasAttribute('data-edit-item')) {
                 return 'item:'.$el->getAttribute('data-edit-item').'/'.$this->structuralPath($node, $el);
+            }
+        }
+
+        // Otherwise anchor to the nearest id. A template's ids are landmarks
+        // (#banner, #footer), so a developer editing one part of the document
+        // cannot shift keys in another part and orphan the content saved
+        // against them. Without this the whole page is one brittle chain.
+        for ($el = $node; $el instanceof DOMElement; $el = $el->parentNode) {
+            $id = $el->getAttribute('id');
+            if ($id !== '') {
+                return 'id:'.$id.'/'.$this->structuralPath($node, $el);
             }
         }
 
