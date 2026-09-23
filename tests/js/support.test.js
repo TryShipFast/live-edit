@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
     classListWith,
+    declaredStyleProps,
     displayedValue,
     iconNamesIn,
     isJsonResponse,
@@ -201,5 +202,28 @@ describe('orderedIcons', () => {
     it('copes with a theme that uses one face', () => {
         expect(orderedIcons([solid]).map((i) => i.name)).toEqual(['fa-apple', 'fa-zoo']);
         expect(orderedIcons([])).toEqual([]);
+    });
+});
+
+describe('declaredStyleProps', () => {
+    const configured = { hidden: 'toggle', background: 'color', textColor: 'color' };
+
+    it('uses what the element asks for', () => {
+        expect(declaredStyleProps('background,hidden', configured)).toEqual(['background', 'hidden']);
+    });
+
+    it('offers everything when the element narrows nothing', () => {
+        // A section tagged as styleable with no narrowing opened a panel with
+        // nothing in it.
+        expect(declaredStyleProps(undefined, configured)).toEqual(['hidden', 'background', 'textColor']);
+        expect(declaredStyleProps('', configured)).toEqual(['hidden', 'background', 'textColor']);
+    });
+
+    it('ignores stray commas and spaces', () => {
+        expect(declaredStyleProps(' background , , hidden ', configured)).toEqual(['background', 'hidden']);
+    });
+
+    it('copes with a site that configured none', () => {
+        expect(declaredStyleProps('', undefined)).toEqual([]);
     });
 });

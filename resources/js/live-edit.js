@@ -1,5 +1,5 @@
 import { createChrome } from './chrome.js';
-import { classListWith, displayedValue, iconNamesIn, isJsonResponse, orderedIcons, ownTextOf, parseEditKey, requestInit } from './support.js';
+import { classListWith, declaredStyleProps, displayedValue, iconNamesIn, isJsonResponse, orderedIcons, ownTextOf, parseEditKey, requestInit } from './support.js';
 
 /**
  * Start only once the host page has finished loading.
@@ -467,10 +467,20 @@ const bootLiveEdit = () => {
             heading.className = 'le-section-heading';
             heading.textContent = 'Style';
             drawerFields.append(heading);
+            let offered = 0;
             (element ? stylePropsFor(element, propNames) : propNames).forEach((name) => {
                 const type = (window.liveEditStyleProps ?? {})[name];
-                if (type) drawerFields.append(styleField(name, type, values[name], element));
+                if (!type) return;
+                drawerFields.append(styleField(name, type, values[name], element));
+                offered++;
             });
+            if (offered === 0) {
+                // Say so. A panel with nothing in it reads as a fault.
+                const none = document.createElement('div');
+                none.className = 'le-hint';
+                none.textContent = 'Nothing on this element can be restyled.';
+                drawerFields.append(none);
+            }
         };
 
         // Live preview: mirror the server's CSS emission for the key being edited.
@@ -1081,7 +1091,7 @@ const bootLiveEdit = () => {
             drawerTitle.textContent = element.dataset.editLabel ?? describeElement(element);
             drawerFields.replaceChildren();
             drawerDelete.classList.add('le-hidden');
-            addStyleFields(styleKey, (element.dataset.styleProps ?? '').split(','), element);
+            addStyleFields(styleKey, declaredStyleProps(element.dataset.styleProps, window.liveEditStyleProps), element);
             appendListControls(element);
             setTrail(element.dataset.styleEdit ? (element.closest('[data-style]') ?? element.parentElement) : element);
             openDrawer();

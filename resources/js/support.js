@@ -149,3 +149,20 @@ export const orderedIcons = (groups) => {
 
     return merged.sort((a, b) => a.name.localeCompare(b.name));
 };
+
+/**
+ * Which style controls an element asks for.
+ *
+ * "data-style-props" narrows the set; leaving it off used to mean none at all,
+ * so a section tagged as styleable opened a panel with nothing in it. An author
+ * who tagged the element meant it to be styleable, so the absence of a
+ * narrowing means everything the site offers.
+ */
+export const declaredStyleProps = (attribute, configured) => {
+    const declared = String(attribute ?? '')
+        .split(',')
+        .map((name) => name.trim())
+        .filter(Boolean);
+
+    return declared.length ? declared : Object.keys(configured ?? {});
+};
