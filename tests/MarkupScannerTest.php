@@ -118,6 +118,24 @@ class MarkupScannerTest extends TestCase
         $this->assertNotSame($this->autoKeyOfHeading($before), $this->autoKeyOfHeading($after));
     }
 
+    public function test_two_lists_do_not_share_keys_for_their_first_items(): void
+    {
+        // Every list numbers its items from i0, so without the list in the key
+        // the first menu entry and the first footer link are the same element
+        // as far as the store is concerned, and editing one rewrites the other.
+        $html = (new MarkupScanner)->apply(
+            '<ul class="menu"><li>Home</li><li>About</li></ul>'
+            .'<ul class="social"><li>Twitter</li><li>Facebook</li></ul>',
+            ['text'],
+            true
+        )['html'];
+
+        preg_match_all('/<li[^>]*data-edit="setting:(auto:[a-f0-9]+)"/', $html, $m);
+
+        $this->assertCount(4, $m[1]);
+        $this->assertSame($m[1], array_unique($m[1]), 'every list item needs its own key');
+    }
+
     public function test_auto_apply_gives_list_items_stable_ids(): void
     {
         $html = (new MarkupScanner)->apply($this->faqList(), ['text'], true)['html'];
@@ -181,6 +199,28 @@ class MarkupScannerTest extends TestCase
         $this->assertContains('Welcome home', $texts);
         $this->assertContains('We build things for people.', $texts);
         $this->assertSame(2, $result['summary']['text']);
+    }
+
+    public function test_a_wrapper_whose_text_lives_in_a_child_is_not_tagged_itself(): void
+    {
+        // <li><a>Activate</a></li> has no words of its own. Tagging it too let
+        // an edit land beside the button instead of changing its label.
+        $html = (new MarkupScanner)->apply('<ul class="actions"><li><a class="button">Activate</a></li><li><a class="button">Learn More</a></li></ul>', ['text', 'link'], true)['html'];
+
+        $this->assertStringNotContainsString('<li data-edit=', $html);
+        $this->assertMatchesRegularExpression('/<a [^>]*data-edit="setting:auto:/', $html);
+    }
+
+    public function test_replacing_text_keeps_a_nested_link_in_place(): void
+    {
+        $tagged = (new MarkupScanner)->apply('<p>Crafted by <a href="/x">Someone</a>.</p>', ['text', 'link'], true)['html'];
+        preg_match('/<p data-edit="setting:(auto:[a-f0-9]+)"/', $tagged, $m);
+
+        $rendered = (new MarkupScanner)->applyOverrides($tagged, [$m[1] => 'Our own words']);
+
+        // The new sentence sits before the link, not jammed after it.
+        $this->assertMatchesRegularExpression('/Our own words\s*<a /', $rendered);
+        $this->assertStringContainsString('>Someone</a>', $rendered);
     }
 
     public function test_it_recognises_images_and_links(): void

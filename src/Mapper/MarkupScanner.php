@@ -274,14 +274,27 @@ class MarkupScanner
             if (! array_key_exists($key, $overrides)) {
                 continue;
             }
-            // Replace the element's own text, preserving any child elements
-            // (e.g. a decorative <span> before the label).
+            // Put the new words where the old ones were. Appending instead
+            // pushed them past any child element, so a paragraph ending in a
+            // link rendered as "HTML5 UPMy new sentence".
+            $replaced = false;
             foreach (iterator_to_array($node->childNodes) as $child) {
-                if ($child->nodeType === XML_TEXT_NODE) {
-                    $node->removeChild($child);
+                if ($child->nodeType !== XML_TEXT_NODE) {
+                    continue;
                 }
+                if ($replaced) {
+                    $node->removeChild($child);
+
+                    continue;
+                }
+                // Keep the spacing that separated the text from a sibling link.
+                $trailing = preg_match('/\s$/', $child->nodeValue) ? ' ' : '';
+                $child->nodeValue = $overrides[$key].$trailing;
+                $replaced = true;
             }
-            $node->appendChild($this->doc->createTextNode($overrides[$key]));
+            if (! $replaced) {
+                $node->appendChild($this->doc->createTextNode($overrides[$key]));
+            }
         }
 
         foreach ($xpath->query('//*[@data-edit-img]') as $node) {
@@ -349,10 +362,16 @@ class MarkupScanner
      */
     protected function keyPath(DOMElement $node): string
     {
-        // Inside a list, key relative to the item's own id.
+        // Inside a list, key relative to the item's own id. The id is only
+        // unique within its list ("i0" is the first item of every list on the
+        // page), so the list's own key has to be part of the path: without it
+        // the first menu entry, the first social link and the copyright line
+        // all collapse onto one key and overwrite each other.
         for ($el = $node; $el instanceof DOMElement; $el = $el->parentNode) {
             if ($el->hasAttribute('data-edit-item')) {
-                return 'item:'.$el->getAttribute('data-edit-item').'/'.$this->structuralPath($node, $el);
+                $list = $el->parentNode instanceof DOMElement ? $el->parentNode->getAttribute('data-edit-list') : '';
+
+                return 'list:'.$list.'/item:'.$el->getAttribute('data-edit-item').'/'.$this->structuralPath($node, $el);
             }
         }
 
@@ -648,6 +667,15 @@ class MarkupScanner
                 continue;
             }
 
+            // An anchor with no href is still a label worth editing. Wrappers
+            // used to be tagged on its behalf; now that they are not, it has to
+            // stand on its own or its words become uneditable.
+            if ($tag === 'a' && $this->isTextLeaf($child)) {
+                $this->addText($child);
+
+                continue;
+            }
+
             if (in_array($tag, self::TEXT_TAGS, true) && $this->isTextLeaf($child)) {
                 $this->addText($child);
 
@@ -661,6 +689,19 @@ class MarkupScanner
     protected function isTextLeaf(DOMElement $element): bool
     {
         if (trim($element->textContent) === '') {
+            return false;
+        }
+
+        // A wrapper whose words all live in a child, like <li><a>Activate</a>,
+        // is not the editable thing: the child is. Tagging both of them let an
+        // edit to the wrapper append a stray phrase beside the button.
+        $direct = '';
+        foreach ($element->childNodes as $child) {
+            if ($child->nodeType === XML_TEXT_NODE) {
+                $direct .= $child->nodeValue;
+            }
+        }
+        if (trim($direct) === '') {
             return false;
         }
 
