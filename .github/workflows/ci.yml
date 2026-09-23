@@ -26,3 +26,15 @@ jobs:
 
       - name: Run tests
         run: vendor/bin/phpunit
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Install runtime dependencies
+        run: npm ci
+
+      # The editor is JavaScript. Every fault that reached a working site was
+      # in this half, so it is not optional here.
+      - name: Test the runtime
+        run: npm test

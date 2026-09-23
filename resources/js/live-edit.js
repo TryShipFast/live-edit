@@ -1,4 +1,5 @@
 import { createChrome } from './chrome.js';
+import { classListWith, iconNamesIn, isJsonResponse, parseEditKey, requestInit } from './support.js';
 
 /**
  * Start only once the host page has finished loading.
@@ -634,33 +635,6 @@ const bootLiveEdit = () => {
          * picker lives in a shadow root and has to adopt those sheets to draw the
          * glyphs.
          */
-        const ICON_NAME = /\.((?:fa|fas|far|fab|fal|fad|bi|ti|icon|flaticon|glyphicon|ion|mdi)-[a-z0-9][a-z0-9-]*)::?before/gi;
-
-        /**
-         * The icon names a stylesheet defines glyphs for.
-         *
-         * Only rules that actually set a `content` count: a name class with no
-         * glyph behind it is a layout helper, and offering it would hand the
-         * client an empty square.
-         */
-        const iconNamesIn = (css) => {
-            const found = [];
-            for (const block of css.split('}')) {
-                const brace = block.indexOf('{');
-                if (brace === -1) continue;
-                const declared = block.slice(brace + 1).match(/content\s*:\s*(["'])(.*?)\1/);
-                if (!declared || declared[2] === '') continue;
-                // A codepoint may arrive escaped ("\\f3a5") or already decoded,
-                // depending on whether it was parsed or fetched as text.
-                const escaped = declared[2].match(/^\\([0-9a-f]{1,6})\s*$/i);
-                const glyph = escaped ? String.fromCodePoint(parseInt(escaped[1], 16)) : declared[2];
-                if ([...glyph].length !== 1) continue;
-                for (const match of block.slice(0, brace).matchAll(ICON_NAME)) found.push({ name: match[1], glyph });
-            }
-
-            return found;
-        };
-
         /**
          * A stylesheet's source text.
          *
@@ -760,13 +734,7 @@ const bootLiveEdit = () => {
         };
 
         const request = async (url, options) => {
-            const response = await fetch(url, {
-                ...options,
-                // After the spread, or the caller's own headers replace these
-                // wholesale and the request goes out with no CSRF token and no
-                // Accept, which Laravel answers with a redirect to a page.
-                headers: { 'X-CSRF-TOKEN': csrf, Accept: 'application/json', ...(options.headers ?? {}) },
-            });
+            const response = await fetch(url, requestInit(csrf, options));
             if (response.status === 419 || response.status === 401) {
                 window.alert('Your session expired. The page will reload — sign in and try again.');
                 window.location.reload();
@@ -776,10 +744,7 @@ const bootLiveEdit = () => {
                 const data = await response.json().catch(() => ({}));
                 throw new Error(data.message ?? 'Could not save. Try again.');
             }
-            // A redirect answered with a page still arrives as 200. Treating
-            // that as success is worse than failing: the editor says "Saved"
-            // and the client's words are gone.
-            if (!(response.headers.get('content-type') ?? '').includes('json')) {
+            if (!isJsonResponse(response)) {
                 throw new Error('That did not save. Reload the page and try again.');
             }
 
@@ -907,15 +872,12 @@ const bootLiveEdit = () => {
         };
 
         const editText = (element) => {
-            const [kind, ...rest] = element.dataset.edit.split(':');
+            const { kind, key, parts: rest } = parseEditKey(element.dataset.edit);
             drawerFields.replaceChildren();
             drawerDelete.classList.add('le-hidden');
 
             if (kind === 'setting') {
-                // An auto key is "setting:auto:<hash>", so everything after the
-                // kind is the key. Taking one segment threw the hash away and
-                // saved every edit against a key called "auto".
-                current = { kind, key: rest.join(':') };
+                current = { kind, key };
                 drawerTitle.textContent = element.dataset.editLabel ?? describeElement(element);
                 const richSetting = (window.liveEditRich?.settings ?? []).includes(rest[0]);
                 // Theme markup is full of tabs and newlines; collapse them so the
@@ -1165,15 +1127,13 @@ const bootLiveEdit = () => {
          * variant's face: the element's own face classes give way to theirs,
          * and everything the theme used for decoration stays.
          */
-        const classListUsing = (element, variant, name, was) => {
-            const mine = faceClassesOf(element, was);
-            const theirs = faceClassesOf(variant, variant.dataset.editIconCurrent);
-            const kept = [...element.classList].filter((cls) => cls !== was && !mine.includes(cls));
-            theirs.forEach((cls) => kept.includes(cls) || kept.push(cls));
-            kept.push(name);
-
-            return kept.join(' ');
-        };
+        const classListUsing = (element, variant, name, was) => classListWith(
+            [...element.classList],
+            name,
+            was,
+            faceClassesOf(element, was),
+            faceClassesOf(variant, variant.dataset.editIconCurrent)
+        );
 
         const drawableIn = (icons, font) => {
             const context = document.createElement('canvas').getContext('2d');

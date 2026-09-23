@@ -1,0 +1,13 @@
+{
+  "name": "@shipfast/live-edit",
+  "private": true,
+  "type": "module",
+  "description": "Runtime for the shipfast/live-edit in-place editor.",
+  "scripts": {
+    "test": "vitest run"
+  },
+  "devDependencies": {
+    "happy-dom": "^15.11.7",
+    "vitest": "^2.1.8"
+  }
+}
