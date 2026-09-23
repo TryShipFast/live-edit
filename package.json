@@ -4,9 +4,11 @@
   "type": "module",
   "description": "Runtime for the shipfast/live-edit in-place editor.",
   "scripts": {
-    "test": "vitest run"
+    "test": "vitest run",
+    "test:e2e": "playwright test"
   },
   "devDependencies": {
+    "@playwright/test": "^1.63.0",
     "happy-dom": "^15.11.7",
     "vitest": "^2.1.8"
   }
