@@ -91,6 +91,20 @@ class LiveEditControllerTest extends TestCase
         $this->assertDatabaseHas('settings', ['key' => 'quotePlaceholder', 'value' => 'Part number or tail sign']);
     }
 
+    public function test_it_replaces_an_auto_keyed_image_only_when_the_generic_store_is_on(): void
+    {
+        // An auto-tagged theme has no named image keys, so without this the
+        // editor offers an image it can never save.
+        $this->postJson('/live-edit/image', ['target' => 'setting:auto:be3a6ddd0725', 'url' => 'https://x.test/a.jpg'])
+            ->assertStatus(422);
+
+        config()->set('live-edit.auto_keys', true);
+
+        $this->postJson('/live-edit/image', ['target' => 'setting:auto:be3a6ddd0725', 'url' => 'https://x.test/a.jpg'])
+            ->assertOk();
+        $this->assertDatabaseHas('settings', ['key' => 'auto:be3a6ddd0725', 'value' => 'https://x.test/a.jpg']);
+    }
+
     public function test_it_stores_an_uploaded_image_and_returns_its_url(): void
     {
         Storage::fake('public');

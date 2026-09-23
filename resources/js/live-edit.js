@@ -813,6 +813,7 @@ if (document.body.hasAttribute('data-admin')) {
         if (element.dataset.editHref) {
             appendLinkFields(element);
         }
+        appendVisitLink(element);
         if (element.dataset.style && element.dataset.styleProps) {
             addStyleFields(element.dataset.style, element.dataset.styleProps.split(','), element);
         }
@@ -878,6 +879,25 @@ if (document.body.hasAttribute('data-admin')) {
             row.append(remove);
         }
         drawerFields.append(heading, row);
+    };
+
+    /** Editing swallows the click, so offer the trip explicitly. */
+    const appendVisitLink = (element) => {
+        const anchor = element.closest?.('a[href]');
+        const href = anchor?.getAttribute('href');
+        if (!href || href === '#' || href.startsWith('javascript:')) return;
+
+        const row = document.createElement('div');
+        row.className = 'le-row';
+        const visit = document.createElement('button');
+        visit.type = 'button';
+        visit.className = 'le-chip-btn';
+        visit.textContent = 'Open this link \u2192';
+        visit.addEventListener('click', () => {
+            window.location.href = anchor.href;
+        });
+        row.append(visit);
+        drawerFields.append(row);
     };
 
     const editStyle = (element) => {
@@ -1169,10 +1189,6 @@ if (document.body.hasAttribute('data-admin')) {
             // Clicks inside the overlay retarget to its shadow host.
             if (event.target === ui.root || ui.root.contains(event.target)) return;
             if (event.target.closest('[data-live-create]')) return;
-
-            // Editable links keep navigating; edit them via the hover handle.
-            const anchor = editableAnchor(event.target);
-            if (anchor && navigable(anchor)) return;
 
             const target = resolveTarget(event.target);
             if (!target) return;

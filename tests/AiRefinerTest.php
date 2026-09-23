@@ -90,6 +90,26 @@ class AiRefinerTest extends TestCase
         $this->assertSame('heroTitleScript', $refined[0]['key']);
     }
 
+    public function test_every_element_in_a_band_gets_that_bands_region(): void
+    {
+        $this->enableAi();
+        // The fake answers both passes: element naming and the region pass.
+        Http::fake(['*' => Http::response([
+            'choices' => [[
+                'message' => ['content' => json_encode([
+                    'items' => [['i' => 0, 'label' => 'Headline']],
+                    'bands' => [['band' => 0, 'region' => 'Features']],
+                ])],
+            ]],
+        ])]);
+
+        $candidates = (new MarkupScanner)->scan('<section><h1>A</h1><p>B</p><p>C</p></section>')['candidates'];
+        $refined = app(AiRefiner::class)->refine($candidates);
+
+        // One band in the markup, so the editor is told one region for all of it.
+        $this->assertSame(['Features'], array_values(array_unique(array_column($refined, 'region'))));
+    }
+
     public function test_disabled_refiner_returns_candidates_untouched_and_calls_nothing(): void
     {
         Http::fake();

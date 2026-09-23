@@ -121,6 +121,39 @@ class MarkupScanner
         if ($body instanceof DOMNode) {
             $this->walk($body);
         }
+
+        $this->assignBands();
+    }
+
+    /**
+     * Where each candidate sits in the page's structure. Region boundaries are
+     * a fact of the DOM, not something to guess from reading order, so the
+     * band each element belongs to is computed here and handed to the labeller.
+     */
+    protected function assignBands(): void
+    {
+        $seen = [];
+        $next = 0;
+
+        foreach ($this->candidates as $index => $candidate) {
+            $node = $candidate['node'] ?? null;
+            if (! $node instanceof DOMElement) {
+                continue;
+            }
+
+            $band = $this->bandFor($node);
+            // Identify the band by its position in the tree, not by object id:
+            // PHP's DOM hands back a new wrapper object each time you walk to a
+            // parent, and freed object ids get reused, so ids collide and
+            // unrelated bands merge into one.
+            $id = $band ? $band->getNodePath() : '';
+            if (! array_key_exists($id, $seen)) {
+                $seen[$id] = $next++;
+            }
+
+            $this->candidates[$index]['band'] = $seen[$id];
+            $this->candidates[$index]['bandTag'] = $band ? strtolower($band->tagName) : null;
+        }
     }
 
     protected function writeTag(DOMElement $node, array $candidate, array $meta = []): void
@@ -337,20 +370,34 @@ class MarkupScanner
         return $this->structuralPath($node);
     }
 
-    /** Record the page region on the nearest band containing this element. */
+    /**
+     * The band an element belongs to: the OUTERMOST sectioning element around
+     * it. Themes nest these freely (a <header> holding a section's title, four
+     * <section>s inside one band), and treating each of those as its own region
+     * splits a single part of the page into several. <main> is excluded because
+     * it wraps the whole document.
+     */
+    protected function bandFor(DOMElement $node): ?DOMElement
+    {
+        $tags = ['section', 'header', 'footer', 'nav', 'article', 'aside'];
+        $band = null;
+
+        for ($el = $node; $el instanceof DOMElement; $el = $el->parentNode) {
+            if (in_array(strtolower($el->tagName), $tags, true)) {
+                $band = $el; // keep going: the last one found is the outermost
+            }
+        }
+
+        return $band;
+    }
+
+    /** Record the page region on the band containing this element. */
     protected function tagRegion(DOMElement $node, string $region): void
     {
-        $bands = ['section', 'header', 'footer', 'nav', 'main', 'article', 'aside'];
+        $band = $this->bandFor($node);
 
-        for ($el = $node->parentNode; $el instanceof DOMElement; $el = $el->parentNode) {
-            if (! in_array(strtolower($el->tagName), $bands, true)) {
-                continue;
-            }
-            if (! $el->hasAttribute('data-edit-region')) {
-                $el->setAttribute('data-edit-region', $region);
-            }
-
-            return;
+        if ($band !== null && ! $band->hasAttribute('data-edit-region')) {
+            $band->setAttribute('data-edit-region', $region);
         }
     }
 

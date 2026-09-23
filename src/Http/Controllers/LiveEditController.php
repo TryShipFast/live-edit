@@ -202,7 +202,12 @@ class LiveEditController extends Controller
         [$type, $key] = explode(':', $validated['target'], 2) + [null, null];
 
         if ($type === 'setting') {
-            abort_unless(in_array($key, config('live-edit.images'), true), 422, 'Unknown image.');
+            // Same rule as a text setting: a named key must be declared, while
+            // a scanner-generated auto:<hash> is accepted when the generic
+            // store is on. Without this, images on an auto-tagged theme are
+            // detected and shown as editable but every save is rejected.
+            $isAutoKey = (bool) config('live-edit.auto_keys', false) && (bool) preg_match('/^auto:[a-f0-9]{6,64}$/', (string) $key);
+            abort_unless($isAutoKey || in_array($key, config('live-edit.images', []), true), 422, 'Unknown image.');
 
             if ($removing) {
                 $this->writeSetting($key, '');
