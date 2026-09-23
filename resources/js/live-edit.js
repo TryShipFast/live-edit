@@ -702,6 +702,23 @@ const bootLiveEdit = () => {
         };
         const iconCatalogue = () => (iconCataloguePromise ??= buildIconCatalogue());
 
+        /**
+         * Drop the icon affordance from elements that are not showing an icon.
+         *
+         * The scanner only sees markup, so a class that merely looks like an
+         * icon name reads as one: Bootstrap's "icon-bar" navbar stripes are
+         * classic false positives. The browser knows better, because an icon
+         * font puts a glyph in ::before and a layout class does not.
+         */
+        const markRealIcons = () => {
+            document.querySelectorAll('[data-edit-icon]').forEach((element) => {
+                const drawn = getComputedStyle(element, '::before').content;
+                if (drawn === 'none' || drawn === 'normal' || drawn === '""' || drawn === '') {
+                    element.removeAttribute('data-edit-icon');
+                }
+            });
+        };
+
         const setEditing = (on) => {
             document.body.classList.toggle('editing', on);
             editables().forEach((el) => {
@@ -714,6 +731,7 @@ const bootLiveEdit = () => {
             ui.toolbar.classList.toggle('is-editing', on);
             toggleButton.textContent = on ? 'Done editing' : 'Edit site';
             if (on) {
+                markRealIcons();
                 markLiveBackgrounds();
                 // Read the theme's icons now, so the picker opens instantly later.
                 if (document.querySelector('[data-edit-icon]')) void iconCatalogue();
