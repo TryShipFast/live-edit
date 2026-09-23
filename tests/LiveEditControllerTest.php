@@ -2,6 +2,8 @@
 
 namespace ShipFast\LiveEdit\Tests;
 
+use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Storage;
 use ShipFast\LiveEdit\Models\EditRevision;
 use ShipFast\LiveEdit\Models\ElementStyle;
 use ShipFast\LiveEdit\Tests\Fixtures\Setting;
@@ -87,6 +89,29 @@ class LiveEditControllerTest extends TestCase
         // A form placeholder is just a setting — free text, no URL rules.
         $this->postJson('/live-edit/setting', ['key' => 'quotePlaceholder', 'value' => 'Part number or tail sign'])->assertOk();
         $this->assertDatabaseHas('settings', ['key' => 'quotePlaceholder', 'value' => 'Part number or tail sign']);
+    }
+
+    public function test_it_stores_an_uploaded_image_and_returns_its_url(): void
+    {
+        Storage::fake('public');
+
+        // URL-valued style fields (a section background) accept an upload as
+        // well as a pasted link, so the editor needs a URL back.
+        $response = $this->post('/live-edit/upload', [
+            'file' => UploadedFile::fake()->image('bg.jpg'),
+        ]);
+
+        $response->assertOk()->assertJsonStructure(['url']);
+        $this->assertStringContainsString('live-edit/', $response->json('url'));
+    }
+
+    public function test_it_rejects_a_non_image_upload(): void
+    {
+        Storage::fake('public');
+
+        $this->post('/live-edit/upload', [
+            'file' => UploadedFile::fake()->create('payload.php', 10),
+        ])->assertStatus(302);
     }
 
     public function test_it_stores_and_removes_a_background_image_setting(): void

@@ -1,3 +1,5 @@
+import { createChrome } from './chrome.js';
+
 /* ------------------------------- login modal ------------------------------- */
 
 const loginModal = document.querySelector('[data-login-modal]');
@@ -43,36 +45,27 @@ if (document.body.hasAttribute('data-admin')) {
         window.scrollTo(0, Number(savedScroll));
     }
 
+    // The editor's UI is the package's own overlay in a shadow root, so the
+    // host theme's CSS can neither style it nor be broken by it.
+    const ui = createChrome();
+
     const toastMessage = sessionStorage.getItem('tb_toast');
     if (toastMessage) {
         sessionStorage.removeItem('tb_toast');
-        const toast = document.createElement('div');
-        toast.textContent = toastMessage;
-        toast.className =
-            'fixed bottom-20 left-1/2 z-[99] -translate-x-1/2 rounded-full bg-navy px-5 py-2.5 text-[13px] font-semibold text-white shadow-lg transition-opacity duration-500';
-        document.body.append(toast);
-        setTimeout(() => (toast.style.opacity = '0'), 1800);
-        setTimeout(() => toast.remove(), 2400);
+        ui.toast(toastMessage);
     }
 
     const reloadWithToast = (message) => {
         sessionStorage.setItem('tb_toast', message);
         reloadPreservingScroll();
     };
-    const drawer = document.querySelector('[data-drawer]');
-    const drawerTitle = document.querySelector('[data-drawer-title]');
-    const drawerTrail = document.querySelector('[data-drawer-trail]');
-    const drawerFields = document.querySelector('[data-drawer-fields]');
-    const drawerDelete = document.querySelector('[data-drawer-delete]');
-    const toggleButton = document.querySelector('[data-edit-toggle]');
-    const statusText = document.querySelector('[data-edit-status]');
-    const statusDot = document.querySelector('[data-edit-dot]');
+    const { drawer, drawerTitle, drawerTrail, drawerFields, drawerDelete, toggleButton, statusText, linkHandle } = ui;
 
     let current = null;
 
     const fieldInput = (name, label, value, rows, rich = false) => {
         const wrap = document.createElement('label');
-        wrap.className = 'flex flex-col gap-1.5 text-[13px] font-semibold text-navy';
+        wrap.className = 'le-field';
         wrap.append(label);
         const options = name === 'icon' ? window.liveEditIcons : (window.liveEditSelects ?? {})[name];
         const iconTemplates = document.querySelector('[data-icon-templates]');
@@ -82,15 +75,13 @@ if (document.body.hasAttribute('data-admin')) {
             hidden.name = name;
             hidden.value = value ?? '';
             const grid = document.createElement('div');
-            grid.className = 'grid grid-cols-6 gap-1.5';
+            grid.className = 'le-icons';
             options.forEach((icon) => {
                 const cell = document.createElement('button');
                 cell.type = 'button';
                 cell.title = icon;
                 cell.dataset.iconChoice = icon;
-                cell.className =
-                    'flex h-10 cursor-pointer items-center justify-center rounded-[10px] border text-navy transition-colors ' +
-                    (icon === hidden.value ? 'border-brand bg-brand text-white' : 'border-field bg-white hover:bg-soft');
+                cell.className = 'le-icon' + (icon === hidden.value ? ' is-active' : '');
                 const template = iconTemplates.querySelector(`template[data-icon="${icon}"]`);
                 if (template) cell.append(template.content.cloneNode(true));
                 else cell.textContent = icon;
@@ -98,9 +89,7 @@ if (document.body.hasAttribute('data-admin')) {
                     hidden.value = icon;
                     grid.querySelectorAll('[data-icon-choice]').forEach((other) => {
                         const active = other.dataset.iconChoice === icon;
-                        other.className =
-                            'flex h-10 cursor-pointer items-center justify-center rounded-[10px] border text-navy transition-colors ' +
-                            (active ? 'border-brand bg-brand text-white' : 'border-field bg-white hover:bg-soft');
+                        other.className = 'le-icon' + (active ? ' is-active' : '');
                     });
                     hidden.dispatchEvent(new Event('input', { bubbles: true }));
                 });
@@ -125,12 +114,11 @@ if (document.body.hasAttribute('data-admin')) {
             input.value = value ?? '';
         }
         input.name = name;
-        input.className =
-            'w-full resize-y rounded-[10px] border border-field bg-white px-3.5 py-3 text-sm font-normal leading-normal text-navy outline-none focus:border-brand';
+        input.className = 'le-input';
 
         if (rich && input.tagName === 'TEXTAREA') {
             const bar = document.createElement('div');
-            bar.className = 'flex items-center gap-1';
+            bar.className = 'le-tools';
             const wrapSelection = (before, after) => {
                 const start = input.selectionStart;
                 const end = input.selectionEnd;
@@ -144,13 +132,13 @@ if (document.body.hasAttribute('data-admin')) {
                 button.type = 'button';
                 button.title = title;
                 button.textContent = text;
-                button.className = 'h-7 min-w-7 cursor-pointer rounded-md border border-field bg-white px-1.5 text-xs text-navy hover:bg-soft ' + cls;
+                button.className = 'le-tool ' + cls;
                 button.addEventListener('click', action);
                 return button;
             };
             bar.append(
-                tool('B', 'Bold', () => wrapSelection('**', '**'), 'font-bold'),
-                tool('I', 'Italic', () => wrapSelection('*', '*'), 'italic'),
+                tool('B', 'Bold', () => wrapSelection('**', '**'), 'is-bold'),
+                tool('I', 'Italic', () => wrapSelection('*', '*'), 'is-italic'),
                 tool('Link', 'Insert link', () => {
                     const url = window.prompt('Link URL (https://\u2026 or /page):');
                     if (!url) return;
@@ -163,7 +151,7 @@ if (document.body.hasAttribute('data-admin')) {
                 })
             );
             const hint = document.createElement('span');
-            hint.className = 'ml-1 text-[11px] font-normal text-ink-500';
+            hint.className = 'le-hint';
             hint.textContent = '**bold** \u00b7 *italic* \u00b7 [text](url)';
             bar.append(hint);
             wrap.append(bar);
@@ -175,36 +163,36 @@ if (document.body.hasAttribute('data-admin')) {
 
     const styleField = (name, type, value) => {
         const wrap = document.createElement('label');
-        wrap.className = 'flex flex-col gap-1.5 text-[13px] font-semibold text-navy';
+        wrap.className = 'le-field';
         const title = name.replace(/([A-Z])/g, ' $1').toLowerCase();
         const label = title.charAt(0).toUpperCase() + title.slice(1);
         wrap.append(type === 'px' ? `${label} (px)` : label);
 
         if (type === 'toggle') {
             const row = document.createElement('div');
-            row.className = 'flex items-center gap-2';
+            row.className = 'le-row';
             const input = document.createElement('input');
             input.type = 'checkbox';
             input.checked = value === '1';
             input.dataset.styleProp = name;
             const hint = document.createElement('span');
-            hint.className = 'text-xs font-normal text-ink-500';
+            hint.className = 'le-hint';
             hint.textContent = 'Hidden from visitors; shown dimmed while editing.';
             row.append(input, hint);
             wrap.replaceChildren('Hide this section', row);
-            wrap.className = 'flex flex-col gap-1.5 border-t border-line pt-4 text-[13px] font-semibold text-danger';
+            wrap.className = 'le-field le-divided';
             return wrap;
         }
         if (type === 'color') {
             const row = document.createElement('div');
-            row.className = 'flex items-center gap-3';
+            row.className = 'le-row';
             const input = document.createElement('input');
             input.type = 'color';
             input.value = value || '#ffffff';
             input.dataset.styleProp = name;
-            input.className = 'h-10 w-16 cursor-pointer rounded-lg border border-field bg-white';
+            input.className = 'le-color';
             const defaultLabel = document.createElement('label');
-            defaultLabel.className = 'flex cursor-pointer items-center gap-1.5 text-xs font-normal text-ink-500';
+            defaultLabel.className = 'le-default';
             const checkbox = document.createElement('input');
             checkbox.type = 'checkbox';
             checkbox.checked = !value;
@@ -214,21 +202,51 @@ if (document.body.hasAttribute('data-admin')) {
             row.append(input, defaultLabel);
             wrap.append(row);
         } else if (type === 'url') {
+            // Any URL-valued field (a background image, say — as opposed to a
+            // link) accepts either an uploaded file or a pasted address.
             const input = document.createElement('input');
             input.type = 'text';
             input.value = value ?? '';
-            input.placeholder = 'https://… (leave blank for the theme default)';
+            input.placeholder = 'Paste an image URL, or upload below';
             input.dataset.styleProp = name;
-            input.className =
-                'w-full rounded-[10px] border border-field bg-white px-3.5 py-3 text-sm font-normal text-navy outline-none focus:border-brand';
-            wrap.append(input);
-            if (value) {
-                const preview = document.createElement('img');
-                preview.src = value;
-                preview.alt = '';
-                preview.className = 'mt-2 h-24 w-full rounded-lg object-cover';
-                wrap.append(preview);
-            }
+            input.className = 'le-input';
+
+            const thumb = document.createElement('img');
+            thumb.className = 'le-thumb';
+            thumb.alt = '';
+            const showThumb = (src) => {
+                thumb.src = src || '';
+                thumb.style.display = src ? '' : 'none';
+            };
+            showThumb(value ?? '');
+            input.addEventListener('input', () => showThumb(input.value.trim()));
+
+            const upload = document.createElement('label');
+            upload.className = 'le-upload';
+            upload.append('Upload from your computer');
+            const file = document.createElement('input');
+            file.type = 'file';
+            file.accept = 'image/*';
+            file.addEventListener('change', async () => {
+                const chosen = file.files[0];
+                if (!chosen) return;
+                showThumb(URL.createObjectURL(chosen)); // instant feedback
+                const body = new FormData();
+                body.append('file', chosen);
+                try {
+                    const response = await request('/live-edit/upload', { method: 'POST', body });
+                    const data = await response.json();
+                    input.value = data.url;
+                    showThumb(data.url);
+                    // Repaint the live preview with the stored URL.
+                    input.dispatchEvent(new Event('input', { bubbles: true }));
+                } catch (error) {
+                    window.alert(error.message);
+                }
+            });
+            upload.append(file);
+
+            wrap.append(input, upload, thumb);
         } else {
             const input = document.createElement('input');
             input.type = 'number';
@@ -237,8 +255,7 @@ if (document.body.hasAttribute('data-admin')) {
             input.value = value ?? '';
             input.placeholder = 'default';
             input.dataset.styleProp = name;
-            input.className =
-                'w-full rounded-[10px] border border-field bg-white px-3.5 py-3 text-sm font-normal text-navy outline-none focus:border-brand';
+            input.className = 'le-input';
             wrap.append(input);
         }
         return wrap;
@@ -248,7 +265,7 @@ if (document.body.hasAttribute('data-admin')) {
         current.styleKey = styleKey;
         const values = (window.liveEditStyles ?? {})[styleKey] ?? {};
         const heading = document.createElement('div');
-        heading.className = 'mt-2 border-t border-line pt-4 text-[11px] font-semibold uppercase tracking-[.14em] text-ink-500';
+        heading.className = 'le-section-heading';
         heading.textContent = 'Style';
         drawerFields.append(heading);
         propNames.forEach((name) => {
@@ -362,29 +379,26 @@ if (document.body.hasAttribute('data-admin')) {
             node = node.parentElement;
         }
         drawerTrail.replaceChildren();
-        drawerTrail.classList.toggle('hidden', items.length === 0);
-        drawerTrail.classList.toggle('flex', items.length > 0);
+        drawerTrail.classList.toggle('is-visible', items.length > 0);
         items.forEach((ancestor, index) => {
             if (index > 0) drawerTrail.append('\u203A');
             const crumb = document.createElement('button');
             crumb.type = 'button';
             crumb.textContent = labelForNode(ancestor);
-            crumb.className = 'cursor-pointer rounded-full bg-soft px-2 py-0.5 font-semibold text-brand hover:bg-brand hover:text-white';
+            crumb.className = 'le-crumb';
             crumb.addEventListener('click', () => switchToNode(ancestor));
             drawerTrail.append(crumb);
         });
     };
 
     const openDrawer = () => {
-        drawer.classList.remove('hidden');
-        drawer.classList.add('flex');
+        drawer.classList.add('is-open');
         drawerFields.querySelector('textarea, input:not([type=checkbox]), select')?.focus();
     };
     const closeDrawer = (force = false) => {
         if (!force && current?.dirty && !window.confirm('Discard unsaved changes?')) return;
         clearStylePreview();
-        drawer.classList.add('hidden');
-        drawer.classList.remove('flex');
+        drawer.classList.remove('is-open');
         current = null;
     };
 
@@ -399,13 +413,8 @@ if (document.body.hasAttribute('data-admin')) {
         sessionStorage.setItem('tb_editing', on ? '1' : '0');
         statusText.textContent = on ? 'Editing mode: click any outlined text or image' : 'Viewing as visitor';
         if (!on && typeof hideHandle === 'function') hideHandle();
-        statusDot.classList.toggle('bg-live', on);
-        statusDot.classList.toggle('bg-sky', !on);
+        ui.toolbar.classList.toggle('is-editing', on);
         toggleButton.textContent = on ? 'Done editing' : 'Edit site';
-        toggleButton.classList.toggle('bg-white', on);
-        toggleButton.classList.toggle('text-brand', on);
-        toggleButton.classList.toggle('bg-brand', !on);
-        toggleButton.classList.toggle('text-white', !on);
         if (!on) closeDrawer(true);
     };
 
@@ -428,7 +437,7 @@ if (document.body.hasAttribute('data-admin')) {
 
     const save = async () => {
         if (!current) return;
-        const saveButton = drawer.querySelector('[data-drawer-save]');
+        const saveButton = ui.saveButton;
         saveButton.disabled = true;
         saveButton.textContent = 'Saving\u2026';
         const restoreButton = () => {
@@ -500,7 +509,7 @@ if (document.body.hasAttribute('data-admin')) {
         current.hrefKey = element.dataset.editHref;
         current.targetKey = element.dataset.editTarget;
         const group = document.createElement('div');
-        group.className = 'flex flex-col gap-1.5 border-t border-line pt-4 text-[13px] font-semibold text-navy';
+        group.className = 'le-field le-divided';
         group.append('Link');
         const hrefInput = document.createElement('input');
         hrefInput.type = 'text';
@@ -511,7 +520,7 @@ if (document.body.hasAttribute('data-admin')) {
         hrefInput.className =
             'w-full rounded-[10px] border border-field bg-white px-3.5 py-3 text-sm font-normal text-navy outline-none focus:border-brand';
         const targetWrap = document.createElement('label');
-        targetWrap.className = 'flex cursor-pointer items-center gap-2 text-xs font-normal text-ink-500';
+        targetWrap.className = 'le-default';
         const targetInput = document.createElement('input');
         targetInput.type = 'checkbox';
         targetInput.dataset.linkField = 'target';
@@ -525,7 +534,7 @@ if (document.body.hasAttribute('data-admin')) {
         current = { kind: 'link' };
         drawerTitle.textContent = element.dataset.editLabel ?? 'Link';
         drawerFields.replaceChildren();
-        drawerDelete.classList.add('hidden');
+        drawerDelete.classList.add('le-hidden');
         appendLinkFields(element);
         setTrail(element);
         openDrawer();
@@ -534,7 +543,7 @@ if (document.body.hasAttribute('data-admin')) {
     const editText = (element) => {
         const [kind, ...rest] = element.dataset.edit.split(':');
         drawerFields.replaceChildren();
-        drawerDelete.classList.add('hidden');
+        drawerDelete.classList.add('le-hidden');
 
         if (kind === 'setting') {
             current = { kind, key: rest[0] };
@@ -556,20 +565,19 @@ if (document.body.hasAttribute('data-admin')) {
             });
             if (element.hasAttribute('data-edit-deletable')) {
                 drawerDelete.textContent = `Delete this ${label.toLowerCase()}`;
-                drawerDelete.classList.remove('hidden');
+                drawerDelete.classList.remove('le-hidden');
             }
 
             const moveRow = document.createElement('div');
-            moveRow.className = 'flex items-center gap-2';
+            moveRow.className = 'le-row';
             const moveLabel = document.createElement('span');
-            moveLabel.className = 'text-[13px] font-semibold text-navy';
+            moveLabel.className = 'le-label';
             moveLabel.textContent = 'Order';
             const moveButton = (direction, text) => {
                 const button = document.createElement('button');
                 button.type = 'button';
                 button.textContent = text;
-                button.className =
-                    'cursor-pointer rounded-full border border-field bg-white px-3 py-1.5 text-xs font-semibold text-navy hover:bg-soft';
+                button.className = 'le-chip-btn';
                 button.addEventListener('click', async () => {
                     const res = await request('/live-edit/record/move', {
                         method: 'POST',
@@ -607,7 +615,7 @@ if (document.body.hasAttribute('data-admin')) {
         };
         drawerTitle.textContent = element.dataset.editLabel ?? roles[element.tagName] ?? 'Block';
         drawerFields.replaceChildren();
-        drawerDelete.classList.add('hidden');
+        drawerDelete.classList.add('le-hidden');
         addStyleFields(styleKey, (element.dataset.styleProps ?? '').split(','));
         setTrail(element.dataset.styleEdit ? (element.closest('[data-style]') ?? element.parentElement) : element);
         openDrawer();
@@ -621,20 +629,20 @@ if (document.body.hasAttribute('data-admin')) {
         current = { kind: 'image', target: element.dataset.editImg ?? element.dataset.editBg };
         drawerTitle.textContent = element.dataset.editLabel ?? (isBackground ? 'Background image' : 'Image');
         drawerFields.replaceChildren();
-        drawerDelete.classList.add('hidden');
+        drawerDelete.classList.add('le-hidden');
 
         const preview = document.createElement('div');
-        preview.className = 'flex h-[200px] items-center justify-center overflow-hidden rounded-xl bg-soft';
+        preview.className = 'le-preview';
         const previewImg = document.createElement('img');
         previewImg.alt = '';
-        previewImg.className = 'size-full object-cover';
+        previewImg.className = '';
         const currentSrc = element.dataset.editPreview;
         if (currentSrc) {
             previewImg.src = currentSrc;
             preview.append(previewImg);
         } else {
             preview.textContent = 'No image yet';
-            preview.classList.add('text-[13px]', 'text-ink-500');
+            
         }
         const showPreview = (src) => {
             preview.replaceChildren(previewImg);
@@ -642,16 +650,14 @@ if (document.body.hasAttribute('data-admin')) {
         };
 
         const fileWrap = document.createElement('label');
-        fileWrap.className =
-            'flex cursor-pointer flex-col gap-2 rounded-xl border-2 border-dashed border-field bg-soft px-4 py-4 text-[13px] font-semibold text-navy transition-colors hover:border-brand hover:bg-brand/5';
+        fileWrap.className = 'le-upload';
         const fileWrapTitle = document.createElement('span');
         fileWrapTitle.textContent = 'Upload from your computer';
         fileWrap.append(fileWrapTitle);
         const fileInput = document.createElement('input');
         fileInput.type = 'file';
         fileInput.accept = 'image/*';
-        fileInput.className =
-            'cursor-pointer text-[13px] font-normal text-ink-500 file:mr-3 file:cursor-pointer file:rounded-full file:border-0 file:bg-brand file:px-4 file:py-2 file:text-[13px] file:font-semibold file:text-white hover:file:bg-navy';
+        fileInput.className = '';
         fileInput.addEventListener('change', () => {
             const file = fileInput.files[0];
             if (file) showPreview(URL.createObjectURL(file));
@@ -659,13 +665,12 @@ if (document.body.hasAttribute('data-admin')) {
         fileWrap.append(fileInput);
 
         const urlWrap = document.createElement('label');
-        urlWrap.className = 'flex flex-col gap-1.5 text-[13px] font-semibold text-navy';
+        urlWrap.className = 'le-field';
         urlWrap.append('Or paste an image URL');
         const urlInput = document.createElement('input');
         urlInput.type = 'url';
         urlInput.placeholder = 'https://...';
-        urlInput.className =
-            'w-full rounded-[10px] border border-field bg-white px-3.5 py-3 text-sm font-normal text-navy outline-none focus:border-brand';
+        urlInput.className = 'le-input';
         urlInput.addEventListener('change', () => {
             const value = urlInput.value.trim();
             if (value) showPreview(value.startsWith('http') ? value : `https://${value}`);
@@ -673,23 +678,22 @@ if (document.body.hasAttribute('data-admin')) {
         urlWrap.append(urlInput);
 
         const note = document.createElement('div');
-        note.className = 'text-xs leading-normal text-ink-500';
+        note.className = 'le-hint';
         note.textContent = 'Uploads are stored on the server and replace the current image.';
 
         const textInput = (name, label, value, hint) => {
             const w = document.createElement('label');
-            w.className = 'flex flex-col gap-1.5 border-t border-line pt-4 text-[13px] font-semibold text-navy';
+            w.className = 'le-field le-divided';
             w.append(label);
             const input = document.createElement('input');
             input.type = 'text';
             input.dataset.imgAttr = name;
             input.value = value ?? '';
-            input.className =
-                'w-full rounded-[10px] border border-field bg-white px-3.5 py-3 text-sm font-normal text-navy outline-none focus:border-brand';
+            input.className = 'le-input';
             w.append(input);
             if (hint) {
                 const h = document.createElement('span');
-                h.className = 'text-xs font-normal text-ink-500';
+                h.className = 'le-hint';
                 h.textContent = hint;
                 w.append(h);
             }
@@ -709,8 +713,7 @@ if (document.body.hasAttribute('data-admin')) {
             const removeButton = document.createElement('button');
             removeButton.type = 'button';
             removeButton.textContent = isBackground ? 'Remove background' : 'Remove image';
-            removeButton.className =
-                'mt-2 cursor-pointer self-start rounded-full border-[1.5px] border-[#F0C4C0] bg-transparent px-4 py-[9px] text-[13px] font-semibold text-danger';
+            removeButton.className = 'le-btn-danger';
             removeButton.addEventListener('click', async () => {
                 const prompt = isBackground
                     ? 'Remove this background image? The section keeps its layout and colour.'
@@ -738,13 +741,6 @@ if (document.body.hasAttribute('data-admin')) {
         return href !== '' && href !== '#' && !href.startsWith('javascript:');
     };
 
-    const linkHandle = document.createElement('button');
-    linkHandle.type = 'button';
-    linkHandle.setAttribute('aria-label', 'Edit this link');
-    linkHandle.innerHTML = '&#9998;';
-    linkHandle.className =
-        'fixed z-[96] hidden size-6 items-center justify-center rounded-full border border-brand bg-white text-xs leading-none text-brand shadow-md';
-    document.body.append(linkHandle);
     let handleTarget = null;
     let overHandle = false;
     let hideTimer = null;
@@ -770,12 +766,10 @@ if (document.body.hasAttribute('data-admin')) {
         const rect = anchor.getBoundingClientRect();
         linkHandle.style.top = `${rect.top + window.scrollY - 10}px`;
         linkHandle.style.left = `${rect.right + window.scrollX - 10}px`;
-        linkHandle.classList.remove('hidden');
-        linkHandle.classList.add('flex');
+        linkHandle.classList.add('is-visible');
     };
     const hideHandle = () => {
-        linkHandle.classList.add('hidden');
-        linkHandle.classList.remove('flex');
+        linkHandle.classList.remove('is-visible');
         handleTarget = null;
     };
 
@@ -818,8 +812,9 @@ if (document.body.hasAttribute('data-admin')) {
         'click',
         (event) => {
             if (!document.body.classList.contains('editing')) return;
-            if (event.target === linkHandle || linkHandle.contains(event.target)) return;
-            if (drawer.contains(event.target) || event.target.closest('[data-edit-toggle],[data-live-create]')) return;
+            // Clicks inside the overlay retarget to its shadow host.
+            if (event.target === ui.root || ui.root.contains(event.target)) return;
+            if (event.target.closest('[data-live-create]')) return;
 
             // Editable links keep navigating; edit them via the hover handle.
             const anchor = editableAnchor(event.target);
@@ -845,10 +840,10 @@ if (document.body.hasAttribute('data-admin')) {
     );
 
     document.addEventListener('keydown', (event) => {
-        if (event.key === 'Escape' && !drawer.classList.contains('hidden')) closeDrawer();
+        if (event.key === 'Escape' && drawer.classList.contains('is-open')) closeDrawer();
         if (!document.body.classList.contains('editing')) return;
         if (event.key !== 'Enter' && event.key !== ' ') return;
-        if (drawer.contains(document.activeElement)) return;
+        if (ui.shadow.activeElement) return;
         const focused = document.activeElement;
         if (focused?.matches('[data-edit-img], [data-edit-bg]')) {
             event.preventDefault();
@@ -861,15 +856,15 @@ if (document.body.hasAttribute('data-admin')) {
 
     toggleButton?.addEventListener('click', () => setEditing(!document.body.classList.contains('editing')));
 
-    document.querySelector('[data-undo]')?.addEventListener('click', async () => {
+    ui.undoButton.addEventListener('click', async () => {
         const res = await request('/live-edit/undo', { method: 'POST' });
         const data = await res.json();
         if (data.undone) reloadWithToast('Undone \u21a9');
         else window.alert('Nothing to undo.');
     });
-    drawer?.querySelector('[data-drawer-close]')?.addEventListener('click', () => closeDrawer());
-    drawer?.querySelector('[data-drawer-cancel]')?.addEventListener('click', () => closeDrawer());
-    drawer?.querySelector('[data-drawer-save]')?.addEventListener('click', save);
+    ui.closeButton.addEventListener('click', () => closeDrawer());
+    ui.cancelButton.addEventListener('click', () => closeDrawer());
+    ui.saveButton.addEventListener('click', save);
 
     drawerDelete?.addEventListener('click', async () => {
         if (!current || current.kind !== 'record') return;

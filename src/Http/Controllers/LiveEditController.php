@@ -6,6 +6,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Routing\Controller;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use ShipFast\LiveEdit\Models\EditRevision;
@@ -242,6 +243,27 @@ class LiveEditController extends Controller
         }
 
         return $this->saved();
+    }
+
+    /**
+     * Store an uploaded image and hand back its URL. Used by style fields that
+     * take an image (a section background), where the value is a URL rather
+     * than a setting — so an editor can upload a file instead of pasting a link.
+     */
+    public function upload(Request $request): JsonResponse
+    {
+        $request->validate([
+            'file' => ['required', 'image', 'max:8192'],
+        ]);
+
+        $path = $request->file('file')->store(
+            config('live-edit.directory'),
+            config('live-edit.disk')
+        );
+
+        return response()->json([
+            'url' => Storage::disk(config('live-edit.disk'))->url($path),
+        ]);
     }
 
     public function updateStyle(Request $request): JsonResponse
