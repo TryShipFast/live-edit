@@ -55,10 +55,14 @@ class MarkupScanner
      * elements. By default only text / image / link are applied — collections
      * need a backing model and real ids the markup alone can't supply.
      *
+     * $labeller, when given, receives the candidate list and returns a human
+     * label per index (this is where the AI refiner plugs in), so auto-tagged
+     * elements can carry a meaningful name instead of a generic role.
+     *
      * @param  array<int, string>  $kinds
      * @return array{html: string, applied: int, skipped: array<string, int>}
      */
-    public function apply(string $html, array $kinds = ['text', 'image', 'link'], bool $auto = false): array
+    public function apply(string $html, array $kinds = ['text', 'image', 'link'], bool $auto = false, ?callable $labeller = null): array
     {
         $this->autoMode = $auto;
         $this->run($html);
@@ -69,10 +73,15 @@ class MarkupScanner
             $this->applyListTags();
         }
 
+        $labels = [];
+        if ($labeller !== null) {
+            $labels = $labeller(array_map(fn (array $c) => array_diff_key($c, ['node' => null]), $this->candidates));
+        }
+
         $applied = 0;
         $skipped = [];
 
-        foreach ($this->candidates as $candidate) {
+        foreach ($this->candidates as $index => $candidate) {
             $node = $candidate['node'] ?? null;
             if (! $node instanceof DOMElement) {
                 continue;
@@ -84,7 +93,7 @@ class MarkupScanner
                 continue;
             }
 
-            $this->writeTag($node, $candidate);
+            $this->writeTag($node, $candidate, (array) ($labels[$index] ?? []));
             $applied++;
         }
 
@@ -114,7 +123,7 @@ class MarkupScanner
         }
     }
 
-    protected function writeTag(DOMElement $node, array $candidate): void
+    protected function writeTag(DOMElement $node, array $candidate, array $meta = []): void
     {
         if ($node->hasAttribute('data-edit') || $node->hasAttribute('data-edit-img') || $node->hasAttribute('data-edit-href')) {
             return; // already tagged — apply is idempotent
@@ -125,7 +134,17 @@ class MarkupScanner
         // In auto mode the key is derived from the element's own words, which
         // makes a poor label ("Magna primis lobortis"); the runtime names the
         // element by its role instead. Hand-authored sites keep their labels.
-        $label = $this->autoMode ? [] : ['data-edit-label' => $this->humanise($candidate['key'])];
+        $label = $this->autoMode
+            // A key derived from the element's own words makes a poor title, so
+            // auto mode stays unlabelled unless a labeller named it properly.
+            ? (filled($meta['label'] ?? null) ? ['data-edit-label' => $meta['label']] : [])
+            : ['data-edit-label' => $this->humanise($candidate['key'])];
+
+        // The region the element was understood to belong to ("Hero", "FAQ")
+        // belongs on the band around it, which is what the editor navigates by.
+        if (filled($meta['region'] ?? null)) {
+            $this->tagRegion($node, (string) $meta['region']);
+        }
 
         match ($candidate['kind']) {
             'text' => $this->setAttrs($node, [
@@ -304,6 +323,23 @@ class MarkupScanner
         }
 
         return $this->structuralPath($node);
+    }
+
+    /** Record the page region on the nearest band containing this element. */
+    protected function tagRegion(DOMElement $node, string $region): void
+    {
+        $bands = ['section', 'header', 'footer', 'nav', 'main', 'article', 'aside'];
+
+        for ($el = $node->parentNode; $el instanceof DOMElement; $el = $el->parentNode) {
+            if (! in_array(strtolower($el->tagName), $bands, true)) {
+                continue;
+            }
+            if (! $el->hasAttribute('data-edit-region')) {
+                $el->setAttribute('data-edit-region', $region);
+            }
+
+            return;
+        }
     }
 
     /**

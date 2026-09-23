@@ -223,6 +223,21 @@ select.le-input {
 }
 .le-upload:hover .le-upload-btn { background: var(--le-ink); color: #fff; border-color: var(--le-ink); }
 
+/* ---- hover indicator ---- */
+.le-hover {
+  position: fixed; z-index: 2147482999; pointer-events: none; display: none;
+  border: 2px solid var(--le-ink); border-radius: 5px;
+  background: rgba(17, 24, 39, .06);
+  transition: top .06s linear, left .06s linear, width .06s linear, height .06s linear;
+}
+.le-hover.is-visible { display: block; }
+.le-hover-label {
+  position: absolute; top: -23px; left: -2px;
+  background: var(--le-ink); color: #fff; font-size: 11px; font-weight: 600;
+  letter-spacing: .02em; padding: 3px 8px; border-radius: 5px; white-space: nowrap;
+}
+.le-hover.is-flipped .le-hover-label { top: auto; bottom: -23px; }
+
 /* ---- floating pencil ---- */
 .le-handle {
   position: fixed; z-index: 2147483001; display: none; width: 26px; height: 26px;
@@ -253,21 +268,12 @@ select.le-input {
 export const PAGE_CSS = `
 body.editing [data-edit],
 body.editing [data-edit-href]:not([data-edit]) {
-  outline: 2px dashed rgba(37, 99, 235, .55);
+  outline: 1px dashed rgba(17, 24, 39, .35);
   outline-offset: 3px;
   border-radius: 3px;
   cursor: pointer;
 }
-body.editing [data-edit]:hover,
-body.editing [data-edit-href]:not([data-edit]):hover {
-  outline-style: solid;
-  outline-color: #2563eb;
-  background: rgba(37, 99, 235, .06);
-}
-body.editing [data-style]:not([data-edit]):hover {
-  outline: 1px dashed rgba(37, 99, 235, .4);
-  outline-offset: 2px;
-}
+/* Hover is drawn by the overlay's indicator, which also names the element. */
 body.editing [data-edit-img],
 body.editing [data-edit-bg] {
   display: flex;
@@ -408,7 +414,11 @@ export function createChrome() {
     bgHandle.title = 'Replace background image';
     bgHandle.textContent = 'Replace background';
 
-    shadow.append(toolbar, drawer, linkHandle, bgHandle);
+    const hoverBox = el('div', 'le-hover');
+    const hoverLabel = el('span', 'le-hover-label');
+    hoverBox.append(hoverLabel);
+
+    shadow.append(toolbar, drawer, linkHandle, bgHandle, hoverBox);
 
     const toast = (message) => {
         const node = el('div', 'le-toast', message);
@@ -436,6 +446,8 @@ export function createChrome() {
         saveButton,
         linkHandle,
         bgHandle,
+        hoverBox,
+        hoverLabel,
         toast,
     };
 }

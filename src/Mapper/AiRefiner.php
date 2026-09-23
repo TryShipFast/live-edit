@@ -53,6 +53,9 @@ class AiRefiner
                 if (! empty($suggestion['label'])) {
                     $candidates[$index]['label'] = (string) $suggestion['label'];
                 }
+                if (! empty($suggestion['region'])) {
+                    $candidates[$index]['region'] = (string) $suggestion['region'];
+                }
             }
         }
 
@@ -75,7 +78,7 @@ class AiRefiner
 
     /**
      * @param  array<int, array<string, mixed>>  $candidates
-     * @return array<int, array{key?: string, label?: string}>
+     * @return array<int, array{key?: string, label?: string, region?: string}>
      */
     protected function ask(array $candidates): array
     {
@@ -89,10 +92,14 @@ class AiRefiner
             ];
         }
 
-        $system = 'You name editable elements for a website CMS. For each item, return a concise camelCase '
-            .'"key" (semantic, from the element role and text — e.g. heroHeadline, servicesSubtitle, footerAddress) '
-            .'and a short human "label" (e.g. "Hero headline"). Keep keys unique. Do not add or remove items. '
-            .'Respond as JSON: {"items":[{"i":0,"key":"...","label":"..."}]}';
+        $system = 'You help a website editor understand a page. The items are elements in document order. '
+            .'For each one return: a concise camelCase "key" (semantic, from the element role and text, '
+            .'e.g. heroHeadline, servicesSubtitle, footerAddress); a short human "label" a non-technical '
+            .'person would recognise (e.g. "Hero headline", "FAQ question", "Price"); and "region", the part '
+            .'of the page it belongs to, chosen consistently across items (e.g. "Hero", "Services", "About", '
+            .'"Pricing", "FAQ", "Testimonials", "Contact", "Footer", "Navigation"). Use document order to infer '
+            .'where one region ends and the next begins. Keep keys unique. Do not add or remove items. '
+            .'Respond as JSON: {"items":[{"i":0,"key":"...","label":"...","region":"..."}]}';
 
         $response = Http::withToken(config('live-edit.ai.api_key'))
             ->timeout((int) config('live-edit.ai.timeout', 30))
@@ -113,7 +120,11 @@ class AiRefiner
         $out = [];
         foreach ($parsed['items'] ?? [] as $item) {
             if (isset($item['i'])) {
-                $out[(int) $item['i']] = ['key' => $item['key'] ?? null, 'label' => $item['label'] ?? null];
+                $out[(int) $item['i']] = [
+                    'key' => $item['key'] ?? null,
+                    'label' => $item['label'] ?? null,
+                    'region' => $item['region'] ?? null,
+                ];
             }
         }
 

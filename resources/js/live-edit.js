@@ -204,6 +204,7 @@ if (document.body.hasAttribute('data-admin')) {
         if (tag === 'HEADER') return 'Header';
         if (tag === 'FOOTER') return 'Footer';
         if (tag === 'FORM') return 'Form';
+        if (element.dataset.editRegion) return element.dataset.editRegion;
         if (element.hasAttribute('data-edit-item')) return 'Card';
         if (element.hasAttribute('data-edit')) return 'Text';
         if (element.hasAttribute('data-has-bg') || element.hasAttribute('data-edit-bg')) return 'Background';
@@ -511,6 +512,8 @@ if (document.body.hasAttribute('data-admin')) {
     // Ancestor trail: jump from an element's editor to any tagged container
     // it sits in (card, section) without hunting for its chip.
     const labelForNode = (node) => {
+        // A band the model understood ("Hero", "FAQ") beats a generic role.
+        if (node.dataset.editRegion) return node.dataset.editRegion;
         if (node.dataset.editLabel) return node.dataset.editLabel;
         const chip = node.querySelector(':scope > [data-style-edit]');
 

@@ -52,7 +52,7 @@ class ScanForEditables extends Command
         $html = (string) file_get_contents($path);
 
         if ($this->option('apply')) {
-            return $this->apply($scanner, $path, $html);
+            return $this->apply($scanner, $refiner, $path, $html);
         }
 
         $result = $scanner->scan($html);
@@ -210,7 +210,7 @@ class ScanForEditables extends Command
         return self::SUCCESS;
     }
 
-    protected function apply(MarkupScanner $scanner, string $path, string $html): int
+    protected function apply(MarkupScanner $scanner, AiRefiner $refiner, string $path, string $html): int
     {
         // Writing tags back through the HTML parser corrupts Blade: `->` becomes
         // `-&gt;` and `{{ route() }}` in an attribute gets URL-encoded. Refuse
@@ -226,7 +226,26 @@ class ScanForEditables extends Command
             return self::FAILURE;
         }
 
-        $result = $scanner->apply($html, ['text', 'image', 'link'], (bool) $this->option('auto'));
+        // With --ai, the model names each element ("Hero headline") instead of
+        // leaving the editor a generic role ("Heading"). Detection stays
+        // deterministic; only the naming is interpreted.
+        $labeller = null;
+        if ($this->option('ai')) {
+            if (! $refiner->enabled()) {
+                $this->components->warn('AI naming is off. Set LIVE_EDIT_AI=true and OPENAI_API_KEY to label elements.');
+            } else {
+                $labeller = function (array $candidates) use ($refiner): array {
+                    $refined = $refiner->refine($candidates);
+
+                    return array_map(fn (array $candidate) => [
+                        'label' => $candidate['label'] ?? null,
+                        'region' => $candidate['region'] ?? null,
+                    ], $refined);
+                };
+            }
+        }
+
+        $result = $scanner->apply($html, ['text', 'image', 'link'], (bool) $this->option('auto'), $labeller);
 
         $target = $this->option('in-place')
             ? $path
