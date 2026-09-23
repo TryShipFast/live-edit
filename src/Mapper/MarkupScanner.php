@@ -7,6 +7,7 @@ use DOMElement;
 use DOMNode;
 use DOMXPath;
 use Illuminate\Support\Str;
+use ShipFast\LiveEdit\Support\ContentSignature;
 
 /**
  * Recognises the editable surface of arbitrary HTML — the core of the
@@ -65,6 +66,8 @@ class MarkupScanner
     public function apply(string $html, array $kinds = ['text', 'image', 'link'], bool $auto = false, ?callable $labeller = null, string $page = ''): array
     {
         $this->page = $page;
+        $this->sharedKeys = [];
+        $this->sharedSeen = [];
 
         $this->autoMode = $auto;
         $this->run($html);
@@ -410,6 +413,41 @@ class MarkupScanner
      * The OUTERMOST sectioning ancestor decides it, so a <header class="major">
      * heading inside a section stays the page's own.
      */
+    /**
+     * A content-based key for an element in a repeated region.
+     *
+     * Memoised per node: a node can be asked for its key more than once (its
+     * words and its link are separate candidates), and the repeat counter must
+     * not move underneath it.
+     */
+    protected function sharedKey(DOMElement $node): string
+    {
+        $path = $node->getNodePath();
+        if (isset($this->sharedKeys[$path])) {
+            return $this->sharedKeys[$path];
+        }
+
+        $band = $this->bandFor($node);
+        $signature = strtolower($band?->tagName ?? 'shared').'/'.ContentSignature::of($node);
+        // The same words can appear twice in one footer, so each repeat is
+        // numbered in document order.
+        $occurrence = $this->sharedSeen[$signature] = ($this->sharedSeen[$signature] ?? -1) + 1;
+
+        return $this->sharedKeys[$path] = 'shared:'.$signature.'#'.$occurrence;
+    }
+
+    /** Whether this element sits inside a list item, which keys its own way. */
+    protected function insideListItem(DOMElement $node): bool
+    {
+        for ($el = $node; $el instanceof DOMElement; $el = $el->parentNode) {
+            if ($el->hasAttribute('data-edit-item')) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
     protected function isShared(DOMElement $node): bool
     {
         $band = $this->bandFor($node);
@@ -419,7 +457,17 @@ class MarkupScanner
 
     protected function keyPath(DOMElement $node): string
     {
-        $scope = ($this->page === '' || $this->isShared($node)) ? '' : 'page:'.$this->page.'/';
+        $shared = $this->isShared($node);
+        $scope = ($this->page === '' || $shared) ? '' : 'page:'.$this->page.'/';
+
+        // In a region the theme repeats, name the element by what it holds
+        // rather than by where it sits. A footer copied onto every page picks
+        // up small differences — one page carries an extra block above the
+        // copyright — and a position-based name then treats the same line as
+        // two, so editing it on one page leaves the others behind.
+        if ($shared && ! $this->insideListItem($node)) {
+            return $this->sharedKey($node);
+        }
 
         // Inside a list, key relative to the item's own id. The id is only
         // unique within its list ("i0" is the first item of every list on the
@@ -457,6 +505,12 @@ class MarkupScanner
      */
     /** The page being tagged, so its content does not collide with another's. */
     protected string $page = '';
+
+    /** Node path => key, so a node asked twice answers the same. */
+    protected array $sharedKeys = [];
+
+    /** Signature => times seen, to number repeats within one page. */
+    protected array $sharedSeen = [];
 
     protected function bandFor(DOMElement $node): ?DOMElement
     {
@@ -527,7 +581,13 @@ class MarkupScanner
                 continue;
             }
 
-            $container->setAttribute('data-edit-list', 'auto:'.substr(hash('sha256', $this->structuralPath($container).'#list'), 0, 12));
+            // A repeated region's list is named by its contents for the same
+            // reason its text is: the menu is the menu on every page, however
+            // the markup around it shifts.
+            $identity = $this->isShared($container)
+                ? 'shared-list:'.ContentSignature::ofSubtree($container)
+                : $this->structuralPath($container).'#list';
+            $container->setAttribute('data-edit-list', 'auto:'.substr(hash('sha256', $identity), 0, 12));
 
             $index = 0;
             foreach ($container->childNodes as $child) {

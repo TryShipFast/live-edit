@@ -469,4 +469,60 @@ class MarkupScannerTest extends TestCase
         $this->assertStringNotContainsString('alert(1)', $rendered);
         $this->assertMatchesRegularExpression('/class="[A-Za-z0-9 _-]*"/', $rendered);
     }
+
+    public function test_a_repeated_region_keys_the_same_element_alike_on_pages_that_differ(): void
+    {
+        // The homepage footer carries an extra block above the copyright. By
+        // position those are two different elements; they are not.
+        $home = '<footer><div>Follow us</div><div><p>&copy; Transfar</p></div></footer>';
+        $inner = '<footer><div><p>&copy; Transfar</p></div></footer>';
+
+        $scanner = new MarkupScanner;
+        $homeKey = $this->keyOfText($scanner->apply($home, ['text'], true, null, '')['html'], 'Transfar');
+        $innerKey = $this->keyOfText($scanner->apply($inner, ['text'], true, null, 'about')['html'], 'Transfar');
+
+        $this->assertNotNull($homeKey);
+        $this->assertSame($homeKey, $innerKey, 'A footer line should be the same line on every page.');
+    }
+
+    public function test_a_repeated_menu_keys_the_same_however_the_markup_around_it_shifts(): void
+    {
+        $home = '<nav><div class="promo">New</div><ul><li><a href="a.html">About</a></li><li><a href="b.html">Blog</a></li></ul></nav>';
+        $inner = '<nav><ul><li><a href="a.html">About</a></li><li><a href="b.html">Blog</a></li></ul></nav>';
+
+        $scanner = new MarkupScanner;
+        $homeHtml = $scanner->apply($home, ['text'], true, null, '')['html'];
+        $innerHtml = $scanner->apply($inner, ['text'], true, null, 'about')['html'];
+
+        preg_match('/data-edit-list="(auto:[a-f0-9]+)"/', $homeHtml, $a);
+        preg_match('/data-edit-list="(auto:[a-f0-9]+)"/', $innerHtml, $b);
+        $this->assertNotEmpty($a);
+        $this->assertSame($a[1], $b[1], 'The menu is the same menu on every page.');
+    }
+
+    public function test_page_content_outside_a_repeated_region_stays_the_page_own(): void
+    {
+        // Same words, same layout, different pages: these must not share.
+        $markup = '<section><h1>Welcome</h1></section>';
+
+        $scanner = new MarkupScanner;
+        $one = $this->firstTextKey($scanner->apply($markup, ['text'], true, null, 'about')['html']);
+        $two = $this->firstTextKey($scanner->apply($markup, ['text'], true, null, 'contact')['html']);
+
+        $this->assertNotNull($one);
+        $this->assertNotSame($one, $two);
+    }
+
+    protected function firstTextKey(string $html): ?string
+    {
+        return preg_match('/data-edit="setting:(auto:[a-f0-9]+)"/', $html, $m) ? $m[1] : null;
+    }
+
+    /** The key on the element holding this text. */
+    protected function keyOfText(string $html, string $needle): ?string
+    {
+        $pattern = '/data-edit="setting:(auto:[a-f0-9]+)"[^>]*>[^<]*'.preg_quote($needle, '/').'/';
+
+        return preg_match($pattern, $html, $m) ? $m[1] : null;
+    }
 }

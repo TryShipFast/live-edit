@@ -108,24 +108,6 @@ class KeyMigrator
     /** What the theme put in this element, which a re-tag does not change. */
     protected static function signature(DOMElement $node): string
     {
-        $parts = [strtolower($node->tagName)];
-
-        // An element's own words, ignoring anything its children contribute.
-        $own = '';
-        foreach ($node->childNodes as $child) {
-            if ($child->nodeType === XML_TEXT_NODE) {
-                $own .= $child->nodeValue;
-            }
-        }
-        $parts[] = trim((string) preg_replace('/\s+/', ' ', $own));
-
-        // For media the address is the more stable identity.
-        foreach (['src', 'href', 'data-background'] as $attribute) {
-            if ($node->hasAttribute($attribute)) {
-                $parts[] = $attribute.'='.$node->getAttribute($attribute);
-            }
-        }
-
-        return implode('|', $parts);
+        return ContentSignature::of($node);
     }
 }
