@@ -23,8 +23,8 @@ const CHROME_CSS = `
   --le-line: #e8ecf1;
   --le-field: #d6dde7;
   --le-soft: #f6f8fb;
-  --le-accent: #4f46e5;
-  --le-accent-soft: rgba(79, 70, 229, .12);
+  --le-accent: #111827;
+  --le-accent-soft: rgba(17, 24, 39, .10);
   --le-danger: #e11d48;
   --le-live: #22c55e;
   --le-shadow: 0 24px 60px -12px rgba(11, 18, 32, .28), 0 8px 20px -8px rgba(11, 18, 32, .16);
@@ -54,9 +54,9 @@ button, input, select, textarea { font: inherit; color: inherit; margin: 0; }
   cursor: pointer; border: 0; border-radius: 999px; padding: 9px 18px;
   font-size: 13px; font-weight: 600; background: var(--le-accent); color: #fff;
   text-decoration: none; display: inline-flex; align-items: center; gap: 6px;
-  box-shadow: 0 6px 16px -6px rgba(79,70,229,.7); transition: transform .15s ease, box-shadow .15s ease, background .15s ease;
+  box-shadow: 0 6px 16px -8px rgba(11,18,32,.6); transition: transform .15s ease, box-shadow .15s ease, background .15s ease;
 }
-.le-btn:hover { background: #4338ca; transform: translateY(-1px); }
+.le-btn:hover { background: #000; transform: translateY(-1px); }
 .le-btn:active { transform: translateY(0); }
 .le-btn-ghost {
   cursor: pointer; border: 1px solid rgba(255,255,255,.16); background: rgba(255,255,255,.04);
@@ -64,6 +64,8 @@ button, input, select, textarea { font: inherit; color: inherit; margin: 0; }
   text-decoration: none; display: inline-flex; align-items: center; transition: background .15s ease, color .15s ease;
 }
 .le-btn-ghost:hover { background: rgba(255,255,255,.12); color: #fff; }
+.le-toolbar .le-btn { background: #fff; color: #0b1220; box-shadow: none; }
+.le-toolbar .le-btn:hover { background: #e9edf3; }
 .le-locale {
   cursor: pointer; border: 1px solid rgba(255,255,255,.16); background: rgba(255,255,255,.04);
   color: #cbd5e1; border-radius: 999px; padding: 8px 12px; font-size: 13px;
@@ -166,9 +168,10 @@ button, input, select, textarea { font: inherit; color: inherit; margin: 0; }
   position: fixed; z-index: 2147483001; display: none; width: 26px; height: 26px;
   align-items: center; justify-content: center; border-radius: 999px;
   border: 0; background: var(--le-accent); color: #fff;
-  font-size: 12px; line-height: 1; cursor: pointer; box-shadow: 0 6px 16px -4px rgba(79,70,229,.8);
+  font-size: 12px; line-height: 1; cursor: pointer; box-shadow: 0 6px 16px -4px rgba(11,18,32,.6);
 }
 .le-handle.is-visible { display: flex; }
+.le-handle-bg { width: 28px; height: 28px; font-size: 13px; background: #0b1220; }
 
 /* ---- toast ---- */
 .le-toast {
@@ -333,7 +336,15 @@ export function createChrome() {
     linkHandle.setAttribute('aria-label', 'Edit this link');
     linkHandle.innerHTML = '&#9998;';
 
-    shadow.append(toolbar, drawer, linkHandle);
+    // Backgrounds painted by the theme's stylesheet have nothing in the markup
+    // to click, so they get their own hover handle.
+    const bgHandle = el('button', 'le-handle le-handle-bg');
+    bgHandle.type = 'button';
+    bgHandle.setAttribute('aria-label', 'Replace this background image');
+    bgHandle.title = 'Replace background image';
+    bgHandle.innerHTML = '&#9635;';
+
+    shadow.append(toolbar, drawer, linkHandle, bgHandle);
 
     const toast = (message) => {
         const node = el('div', 'le-toast', message);
@@ -360,6 +371,7 @@ export function createChrome() {
         cancelButton,
         saveButton,
         linkHandle,
+        bgHandle,
         toast,
     };
 }

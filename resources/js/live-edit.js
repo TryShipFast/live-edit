@@ -59,7 +59,7 @@ if (document.body.hasAttribute('data-admin')) {
         sessionStorage.setItem('tb_toast', message);
         reloadPreservingScroll();
     };
-    const { drawer, drawerTitle, drawerTrail, drawerFields, drawerDelete, toggleButton, statusText, linkHandle } = ui;
+    const { drawer, drawerTitle, drawerTrail, drawerFields, drawerDelete, toggleButton, statusText, linkHandle, bgHandle } = ui;
 
     let current = null;
 
@@ -431,6 +431,22 @@ if (document.body.hasAttribute('data-admin')) {
 
     const editables = () => document.querySelectorAll('[data-edit], [data-edit-img], [data-edit-bg], [data-edit-href]');
 
+    /**
+     * A background set in the theme's stylesheet exists nowhere in the markup,
+     * so the scanner cannot tag it. The browser can see it, though: mark such
+     * elements when editing starts so they get a hover handle of their own.
+     */
+    const markLiveBackgrounds = () => {
+        document.querySelectorAll('[data-style]').forEach((element) => {
+            if (element.hasAttribute('data-edit-bg')) return;
+            const computed = getComputedStyle(element).backgroundImage || '';
+            const match = computed.match(/url\((['"]?)(.*?)\1\)/);
+            const rect = element.getBoundingClientRect();
+            const worthEditing = match && !match[2].startsWith('data:') && rect.width >= 120 && rect.height >= 120;
+            element.toggleAttribute('data-has-bg', Boolean(worthEditing));
+        });
+    };
+
     const setEditing = (on) => {
         document.body.classList.toggle('editing', on);
         editables().forEach((el) => {
@@ -442,6 +458,8 @@ if (document.body.hasAttribute('data-admin')) {
         if (!on && typeof hideHandle === 'function') hideHandle();
         ui.toolbar.classList.toggle('is-editing', on);
         toggleButton.textContent = on ? 'Done editing' : 'Edit site';
+        if (on) markLiveBackgrounds();
+        else hideBgHandle();
         if (!on) closeDrawer(true);
     };
 
@@ -858,8 +876,29 @@ if (document.body.hasAttribute('data-admin')) {
         handleTarget = null;
     };
 
+    let bgTarget = null;
+    const hideBgHandle = () => {
+        bgHandle.classList.remove('is-visible');
+        bgTarget = null;
+    };
+    const showBgHandle = (element) => {
+        bgTarget = element;
+        const rect = element.getBoundingClientRect();
+        bgHandle.style.top = `${Math.max(rect.top, 8) + 8}px`;
+        bgHandle.style.left = `${rect.left + 8}px`;
+        bgHandle.classList.add('is-visible');
+    };
+    bgHandle.addEventListener('click', (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        if (bgTarget) editStyle(bgTarget);
+        hideBgHandle();
+    });
+
     document.addEventListener('pointerover', (event) => {
         if (!document.body.classList.contains('editing')) return;
+        const withBackground = event.target.closest?.('[data-has-bg]');
+        if (withBackground) showBgHandle(withBackground);
         const anchor = editableAnchor(event.target);
         if (anchor && navigable(anchor)) {
             cancelHide();
