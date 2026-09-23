@@ -881,8 +881,10 @@ const bootLiveEdit = () => {
             const currentHref = element.getAttribute('href') ?? '';
             hrefInput.value = currentHref === '#' ? '' : currentHref;
             hrefInput.placeholder = '/contact or https://...';
-            hrefInput.className =
-                'w-full rounded-[10px] border border-field bg-white px-3.5 py-3 text-sm font-normal text-navy outline-none focus:border-brand';
+            // These were utility classes from before the editor moved into a
+            // shadow root, where the page's stylesheet cannot reach: the field
+            // had been rendering unstyled next to a text box that was not.
+            hrefInput.className = 'le-input le-link';
             const targetWrap = document.createElement('label');
             targetWrap.className = 'le-default';
             const targetInput = document.createElement('input');

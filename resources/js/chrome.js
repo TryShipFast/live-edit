@@ -136,6 +136,13 @@ button, input, select, textarea { font: inherit; color: inherit; margin: 0; }
 }
 .le-prose:hover { background: #fff; }
 .le-prose:focus { background: #fff; }
+/* The address sits beside the words, so it is built from the same surface:
+   one field, not a form control bolted under a designed one. */
+.le-link {
+  font-size: 15px; padding: 13px 16px; border-radius: 14px; background: var(--le-soft);
+  transition: border-color .15s ease, box-shadow .15s ease, background .15s ease;
+}
+.le-link:hover, .le-link:focus { background: #fff; }
 .le-input:focus { border-color: var(--le-accent); box-shadow: 0 0 0 4px var(--le-accent-soft); }
 .le-icon-grid {
     display: grid;
