@@ -184,20 +184,34 @@ class MarkupScanner
             $this->tagRegion($node, (string) $meta['region']);
         }
 
+        // A counter's words are a placeholder, so say where its real value
+        // lives. The panel shows that instead of the "00" on the page, which
+        // is also what the client sees once the script has run and left the
+        // element with no words of its own at all.
+        $counter = $this->counterAttributeOf($node);
+        $counted = $counter === null ? [] : [
+            'data-edit-attr' => $counter,
+            'data-edit-value' => trim($node->getAttribute($counter)),
+        ];
+
         match ($candidate['kind']) {
             'text' => $this->setAttrs($node, [
                 'data-edit' => 'setting:'.$key,
-            ] + $label),
+            ] + $counted + $label),
             'image' => $this->setAttrs($node, [
                 'data-edit-img' => 'setting:'.$key,
                 'data-edit-preview' => $node->getAttribute('src'),
             ] + $label),
             'link' => $this->setAttrs($node, $this->autoMode
-                // Auto: a link's TEXT and its href are both editable.
-                ? [
-                    'data-edit' => 'setting:'.$key,
+                // Auto: a link's href is editable, and its text too when the
+                // words are its own. A social link wraps them in a span
+                // ("<a><span>Instagram</span></a>"), and offering the anchor a
+                // text box then hands the client a blank for a word plainly on
+                // the page. The span is reached and tagged separately.
+                ? array_filter([
+                    'data-edit' => ContentSignature::hasOwnText($node) ? 'setting:'.$key : null,
                     'data-edit-href' => 'auto:'.$this->autoKey($node, '#href'),
-                ]
+                ])
                 : [
                     'data-edit-href' => $key,
                     'data-edit-label' => $this->humanise($candidate['key']),
@@ -299,6 +313,14 @@ class MarkupScanner
             }
             if (! $replaced) {
                 $node->appendChild($this->doc->createTextNode($overrides[$key]));
+            }
+
+            // A counter renders from its attribute, so text alone would be
+            // overwritten the moment the theme's script ran.
+            $attribute = $node->getAttribute('data-edit-attr');
+            if ($attribute !== '') {
+                $node->setAttribute($attribute, $overrides[$key]);
+                $node->setAttribute('data-edit-value', $overrides[$key]);
             }
         }
 
@@ -631,6 +653,19 @@ class MarkupScanner
     }
 
     /** Style props every element exposes to the editor. */
+    /**
+     * Attributes a theme's own script counts up from.
+     *
+     * A counter shows a number the markup does not contain: the text is a
+     * placeholder ("00") and the real figure sits in an attribute, which the
+     * script renders once the section is scrolled to. Editing the text is
+     * pointless — the script overwrites it on the next load — so the attribute
+     * is the thing the client is actually changing.
+     */
+    protected const COUNTER_ATTRIBUTES = [
+        'data-count', 'data-counter', 'data-number', 'data-num', 'data-stop', 'data-purecounter-end',
+    ];
+
     protected const STYLE_PROPS = 'background,backgroundImage,textColor,fontSize,paddingY,paddingX,radius,hidden';
 
     /**
@@ -808,6 +843,14 @@ class MarkupScanner
                 continue;
             }
 
+            // Before anything else: a counter's placeholder text can fail the
+            // usual checks, and two of Transfar's four went untagged for it.
+            if ($this->counterAttributeOf($child) !== null) {
+                $this->addText($child);
+
+                continue;
+            }
+
             if ($tag === 'a' && $child->getAttribute('href') !== '') {
                 $this->addLink($child);
                 if (! $this->isTextLeaf($child)) {
@@ -829,11 +872,48 @@ class MarkupScanner
             if (in_array($tag, self::TEXT_TAGS, true) && $this->isTextLeaf($child)) {
                 $this->addText($child);
 
+                // A counter sits inside a wrapper whose own words are a suffix
+                // ("3670" + "K"). The wrapper is editable for the suffix, but
+                // the number is a separate thing and has to be reached.
+                if ($this->hasCounterInside($child)) {
+                    $this->walk($child);
+                }
+
                 continue;
             }
 
             $this->walk($child);
         }
+    }
+
+    /**
+     * The attribute holding this element's number, if it is a counter.
+     *
+     * The value must look like a number, which is what keeps this from
+     * matching the many other things a theme keeps in a data attribute.
+     */
+    protected function counterAttributeOf(DOMElement $element): ?string
+    {
+        foreach (self::COUNTER_ATTRIBUTES as $attribute) {
+            if ($element->hasAttribute($attribute)
+                && preg_match('/^\s*\d[\d,. ]*\s*$/', $element->getAttribute($attribute))) {
+                return $attribute;
+            }
+        }
+
+        return null;
+    }
+
+    /** Whether a counter sits somewhere below this element. */
+    protected function hasCounterInside(DOMElement $element): bool
+    {
+        foreach ($element->getElementsByTagName('*') as $descendant) {
+            if ($descendant instanceof DOMElement && $this->counterAttributeOf($descendant) !== null) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     protected function isTextLeaf(DOMElement $element): bool

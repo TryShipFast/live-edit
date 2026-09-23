@@ -525,4 +525,80 @@ class MarkupScannerTest extends TestCase
 
         return preg_match($pattern, $html, $m) ? $m[1] : null;
     }
+
+    public function test_a_counter_offers_the_number_it_shows_not_its_placeholder(): void
+    {
+        // The markup says "00"; the figure on the page is 3670, rendered from
+        // the attribute by the theme's own script.
+        $html = (new MarkupScanner)->apply('<span class="odometer" data-count="3670">00</span>', ['text'], true)['html'];
+
+        $this->assertStringContainsString('data-edit-value="3670"', $html);
+        $this->assertStringContainsString('data-edit-attr="data-count"', $html);
+    }
+
+    public function test_editing_a_counter_writes_where_its_script_reads(): void
+    {
+        // Text alone is overwritten the moment the script runs.
+        $tagged = (new MarkupScanner)->apply('<span class="odometer" data-count="3670">00</span>', ['text'], true)['html'];
+        preg_match('/data-edit="setting:(auto:[a-f0-9]+)"/', $tagged, $m);
+
+        $rendered = (new MarkupScanner)->applyOverrides($tagged, [$m[1] => '4200']);
+
+        $this->assertStringContainsString('data-count="4200"', $rendered);
+        $this->assertStringContainsString('data-edit-value="4200"', $rendered);
+        $this->assertStringNotContainsString('data-count="3670"', $rendered);
+    }
+
+    public function test_every_counter_on_a_page_is_editable(): void
+    {
+        // Two of Transfar's four went untagged, because a placeholder like "00"
+        // can fail the checks that decide what counts as editable text.
+        $html = (new MarkupScanner)->apply(
+            '<div><span class="odometer" data-count="6823">00</span><span class="odometer" data-count="3670">00</span>'
+            .'<span class="odometer" data-count="690">00</span><span class="odometer" data-count="200">00</span></div>',
+            ['text'],
+            true
+        )['html'];
+
+        $this->assertSame(4, substr_count($html, 'data-edit-attr="data-count"'));
+        $this->assertSame(4, preg_match_all('/data-edit="setting:auto:[a-f0-9]+"/', $html));
+    }
+
+    public function test_a_counter_inside_a_wrapper_is_still_reachable(): void
+    {
+        // "3670" with a "+" beside it: the wrapper owns the suffix, but the
+        // number is its own thing and must not be swallowed by it.
+        $html = (new MarkupScanner)->apply('<h3><span class="odometer" data-count="690">00</span>+</h3>', ['text'], true)['html'];
+
+        $this->assertStringContainsString('data-edit-attr="data-count"', $html);
+        $this->assertStringContainsString('data-edit-value="690"', $html);
+    }
+
+    public function test_a_link_whose_words_live_in_a_child_gets_no_text_box(): void
+    {
+        // Spectral's social links: <a><span class="label">Instagram</span></a>.
+        // The anchor has no words of its own, so a text box on it is a blank.
+        $html = (new MarkupScanner)->apply('<a href="#" class="icon brands"><span class="label">Instagram</span></a>', ['text', 'link'], true)['html'];
+
+        $this->assertStringContainsString('data-edit-href=', $html);
+        $this->assertDoesNotMatchRegularExpression('/<a[^>]*data-edit="setting:/', $html);
+        // The word itself is still reachable, on the element that holds it.
+        $this->assertMatchesRegularExpression('/<span[^>]*data-edit="setting:/', $html);
+    }
+
+    public function test_a_link_with_its_own_words_still_gets_a_text_box(): void
+    {
+        $html = (new MarkupScanner)->apply('<a href="/about">About us</a>', ['text', 'link'], true)['html'];
+
+        $this->assertMatchesRegularExpression('/<a[^>]*data-edit="setting:/', $html);
+        $this->assertStringContainsString('data-edit-href=', $html);
+    }
+
+    public function test_a_data_attribute_that_is_not_a_number_is_left_alone(): void
+    {
+        // Themes keep all sorts of things in data attributes.
+        $html = (new MarkupScanner)->apply('<div data-count="open" data-number="#target">Panel</div>', ['text'], true)['html'];
+
+        $this->assertStringNotContainsString('data-edit-attr', $html);
+    }
 }

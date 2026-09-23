@@ -691,6 +691,22 @@ const bootLiveEdit = () => {
         const iconCatalogue = () => (iconCataloguePromise ??= buildIconCatalogue());
 
         /**
+         * A background set in the theme's stylesheet exists nowhere in the markup,
+         * so the scanner cannot tag it. The browser can see it, though: mark such
+         * elements when editing starts so they get a hover handle of their own.
+         */
+        const markLiveBackgrounds = () => {
+            document.querySelectorAll('[data-style]').forEach((element) => {
+                if (element.hasAttribute('data-edit-bg')) return;
+                const computed = getComputedStyle(element).backgroundImage || '';
+                const match = computed.match(/url\((['"]?)(.*?)\1\)/);
+                const rect = element.getBoundingClientRect();
+                const worthEditing = match && !match[2].startsWith('data:') && rect.width >= 120 && rect.height >= 120;
+                element.toggleAttribute('data-has-bg', Boolean(worthEditing));
+            });
+        };
+
+        /**
          * Drop the icon affordance from elements that are not showing an icon.
          *
          * The scanner only sees markup, so a class that merely looks like an

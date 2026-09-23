@@ -193,4 +193,59 @@ test.describe('a site running the editor', () => {
         await page.getByRole('button', { name: /save changes/i }).click();
         await expect(page.locator('body')).not.toContainText(edited, { timeout: 15000 });
     });
+
+    test('throws nothing while the client edits', async ({ page }) => {
+        // A function was deleted by a careless edit and its caller left behind.
+        // Editing carried on well enough to look fine, while backgrounds set in
+        // the theme's stylesheet quietly stopped being editable at all. Nothing
+        // asserted that the page was not throwing, so nothing said so.
+        const thrown = [];
+        page.on('pageerror', (error) => thrown.push(String(error).slice(0, 160)));
+
+        await startEditing(page);
+        await openEditableText(page);
+
+        expect(thrown).toEqual([]);
+    });
+
+    test('never opens an empty box on words the page is showing', async ({ page }) => {
+        // A counter shows a number the markup does not contain: its text is a
+        // placeholder the theme's script replaces, so the panel offered an
+        // empty box for a figure plainly on the page.
+        //
+        // Every element is checked rather than a handful, so this asks what the
+        // panel WOULD show, by the same rule it uses, instead of opening each
+        // one. The case above already opens one for real.
+        await startEditing(page);
+
+        const empties = await page.evaluate(() =>
+            [...document.querySelectorAll('[data-edit^="setting:auto:"]')]
+                .filter((element) => {
+                    if (element.closest('[data-style-edit], [data-edit-img], [data-edit-bg]')) return false;
+                    if (element.querySelector('[data-edit-img], [data-edit-bg]')) return false;
+
+                    // What the page DISPLAYS, not what the markup holds. A
+                    // counter's own words are emptied by the script that draws
+                    // it, so asking the markup skips the very case that broke.
+                    const box = element.getBoundingClientRect();
+                    if (element.textContent.trim() === '' || box.width < 2 || box.height < 2) return false;
+
+                    const own = [...element.childNodes]
+                        .filter((node) => node.nodeType === Node.TEXT_NODE)
+                        .map((node) => node.nodeValue)
+                        .join('')
+                        .trim();
+
+                    // The panel shows the recorded value, or the element's own
+                    // words. If both are empty the client is handed a blank.
+                    return (element.dataset.editValue ?? '') === '' && own === '';
+                })
+                .map((element) => ({
+                    key: element.dataset.edit,
+                    showing: element.textContent.replace(/\s+/g, ' ').trim().slice(0, 30),
+                }))
+        );
+
+        expect(empties, 'these show words but would open an empty box').toEqual([]);
+    });
 });
