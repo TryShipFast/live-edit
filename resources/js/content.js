@@ -47,6 +47,50 @@ export const applyValue = (element, value) => {
     element.textContent = value;
 };
 
+/**
+ * Swap an icon's class for another, leaving the theme's own classes alone.
+ *
+ * One name replaces the one that is there. Several mean the editor moved this
+ * icon to a different variant of the theme's own set, which takes a different
+ * list — so the list stands in for the whole attribute.
+ */
+export const applyIcon = (element, value) => {
+    // Class names land in an attribute, so nothing but class names goes in.
+    const chosen = String(value).replace(/[^A-Za-z0-9_\- ]/g, '').split(/\s+/).filter(Boolean);
+    const was = element.getAttribute('data-edit-icon-current');
+
+    if (chosen.length === 0 || !was) {
+        return false;
+    }
+
+    const classes = chosen.length === 1
+        ? (element.getAttribute('class') ?? '').trim().split(/\s+/).map((c) => (c === was ? chosen[0] : c))
+        : chosen;
+
+    element.setAttribute('class', classes.join(' '));
+    element.setAttribute('data-edit-icon-current', chosen.length === 1 ? chosen[0] : chosen[chosen.length - 1]);
+
+    return true;
+};
+
+/**
+ * Point a background at a new picture.
+ *
+ * Both the theme's own lazy-loading attributes and an inline style, because a
+ * theme that reads one on load will otherwise put the old picture back.
+ */
+export const applyBackground = (element, url) => {
+    for (const attribute of ['data-background', 'data-bg', 'data-background-image']) {
+        if (element.hasAttribute(attribute)) {
+            element.setAttribute(attribute, url);
+        }
+    }
+
+    const style = (element.getAttribute('style') ?? '').replace(/background-image\s*:[^;]*;?/gi, '').trim();
+
+    element.setAttribute('style', `${style ? style.replace(/;?$/, ';') : ''}background-image:url('${url}')`);
+};
+
 /** @param {Record<string, string>} settings */
 export const applyContent = (root, settings) => {
     let applied = 0;
@@ -81,6 +125,36 @@ export const applyContent = (root, settings) => {
             applyValue(element, settings[key]);
             applied++;
         }
+    }
+
+    // An icon is a set of class names, not words. The server swaps them the
+    // same way; two implementations of one rule is how an icon ends up
+    // different depending on which kind of site it is on.
+    for (const element of root.querySelectorAll('[data-edit-icon]')) {
+        const key = (element.getAttribute('data-edit-icon') ?? '').replace(/^setting:/, '');
+        const value = settings[key];
+
+        if (!Object.hasOwn(settings, key) || value === '') {
+            continue;
+        }
+
+        if (applyIcon(element, value)) {
+            applied++;
+        }
+    }
+
+    // A background set by the theme's own CSS or by its lazy-loading
+    // attributes, rather than by an <img>.
+    for (const element of root.querySelectorAll('[data-edit-bg]')) {
+        const key = (element.getAttribute('data-edit-bg') ?? '').replace(/^setting:/, '');
+        const value = settings[key];
+
+        if (!Object.hasOwn(settings, key) || value === '') {
+            continue;
+        }
+
+        applyBackground(element, value);
+        applied++;
     }
 
     // A link's target carries its own key alongside the element's.

@@ -277,3 +277,82 @@ describe('a site that has published nothing yet', () => {
         expect(globalThis.fetch).toHaveBeenCalledTimes(1);
     });
 })
+
+describe('icons and backgrounds, which are not words', () => {
+    it('swaps one icon class and leaves the theme own classes alone', () => {
+        document.body.innerHTML =
+            '<span class="icon brands fa-twitter" data-edit-icon="setting:auto:i" data-edit-icon-current="fa-twitter"></span>';
+
+        applyContent(document, { 'auto:i': 'fa-mastodon' });
+
+        const el = document.querySelector('span');
+        expect(el.className).toBe('icon brands fa-mastodon');
+        expect(el.getAttribute('data-edit-icon-current')).toBe('fa-mastodon');
+    });
+
+    it('takes the whole class list when the editor moved to another variant', () => {
+        // Several names mean a different variant of the theme's own set, which
+        // takes a different list.
+        document.body.innerHTML =
+            '<span class="icon brands fa-twitter" data-edit-icon="setting:auto:i" data-edit-icon-current="fa-twitter"></span>';
+
+        applyContent(document, { 'auto:i': 'icon solid fa-envelope' });
+
+        expect(document.querySelector('span').className).toBe('icon solid fa-envelope');
+    });
+
+    it('lets nothing but class names into the attribute', () => {
+        // These land in a class attribute, so what matters is that nothing can
+        // close it and start another — quotes, equals, parentheses. A word
+        // like "onloadalert1" surviving as a class name is inert.
+        document.body.innerHTML =
+            '<span class="icon fa-twitter" data-edit-icon="setting:auto:i" data-edit-icon-current="fa-twitter"></span>';
+
+        applyContent(document, { 'auto:i': 'fa-x" onload="alert(1)' });
+
+        const el = document.querySelector('span');
+
+        expect(el.className).toMatch(/^[A-Za-z0-9_\- ]*$/);
+        expect(el.getAttribute('onload')).toBeNull();
+        expect(el.outerHTML).not.toContain('onload=');
+    });
+
+    it('leaves an icon alone when there is nothing to swap from', () => {
+        document.body.innerHTML = '<span class="icon" data-edit-icon="setting:auto:i"></span>';
+
+        applyContent(document, { 'auto:i': 'fa-twitter' });
+
+        expect(document.querySelector('span').className).toBe('icon');
+    });
+
+    it('points a background at a new picture', () => {
+        document.body.innerHTML = '<section data-edit-bg="setting:auto:b" style="color:red"></section>';
+
+        applyContent(document, { 'auto:b': '/new.jpg' });
+
+        const style = document.querySelector('section').getAttribute('style');
+        expect(style).toContain("background-image:url('/new.jpg')");
+        expect(style).toContain('color:red');
+    });
+
+    it('replaces an old background rather than stacking one on it', () => {
+        document.body.innerHTML =
+            '<section data-edit-bg="setting:auto:b" style="background-image:url(\'/old.jpg\');color:red"></section>';
+
+        applyContent(document, { 'auto:b': '/new.jpg' });
+
+        const style = document.querySelector('section').getAttribute('style');
+        expect(style).toContain('/new.jpg');
+        expect(style).not.toContain('/old.jpg');
+    });
+
+    it('updates the attributes a lazy-loading theme reads', () => {
+        // A theme that reads one of these on load would otherwise put the old
+        // picture back over ours.
+        document.body.innerHTML = '<section data-edit-bg="setting:auto:b" data-background="/old.jpg"></section>';
+
+        applyContent(document, { 'auto:b': '/new.jpg' });
+
+        expect(document.querySelector('section').getAttribute('data-background')).toBe('/new.jpg');
+    });
+})
