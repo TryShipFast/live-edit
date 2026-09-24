@@ -4,10 +4,12 @@ use Illuminate\Routing\Middleware\SubstituteBindings;
 use Illuminate\Support\Facades\Route;
 use ShipFast\LiveEdit\Http\Api\Middleware\AuthenticateApiToken;
 use ShipFast\LiveEdit\Http\Api\Middleware\AuthenticateProvisioner;
+use ShipFast\LiveEdit\Http\Api\Middleware\EnforceCors;
 use ShipFast\LiveEdit\Http\Api\Middleware\ThrottleApi;
 use ShipFast\LiveEdit\Http\Api\V1\ContentController;
 use ShipFast\LiveEdit\Http\Api\V1\MediaController;
 use ShipFast\LiveEdit\Http\Api\V1\SessionController;
+use ShipFast\LiveEdit\Http\Api\V1\SignInController;
 use ShipFast\LiveEdit\Http\Api\V1\SiteController;
 
 /*
@@ -104,6 +106,32 @@ Route::middleware([
         Route::get('/sites/{site:slug}', [SiteController::class, 'show'])->name('live-edit.api.sites.show');
         Route::patch('/sites/{site:slug}', [SiteController::class, 'update'])->name('live-edit.api.sites.update');
         Route::get('/sites/{site:slug}/usage', [SiteController::class, 'usage'])->name('live-edit.api.sites.usage');
+        Route::get('/sites/{site:slug}/editors', [SiteController::class, 'editors'])->name('live-edit.api.sites.editors');
+        Route::post('/sites/{site:slug}/editors', [SiteController::class, 'addEditor'])->name('live-edit.api.sites.editors.add');
+        Route::delete('/sites/{site:slug}/editors/{editorId}', [SiteController::class, 'removeEditor'])->name('live-edit.api.sites.editors.remove');
         Route::post('/sites/{site:slug}/keys', [SiteController::class, 'issueKey'])->name('live-edit.api.sites.keys');
         Route::delete('/sites/{site:slug}/keys/{keyId}', [SiteController::class, 'revokeKey'])->name('live-edit.api.sites.keys.revoke');
     });
+
+/*
+ * Signing in, for sites with nowhere else to do it.
+ *
+ * No API key is presented here, because the point is that the person at the
+ * keyboard has none. What stands guard is that a link only goes to an address
+ * already listed as an editor of that site, and only returns to an origin that
+ * site already allows — both decided when the link is made, never when it is
+ * clicked.
+ *
+ * Throttled hard: asking for links is the one thing here that sends email.
+ */
+Route::middleware([EnforceCors::class])
+    ->prefix(config('live-edit.api.prefix', 'api/live-edit/v1'))
+    ->group(function () {
+        Route::middleware([ThrottleApi::class.':sign_in'])
+            ->post('/sign-in', [SignInController::class, 'request'])
+            ->name('live-edit.api.sign-in');
+    });
+
+Route::get('/live-edit/sign-in/{token}', [SignInController::class, 'redeem'])
+    ->middleware([ThrottleApi::class.':sign_in'])
+    ->name('live-edit.sign-in.redeem');

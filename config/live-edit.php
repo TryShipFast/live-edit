@@ -192,6 +192,10 @@ return [
         // is right for an installation that serves one site.
         'admin_token' => env('LIVE_EDIT_ADMIN_TOKEN', ''),
 
+        // How long a sign-in link stays alive. Short: it is a credential
+        // sitting in an inbox.
+        'sign_in_ttl' => (int) env('LIVE_EDIT_SIGN_IN_TTL', 15),
+
         // Two windows per bucket. The short one is sized for a person editing
         // in bursts; the long one for what a site really consumes in an hour.
         // A caller passes both or waits.
@@ -225,6 +229,12 @@ return [
             'provision' => [
                 'burst' => ['max' => 10, 'seconds' => 60],
                 'sustained' => ['max' => 100, 'seconds' => 3600],
+            ],
+            // Asking for links is the one thing here that sends email, so it
+            // is the one thing worth being ungenerous about.
+            'sign_in' => [
+                'burst' => ['max' => 5, 'seconds' => 60],
+                'sustained' => ['max' => 30, 'seconds' => 3600],
             ],
         ],
 

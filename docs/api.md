@@ -158,11 +158,47 @@ The alternative is to serve the files from the site's own domain — a CDN path
 such as `/content/*` pointed at the bucket — and then no CORS is involved at
 all. That is the tidier answer where the customer controls their edge.
 
-**What still needs a server.** Minting an edit session, and publishing, both
-need the secret key, and a folder of files has nowhere to keep one. A static
-customer needs a single small function — on Netlify, Vercel, Workers, anywhere
-— that checks whoever is asking and calls `POST /{site}/sessions`. Without it
-a static site can be read and rendered, but not edited.
+**Signing in, when the site has nowhere to do it.** Every other adapter
+borrows an existing answer to "who is this": Laravel has users, WordPress has
+users, a Next app has whatever its owner built. A folder of HTML has none — so
+this service does the asking, and the customer needs no server at all.
+
+```
+POST /sites/{slug}/editors   {"email": "…", "name": "…", "may_publish": true}
+POST /sign-in                {"site": "…", "email": "…", "return_to": "https://…"}
+GET  /live-edit/sign-in/{token}   → redirects to return_to#kb_session=…
+```
+
+A link to an inbox rather than a password: nothing for us to store on a
+customer's behalf, and no reset flow to get right. It proves the same thing —
+whoever opened it reads that mailbox.
+
+The key arrives in the **fragment**, which is never sent to a server, appears
+in no access log and is passed on in no Referer header. The page takes it out
+of the address bar immediately, because URLs get copied into chats and
+screenshots, and keeps it in sessionStorage so an edit session ends with the
+tab.
+
+**A session we issued may publish**, unlike one a customer's own server minted.
+Publishing is normally kept from a browser precisely because someone else
+vouched for the holder and we cannot see past that. Here the sign-in was ours,
+so the decision can be the site owner's — per editor, with `may_publish`.
+
+Four things stand guard, and each has a test that fails if it is removed:
+
+- A link only goes to an address already listed as an editor **of that site**.
+- It returns only to an origin that site already allows — checked where the
+  link is **made**, never where it is clicked, since an open redirect arriving
+  by email from us would look entirely legitimate.
+- It works **once**, marked spent before the key is issued, so a forwarded or
+  replayed link is dead.
+- The answer is identical for an address that cannot edit, an address that does
+  not exist, and a site that does not exist — anything else is a way to ask
+  which of a customer's staff are real.
+
+Links are stored only as a hash, expire in minutes, and asking for one is the
+most tightly throttled thing here, because it is the only thing that sends
+email.
 
 ## Whose content is it
 

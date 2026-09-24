@@ -6,6 +6,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\ValidationException;
 use ShipFast\LiveEdit\Domain\Site\ApiToken;
+use ShipFast\LiveEdit\Domain\Site\Editor;
 use ShipFast\LiveEdit\Domain\Site\Meter;
 use ShipFast\LiveEdit\Domain\Site\Provisioner;
 use ShipFast\LiveEdit\Domain\Site\Site;
@@ -79,6 +80,54 @@ class SiteController
         }
 
         return response()->json(['site' => self::describe($site->fresh()->load('tokens'))]);
+    }
+
+    /** The people who may edit this site. */
+    public function editors(Site $site): JsonResponse
+    {
+        return response()->json(['editors' => Editor::query()
+            ->where('site_id', $site->id)
+            ->get()
+            ->map(fn (Editor $e) => [
+                'id' => $e->id,
+                'email' => $e->email,
+                'name' => $e->name,
+                'may_publish' => $e->may_publish,
+                'last_seen_at' => $e->last_seen_at?->toIso8601String(),
+            ])->all()]);
+    }
+
+    public function addEditor(Request $request, Site $site): JsonResponse
+    {
+        $validated = $request->validate([
+            'email' => ['required', 'email', 'max:200'],
+            'name' => ['nullable', 'string', 'max:120'],
+            'may_publish' => ['nullable', 'boolean'],
+        ]);
+
+        $editor = Editor::query()->updateOrCreate(
+            ['site_id' => $site->id, 'email' => mb_strtolower(trim($validated['email']))],
+            ['name' => $validated['name'] ?? null, 'may_publish' => $validated['may_publish'] ?? true],
+        );
+
+        return response()->json(['editor' => [
+            'id' => $editor->id,
+            'email' => $editor->email,
+            'may_publish' => $editor->may_publish,
+        ]], 201);
+    }
+
+    public function removeEditor(Site $site, int $editorId): JsonResponse
+    {
+        $editor = Editor::query()->where('site_id', $site->id)->where('id', $editorId)->first();
+
+        if ($editor === null) {
+            return response()->json(['error' => ['type' => 'not_found', 'message' => 'No such editor on this site.']], 404);
+        }
+
+        $editor->delete();
+
+        return response()->json(['removed' => $editorId]);
     }
 
     public function usage(Request $request, Site $site): JsonResponse
