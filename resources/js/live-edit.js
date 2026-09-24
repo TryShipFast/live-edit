@@ -1620,6 +1620,53 @@ const bootLiveEdit = () => {
 
         toggleButton?.addEventListener('click', () => setEditing(!document.body.classList.contains('editing')));
 
+        /*
+         * Publishing, where the site holds edits back. The host says so by
+         * declaring how many changes are waiting; without that the buttons stay
+         * hidden and the editor behaves as it always did.
+         */
+        const publishing = window.liveEditPublishing;
+        if (publishing) {
+            let pending = publishing.pending ?? 0;
+            const showPending = () => {
+                ui.publishButton.hidden = false;
+                ui.previewButton.hidden = false;
+                ui.publishButton.textContent = pending > 0 ? `Publish ${pending}` : 'Published';
+                ui.publishButton.disabled = pending === 0;
+                ui.publishButton.title = pending > 0
+                    ? `Put ${pending} change${pending === 1 ? '' : 's'} live`
+                    : 'Nothing is waiting to be published';
+            };
+            showPending();
+
+            ui.publishButton.addEventListener('click', async () => {
+                if (!window.confirm(`Put ${pending} change${pending === 1 ? '' : 's'} live for everyone to see?`)) return;
+                ui.publishButton.disabled = true;
+                try {
+                    const response = await request('/live-edit/publish', { method: 'POST' });
+                    const data = await response.json();
+                    pending = 0;
+                    showPending();
+                    reloadWithToast(`Published ${data.published} change${data.published === 1 ? '' : 's'} \u2713`);
+                } catch (error) {
+                    showPending();
+                    window.alert(error.message);
+                }
+            });
+
+            ui.previewButton.addEventListener('click', async () => {
+                if (!publishing.previewUrl) return;
+                try {
+                    await navigator.clipboard.writeText(publishing.previewUrl);
+                    ui.toast('Preview link copied \u2713');
+                } catch {
+                    // Clipboard access is refused often enough that the link
+                    // has to be gettable without it.
+                    window.prompt('Copy this preview link:', publishing.previewUrl);
+                }
+            });
+        }
+
         ui.undoButton.addEventListener('click', async () => {
             const res = await request('/live-edit/undo', { method: 'POST' });
             const data = await res.json();

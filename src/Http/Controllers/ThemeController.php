@@ -5,7 +5,9 @@ namespace ShipFast\LiveEdit\Http\Controllers;
 use Illuminate\Http\Response;
 use Illuminate\Routing\Controller;
 use Illuminate\Support\Facades\Gate;
+use Illuminate\Support\Facades\URL;
 use ShipFast\LiveEdit\Mapper\MarkupScanner;
+use ShipFast\LiveEdit\Support\DraftStore;
 use ShipFast\LiveEdit\Support\StyleCss;
 
 /**
@@ -26,7 +28,7 @@ class ThemeController extends Controller
 
         $html = $scanner->applyOverrides((string) file_get_contents($path), $this->overrides());
 
-        $styles = StyleCss::render();
+        $styles = StyleCss::render(DraftStore::visibleToViewer() ? DraftStore::styles() : []);
         if ($styles !== '') {
             $html = str_replace('</head>', '<style id="live-edit-styles">'.$styles.'</style></head>', $html);
         }
@@ -37,7 +39,28 @@ class ThemeController extends Controller
         }
         $html = preg_replace('/<body\b/', '<body '.$attributes, $html, 1);
 
-        return response(str_replace('</body>', view(config('live-edit.chrome_view'))->render()."\n</body>", $html));
+        $chrome = view(config('live-edit.chrome_view'))->render().$this->publishingScript();
+
+        return response(str_replace('</body>', $chrome."\n</body>", $html));
+    }
+
+    /**
+     * Tells the editor how many changes are waiting, and where the preview link
+     * points. Declared by the package rather than by each host, so turning
+     * publishing on is a config flag and nothing else.
+     */
+    protected function publishingScript(): string
+    {
+        if (! DraftStore::enabled() || ! Gate::allows('live-edit')) {
+            return '';
+        }
+
+        $config = [
+            'pending' => DraftStore::pending(),
+            'previewUrl' => URL::temporarySignedRoute('live-edit.preview', now()->addDays(7)),
+        ];
+
+        return '<script>window.liveEditPublishing = '.json_encode($config, JSON_HEX_TAG | JSON_HEX_AMP).';</script>';
     }
 
     /**
@@ -60,11 +83,22 @@ class ThemeController extends Controller
         return null;
     }
 
-    /** @return array<string, string> */
+    /**
+     * The content to serve.
+     *
+     * Published values, with unpublished work laid over them for anyone
+     * entitled to see it — whoever is editing, and whoever was given a preview
+     * link. A visitor gets the published site.
+     *
+     * @return array<string, string>
+     */
     protected function overrides(): array
     {
         $model = config('live-edit.setting_model');
+        $published = $model::query()->where('key', 'like', 'auto:%')->pluck('value', 'key')->all();
 
-        return $model::query()->where('key', 'like', 'auto:%')->pluck('value', 'key')->all();
+        return DraftStore::visibleToViewer()
+            ? array_merge($published, DraftStore::settings())
+            : $published;
     }
 }

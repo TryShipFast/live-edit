@@ -19,6 +19,12 @@ return [
      * the editor's own markup. Set 'theme' to null to serve nothing and route
      * pages yourself.
      */
+    /*
+     * Hold edits back until someone publishes them. Off keeps the original
+     * behaviour, where every change is live the moment it saves.
+     */
+    'publishing' => env('LIVE_EDIT_PUBLISHING', false),
+
     'theme' => env('LIVE_EDIT_THEME'),
     'chrome_view' => 'live-edit-chrome',
 

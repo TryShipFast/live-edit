@@ -168,6 +168,13 @@ button, input, select, textarea { font: inherit; color: inherit; margin: 0; }
 .le-icon-choice.is-current { border-color: var(--le-accent); box-shadow: inset 0 0 0 1px var(--le-accent); }
 /* The glyph is drawn with the page's icon font, set inline per element. */
 .le-icon-choice { line-height: 1; }
+.le-btn-publish {
+  border: none; background: var(--le-live); color: #05300f; font-weight: 650;
+  border-radius: 999px; padding: 8px 16px; cursor: pointer; font-size: 13px;
+  transition: filter .15s ease;
+}
+.le-btn-publish:hover { filter: brightness(1.06); }
+.le-btn-publish:disabled { opacity: .5; cursor: default; filter: none; }
 .le-hint { font-size: 11px; font-weight: 400; letter-spacing: normal; text-transform: none; color: var(--le-muted); }
 .le-section-heading {
   margin-top: 4px; border-top: 1px solid var(--le-line); padding-top: 18px;
@@ -383,7 +390,21 @@ export function createChrome() {
     const undoButton = el('button', 'le-btn-ghost', 'Undo');
     undoButton.type = 'button';
     undoButton.title = 'Undo the last change';
-    toolbar.append(toggleButton, undoButton);
+
+    // Publishing: shown only where the site holds edits back. The count is on
+    // the button because "Publish" alone does not say whether there is
+    // anything to publish.
+    const publishButton = el('button', 'le-btn-publish', 'Publish');
+    publishButton.type = 'button';
+    publishButton.title = 'Put your changes live';
+    publishButton.hidden = true;
+
+    const previewButton = el('button', 'le-btn-ghost', 'Preview link');
+    previewButton.type = 'button';
+    previewButton.title = 'Copy a link that shows the unpublished version';
+    previewButton.hidden = true;
+
+    toolbar.append(toggleButton, undoButton, publishButton, previewButton);
 
     (config.links ?? []).forEach((link) => {
         const anchor = el('a', 'le-btn-ghost', link.label);
@@ -482,6 +503,8 @@ export function createChrome() {
         drawerTrail,
         drawerFields,
         drawerDelete,
+        publishButton,
+        previewButton,
         closeButton,
         cancelButton,
         saveButton,

@@ -11,11 +11,20 @@ use ShipFast\LiveEdit\Models\ElementStyle;
  */
 class StyleCss
 {
-    public static function render(): string
+    public static function render(array $drafts = []): string
     {
         $css = '';
 
-        foreach (ElementStyle::all() as $style) {
+        $styles = ElementStyle::all()->keyBy('key');
+
+        // Unpublished styling sits on top for whoever may see it, keyed the
+        // same way, so a draft replaces its published counterpart entirely
+        // rather than merging property by property.
+        foreach ($drafts as $key => $props) {
+            $styles[$key] = new ElementStyle(['key' => $key, 'props' => $props]);
+        }
+
+        foreach ($styles as $style) {
             $selector = '[data-style="'.$style->key.'"]';
             $rules = '';
 

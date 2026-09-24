@@ -11,6 +11,7 @@ use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use ShipFast\LiveEdit\Models\EditRevision;
 use ShipFast\LiveEdit\Models\ElementStyle;
+use ShipFast\LiveEdit\Support\DraftStore;
 use ShipFast\LiveEdit\Support\ImageFitter;
 
 /**
@@ -328,6 +329,12 @@ class LiveEditController extends Controller
             $props[$prop] = $value;
         }
 
+        if (DraftStore::enabled()) {
+            DraftStore::put('style', $validated['key'], ['props' => $props]);
+
+            return response()->json(['ok' => true, 'pending' => DraftStore::pending()]);
+        }
+
         $existing = ElementStyle::query()->where('key', $validated['key'])->first();
         $this->remember('style', $validated['key'], [
             'props' => $existing?->props,
@@ -341,6 +348,27 @@ class LiveEditController extends Controller
         }
 
         return $this->saved();
+    }
+
+    /**
+     * Put the held changes live.
+     *
+     * The count goes back so the editor can say what happened rather than just
+     * claiming success.
+     */
+    public function publish(): JsonResponse
+    {
+        abort_unless(DraftStore::enabled(), 404);
+
+        return response()->json(['ok' => true, 'published' => DraftStore::publish()]);
+    }
+
+    /** Throw the held changes away; the published site is untouched. */
+    public function discardDraft(): JsonResponse
+    {
+        abort_unless(DraftStore::enabled(), 404);
+
+        return response()->json(['ok' => true, 'discarded' => DraftStore::discard()]);
     }
 
     public function undo(): JsonResponse
@@ -398,6 +426,14 @@ class LiveEditController extends Controller
 
     protected function writeSetting(string $key, string $value): void
     {
+        // With publishing on the change is held back rather than applied, so
+        // the visitor keeps the published site until someone releases it.
+        if (DraftStore::enabled()) {
+            DraftStore::put('setting', $key, ['value' => $value]);
+
+            return;
+        }
+
         $existing = ($this->settingModel())::query()->where('key', $key)->first();
         $this->remember('setting', $key, [
             'value' => $existing?->value,
