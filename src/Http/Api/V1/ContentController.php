@@ -6,6 +6,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\ValidationException;
 use ShipFast\LiveEdit\Application\Api\ApplyEdit;
+use ShipFast\LiveEdit\Application\Api\ExportMarkup;
 use ShipFast\LiveEdit\Application\Api\PublishSite;
 use ShipFast\LiveEdit\Application\Api\ReadPublishedContent;
 use ShipFast\LiveEdit\Application\Api\TagMarkup;
@@ -206,6 +207,25 @@ class ContentController
             // usefully keep it — and they do, against a hash of that markup.
             'Cache-Control' => 'private, max-age=600',
         ]);
+    }
+
+    /**
+     * Their content, baked into their own markup.
+     *
+     * A secret key, because this is the owner's decision rather than an
+     * editor's — and because what comes back is the whole of what they have
+     * been paying us to keep.
+     */
+    public function export(Request $request, ExportMarkup $export): JsonResponse
+    {
+        $validated = $request->validate([
+            'html' => ['required', 'string', 'max:'.ExportMarkup::MAX_BYTES],
+            'page' => ['nullable', 'string', 'max:200'],
+        ]);
+
+        $result = $export(ApiContext::site($request), $validated['html'], $validated['page'] ?? '');
+
+        return response()->json($result)->withHeaders(['Cache-Control' => 'no-store, private']);
     }
 
     private function locale(Request $request): ?string

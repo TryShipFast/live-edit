@@ -83,6 +83,14 @@ Route::prefix(config('live-edit.api.prefix', 'api/live-edit/v1').'/{site}')
             AuthenticateApiToken::class.':publish',
             ThrottleApi::class.':publish',
         ])->post('/restore', [ContentController::class, 'restore'])->name('live-edit.api.restore');
+
+        // Taking their content away with them. An owner's decision, so it asks
+        // for an owner's key.
+        Route::middleware([
+            ThrottleApi::class.':tag',
+            AuthenticateApiToken::class.':publish',
+            ThrottleApi::class.':tag',
+        ])->post('/export', [ContentController::class, 'export'])->name('live-edit.api.export');
     });
 
 /*

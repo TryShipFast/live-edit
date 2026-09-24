@@ -45,7 +45,10 @@ class TokenDomainTest extends TestCase
             [$token, $plain] = $site->issueToken($type, 'Server');
 
             $stored = json_encode($token->fresh()->getAttributes());
-            $secret = explode('_', $plain)[2];
+            // Split into three, not on every underscore: the secret is
+            // url-safe base64 and may begin with one, which yields an empty
+            // needle and a test that passes or fails on the luck of the draw.
+            $secret = explode('_', $plain, 3)[2];
 
             $this->assertStringNotContainsString($secret, $stored, $type->value.' was stored recoverably');
             $this->assertNull($token->fresh()->public_text);

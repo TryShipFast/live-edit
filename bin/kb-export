@@ -1,0 +1,84 @@
+#!/usr/bin/env php
+<?php
+
+/**
+ * Take a site's content and leave.
+ *
+ * Bakes published words into the customer's own pages and strips every trace
+ * of the editor, so what they are left with is a plain site that needs nothing
+ * from anybody.
+ *
+ *   KB_API=https://cms.example.com/api/live-edit/v1 \
+ *   KB_SITE=acme KB_KEY=kbs_… vendor/bin/kb-export public --write
+ *
+ * Shows what would change unless told otherwise, like everything else here.
+ */
+
+$api = getenv('KB_API');
+$site = getenv('KB_SITE');
+$key = getenv('KB_KEY');
+
+if (! $api || ! $site || ! $key) {
+    fwrite(STDERR, "Set KB_API, KB_SITE and KB_KEY (a secret key).\n");
+    exit(1);
+}
+
+$args = array_slice($argv, 1);
+$root = realpath($args[0] ?? '.') ?: '';
+$write = in_array('--write', $args, true);
+
+if ($root === '' || ! is_dir($root)) {
+    fwrite(STDERR, "No such directory: ".($args[0] ?? '.')."\n");
+    exit(1);
+}
+
+$files = [];
+$walk = function (string $dir) use (&$walk, &$files) {
+    foreach (scandir($dir) ?: [] as $entry) {
+        if (in_array($entry, ['.', '..', 'node_modules', 'vendor', '.git'], true) || str_starts_with($entry, '.')) {
+            continue;
+        }
+
+        $path = $dir.'/'.$entry;
+        is_dir($path) ? $walk($path) : (preg_match('/\.html?$/i', $entry) && $files[] = $path);
+    }
+};
+$walk($root);
+
+$exported = 0;
+
+foreach ($files as $file) {
+    $relative = ltrim(substr($file, strlen($root)), '/');
+    $html = (string) file_get_contents($file);
+
+    $context = stream_context_create(['http' => [
+        'method' => 'POST',
+        'header' => "Content-Type: application/json\r\nAuthorization: Bearer {$key}\r\nAccept: application/json\r\n",
+        'content' => json_encode(['html' => $html, 'page' => $relative]),
+        'timeout' => 30,
+        'ignore_errors' => true,
+    ]]);
+
+    $body = @file_get_contents(rtrim($api, '/')."/{$site}/export", false, $context);
+    $result = json_decode((string) $body, true);
+
+    if (! is_array($result) || ! isset($result['html'])) {
+        // Said by name. A page silently left as it was is a page the customer
+        // thinks they exported.
+        fwrite(STDERR, "  could not export {$relative}: ".($result['error']['message'] ?? 'no answer')."\n");
+
+        continue;
+    }
+
+    $exported++;
+    printf("%s  %d value%s baked in\n", $relative, $result['applied'], $result['applied'] === 1 ? '' : 's');
+
+    if ($write) {
+        file_put_contents($file, $result['html']);
+    }
+}
+
+printf("\n%d page%s\n", $exported, $exported === 1 ? '' : 's');
+echo $write
+    ? "\nWritten. These files now need nothing from the service.\n"
+    : "\nNothing written. Re-run with --write to apply.\n";

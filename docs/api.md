@@ -262,6 +262,29 @@ Links are stored only as a hash, expire in minutes, and asking for one is the
 most tightly throttled thing here, because it is the only thing that sends
 email.
 
+## Leaving with your content
+
+The published words live here rather than on the customer's server, which is
+what makes this a service — and also what makes "what happens if you
+disappear?" the first serious question anybody asks. The answer should not be
+"your site reverts to the template you bought".
+
+```bash
+KB_API=… KB_SITE=acme KB_KEY=kbs_… vendor/bin/kb-export public --write
+```
+
+Their markup goes in, their published words are baked into it, and every trace
+of the editor comes out: no markers, and no script tag pointing at a host that
+may no longer answer. What they are left with is a plain site that needs
+nothing from anybody.
+
+An owner's key, not an editor's — writing words and taking the whole site away
+are different decisions.
+
+It costs almost nothing commercially. Anybody exporting was leaving anyway, and
+being able to say "take your content whenever you like" closes more than
+lock-in ever does.
+
 ## Whose content is it
 
 Content belongs to a site, not to the installation. Two customers can be served
