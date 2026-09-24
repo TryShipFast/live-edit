@@ -152,4 +152,67 @@ return [
     // Invoked after every successful write (e.g. to bust a content cache).
     // 'after_save' => [App\Support\SiteContent::class, 'flush'],
     'after_save' => null,
+
+    // ------------------------------------------------------------------
+    // HTTP API
+    //
+    // How a site that is not this application reads and writes content: a
+    // WordPress plugin, a static build, a React front end. Off until it is
+    // turned on, because an install that does not need it should not expose it.
+    // ------------------------------------------------------------------
+    'api' => [
+        'enabled' => env('LIVE_EDIT_API', false),
+
+        'prefix' => env('LIVE_EDIT_API_PREFIX', 'api/live-edit/v1'),
+
+        // Worth knowing: Laravel ships config/cors.php with paths ['api/*']
+        // and allowed_origins ['*'], which matches this prefix on a default
+        // install and will overwrite the per-site header with a wildcard. It
+        // does not open a hole — a call from an unlisted origin is still
+        // refused by the key check, and there is a test for exactly that — but
+        // keep this prefix out of cors.paths so the header says what it means.
+
+        // How long a browser edit session lasts before their server has to
+        // vouch for the person again. Short on purpose: this is the only key
+        // that can write and the only one a page ever holds.
+        'session_ttl' => (int) env('LIVE_EDIT_API_SESSION_TTL', 1800),
+
+        // Two windows per bucket. The short one is sized for a person editing
+        // in bursts; the long one for what a site really consumes in an hour.
+        // A caller passes both or waits.
+        'throttle' => [
+            'read' => [
+                'burst' => ['max' => 120, 'seconds' => 60],
+                'sustained' => ['max' => 3000, 'seconds' => 3600],
+            ],
+            'write' => [
+                'burst' => ['max' => 40, 'seconds' => 60],
+                'sustained' => ['max' => 600, 'seconds' => 3600],
+            ],
+            // Minting a session is a server-to-server act that should happen
+            // once per editor, not once per keystroke.
+            'session' => [
+                'burst' => ['max' => 10, 'seconds' => 60],
+                'sustained' => ['max' => 120, 'seconds' => 3600],
+            ],
+            'publish' => [
+                'burst' => ['max' => 6, 'seconds' => 60],
+                'sustained' => ['max' => 60, 'seconds' => 3600],
+            ],
+        ],
+
+        'cache' => [
+            // The pointer is the only thing that changes in place, so it is the
+            // only thing worth re-reading often.
+            'pointer_seconds' => (int) env('LIVE_EDIT_API_POINTER_TTL', 30),
+            // A version never changes once written. It can be held forever, and
+            // saying so is what keeps a busy site off this application.
+            'version_seconds' => (int) env('LIVE_EDIT_API_VERSION_TTL', 31536000),
+            // How long a cache may keep serving a stale answer while it fetches
+            // a fresh one. Visitors see the old content for a moment instead of
+            // waiting, and a thundering herd becomes one request.
+            'stale_while_revalidate' => (int) env('LIVE_EDIT_API_SWR', 86400),
+        ],
+    ],
+
 ];

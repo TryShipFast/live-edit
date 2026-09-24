@@ -9,6 +9,7 @@ use Illuminate\Routing\Controller;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
+use ShipFast\LiveEdit\Domain\Content\EditPolicy;
 use ShipFast\LiveEdit\Models\EditRevision;
 use ShipFast\LiveEdit\Models\ElementStyle;
 use ShipFast\LiveEdit\Support\DraftStore;
@@ -37,36 +38,11 @@ class LiveEditController extends Controller
             'locale' => ['nullable', 'string', 'in:'.implode(',', array_keys(config('live-edit.locales', [])))],
         ]);
 
-        // A named key must be on the allowlist; an auto:<hash> key from the
-        // scanner is accepted without config when the generic store is on, so
-        // a whole theme is editable without hand-declaring every element.
-        $key = $validated['key'];
-        $isAutoKey = (bool) config('live-edit.auto_keys', false) && (bool) preg_match('/^auto:[a-f0-9]{6,64}$/', $key);
-        throw_unless(
-            $isAutoKey || in_array($key, config('live-edit.settings', []), true),
-            ValidationException::withMessages(['key' => 'Unknown setting.'])
-        );
-
+        // These rules are shared with the HTTP API rather than repeated: a
+        // second way in that validated differently would be a way past.
+        $policy = new EditPolicy;
         $value = $validated['value'] ?? '';
-
-        $isLinkKey = str_ends_with($validated['key'], 'Href')
-            || (str_starts_with($validated['key'], 'social') && ! str_ends_with($validated['key'], 'Target'));
-        throw_if(
-            $isLinkKey && $value !== '' && ! preg_match('#^(/|\#|https?://)#', $value),
-            ValidationException::withMessages(['value' => 'Links must start with /, #, http:// or https://.'])
-        );
-        throw_if(
-            str_ends_with($validated['key'], 'Target') && ! in_array($value, ['', '_blank'], true),
-            ValidationException::withMessages(['value' => 'Invalid link target.'])
-        );
-
-        // A media embed (iframe/video src) must be a real http(s) URL — never a
-        // javascript: or data: URI that would run in the page.
-        $isMediaKey = str_ends_with($validated['key'], 'Embed') || str_ends_with($validated['key'], 'Src');
-        throw_if(
-            $isMediaKey && $value !== '' && ! preg_match('#^https?://#', $value),
-            ValidationException::withMessages(['value' => 'Media links must start with http:// or https://.'])
-        );
+        $policy->assert($validated['key'], $value);
 
         $this->writeSetting($this->localeKey($validated['key'], $validated['locale'] ?? null), $value);
 
