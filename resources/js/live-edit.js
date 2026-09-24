@@ -570,9 +570,14 @@ const bootLiveEdit = () => {
         const openNode = (node) => {
             if (node.dataset.editImg !== undefined) editImage(node);
             else if (node.dataset.edit !== undefined) editText(node);
+            else if (node.dataset.svgEdit !== undefined || node.dataset.editSvg !== undefined) editDrawing(node);
             else if (node.dataset.style !== undefined) {
+                // A chip is how a section offers its styling, but plenty of
+                // styleable elements have none. Requiring one made them
+                // unreachable from the trail: clicking the crumb did nothing
+                // and the panel sat there showing the child it came from.
                 const chip = node.querySelector(':scope > [data-style-edit]');
-                if (chip) editStyle(chip);
+                editStyle(chip ?? node);
             }
         };
 
