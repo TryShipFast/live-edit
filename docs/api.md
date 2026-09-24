@@ -119,6 +119,38 @@ key — SQLite does not enforce foreign keys by default and neither do some MySQ
 configurations, and leaving a departed customer's words behind is not a
 tidiness problem but data nobody has a right to hold.
 
+## Published files
+
+Publishing writes each site's content as files that never change again, under
+its own directory:
+
+```
+{snapshot dir}/sites/{slug}/current.json      the pointer — the only thing that moves
+{snapshot dir}/sites/{slug}/v{n}/{locale}.json  a version, safe to cache forever
+```
+
+That is what makes the promise true. A customer's pages are read far more often
+than they are written, and reading them through this application makes every
+visitor depend on it being up and quick. A file can be taken by a CDN, a build
+or a server renderer without asking anything — and if this service is down, the
+last publish keeps serving. It is also what makes the pricing honest: a site
+served from an edge costs almost nothing to keep running.
+
+```
+GET /{site}/versions       the pointer and every version, with addresses
+POST /{site}/restore       {"version": 3} — secret key, like publishing
+```
+
+Restoring is applied forward rather than rewound: the restore becomes the
+newest version, so history stays append-only and undoing a bad rollback is the
+same operation again. One site can never restore from another's history, even
+by asking for a version number that exists elsewhere.
+
+A site that has never published has no files, so the database answers and
+nothing changes for it. Removing a site removes its published files too — a
+departed customer's words in a bucket are data nobody has a right to hold, and
+a CDN would happily keep serving them.
+
 ## Usage and limits
 
 Billing needs a number that can be defended, so each site's use is counted per

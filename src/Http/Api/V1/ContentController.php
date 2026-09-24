@@ -8,9 +8,12 @@ use Illuminate\Validation\ValidationException;
 use ShipFast\LiveEdit\Application\Api\ApplyEdit;
 use ShipFast\LiveEdit\Application\Api\PublishSite;
 use ShipFast\LiveEdit\Application\Api\ReadPublishedContent;
+use ShipFast\LiveEdit\Domain\Content\SiteSnapshot;
+use ShipFast\LiveEdit\Domain\Content\SiteStore;
 use ShipFast\LiveEdit\Domain\Site\Ability;
 use ShipFast\LiveEdit\Domain\Site\OverLimit;
 use ShipFast\LiveEdit\Http\Api\ApiContext;
+use ShipFast\LiveEdit\Models\Version;
 
 /**
  * The content endpoints. Thin on purpose: everything worth testing is below.
@@ -125,6 +128,57 @@ class ContentController
         return response()->json([
             'error' => ['type' => 'over_limit', 'message' => $e->getMessage()],
         ], 402);
+    }
+
+    /**
+     * Where this site's published files can be fetched, and which versions
+     * exist.
+     *
+     * A consumer that is not this application — a CDN, a build, another
+     * framework — needs addresses rather than a database.
+     */
+    public function versions(Request $request, ReadPublishedContent $read): JsonResponse
+    {
+        $site = ApiContext::site($request);
+        $store = new SiteStore($site);
+        $snapshot = new SiteSnapshot($store);
+
+        return response()->json([
+            'current' => $store->version(),
+            'pointer' => $snapshot->url(),
+            'versions' => Version::query()
+                ->where('site_id', $site->id)
+                ->orderByDesc('number')
+                ->limit(50)
+                ->get()
+                ->map(fn (Version $v) => [
+                    'number' => $v->number,
+                    'changes' => $v->changes,
+                    'restored_from' => $v->restored_from,
+                    'published_at' => $v->created_at?->toIso8601String(),
+                    'url' => $snapshot->url($v->number),
+                ])->all(),
+        ]);
+    }
+
+    /**
+     * Put an earlier version back.
+     *
+     * A secret key, like publishing: this decides what the public sees.
+     */
+    public function restore(Request $request, ReadPublishedContent $read): JsonResponse
+    {
+        $validated = $request->validate(['version' => ['required', 'integer', 'min:1']]);
+
+        $changed = (new SiteStore(ApiContext::site($request)))->restore((int) $validated['version']);
+
+        if ($changed === null) {
+            return response()->json([
+                'error' => ['type' => 'not_found', 'message' => 'There is no such version for this site.'],
+            ], 404);
+        }
+
+        return response()->json(['restored_from' => (int) $validated['version'], 'changed' => $changed]);
     }
 
     private function locale(Request $request): ?string

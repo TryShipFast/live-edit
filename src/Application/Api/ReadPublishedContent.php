@@ -2,6 +2,7 @@
 
 namespace ShipFast\LiveEdit\Application\Api;
 
+use ShipFast\LiveEdit\Domain\Content\SiteSnapshot;
 use ShipFast\LiveEdit\Domain\Content\SiteStore;
 use ShipFast\LiveEdit\Domain\Site\Site;
 use ShipFast\LiveEdit\Support\DraftStore;
@@ -30,8 +31,16 @@ class ReadPublishedContent
         $locale ??= (string) config('live-edit.default_locale', 'en');
         $store = new SiteStore($site);
 
-        $settings = $store->published($locale);
-        $styles = $store->publishedStyles();
+        // The published state is read from the last snapshot rather than from
+        // the database. Not an optimisation for its own sake: it makes the
+        // read path a file, which is the same shape a CDN, a build or another
+        // framework uses — one answer to keep correct instead of one per
+        // consumer. A site that has never published has no file, so the
+        // database answers and nothing changes for it.
+        $snapshot = (new SiteSnapshot($store))->current($locale);
+
+        $settings = $snapshot['settings'] ?? $store->published($locale);
+        $styles = $snapshot['styles'] ?? $store->publishedStyles();
 
         // With publishing off there is no held state, so nothing to merge and
         // nothing waiting.

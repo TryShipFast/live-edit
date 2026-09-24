@@ -6,6 +6,9 @@ use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
 use PHPUnit\Framework\Attributes\Group;
 use ShipFast\LiveEdit\Domain\Content\ImageStore;
+use ShipFast\LiveEdit\Domain\Content\SiteStore;
+use ShipFast\LiveEdit\Domain\Site\Site;
+use ShipFast\LiveEdit\Models\SiteSetting;
 use ShipFast\LiveEdit\Support\Snapshot;
 use ShipFast\LiveEdit\Tests\Fixtures\Setting;
 use ShipFast\LiveEdit\Tests\TestCase;
@@ -144,6 +147,39 @@ class S3IntegrationTest extends TestCase
 
         $this->assertSame($version->number, json_decode($disk->get($pointer), true)['version']);
         $this->assertSame('Published to S3', json_decode($disk->get($file), true)['settings']['heroTitle']);
+    }
+
+    public function test_two_sites_publish_into_their_own_directories_on_a_real_bucket(): void
+    {
+        // The whole promise: a customer's distribution points at their own
+        // directory and can reach nothing else. Worth proving against a real
+        // bucket, where a prefixed key is a key and not a path.
+        $acme = Site::query()->create(['slug' => 'acme-'.substr(sha1((string) getmypid()), 0, 6), 'name' => 'Acme', 'allowed_origins' => []]);
+        $rival = Site::query()->create(['slug' => 'rival-'.substr(sha1((string) getmypid()), 0, 6), 'name' => 'Rival', 'allowed_origins' => []]);
+
+        SiteSetting::query()->create(['site_id' => $acme->id, 'key' => 'heroTitle', 'value' => 'Acme words']);
+        SiteSetting::query()->create(['site_id' => $rival->id, 'key' => 'heroTitle', 'value' => 'Rival words']);
+
+        $acmeStore = new SiteStore($acme);
+        $rivalStore = new SiteStore($rival);
+
+        $acmeStore->publish();
+        $rivalStore->publish();
+
+        $disk = Storage::disk('kb_s3');
+
+        foreach ([$acmeStore, $rivalStore] as $store) {
+            $this->written[] = $store->snapshotDirectory().'/current.json';
+            $this->written[] = $store->snapshotDirectory().'/v1/en.json';
+        }
+
+        $this->assertTrue($disk->exists($acmeStore->snapshotDirectory().'/v1/en.json'));
+        $this->assertStringContainsString('Acme words', $disk->get($acmeStore->snapshotDirectory().'/v1/en.json'));
+        $this->assertStringNotContainsString('Acme words', $disk->get($rivalStore->snapshotDirectory().'/v1/en.json'));
+
+        // And the pointer a consumer actually fetches first.
+        $pointer = json_decode($disk->get($acmeStore->snapshotDirectory().'/current.json'), true);
+        $this->assertSame(1, $pointer['version']);
     }
 
     public function test_the_stored_value_is_a_key_and_the_url_is_separate(): void

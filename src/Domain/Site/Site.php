@@ -4,6 +4,8 @@ namespace ShipFast\LiveEdit\Domain\Site;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use ShipFast\LiveEdit\Domain\Content\SiteSnapshot;
+use ShipFast\LiveEdit\Domain\Content\SiteStore;
 use ShipFast\LiveEdit\Models\Draft;
 use ShipFast\LiveEdit\Models\SiteSetting;
 use ShipFast\LiveEdit\Models\SiteStyle;
@@ -46,6 +48,11 @@ class Site extends Model
     protected static function booted(): void
     {
         static::deleting(function (self $site) {
+            // Their published files too. A departed customer's words sitting
+            // in a bucket are data nobody has a right to hold, and a CDN would
+            // happily keep serving them.
+            rescue(fn () => (new SiteSnapshot(new SiteStore($site)))->forget(), null, false);
+
             SiteSetting::query()->where('site_id', $site->id)->delete();
             SiteStyle::query()->where('site_id', $site->id)->delete();
             Draft::query()->where('site_id', $site->id)->delete();

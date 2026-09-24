@@ -130,7 +130,61 @@ class SiteStore
         $count = $drafts->count();
         $this->drafts()->delete();
 
-        return ['published' => $count, 'version' => $this->recordVersion($count)->number];
+        $version = $this->recordVersion($count);
+
+        // Written after the drafts are applied, so the file holds what is now
+        // live rather than what was about to be.
+        (new SiteSnapshot($this))->write($version->number);
+
+        return ['published' => $count, 'version' => $version->number];
+    }
+
+    /**
+     * Put an earlier version back.
+     *
+     * Applied forward rather than by rewinding: the restore becomes the newest
+     * version, so history stays append-only and going back from a bad rollback
+     * is the same operation again.
+     */
+    public function restore(int $number): ?int
+    {
+        $snapshot = (new SiteSnapshot($this))->read($number);
+
+        if ($snapshot === null) {
+            return null;
+        }
+
+        $changed = 0;
+
+        foreach (($snapshot['settings'] ?? []) as $key => $value) {
+            $existing = $this->settings()->where('key', $key)->value('value');
+
+            if ((string) $existing === (string) $value) {
+                continue;
+            }
+
+            SiteSetting::query()->updateOrCreate(
+                ['site_id' => $this->site->id, 'key' => $key],
+                ['value' => (string) $value]
+            );
+            $changed++;
+        }
+
+        foreach (($snapshot['styles'] ?? []) as $key => $props) {
+            SiteStyle::query()->updateOrCreate(
+                ['site_id' => $this->site->id, 'key' => $key],
+                ['props' => $props]
+            );
+        }
+
+        // Pending work is not what was asked for: restoring is a decision
+        // about what is live, and leaving drafts on top would undo it at once.
+        $this->drafts()->delete();
+
+        $version = $this->recordVersion($changed, $number);
+        (new SiteSnapshot($this))->write($version->number);
+
+        return $changed;
     }
 
     public function discard(): int
@@ -167,7 +221,7 @@ class SiteStore
         return trim((string) config('live-edit.directory', 'live-edit'), '/').'/sites/'.$this->site->slug;
     }
 
-    private function recordVersion(int $changes): Version
+    private function recordVersion(int $changes, ?int $restoredFrom = null): Version
     {
         $number = (int) $this->versions()->max('number') + 1;
 
@@ -176,6 +230,7 @@ class SiteStore
             'number' => $number,
             'locales' => [(string) config('live-edit.default_locale', 'en') => $this->settings()->count()],
             'changes' => $changes,
+            'restored_from' => $restoredFrom,
         ]);
     }
 

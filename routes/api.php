@@ -36,6 +36,9 @@ Route::prefix(config('live-edit.api.prefix', 'api/live-edit/v1').'/{site}')
         ])->group(function () {
             Route::get('/content', [ContentController::class, 'show'])->name('live-edit.api.content');
             Route::get('/content/version', [ContentController::class, 'version'])->name('live-edit.api.version');
+            // Where the published files are, so a CDN or a build can fetch
+            // them without going through this application again.
+            Route::get('/versions', [ContentController::class, 'versions'])->name('live-edit.api.versions');
         });
 
         // Writing: a session key, which only the customer's own server can mint.
@@ -66,6 +69,14 @@ Route::prefix(config('live-edit.api.prefix', 'api/live-edit/v1').'/{site}')
             AuthenticateApiToken::class.':publish',
             ThrottleApi::class.':publish',
         ])->post('/publish', [ContentController::class, 'publish'])->name('live-edit.api.publish');
+
+        // Rolling back is the same kind of decision as publishing, so it asks
+        // for the same kind of key.
+        Route::middleware([
+            ThrottleApi::class.':publish',
+            AuthenticateApiToken::class.':publish',
+            ThrottleApi::class.':publish',
+        ])->post('/restore', [ContentController::class, 'restore'])->name('live-edit.api.restore');
     });
 
 /*
