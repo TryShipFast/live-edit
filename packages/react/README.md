@@ -72,3 +72,34 @@ Edits show immediately and save after a pause — one request per key per pause,
 not one per keystroke. A failed save leaves the typed words on screen rather
 than reverting, because silently restoring the old text is how somebody loses a
 paragraph without being told.
+
+## Making an existing app editable
+
+You do not hand-edit components. The codemod walks the project and does it:
+
+```bash
+npx kb-codemod .          # shows what it would do, changes nothing
+npx kb-codemod . --write  # applies it
+```
+
+It reads `.js`, `.jsx`, `.mjs`, `.ts` and `.tsx` — JSX lives in `.js` as often
+as in `.jsx`, so the extension is not taken as a guide to the contents. `.ts` is
+parsed without JSX, because there `<T>value` is a type assertion and reading it
+as a tag turns working code into a parse error.
+
+What it changes, and what it will not touch:
+
+| | |
+|---|---|
+| `<h1>Northfield Studio</h1>` | tagged, and read from content |
+| `<p>Hello {user.name}</p>` | left alone — built from your data |
+| `<Button>Save</Button>` | left alone — text is a prop, not a DOM node |
+| already tagged | left alone, so a second run cannot orphan saved edits |
+
+Positions are edited in the original source rather than reprinting from the
+syntax tree, so the diff contains only what changed. A file that cannot be
+parsed is reported and skipped, never guessed at.
+
+A client component gets the hook and edits appear instantly. A server component
+gets the marker only — it renders once, on the server, so there is no React on
+the client to re-render it and its edits land on the next render.

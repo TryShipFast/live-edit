@@ -9,5 +9,11 @@
   },
   "peerDependencies": {
     "react": ">=18"
+  },
+  "bin": {
+    "kb-codemod": "./bin/kb-codemod.mjs"
+  },
+  "dependencies": {
+    "@babel/parser": "^7.25.0"
   }
 }
