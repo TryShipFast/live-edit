@@ -2,3 +2,5 @@ node_modules/
 test-results/
 playwright-report/
 .phpunit.result.cache
+# Written by the suite when it publishes: artefacts of a run, not source.
+vendor/orchestra/testbench-core/laravel/storage/app/
