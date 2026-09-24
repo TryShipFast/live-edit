@@ -115,6 +115,30 @@ class Snapshot
         return json_decode((string) self::disk()->get($path), true);
     }
 
+    /**
+     * Where a published file can be fetched from.
+     *
+     * A consumer that is not this application — a build, a server renderer,
+     * another framework — needs an address rather than a disk. Set
+     * snapshot_url to a CDN in front of the bucket and nothing else changes.
+     */
+    public static function url(?int $number = null, ?string $locale = null): ?string
+    {
+        $base = rtrim((string) config('live-edit.snapshot_url', ''), '/');
+
+        if ($base === '') {
+            // Fall back to whatever the disk itself can address, which is only
+            // the case for a disk that is served (public, s3).
+            $path = $number === null ? self::directory().'/current.json' : self::path($number, $locale ?? config('live-edit.default_locale', 'en'));
+
+            return method_exists(self::disk(), 'url') ? rescue(fn () => self::disk()->url($path), null, false) : null;
+        }
+
+        return $number === null
+            ? $base.'/current.json'
+            : $base.'/v'.$number.'/'.($locale ?? config('live-edit.default_locale', 'en')).'.json';
+    }
+
     /** @return array<int, string> */
     protected static function locales(): array
     {

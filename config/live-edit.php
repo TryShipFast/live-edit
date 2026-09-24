@@ -32,6 +32,13 @@ return [
     'snapshot_disk' => env('LIVE_EDIT_SNAPSHOT_DISK'),
     'snapshot_directory' => 'live-edit/content',
 
+    /*
+     * Where published content can be fetched from by something that is not
+     * this application. A CDN in front of the bucket in production; left empty,
+     * the disk's own URL is used where it has one.
+     */
+    'snapshot_url' => env('LIVE_EDIT_SNAPSHOT_URL'),
+
     'theme' => env('LIVE_EDIT_THEME'),
     'chrome_view' => 'live-edit-chrome',
 
