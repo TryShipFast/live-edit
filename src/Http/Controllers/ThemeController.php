@@ -8,6 +8,7 @@ use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\URL;
 use ShipFast\LiveEdit\Mapper\MarkupScanner;
 use ShipFast\LiveEdit\Support\DraftStore;
+use ShipFast\LiveEdit\Support\PublishedContent;
 use ShipFast\LiveEdit\Support\StyleCss;
 
 /**
@@ -28,7 +29,10 @@ class ThemeController extends Controller
 
         $html = $scanner->applyOverrides((string) file_get_contents($path), $this->overrides());
 
-        $styles = StyleCss::render(DraftStore::visibleToViewer() ? DraftStore::styles() : []);
+        $styles = StyleCss::render(
+            DraftStore::visibleToViewer() ? DraftStore::styles() : [],
+            PublishedContent::styles()
+        );
         if ($styles !== '') {
             $html = str_replace('</head>', '<style id="live-edit-styles">'.$styles.'</style></head>', $html);
         }
@@ -94,8 +98,7 @@ class ThemeController extends Controller
      */
     protected function overrides(): array
     {
-        $model = config('live-edit.setting_model');
-        $published = $model::query()->where('key', 'like', 'auto:%')->pluck('value', 'key')->all();
+        $published = PublishedContent::settings();
 
         return DraftStore::visibleToViewer()
             ? array_merge($published, DraftStore::settings())

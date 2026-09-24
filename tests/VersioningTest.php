@@ -2,9 +2,11 @@
 
 namespace ShipFast\LiveEdit\Tests;
 
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
 use ShipFast\LiveEdit\Models\Version;
 use ShipFast\LiveEdit\Support\DraftStore;
+use ShipFast\LiveEdit\Support\PublishedContent;
 use ShipFast\LiveEdit\Support\Snapshot;
 use ShipFast\LiveEdit\Tests\Fixtures\Setting;
 
@@ -104,5 +106,42 @@ class VersioningTest extends TestCase
         $version = Version::query()->first();
         $this->assertSame(1, $version->changes);
         $this->assertSame(['en', 'fr'], array_keys($version->locales));
+    }
+
+    public function test_a_page_is_served_from_the_snapshot_not_the_database(): void
+    {
+        // The point of publishing: the database can move without the site
+        // moving with it, until someone says so.
+        Setting::query()->create(['key' => 'auto:a1b2c3', 'value' => 'What was published.']);
+        DraftStore::publish();
+
+        Setting::query()->where('key', 'auto:a1b2c3')->update(['value' => 'Not published yet.']);
+
+        $this->assertSame('What was published.', PublishedContent::settings('en')['auto:a1b2c3']);
+
+        DraftStore::publish();
+        $this->assertSame('Not published yet.', PublishedContent::settings('en')['auto:a1b2c3']);
+    }
+
+    public function test_a_site_that_never_published_is_served_from_the_database(): void
+    {
+        // Nothing changes for an installation that does not hold edits back.
+        Setting::query()->create(['key' => 'auto:a1b2c3', 'value' => 'Straight to the page.']);
+
+        $this->assertNull(PublishedContent::version());
+        $this->assertSame('Straight to the page.', PublishedContent::settings('en')['auto:a1b2c3']);
+    }
+
+    public function test_a_site_that_has_not_run_the_migration_still_serves(): void
+    {
+        // An installation upgrades the package before it migrates. Every page
+        // five-hundreded in that window.
+        Schema::drop('live_edit_versions');
+        Schema::drop('live_edit_drafts');
+        Setting::query()->create(['key' => 'auto:a1b2c3', 'value' => 'Still serving.']);
+
+        $this->assertNull(PublishedContent::version());
+        $this->assertFalse(DraftStore::enabled());
+        $this->assertSame('Still serving.', PublishedContent::settings('en')['auto:a1b2c3']);
     }
 }

@@ -11,11 +11,15 @@ use ShipFast\LiveEdit\Models\ElementStyle;
  */
 class StyleCss
 {
-    public static function render(array $drafts = []): string
+    public static function render(array $drafts = [], ?array $published = null): string
     {
         $css = '';
 
-        $styles = ElementStyle::all()->keyBy('key');
+        // The published set is supplied by whoever is serving the page, which
+        // is how it comes from a snapshot rather than a query. Reading the
+        // table is the fallback for a caller that has not been told.
+        $styles = collect($published ?? ElementStyle::query()->pluck('props', 'key')->all())
+            ->map(fn ($props, $key) => new ElementStyle(['key' => $key, 'props' => $props]));
 
         // Unpublished styling sits on top for whoever may see it, keyed the
         // same way, so a draft replaces its published counterpart entirely

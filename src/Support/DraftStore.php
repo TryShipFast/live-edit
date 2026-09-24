@@ -3,6 +3,7 @@
 namespace ShipFast\LiveEdit\Support;
 
 use Illuminate\Support\Facades\Gate;
+use Illuminate\Support\Facades\Schema;
 use ShipFast\LiveEdit\Models\Draft;
 use ShipFast\LiveEdit\Models\ElementStyle;
 
@@ -25,7 +26,14 @@ class DraftStore
 
     public static function enabled(): bool
     {
-        return (bool) config('live-edit.publishing', false);
+        if (! config('live-edit.publishing', false)) {
+            return false;
+        }
+
+        // Turned on before the migration has run, holding an edit back would
+        // mean writing to a table that is not there. Behaving as though
+        // publishing were off is the safe reading.
+        return Schema::hasTable((new Draft)->getTable());
     }
 
     /**
