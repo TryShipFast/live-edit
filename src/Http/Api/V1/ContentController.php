@@ -8,6 +8,7 @@ use Illuminate\Validation\ValidationException;
 use ShipFast\LiveEdit\Application\Api\ApplyEdit;
 use ShipFast\LiveEdit\Application\Api\PublishSite;
 use ShipFast\LiveEdit\Application\Api\ReadPublishedContent;
+use ShipFast\LiveEdit\Domain\Site\Ability;
 use ShipFast\LiveEdit\Http\Api\ApiContext;
 
 /**
@@ -20,7 +21,22 @@ class ContentController
         $site = ApiContext::site($request);
         $locale = $this->locale($request);
 
-        $payload = $read($site, $locale);
+        // The editor sees their own unpublished work; a publishable key, which
+        // is in the page for everyone, does not.
+        $editing = ApiContext::token($request)->can(Ability::Write);
+
+        $payload = $read($site, $locale, $editing);
+
+        if ($editing) {
+            // Never cached, by anything. This is one person's unfinished work,
+            // and a cache that kept it would serve a half-typed sentence to
+            // the next visitor.
+            return response()->json($payload)->withHeaders([
+                'Cache-Control' => 'no-store, private',
+                'X-Live-Edit-Version' => (string) ($payload['version'] ?? 0),
+            ]);
+        }
+
         $etag = $read->etag($site, $payload);
 
         // The cheapest response is the one with no body. A client that already
@@ -35,13 +51,17 @@ class ContentController
     public function version(Request $request, ReadPublishedContent $read): JsonResponse
     {
         $site = ApiContext::site($request);
-        $payload = $read($site, $this->locale($request));
+        $editing = ApiContext::token($request)->can(Ability::Write);
+        $payload = $read($site, $this->locale($request), $editing);
 
         $seconds = (int) config('live-edit.api.cache.pointer_seconds', 30);
 
         return response()->json([
             'version' => $payload['version'],
             'locale' => $payload['locale'],
+            // So an editor can be offered a way to release held work rather
+            // than being left to wonder where it went.
+            'pending' => $payload['pending'] ?? 0,
             // What a consumer should key a cache on. A version alone is not
             // enough: a site with publishing off changes its words without
             // moving one.

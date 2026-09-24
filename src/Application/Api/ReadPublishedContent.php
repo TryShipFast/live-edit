@@ -10,17 +10,22 @@ use ShipFast\LiveEdit\Support\Snapshot;
 /**
  * The published content of a site, in the shape anything can render.
  *
- * Note what this deliberately does not do: consult drafts. Unpublished work
- * belongs to the editor and to whoever holds a preview link, and this endpoint
- * answers the open internet. An API that quietly included drafts would put a
- * half-typed sentence on a customer's live site the moment they cached it.
+ * Drafts are included only for a caller that can write — which is the editor,
+ * and nobody else. A publishable key is in the page for everyone, so it sees
+ * published content alone; including drafts there would put a half-typed
+ * sentence on a customer's live site the moment anything cached it.
+ *
+ * Leaving them out for the editor too was worse, and not obviously so: they
+ * save, the words they just typed are replaced by the published ones, and
+ * nothing says why. The save worked. It looks exactly like a save that did
+ * not.
  */
 class ReadPublishedContent
 {
     /**
      * @return array{version: int|null, locale: string, settings: array<string, string>, styles: array<string, mixed>}
      */
-    public function __invoke(Site $site, ?string $locale = null): array
+    public function __invoke(Site $site, ?string $locale = null, bool $includeDrafts = false): array
     {
         $locale ??= (string) config('live-edit.default_locale', 'en');
 
@@ -36,16 +41,28 @@ class ReadPublishedContent
             return [
                 'version' => PublishedContent::version(),
                 'locale' => $locale,
+                'pending' => 0,
                 'settings' => $composed['settings'] ?? [],
                 'styles' => $composed['styles'] ?? [],
             ];
         }
 
+        $settings = PublishedContent::settings($locale);
+        $styles = PublishedContent::styles($locale);
+
+        if ($includeDrafts) {
+            $settings = array_merge($settings, DraftStore::settings());
+            $styles = array_merge($styles, DraftStore::styles());
+        }
+
         return [
             'version' => PublishedContent::version(),
             'locale' => $locale,
-            'settings' => PublishedContent::settings($locale),
-            'styles' => PublishedContent::styles($locale),
+            // How many changes are waiting, so an editor can be offered a way
+            // to release them rather than wondering where they went.
+            'pending' => DraftStore::pending(),
+            'settings' => $settings,
+            'styles' => $styles,
         ];
     }
 

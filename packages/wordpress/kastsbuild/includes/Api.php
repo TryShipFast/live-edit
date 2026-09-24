@@ -38,7 +38,14 @@ class Api
             }
         }
 
-        $body = self::get('/content', Settings::get('publishable_key'));
+        // An editor reads with their own session key, because only a
+        // write-capable key is shown unpublished work. Reading with the
+        // publishable key would hand the person who just saved the same page
+        // every visitor gets — their words replaced by the published ones,
+        // with nothing to say why.
+        $key = $fresh ? (Session::forCurrentUser() ?? Settings::get('publishable_key')) : Settings::get('publishable_key');
+
+        $body = self::get('/content', $key);
         $settings = is_array($body['settings'] ?? null) ? $body['settings'] : [];
 
         // Held for a long time because the key itself moves whenever the

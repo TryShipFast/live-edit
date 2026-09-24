@@ -158,6 +158,65 @@ class ApiEndpointTest extends TestCase
         }
     }
 
+    // --- what an editor sees while publishing is on ---------------------
+
+    public function test_an_editor_reads_back_the_words_they_just_saved(): void
+    {
+        // The failure this replaces: the save worked, the page showed the
+        // published words, and nothing said why. Indistinguishable from a
+        // save that did nothing — so the next thing they do is type it again.
+        config()->set('live-edit.publishing', true);
+
+        $this->postJson($this->url(), ['key' => 'heroTitle', 'value' => 'Half written'],
+            $this->as($this->session, ['Origin' => 'https://client.test']))
+            ->assertOk()
+            ->assertJsonPath('held', true);
+
+        $this->getJson($this->url(), $this->as($this->session, ['Origin' => 'https://client.test']))
+            ->assertOk()
+            ->assertJsonPath('settings.heroTitle', 'Half written')
+            ->assertJsonPath('pending', 1);
+    }
+
+    public function test_a_publishable_key_still_sees_only_published_words(): void
+    {
+        config()->set('live-edit.publishing', true);
+
+        $this->postJson($this->url(), ['key' => 'heroTitle', 'value' => 'Half written'],
+            $this->as($this->session, ['Origin' => 'https://client.test']))->assertOk();
+
+        // The key that sits in the page for every visitor.
+        $this->getJson($this->url(), $this->as($this->publishable, ['Origin' => 'https://client.test']))
+            ->assertOk()
+            ->assertJsonPath('settings.heroTitle', 'Published');
+    }
+
+    public function test_unpublished_work_is_never_cacheable(): void
+    {
+        config()->set('live-edit.publishing', true);
+
+        $response = $this->getJson($this->url(), $this->as($this->session, ['Origin' => 'https://client.test']));
+
+        // One person's unfinished sentence must not be held by anything that
+        // could hand it to the next visitor.
+        $this->assertStringContainsString('no-store', $response->headers->get('Cache-Control'));
+        $this->assertNull($response->headers->get('ETag'));
+    }
+
+    public function test_the_editor_is_told_how_much_is_waiting(): void
+    {
+        config()->set('live-edit.publishing', true);
+
+        foreach (['heroTitle', 'ctaHref'] as $key) {
+            $this->postJson($this->url(), ['key' => $key, 'value' => $key === 'ctaHref' ? '/quote' : 'x'],
+                $this->as($this->session, ['Origin' => 'https://client.test']))->assertOk();
+        }
+
+        $this->getJson($this->url('/content/version'), $this->as($this->session, ['Origin' => 'https://client.test']))
+            ->assertOk()
+            ->assertJsonPath('pending', 2);
+    }
+
     // --- sessions ------------------------------------------------------
 
     public function test_a_secret_key_mints_a_session(): void
