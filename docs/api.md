@@ -49,6 +49,7 @@ Never in a query string — those end up in access logs and `Referer` headers.
 | `GET /content/version` | the current version number only |
 | `POST /content` | `{key, value, locale?}` — one change |
 | `POST /sessions` | `{label?}` — mint a session key (secret only) |
+| `POST /media` | multipart `file`, optional `fitWidth`/`fitHeight` — returns a URL |
 | `POST /publish` | release held changes as a new version (secret only) |
 
 ## Origins
@@ -97,3 +98,40 @@ words underneath it did.
 
 `Cache-Control` pairs a short `max-age` with a long `stale-while-revalidate`, so
 a busy site serves from its cache at once and refreshes behind the scenes.
+
+## Images
+
+`POST /media` takes a file and answers with a URL. What comes back is an
+address; what is stored against a key is the object's path. Keeping those apart
+matters — a URL saved where a key belongs works until the first caller that
+needs a key.
+
+**Fitted before it is stored, never after.** A client rarely has a picture the
+same shape as the one in the template, and dropped in untouched it stretches the
+section it sits in. The fitter needs a real file, and on a bucket a stored path
+is a key rather than a location — so fitting after storing silently did nothing
+and the picture arrived at its original size. An upload is always a local
+temporary file, so that is where the work happens.
+
+**Stored with the headers a CDN needs**, at the moment it is written. An object
+is served by the distribution without passing through this application again, so
+anything not said at upload time cannot be said later. Names are random, which
+means a given URL is that picture forever and a year-long immutable cache is
+safe: replacing an image writes a new object rather than overwriting one.
+
+```
+LIVE_EDIT_MEDIA_URL=https://cdn.example.com   # the distribution in front of the bucket
+LIVE_EDIT_MAX_UPLOAD_KB=8192
+```
+
+Accepted: JPG, PNG, GIF, WebP, AVIF, SVG. Anything else is refused by name — a
+file claiming to be an image because its declared type says so does not get into
+a bucket something else may be willing to execute.
+
+**An SVG is rebuilt before it is stored**, not on the way out. It is a document
+rather than a picture: it can carry script, handlers and remote references. A
+file served straight from a CDN never passes through anything again, so it has
+to be safe going in.
+
+Uploads are counted on their own throttle, far tighter than a text save, because
+one costs bandwidth, storage and CPU rather than a row.

@@ -4,6 +4,7 @@ use Illuminate\Support\Facades\Route;
 use ShipFast\LiveEdit\Http\Api\Middleware\AuthenticateApiToken;
 use ShipFast\LiveEdit\Http\Api\Middleware\ThrottleApi;
 use ShipFast\LiveEdit\Http\Api\V1\ContentController;
+use ShipFast\LiveEdit\Http\Api\V1\MediaController;
 use ShipFast\LiveEdit\Http\Api\V1\SessionController;
 
 /*
@@ -40,6 +41,14 @@ Route::prefix(config('live-edit.api.prefix', 'api/live-edit/v1').'/{site}')
             AuthenticateApiToken::class.':write',
             ThrottleApi::class.':write',
         ])->post('/content', [ContentController::class, 'update'])->name('live-edit.api.content.update');
+
+        // Uploading is counted separately and far more tightly than a text
+        // save: it costs bandwidth, storage and CPU rather than a row.
+        Route::middleware([
+            ThrottleApi::class.':upload',
+            AuthenticateApiToken::class.':write',
+            ThrottleApi::class.':upload',
+        ])->post('/media', [MediaController::class, 'store'])->name('live-edit.api.media');
 
         // Minting a session and publishing are both secret-key acts: decisions
         // about who may edit, and about what the public sees.

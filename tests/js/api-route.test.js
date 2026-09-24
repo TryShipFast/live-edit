@@ -18,10 +18,25 @@ describe('apiRequestFor', () => {
         expect(init.headers.Authorization).toBe('Bearer kbe_x');
     });
 
+    it('points an image upload at the media endpoint', () => {
+        const { url } = apiRequestFor('/live-edit/image', { method: 'POST', body: new FormData() }, api);
+
+        expect(url).toBe('https://cms.test/api/live-edit/v1/acme/media');
+    });
+
+    it('does not set a content type for an upload', () => {
+        // FormData carries a boundary the browser generates. Setting the
+        // header by hand strips it, the server reads an empty body, and the
+        // picture silently never arrives.
+        const { init } = apiRequestFor('/live-edit/image', { method: 'POST', body: new FormData() }, api);
+
+        expect(init.headers['Content-Type']).toBeUndefined();
+    });
+
     it('says plainly when an action has no API endpoint yet', () => {
         // Better than posting to a URL that does not exist and calling it saved.
-        expect(() => apiRequestFor('/live-edit/image', {}, api)).toThrow(/not available over the content API/);
         expect(() => apiRequestFor('/live-edit/record', {}, api)).toThrow(/not available over the content API/);
+        expect(() => apiRequestFor('/live-edit/undo', {}, api)).toThrow(/not available over the content API/);
     });
 
     it('refuses to run half configured', () => {

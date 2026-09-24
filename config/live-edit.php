@@ -149,6 +149,15 @@ return [
     'disk' => 'public',
     'directory' => 'live-edit',
 
+    // Where uploaded images are served from. Point this at a CloudFront
+    // distribution in front of the bucket and pictures come from an edge near
+    // the visitor rather than from one region — and never from this
+    // application. Empty means the disk answers for itself.
+    'media_url' => env('LIVE_EDIT_MEDIA_URL', ''),
+
+    // The largest upload accepted, in kilobytes.
+    'max_upload_kb' => (int) env('LIVE_EDIT_MAX_UPLOAD_KB', 8192),
+
     // Invoked after every successful write (e.g. to bust a content cache).
     // 'after_save' => [App\Support\SiteContent::class, 'flush'],
     'after_save' => null,
@@ -198,6 +207,12 @@ return [
             'publish' => [
                 'burst' => ['max' => 6, 'seconds' => 60],
                 'sustained' => ['max' => 60, 'seconds' => 3600],
+            ],
+            // An upload costs bandwidth, storage and CPU rather than a row, so
+            // it is counted far more tightly than a text save.
+            'upload' => [
+                'burst' => ['max' => 12, 'seconds' => 60],
+                'sustained' => ['max' => 200, 'seconds' => 3600],
             ],
         ],
 

@@ -10,10 +10,10 @@ use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use ShipFast\LiveEdit\Domain\Content\EditPolicy;
+use ShipFast\LiveEdit\Domain\Content\ImageStore;
 use ShipFast\LiveEdit\Models\EditRevision;
 use ShipFast\LiveEdit\Models\ElementStyle;
 use ShipFast\LiveEdit\Support\DraftStore;
-use ShipFast\LiveEdit\Support\ImageFitter;
 
 /**
  * ShipFast live-edit CMS: generic, config-driven endpoints for editing a
@@ -259,19 +259,14 @@ class LiveEditController extends Controller
      */
     protected function storeImage(Request $request): string
     {
-        $path = $request->file('file')->store(
-            config('live-edit.directory'),
-            config('live-edit.disk')
+        // Shared with the HTTP API rather than repeated, and it is where the
+        // fitting order is kept right: on a remote disk a stored path is a key
+        // and not a file, so fitting afterwards silently did nothing.
+        return (new ImageStore)->store(
+            $request->file('file'),
+            (int) $request->input('fitWidth', 0) ?: null,
+            (int) $request->input('fitHeight', 0) ?: null,
         );
-
-        $width = (int) $request->input('fitWidth', 0);
-        $height = (int) $request->input('fitHeight', 0);
-
-        if ($width > 0 && $height > 0) {
-            ImageFitter::fit(Storage::disk(config('live-edit.disk'))->path($path), $width, $height);
-        }
-
-        return $path;
     }
 
     public function updateStyle(Request $request): JsonResponse

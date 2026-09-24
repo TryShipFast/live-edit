@@ -184,6 +184,8 @@ export const apiRequestFor = (url, options = {}, api) => {
     const routes = {
         '/live-edit/setting': `${base}/${api?.site}/content`,
         '/live-edit/publish': `${base}/${api?.site}/publish`,
+        '/live-edit/image': `${base}/${api?.site}/media`,
+        '/live-edit/upload': `${base}/${api?.site}/media`,
     };
 
     const target = routes[url];
@@ -207,6 +209,9 @@ export const apiRequestFor = (url, options = {}, api) => {
                 Authorization: `Bearer ${api.token}`,
                 Accept: 'application/json',
             },
+            // An upload is FormData, and setting Content-Type by hand strips
+            // the boundary the browser generated — the server then reads an
+            // empty body and the picture silently never arrives.
         },
     };
 };
