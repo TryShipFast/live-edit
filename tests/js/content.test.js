@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { applyContent, applyValue, fetchContent, resolve } from '../../resources/js/content.js';
+import { applyContent, applyStyles, applyValue, fetchContent, resolve, styleRules } from '../../resources/js/content.js';
 
 const page = (html) => {
     document.body.innerHTML = html;
@@ -167,3 +167,67 @@ describe('where a static page gets its content from', () => {
         expect(globalThis.fetch).not.toHaveBeenCalled();
     });
 });
+
+describe('rendering saved styles on a page nobody server-renders', () => {
+    it('writes the rule a button needs to change colour', () => {
+        // The gap this closes: a client changed a button's background, the
+        // save worked, and nothing on the page rendered it.
+        expect(styleRules('sabc', { background: '#4ade80' }))
+            .toBe('[data-style="sabc"]{background:#4ade80 !important;}');
+    });
+
+    it('beats the theme own stylesheet', () => {
+        // Without !important a saved colour loses to the class that set it,
+        // which is the entire point of being able to restyle something.
+        expect(styleRules('sabc', { background: 'red' })).toContain('!important');
+    });
+
+    it('maps every property the editor offers', () => {
+        const css = styleRules('s1', {
+            background: '#fff', textColor: '#000', fontSize: '18',
+            radius: '6', paddingX: '20', paddingY: '12',
+        });
+
+        expect(css).toContain('background:#fff !important');
+        expect(css).toContain('color:#000 !important');
+        expect(css).toContain('font-size:18px !important');
+        expect(css).toContain('border-radius:6px !important');
+        expect(css).toContain('padding-left:20px !important');
+        expect(css).toContain('padding-top:12px !important');
+    });
+
+    it('hides from visitors while leaving it visible, dimmed, to an editor', () => {
+        const css = styleRules('s1', { hidden: '1' });
+
+        expect(css).toContain('body:not(.editing) [data-style="s1"]{display:none !important}');
+        expect(css).toContain('body.editing [data-style="s1"]{opacity:.45}');
+    });
+
+    it('skips properties that were cleared', () => {
+        expect(styleRules('s1', { background: '', textColor: null })).toBe('');
+    });
+
+    it('puts the rules into the page', () => {
+        document.head.innerHTML = '';
+        document.body.innerHTML = '<a data-style="sbtn">Book</a>';
+
+        applyStyles(document, { sbtn: { background: '#4ade80' } });
+
+        const tag = document.getElementById('live-edit-styles');
+        expect(tag).not.toBeNull();
+        expect(tag.textContent).toContain('background:#4ade80');
+    });
+
+    it('reuses one tag rather than stacking sheets', () => {
+        // Applying twice — a locale change, a refresh after publishing —
+        // must not leave two stylesheets fighting.
+        document.head.innerHTML = '';
+        document.body.innerHTML = '<a data-style="sbtn">Book</a>';
+
+        applyStyles(document, { sbtn: { background: '#111' } });
+        applyStyles(document, { sbtn: { background: '#222' } });
+
+        expect(document.querySelectorAll('#live-edit-styles')).toHaveLength(1);
+        expect(document.getElementById('live-edit-styles').textContent).toContain('#222');
+    });
+})

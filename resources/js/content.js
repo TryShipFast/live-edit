@@ -90,6 +90,77 @@ export const applyContent = (root, settings) => {
  * which moves on each publish and is cached for seconds, and the version,
  * which never changes and is cached forever.
  */
+/**
+ * The same rules the server writes, written here instead.
+ *
+ * A server-rendered page gets these as a stylesheet before it is sent. A
+ * static page has nobody to do that — so without this, a client can change a
+ * button's colour, watch it save, and see nothing happen. The save was fine.
+ * There was simply nothing rendering it.
+ *
+ * Kept deliberately in step with the server's version: two implementations of
+ * one mapping is how a button ends up a different colour depending on which
+ * kind of site it is on.
+ */
+export const styleRules = (key, props) => {
+    const selector = `[data-style="${key}"]`;
+    let css = '';
+    let rules = '';
+
+    for (const [prop, value] of Object.entries(props ?? {})) {
+        if (value === '' || value === null || value === undefined) {
+            continue;
+        }
+
+        if (prop === 'hidden') {
+            css += `body:not(.editing) ${selector}{display:none !important}`;
+            css += `body.editing ${selector}{opacity:.45}`;
+            continue;
+        }
+
+        // !important, because a saved value has to beat the theme's own
+        // stylesheet — that is the entire point of being able to restyle
+        // something a class already coloured.
+        rules += {
+            backgroundImage: `background-image:url('${value}') !important;background-size:cover !important;background-position:center !important;`,
+            background: `background:${value} !important;`,
+            textColor: `color:${value} !important;`,
+            fontSize: `font-size:${value}px !important;`,
+            radius: `border-radius:${value}px !important;`,
+            paddingX: `padding-left:${value}px !important;padding-right:${value}px !important;`,
+            paddingY: `padding-top:${value}px !important;padding-bottom:${value}px !important;`,
+        }[prop] ?? '';
+    }
+
+    return rules === '' ? css : css + `${selector}{${rules}}`;
+};
+
+/** @param {Record<string, Record<string, string>>} styles */
+export const applyStyles = (root, styles) => {
+    const css = Object.entries(styles ?? {})
+        .map(([key, props]) => styleRules(key, props))
+        .join('');
+
+    if (css === '') {
+        return 0;
+    }
+
+    // One tag, reused: applying content twice — a locale change, a refresh
+    // after publishing — must not stack another sheet on the page.
+    const id = 'live-edit-styles';
+    const tag = root.getElementById?.(id) ?? root.querySelector?.(`#${id}`) ?? null;
+    const style = tag ?? root.createElement('style');
+
+    style.id = id;
+    style.textContent = css;
+
+    if (!tag) {
+        (root.head ?? root.body)?.appendChild(style);
+    }
+
+    return Object.keys(styles).length;
+};
+
 export const fetchSnapshot = async ({ snapshot, locale }) => {
     const base = String(snapshot).replace(/\/$/, '');
     const pointer = await fetch(`${base}/current.json`).then((r) => {
@@ -135,6 +206,7 @@ const start = async () => {
 
         if (payload) {
             applyContent(document, payload.settings ?? {});
+            applyStyles(document, payload.styles ?? {});
         }
     } catch (error) {
         // The words already in the file are perfectly good. A page must never
