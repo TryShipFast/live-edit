@@ -121,10 +121,21 @@ are scoped by page, so the same heading on two pages stays two things.
 
 ```html
 <script>
-  window.liveEditContent = { base: '…/api/live-edit/v1', site: 'acme', key: 'kbp_…' };
+  window.liveEditContent = { snapshot: 'https://cdn.acme.com/content/sites/acme' };
 </script>
 <script type="module" src="/editor/content.js"></script>
 ```
+
+It reads the published **files**, not the application: the pointer, cached for
+seconds, then the version, cached forever. No key is needed, because published
+content is what every visitor is being shown anyway. That is the whole point of
+publishing to files — a busy site is served from an edge and never reaches the
+application, so its traffic costs its owner nothing and costs you nothing.
+Reading through the API instead would put every page view of every customer
+back through one server.
+
+Give it `base`, `site` and `key` as well and the API is used as a fallback, for
+a site that has not published yet.
 
 That is a separate, small file from the editor, because every visitor loads it
 and almost none of them will ever edit anything. Published values are written
@@ -133,6 +144,19 @@ a way to run scripts in every visitor's browser.
 
 The words in the file are what shows if the service is slow or unreachable, so
 a static site degrades to exactly what it was before.
+
+**The files must allow cross-origin reads.** The page is on the customer's
+domain and the files are on a CDN, so the browser will not read them unless the
+bucket says it may — and a blocked fetch looks like an ordinary network error,
+so the symptom is a page that quietly shows its original words forever.
+
+```json
+[{ "AllowedOrigins": ["https://acme.com"], "AllowedMethods": ["GET", "HEAD"], "AllowedHeaders": ["*"], "MaxAgeSeconds": 3600 }]
+```
+
+The alternative is to serve the files from the site's own domain — a CDN path
+such as `/content/*` pointed at the bucket — and then no CORS is involved at
+all. That is the tidier answer where the customer controls their edge.
 
 **What still needs a server.** Minting an edit session, and publishing, both
 need the secret key, and a folder of files has nowhere to keep one. A static

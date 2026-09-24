@@ -11,8 +11,15 @@
  * Kept separate from the editor and deliberately small: every visitor loads
  * this, and almost none of them will ever edit anything.
  *
- *   <script>window.liveEditContent = { base, site, key }</script>
+ *   <script>window.liveEditContent = { snapshot: 'https://cdn.example.com/content/sites/acme' }</script>
  *   <script type="module" src="/editor/content.js"></script>
+ *
+ * The snapshot is preferred over the API and needs no key, because published
+ * content is what every visitor is being shown anyway. That is the whole point
+ * of publishing to files: a busy site is served from an edge and never reaches
+ * the application, so traffic costs its owner nothing and costs us nothing.
+ * Reading through the API instead would have put every page view of every
+ * customer back through one server.
  */
 
 const PREFIX = 'setting:';
@@ -76,6 +83,33 @@ export const applyContent = (root, settings) => {
     return applied;
 };
 
+/**
+ * Published content from the files, without troubling the application.
+ *
+ * Two requests, both cacheable and neither of them ours to serve: the pointer,
+ * which moves on each publish and is cached for seconds, and the version,
+ * which never changes and is cached forever.
+ */
+export const fetchSnapshot = async ({ snapshot, locale }) => {
+    const base = String(snapshot).replace(/\/$/, '');
+    const pointer = await fetch(`${base}/current.json`).then((r) => {
+        if (!r.ok) {
+            throw new Error(`Pointer answered ${r.status}`);
+        }
+
+        return r.json();
+    });
+
+    const language = locale ?? 'en';
+    const response = await fetch(`${base}/v${pointer.version}/${language}.json`);
+
+    if (!response.ok) {
+        throw new Error(`Version answered ${response.status}`);
+    }
+
+    return response.json();
+};
+
 export const fetchContent = async ({ base, site, key, locale }) => {
     const url = `${String(base).replace(/\/$/, '')}/${site}/content${locale ? `?locale=${encodeURIComponent(locale)}` : ''}`;
     const response = await fetch(url, { headers: { Authorization: `Bearer ${key}`, Accept: 'application/json' } });
@@ -92,16 +126,52 @@ export const fetchContent = async ({ base, site, key, locale }) => {
 const start = async () => {
     const config = typeof window !== 'undefined' ? window.liveEditContent : null;
 
-    if (!config?.base || !config?.site || !config?.key) {
+    if (!config) {
         return;
     }
 
     try {
-        const payload = await fetchContent(config);
-        applyContent(document, payload.settings ?? {});
+        const payload = await resolve(config);
+
+        if (payload) {
+            applyContent(document, payload.settings ?? {});
+        }
     } catch (error) {
+        // The words already in the file are perfectly good. A page must never
+        // break because a content service is briefly unreachable.
         console.warn('[live-edit] serving the words already in the page:', error.message);
     }
+};
+
+/**
+ * Files first, the application only if there are none.
+ *
+ * A site that has never published has no snapshot, and one that cannot reach
+ * its CDN should still show its words rather than nothing — so the API remains
+ * a fallback rather than the usual path.
+ */
+export const resolve = async (config) => {
+    if (config.snapshot) {
+        try {
+            return await fetchSnapshot(config);
+        } catch (error) {
+            // A browser reports a blocked cross-origin fetch as an ordinary
+            // network failure, so the most likely cause is named here. Without
+            // it the page simply shows its original words forever and nothing
+            // says why — which is exactly how this was first met.
+            const hint = error.message.includes('fetch')
+                ? ' (if the files are on another origin, the bucket or CDN must allow cross-origin reads)'
+                : '';
+
+            if (!config.base) {
+                throw new Error(error.message + hint);
+            }
+
+            console.warn('[live-edit] falling back to the content API:', error.message + hint);
+        }
+    }
+
+    return config.base && config.site && config.key ? fetchContent(config) : null;
 };
 
 if (typeof document !== 'undefined') {

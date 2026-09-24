@@ -182,6 +182,33 @@ class S3IntegrationTest extends TestCase
         $this->assertSame(1, $pointer['version']);
     }
 
+    public function test_published_files_tell_a_cdn_how_long_to_keep_them(): void
+    {
+        // Asked of S3 itself. A filesystem abstraction has no opinion about
+        // cache headers, and these cannot be added after the fact: the file is
+        // served from an edge and never passes through here again.
+        $site = Site::query()->create(['slug' => 'cache-'.substr(sha1((string) getmypid()), 0, 6), 'name' => 'C', 'allowed_origins' => []]);
+        SiteSetting::query()->create(['site_id' => $site->id, 'key' => 'heroTitle', 'value' => 'Words']);
+
+        $store = new SiteStore($site);
+        $store->publish();
+
+        $this->written[] = $store->snapshotDirectory().'/current.json';
+        $this->written[] = $store->snapshotDirectory().'/v1/en.json';
+
+        $client = Storage::disk('kb_s3')->getClient();
+        $bucket = config('filesystems.disks.kb_s3.bucket');
+
+        $version = $client->headObject(['Bucket' => $bucket, 'Key' => $store->snapshotDirectory().'/v1/en.json']);
+        $pointer = $client->headObject(['Bucket' => $bucket, 'Key' => $store->snapshotDirectory().'/current.json']);
+
+        $this->assertSame('public, max-age=31536000, immutable', $version['CacheControl'] ?? null,
+            'a version never changes and should be cached forever');
+        $this->assertStringContainsString('max-age=30', (string) ($pointer['CacheControl'] ?? ''),
+            'the pointer is the one thing that moves');
+        $this->assertSame('application/json', $version['ContentType'] ?? null);
+    }
+
     public function test_the_stored_value_is_a_key_and_the_url_is_separate(): void
     {
         // The boundary that goes wrong quietly: a URL stored where a key

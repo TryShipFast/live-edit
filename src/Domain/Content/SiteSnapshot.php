@@ -44,17 +44,24 @@ class SiteSnapshot
                 'styles' => $this->store->publishedStyles(),
             ];
 
-            $this->put($this->path($number, $locale), $payload);
+            // A version never changes once written, so it may be held for as
+            // long as anyone likes.
+            $this->put($this->path($number, $locale), $payload, 'public, max-age=31536000, immutable');
             $locales[$locale] = count($payload['settings']);
         }
 
         // The pointer is the only thing that changes in place, so a cache in
         // front of these has exactly one object to invalidate.
+        // The pointer is the one thing that moves, so it is the one thing
+        // that must not be held for long — this interval is how soon a publish
+        // reaches the world.
+        $seconds = (int) config('live-edit.api.cache.pointer_seconds', 30);
+
         $this->put($this->store->snapshotDirectory().'/current.json', [
             'version' => $number,
             'locales' => array_keys($locales),
             'published_at' => now()->toIso8601String(),
-        ]);
+        ], "public, max-age={$seconds}, s-maxage={$seconds}");
 
         return $locales;
     }
@@ -129,14 +136,17 @@ class SiteSnapshot
         return $configured === [] ? [(string) config('live-edit.default_locale', 'en')] : $configured;
     }
 
-    private function put(string $path, array $payload): void
+    /**
+     * A published file is served straight from a CDN and never passes through
+     * this application again, so anything not said as it is written cannot be
+     * said afterwards — including how long it may be cached.
+     */
+    private function put(string $path, array $payload, string $cacheControl): void
     {
         $this->disk()->put(
             $path,
             json_encode($payload, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE),
-            // A published file is served straight from a CDN, so what it is
-            // cannot be said later.
-            ['ContentType' => 'application/json']
+            ['ContentType' => 'application/json', 'CacheControl' => $cacheControl]
         );
     }
 

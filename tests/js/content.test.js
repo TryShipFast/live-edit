@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { applyContent, applyValue, fetchContent } from '../../resources/js/content.js';
+import { applyContent, applyValue, fetchContent, resolve } from '../../resources/js/content.js';
 
 const page = (html) => {
     document.body.innerHTML = html;
@@ -83,5 +83,87 @@ describe('putting published content into a static page', () => {
         globalThis.fetch = vi.fn(() => Promise.resolve({ ok: false, status: 503, json: () => Promise.resolve({}) }));
 
         await expect(fetchContent({ base: 'https://cms.test', site: 'a', key: 'k' })).rejects.toThrow('503');
+    });
+});
+
+describe('where a static page gets its content from', () => {
+    const snapshot = { snapshot: 'https://cdn.test/content/sites/acme/' };
+
+    const answering = (map) => vi.fn((url) => {
+        const body = map[url];
+
+        return Promise.resolve(body === undefined
+            ? { ok: false, status: 404, json: () => Promise.resolve({}) }
+            : { ok: true, status: 200, json: () => Promise.resolve(body) });
+    });
+
+    it('reads the files, not the application', async () => {
+        // The whole point of publishing to files: a busy site is served from
+        // an edge and never reaches the application, so its traffic costs its
+        // owner nothing and costs us nothing.
+        globalThis.fetch = answering({
+            'https://cdn.test/content/sites/acme/current.json': { version: 7 },
+            'https://cdn.test/content/sites/acme/v7/en.json': { settings: { 'auto:abc': 'From the CDN' } },
+        });
+
+        const payload = await resolve(snapshot);
+
+        expect(payload.settings['auto:abc']).toBe('From the CDN');
+        expect(globalThis.fetch.mock.calls.map(([url]) => url)).toEqual([
+            'https://cdn.test/content/sites/acme/current.json',
+            'https://cdn.test/content/sites/acme/v7/en.json',
+        ]);
+    });
+
+    it('sends no key to the CDN', async () => {
+        // Published content is what every visitor is shown anyway, and a key
+        // in a request to a cache is a key in somebody's cache.
+        globalThis.fetch = answering({
+            'https://cdn.test/content/sites/acme/current.json': { version: 1 },
+            'https://cdn.test/content/sites/acme/v1/en.json': { settings: {} },
+        });
+
+        await resolve(snapshot);
+
+        for (const [, init] of globalThis.fetch.mock.calls) {
+            expect(init?.headers?.Authorization).toBeUndefined();
+        }
+    });
+
+    it('asks for the locale it was given', async () => {
+        globalThis.fetch = answering({
+            'https://cdn.test/content/sites/acme/current.json': { version: 2 },
+            'https://cdn.test/content/sites/acme/v2/fr.json': { settings: { 'auto:abc': 'Bonjour' } },
+        });
+
+        const payload = await resolve({ ...snapshot, locale: 'fr' });
+
+        expect(payload.settings['auto:abc']).toBe('Bonjour');
+    });
+
+    it('falls back to the application when there are no files yet', async () => {
+        // A site that has never published has no snapshot, and should not be
+        // blank because of it.
+        vi.spyOn(console, 'warn').mockImplementation(() => {});
+        globalThis.fetch = answering({
+            'https://cms.test/api/v1/acme/content': { settings: { 'auto:abc': 'From the API' } },
+        });
+
+        const payload = await resolve({ ...snapshot, base: 'https://cms.test/api/v1', site: 'acme', key: 'kbp_x' });
+
+        expect(payload.settings['auto:abc']).toBe('From the API');
+    });
+
+    it('says so rather than pretending when there is nowhere to fall back to', async () => {
+        globalThis.fetch = answering({});
+
+        await expect(resolve(snapshot)).rejects.toThrow(/Pointer answered 404/);
+    });
+
+    it('does nothing at all when nothing is configured', async () => {
+        globalThis.fetch = vi.fn();
+
+        expect(await resolve({})).toBeNull();
+        expect(globalThis.fetch).not.toHaveBeenCalled();
     });
 });
