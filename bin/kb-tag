@@ -73,7 +73,11 @@ foreach ($files as $file) {
     $relative = ltrim(substr($file, strlen($root)), '/');
     $html = (string) file_get_contents($file);
 
-    preg_match_all('/data-edit="setting:([^"]+)"/', $html, $before);
+    // Every marker the scanner writes, not only the one for words. An image
+    // is tagged with data-edit-img and a link's target with data-edit-href, so
+    // counting data-edit alone reported "nothing new" for a page whose only
+    // new editable thing was a picture — and then wrote nothing.
+    preg_match_all('/data-edit[a-z-]*="([^"]+)"/', $html, $before);
 
     try {
         // The page name scopes keys, so the same heading on two pages is two
@@ -85,7 +89,7 @@ foreach ($files as $file) {
         continue;
     }
 
-    preg_match_all('/data-edit="setting:([^"]+)"/', $result['html'] ?? '', $after);
+    preg_match_all('/data-edit[a-z-]*="([^"]+)"/', $result['html'] ?? '', $after);
 
     // Only what is new. The scanner keeps keys it already wrote, so a page can
     // be re-tagged after a redesign and a client's saved words stay attached

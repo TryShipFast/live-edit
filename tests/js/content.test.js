@@ -231,3 +231,34 @@ describe('rendering saved styles on a page nobody server-renders', () => {
         expect(document.getElementById('live-edit-styles').textContent).toContain('#222');
     });
 })
+
+describe('the markers that are not data-edit', () => {
+    it('replaces a picture marked with data-edit-img', () => {
+        // The scanner marks an image differently from words, because replacing
+        // one means setting a source rather than writing text. Missing it meant
+        // a client could change an image, publish, and see the old one.
+        document.body.innerHTML = '<img data-edit-img="setting:auto:pic" src="/old.png" alt="">';
+
+        applyContent(document, { 'auto:pic': '/new.png' });
+
+        expect(document.querySelector('img').getAttribute('src')).toBe('/new.png');
+    });
+
+    it('leaves a picture alone when nothing was published for it', () => {
+        document.body.innerHTML = '<img data-edit-img="setting:auto:pic" src="/old.png" alt="">';
+
+        applyContent(document, {});
+
+        expect(document.querySelector('img').getAttribute('src')).toBe('/old.png');
+    });
+
+    it('changes where a link goes', () => {
+        document.body.innerHTML = '<a data-edit="setting:auto:t" data-edit-href="auto:h" href="/old">Book</a>';
+
+        applyContent(document, { 'auto:t': 'Book now', 'auto:h': 'https://booking.test' });
+
+        const link = document.querySelector('a');
+        expect(link.textContent).toBe('Book now');
+        expect(link.getAttribute('href')).toBe('https://booking.test');
+    });
+})

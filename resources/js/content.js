@@ -71,7 +71,19 @@ export const applyContent = (root, settings) => {
         applied++;
     }
 
-    // Links and images carry their own keys alongside the element's.
+    // A picture is marked differently from words, because replacing it means
+    // setting a source rather than writing text. Missing this meant a client
+    // could change an image, publish it, and go on seeing the old one.
+    for (const element of root.querySelectorAll('[data-edit-img]')) {
+        const key = (element.getAttribute('data-edit-img') ?? '').replace(/^setting:/, '');
+
+        if (Object.hasOwn(settings, key)) {
+            applyValue(element, settings[key]);
+            applied++;
+        }
+    }
+
+    // A link's target carries its own key alongside the element's.
     for (const element of root.querySelectorAll('[data-edit-href]')) {
         const key = element.getAttribute('data-edit-href');
         if (Object.hasOwn(settings, key)) {
