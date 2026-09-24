@@ -73,13 +73,7 @@ foreach ($files as $file) {
     $relative = ltrim(substr($file, strlen($root)), '/');
     $html = (string) file_get_contents($file);
 
-    if (str_contains($html, 'data-edit=')) {
-        // Already done. Re-tagging would issue new keys for elements a client
-        // has already edited, and quietly orphan their words.
-        $skipped[] = $relative.' (already tagged)';
-
-        continue;
-    }
+    preg_match_all('/data-edit="setting:([^"]+)"/', $html, $before);
 
     try {
         // The page name scopes keys, so the same heading on two pages is two
@@ -91,15 +85,21 @@ foreach ($files as $file) {
         continue;
     }
 
-    $count = preg_match_all('/data-edit="/', $result['html'] ?? '');
+    preg_match_all('/data-edit="setting:([^"]+)"/', $result['html'] ?? '', $after);
 
-    if ($count === 0) {
+    // Only what is new. The scanner keeps keys it already wrote, so a page can
+    // be re-tagged after a redesign and a client's saved words stay attached
+    // to the elements holding them — while a section added last week finally
+    // becomes editable.
+    $fresh = count(array_diff($after[1], $before[1]));
+
+    if ($fresh === 0) {
         continue;
     }
 
     $touched++;
-    $tagged += $count;
-    printf("%s  %d\n", $relative, $count);
+    $tagged += $fresh;
+    printf("%s  %d new\n", $relative, $fresh);
 
     if ($write) {
         file_put_contents($file, $result['html']);
