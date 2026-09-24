@@ -41,10 +41,12 @@ require KASTSBUILD_PATH.'includes/Settings.php';
 require KASTSBUILD_PATH.'includes/Api.php';
 require KASTSBUILD_PATH.'includes/Session.php';
 require KASTSBUILD_PATH.'includes/Frontend.php';
+require KASTSBUILD_PATH.'includes/Publishing.php';
 
 add_action('plugins_loaded', function () {
     KastsBuild\Settings::boot();
     KastsBuild\Frontend::boot();
+    KastsBuild\Publishing::boot();
 });
 
 register_deactivation_hook(__FILE__, function () {

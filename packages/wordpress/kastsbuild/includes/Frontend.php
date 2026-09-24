@@ -158,12 +158,26 @@ class Frontend
         add_filter('script_loader_tag', [self::class, 'asModule'], 10, 3);
 
         wp_add_inline_script('kastsbuild-editor', sprintf(
-            'window.liveEditApi = %s;',
+            'window.liveEditApi = %s; window.liveEditPublishing = %s;',
             wp_json_encode([
                 'base' => rtrim((string) Settings::get('api_base'), '/'),
                 'site' => Settings::get('site'),
                 // The short-lived one. The secret never leaves the server.
                 'token' => $session,
+                // Publishing is asked of this site, not of the content API:
+                // the key a page holds cannot publish, and should not be able
+                // to.
+                'publishUrl' => rest_url('kastsbuild/v1/publish'),
+                'publishHeaders' => ['X-WP-Nonce' => wp_create_nonce('wp_rest')],
+            ]),
+            wp_json_encode([
+                // Without this the editor has no Publish button at all, and
+                // someone could save drafts indefinitely with no way to
+                // release them — which is what happened before this existed.
+                'pending' => Api::pending(),
+                // WordPress has no signed preview link to offer, and a control
+                // that does nothing is worse than one that is absent.
+                'previewUrl' => null,
             ])
         ), 'before');
     }

@@ -44,3 +44,32 @@ describe('apiRequestFor', () => {
         expect(() => apiRequestFor('/live-edit/setting', {}, { base: 'https://x', site: 'a' })).toThrow(/not configured/);
     });
 });
+
+describe('publishing through a host that has its own idea of who may publish', () => {
+    const wp = { ...api, publishUrl: 'https://site.test/wp-json/kastsbuild/v1/publish', publishHeaders: { 'X-WP-Nonce': 'abc123' } };
+
+    it('posts to the host route rather than the content API', () => {
+        // The content API asks for a secret key to publish, and a browser must
+        // never hold one. WordPress knows who its own users are, so it decides
+        // and publishes from its server.
+        const { url, init } = apiRequestFor('/live-edit/publish', { method: 'POST' }, wp);
+
+        expect(url).toBe('https://site.test/wp-json/kastsbuild/v1/publish');
+        expect(init.headers['X-WP-Nonce']).toBe('abc123');
+        expect(init.credentials).toBe('same-origin');
+    });
+
+    it('does not send the content API key to the host', () => {
+        // It is a different service and has no use for it.
+        const { init } = apiRequestFor('/live-edit/publish', { method: 'POST' }, wp);
+
+        expect(init.headers.Authorization).toBeUndefined();
+    });
+
+    it('still uses the content API when no host route is given', () => {
+        const { url, init } = apiRequestFor('/live-edit/publish', { method: 'POST' }, api);
+
+        expect(url).toBe('https://cms.test/api/live-edit/v1/acme/publish');
+        expect(init.headers.Authorization).toBe('Bearer kbe_x');
+    });
+});

@@ -1785,7 +1785,11 @@ const bootLiveEdit = () => {
             let pending = publishing.pending ?? 0;
             const showPending = () => {
                 ui.publishButton.hidden = false;
-                ui.previewButton.hidden = false;
+                // A control that does nothing is worse than one that is not
+                // there: not every host can issue a preview link, and an
+                // editor who clicks it and gets silence learns to distrust the
+                // rest of the toolbar.
+                ui.previewButton.hidden = ! publishing.previewUrl;
                 ui.publishButton.textContent = pending > 0 ? `Publish ${pending}` : 'Published';
                 ui.publishButton.disabled = pending === 0;
                 ui.publishButton.title = pending > 0

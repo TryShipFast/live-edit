@@ -83,6 +83,23 @@ class Api
         return $stamp;
     }
 
+    /**
+     * How many changes are waiting.
+     *
+     * Asked with the editor's own key, because the count of unpublished work
+     * is only answered to someone allowed to see it.
+     */
+    public static function pending(): int
+    {
+        $key = Session::forCurrentUser();
+
+        if ($key === null) {
+            return 0;
+        }
+
+        return (int) (self::get('/content/version', $key)['pending'] ?? 0);
+    }
+
     /** @return array<string, mixed> */
     public static function get(string $path, string $key): array
     {

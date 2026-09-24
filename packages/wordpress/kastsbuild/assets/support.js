@@ -188,6 +188,23 @@ export const apiRequestFor = (url, options = {}, api) => {
         '/live-edit/upload': `${base}/${api?.site}/media`,
     };
 
+    // Publishing decides what the public sees, so the content API asks for a
+    // secret key — which a browser must never hold. A host that has its own
+    // idea of who may publish (WordPress knows, from its own users) points
+    // this at one of its own routes instead, and does the publishing from its
+    // server where the secret already lives.
+    if (url === '/live-edit/publish' && api?.publishUrl) {
+        return {
+            url: api.publishUrl,
+            init: {
+                ...options,
+                headers: { ...(options.headers ?? {}), ...(api.publishHeaders ?? {}), Accept: 'application/json' },
+                // Same origin, so the host's own session says who this is.
+                credentials: 'same-origin',
+            },
+        };
+    }
+
     const target = routes[url];
 
     if (!base || !api?.site || !api?.token) {
