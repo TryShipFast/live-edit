@@ -4,6 +4,7 @@ namespace ShipFast\LiveEdit\Tests\Integration;
 
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
+use PHPUnit\Framework\Attributes\Group;
 use ShipFast\LiveEdit\Domain\Content\ImageStore;
 use ShipFast\LiveEdit\Support\Snapshot;
 use ShipFast\LiveEdit\Tests\Fixtures\Setting;
@@ -25,9 +26,8 @@ use ShipFast\LiveEdit\Tests\TestCase;
  * Credentials come from the usual AWS chain — environment, shared file, or
  * instance role — so nothing secret is written into this repository or passed
  * on a command line where it would land in shell history.
- *
- * @group aws
  */
+#[Group('aws')]
 class S3IntegrationTest extends TestCase
 {
     private array $written = [];
@@ -97,9 +97,16 @@ class S3IntegrationTest extends TestCase
 
         // The whole point of the bucket: served by a CDN without passing
         // through the application again, so what was not said at upload time
-        // cannot be said later.
-        $meta = $disk->getMetadata($path) ?? [];
-        $this->assertNotEmpty($meta, 'no metadata came back for the stored object');
+        // cannot be said later. Asked of S3 itself, because a filesystem
+        // abstraction has no opinion about cache headers.
+        $head = $disk->getClient()->headObject([
+            'Bucket' => config('filesystems.disks.kb_s3.bucket'),
+            'Key' => $path,
+        ]);
+
+        $this->assertSame('public, max-age=31536000, immutable', $head['CacheControl'] ?? null,
+            'a CDN would re-fetch this picture for every visitor');
+        $this->assertStringStartsWith('image/', (string) ($head['ContentType'] ?? ''));
 
         $this->assertSame([400, 400], array_slice(getimagesizefromstring($disk->get($path)), 0, 2),
             'the image reached the bucket unfitted');

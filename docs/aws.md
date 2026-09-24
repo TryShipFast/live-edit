@@ -63,7 +63,7 @@ Scoped to one bucket, and to object actions plus creating that bucket:
   "Statement": [
     {
       "Effect": "Allow",
-      "Action": ["s3:CreateBucket", "s3:ListBucket", "s3:GetBucketLocation"],
+      "Action": ["s3:CreateBucket", "s3:ListBucket", "s3:GetBucketLocation", "s3:DeleteBucket"],
       "Resource": "arn:aws:s3:::kastsbuild-content-test-*"
     },
     {
@@ -89,7 +89,15 @@ Credentials come from the standard AWS chain — environment, shared credentials
 file, or instance role — so nothing secret is written into the repository or
 passed on a command line where it would land in shell history.
 
-Everything it writes goes under one prefix and is deleted afterwards.
+Everything it writes goes under one prefix and is deleted afterwards. The
+bucket itself is left standing unless `s3:DeleteBucket` is granted — an empty
+bucket costs nothing and makes the next run a single command.
+
+Verified against a real bucket on 2026-09-24: objects stored under a prefixed
+key, `CacheControl: public, max-age=31536000, immutable` confirmed by asking S3
+for the object's own headers, an SVG stored as `image/svg+xml` with its
+case-sensitive attributes intact, a published snapshot and its pointer read
+back, and the run leaving nothing behind.
 
 It answers the questions a faked disk cannot: whether object metadata survives
 a PUT, whether a prefixed key round-trips, whether the URL a page is handed
