@@ -16,6 +16,10 @@
 const CHROME_CSS = `
 :host { all: initial; }
 *, *::before, *::after { box-sizing: border-box; }
+/* A class that sets display beats the browser's rule for [hidden], so a button
+   hidden in script stayed on screen. The preview link showed on every site
+   without publishing, doing nothing when pressed. */
+[hidden] { display: none !important; }
 :host {
   --le-ink: #0b1220;
   --le-body: #334155;
