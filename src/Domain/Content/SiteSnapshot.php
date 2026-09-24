@@ -117,6 +117,31 @@ class SiteSnapshot
         return SnapshotUrl::for($relative);
     }
 
+    /**
+     * Write an empty pointer, so a site that has never published still answers.
+     *
+     * Without it the first thing a customer sees in their console is a 404
+     * from us. It falls back and the page is fine — but a 404 on day one is
+     * the sort of thing that makes somebody doubt the rest of it, and they are
+     * right to.
+     */
+    public function initialise(): void
+    {
+        $pointer = $this->store->snapshotDirectory().'/current.json';
+
+        if ($this->disk()->exists($pointer)) {
+            return;
+        }
+
+        $seconds = (int) config('live-edit.api.cache.pointer_seconds', 30);
+
+        $this->put($pointer, [
+            'version' => 0,
+            'locales' => [],
+            'published_at' => null,
+        ], "public, max-age={$seconds}, s-maxage={$seconds}");
+    }
+
     /** Remove every file this site has published. */
     public function forget(): void
     {

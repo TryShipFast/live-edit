@@ -3,6 +3,8 @@
 namespace ShipFast\LiveEdit\Domain\Site;
 
 use Illuminate\Validation\ValidationException;
+use ShipFast\LiveEdit\Domain\Content\SiteSnapshot;
+use ShipFast\LiveEdit\Domain\Content\SiteStore;
 
 /**
  * Bringing a site into existence, and handing over its keys.
@@ -47,6 +49,10 @@ class Provisioner
         // the publishable key reads, the secret key vouches for editors.
         [, $publishable] = $site->issueToken(TokenType::Publishable, 'Web');
         [, $secret] = $site->issueToken(TokenType::Secret, 'Server');
+
+        // So the very first page view finds a pointer rather than a 404 from
+        // us. It costs one small file and saves a customer's first impression.
+        rescue(fn () => (new SiteSnapshot(new SiteStore($site)))->initialise(), null, false);
 
         return ['site' => $site, 'keys' => ['publishable' => $publishable, 'secret' => $secret]];
     }

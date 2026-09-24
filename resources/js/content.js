@@ -183,6 +183,12 @@ export const fetchSnapshot = async ({ snapshot, locale }) => {
         return r.json();
     });
 
+    // A site that has published nothing has a pointer saying so. Its words
+    // are the ones already in the file, which is exactly right.
+    if (!pointer.version) {
+        return { settings: {}, styles: {} };
+    }
+
     const language = locale ?? 'en';
     const response = await fetch(`${base}/v${pointer.version}/${language}.json`);
 

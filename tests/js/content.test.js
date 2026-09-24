@@ -262,3 +262,18 @@ describe('the markers that are not data-edit', () => {
         expect(link.getAttribute('href')).toBe('https://booking.test');
     });
 })
+
+describe('a site that has published nothing yet', () => {
+    it('is not an error, and leaves the words in the file', async () => {
+        // A newly bought template has a pointer saying "nothing published".
+        // Treating that as a failure put a 404 in every new customer console.
+        globalThis.fetch = vi.fn(() => Promise.resolve({
+            ok: true, status: 200, json: () => Promise.resolve({ version: 0, locales: [] }),
+        }));
+
+        const payload = await resolve({ snapshot: 'https://cdn.test/sites/acme' });
+
+        expect(payload).toEqual({ settings: {}, styles: {} });
+        expect(globalThis.fetch).toHaveBeenCalledTimes(1);
+    });
+})
