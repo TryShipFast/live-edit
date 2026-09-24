@@ -7,6 +7,7 @@ use ShipFast\LiveEdit\Http\Api\Middleware\AuthenticateProvisioner;
 use ShipFast\LiveEdit\Http\Api\Middleware\EnforceCors;
 use ShipFast\LiveEdit\Http\Api\Middleware\ThrottleApi;
 use ShipFast\LiveEdit\Http\Api\V1\ContentController;
+use ShipFast\LiveEdit\Http\Api\V1\EmbedController;
 use ShipFast\LiveEdit\Http\Api\V1\MediaController;
 use ShipFast\LiveEdit\Http\Api\V1\SessionController;
 use ShipFast\LiveEdit\Http\Api\V1\SignInController;
@@ -135,3 +136,17 @@ Route::middleware([EnforceCors::class])
 Route::get('/live-edit/sign-in/{token}', [SignInController::class, 'redeem'])
     ->middleware([ThrottleApi::class.':sign_in'])
     ->name('live-edit.sign-in.redeem');
+
+/*
+ * The editor's own files.
+ *
+ * Open and cacheable: this is a static asset, and the customer pasting one
+ * line into their site is the whole point of it being here rather than in
+ * their repository.
+ */
+Route::get('/live-edit/assets/{file}', EmbedController::class)
+    ->where('file', '[a-z-]+\.js')
+    ->name('live-edit.assets');
+
+Route::get('/live-edit/embed.js', fn () => app(EmbedController::class)('embed.js'))
+    ->name('live-edit.embed');

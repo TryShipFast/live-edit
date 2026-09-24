@@ -106,6 +106,25 @@ words before the page is sent. A folder of HTML on a CDN has neither, so it
 needs two things — and until both existed, "static sites are supported" was
 true of the engine and false of anything a customer could run.
 
+**Install it with one line.** The editor's files are served by this service,
+so nothing is copied into a customer's site and nothing has to be re-copied
+when a release goes out:
+
+```html
+<script src="https://cms.example.com/live-edit/embed.js"
+        data-site="acme"
+        data-key="kbp_…"
+        data-snapshot="https://cdn.acme.com/content/sites/acme" defer></script>
+```
+
+A visitor downloads that and the content applier — a page's worth of words,
+and no editor. The editor is fetched only for somebody who arrived from a
+sign-in link or asked for it, which is almost nobody.
+
+The file is cached for an hour rather than forever, because it is the one
+thing a customer cannot redeploy themselves: a fix has to be able to reach
+them without anyone being asked to do anything.
+
 **Tag it once**, with the same scanner every other adapter uses:
 
 ```bash
