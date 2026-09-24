@@ -150,3 +150,13 @@ Route::get('/live-edit/assets/{file}', EmbedController::class)
 
 Route::get('/live-edit/embed.js', fn () => app(EmbedController::class)('embed.js'))
     ->name('live-edit.embed');
+
+/*
+ * A site's own install: one URL, nothing to fill in.
+ *
+ * Which also means a rotated key or a moved snapshot reaches a site nobody is
+ * going to redeploy.
+ */
+Route::get('/s/{site:slug}.js', [EmbedController::class, 'site'])
+    ->middleware([SubstituteBindings::class])
+    ->name('live-edit.site-embed');

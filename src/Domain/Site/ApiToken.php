@@ -23,8 +23,8 @@ class ApiToken extends Model
         'last_used_at' => 'datetime',
     ];
 
-    /** The secret hash is not something a caller should be able to ask for. */
-    protected $hidden = ['secret_hash'];
+    /** Neither of these is something a caller should be able to ask for. */
+    protected $hidden = ['secret_hash', 'public_text'];
 
     public function site(): BelongsTo
     {

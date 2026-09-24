@@ -87,6 +87,10 @@ class Site extends Model
             'type' => $type->value,
             'name' => $name,
             'secret_hash' => $value->hash(),
+            // Kept readable only for the key that is printed into every page
+            // of the site anyway. Hashing that one protected nothing and meant
+            // we could not tell a site what its own key was.
+            'public_text' => $type === TokenType::Publishable ? $value->plain() : null,
             'abilities' => array_map(fn (Ability $a) => $a->value, $abilities ?? $type->defaultAbilities()),
             'expires_at' => $expiresAt,
         ]);

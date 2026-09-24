@@ -27,18 +27,40 @@ class TokenDomainTest extends TestCase
         return new TokenAuthenticator;
     }
 
-    public function test_a_minted_key_round_trips_and_is_stored_only_as_a_hash(): void
+    public function test_a_minted_key_round_trips(): void
     {
         [$token, $plain] = $this->site()->issueToken(TokenType::Publishable, 'Web');
 
         $this->assertStringStartsWith('kbp_', $plain);
         $this->assertNotSame($plain, $token->secret_hash);
-        $this->assertStringNotContainsString($token->secret_hash, $plain);
+    }
 
-        // The secret itself must be nowhere in the row.
-        $stored = json_encode($token->fresh()->getAttributes());
-        $secret = explode('_', $plain)[2];
-        $this->assertStringNotContainsString($secret, $stored);
+    public function test_a_secret_is_never_recoverable_from_the_database(): void
+    {
+        // The rule that matters: a leaked database must not hand anybody a
+        // working key that can change or publish a customer's content.
+        $site = $this->site();
+
+        foreach ([TokenType::Secret, TokenType::Session] as $type) {
+            [$token, $plain] = $site->issueToken($type, 'Server');
+
+            $stored = json_encode($token->fresh()->getAttributes());
+            $secret = explode('_', $plain)[2];
+
+            $this->assertStringNotContainsString($secret, $stored, $type->value.' was stored recoverably');
+            $this->assertNull($token->fresh()->public_text);
+        }
+    }
+
+    public function test_a_publishable_key_is_kept_readable_on_purpose(): void
+    {
+        // It is printed into every page of the site it belongs to, so hashing
+        // it protects nothing — and made it impossible to tell a site what its
+        // own key is, which meant customers pasting it by hand and editing
+        // their HTML whenever one was rotated.
+        [$token, $plain] = $this->site()->issueToken(TokenType::Publishable, 'Web');
+
+        $this->assertSame($plain, $token->fresh()->public_text);
     }
 
     public function test_a_token_is_not_serialised_with_its_hash(): void
@@ -46,6 +68,7 @@ class TokenDomainTest extends TestCase
         [$token] = $this->site()->issueToken(TokenType::Secret, 'Server');
 
         $this->assertArrayNotHasKey('secret_hash', $token->toArray());
+        $this->assertArrayNotHasKey('public_text', $token->toArray());
     }
 
     public function test_a_correct_key_authenticates(): void

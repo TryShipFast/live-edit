@@ -106,14 +106,30 @@ words before the page is sent. A folder of HTML on a CDN has neither, so it
 needs two things — and until both existed, "static sites are supported" was
 true of the engine and false of anything a customer could run.
 
-**Install it with one line.** The editor's files are served by this service,
-so nothing is copied into a customer's site and nothing has to be re-copied
-when a release goes out:
+**Install it with one line**, and nothing in it to fill in:
+
+```html
+<script src="https://cms.example.com/s/acme.js" defer></script>
+```
+
+That URL serves the site's own configuration — which key to use, where the API
+is, where its published files are. So there is nothing for a customer to get
+wrong, and, more usefully, nothing of theirs to edit when a key is rotated or
+a snapshot moves: their page asks every time, so the answer can change without
+anybody touching their HTML. A suspended site serves a comment instead, which
+stops the editor without breaking the page.
+
+The publishable key is the one credential stored readably rather than hashed.
+It is printed into every page of the site it belongs to, so hashing protected
+nothing — and made it impossible to tell a site what its own key was. Secrets
+and sessions stay hashed and unrecoverable, and there is a test that says so.
+
+The attribute form still works where a site would rather hold its own
+configuration:
 
 ```html
 <script src="https://cms.example.com/live-edit/embed.js"
-        data-site="acme"
-        data-key="kbp_…"
+        data-site="acme" data-key="kbp_…"
         data-snapshot="https://cdn.acme.com/content/sites/acme" defer></script>
 ```
 
