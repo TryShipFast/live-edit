@@ -956,6 +956,17 @@ const bootLiveEdit = () => {
                     const richField = (window.liveEditRich?.fields ?? []).includes(`${type}.${name}`);
                     drawerFields.append(fieldInput(name, fieldLabel, value, name === 'detail' || name === 'answer' ? 6 : 3, richField));
                 });
+                // Drafts cover settings and styling, not records. On a site
+                // that holds edits back this is the one panel where Save is
+                // immediate, and a client who has learned to press Publish
+                // would otherwise assume this waited too.
+                if (window.liveEditPublishing) {
+                    const immediate = document.createElement('div');
+                    immediate.className = 'le-hint le-immediate';
+                    immediate.textContent = 'Changes here go live as soon as you save, without publishing.';
+                    drawerFields.append(immediate);
+                }
+
                 if (element.hasAttribute('data-edit-deletable')) {
                     drawerDelete.textContent = `Delete this ${label.toLowerCase()}`;
                     drawerDelete.classList.remove('le-hidden');

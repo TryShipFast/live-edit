@@ -8,6 +8,12 @@ return new class extends Migration
 {
     public function up(): void
     {
+        // A host that ran this table's migration before the package shipped
+        // one already has it; creating it again stops the whole migration.
+        if (Schema::hasTable('edit_revisions')) {
+            return;
+        }
+
         Schema::create('edit_revisions', function (Blueprint $table) {
             $table->id();
             $table->uuid('batch');

@@ -193,6 +193,10 @@ button, input, select, textarea { font: inherit; color: inherit; margin: 0; }
 }
 .le-btn-publish:hover { filter: brightness(1.06); }
 .le-btn-publish:disabled { opacity: .5; cursor: default; filter: none; }
+.le-immediate {
+  margin-top: 10px; padding: 10px 12px; border-radius: 10px;
+  background: #fff8e6; border: 1px solid #f0dfae; color: #7a5b12;
+}
 .le-hint { font-size: 11px; font-weight: 400; letter-spacing: normal; text-transform: none; color: var(--le-muted); }
 .le-section-heading {
   margin-top: 4px; border-top: 1px solid var(--le-line); padding-top: 18px;

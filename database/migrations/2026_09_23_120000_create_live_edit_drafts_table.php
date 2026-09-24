@@ -16,6 +16,12 @@ return new class extends Migration
 {
     public function up(): void
     {
+        // A host that ran this table's migration before the package shipped
+        // one already has it; creating it again stops the whole migration.
+        if (Schema::hasTable('live_edit_drafts')) {
+            return;
+        }
+
         Schema::create('live_edit_drafts', function (Blueprint $table) {
             $table->id();
             // 'setting' or 'style': what the subject names.
