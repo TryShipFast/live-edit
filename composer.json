@@ -40,5 +40,8 @@
         "aws/aws-sdk-php": "Required only to sign CloudFront URLs for a private distribution.",
         "illuminate/database": "Provided by any Laravel application; needed only for the Eloquent-backed side of the engine.",
         "illuminate/http": "Provided by any Laravel application; needed only for the HTTP API and the remote content driver."
-    }
+    },
+    "bin": [
+        "bin/kb-tag"
+    ]
 }

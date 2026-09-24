@@ -1,0 +1,121 @@
+#!/usr/bin/env php
+<?php
+
+/**
+ * Make static HTML editable, without needing a framework to do it.
+ *
+ * The engine could already tag any page, but only from inside a Laravel
+ * application — so "we support static sites" was true of the scanner and false
+ * of anything a customer could actually run. This is the same scanner, on the
+ * command line.
+ *
+ *   vendor/bin/kb-tag public              # show what would change
+ *   vendor/bin/kb-tag public --write      # apply it
+ *
+ * Shows and changes nothing unless asked. A tool that rewrites somebody's site
+ * the first time they try it is a tool they run once.
+ */
+
+$autoload = null;
+
+foreach ([__DIR__.'/../vendor/autoload.php', __DIR__.'/../../../autoload.php'] as $candidate) {
+    if (is_file($candidate)) {
+        $autoload = $candidate;
+        break;
+    }
+}
+
+if ($autoload === null) {
+    fwrite(STDERR, "Could not find the autoloader. Run composer install first.\n");
+    exit(1);
+}
+
+require $autoload;
+
+use ShipFast\LiveEdit\Mapper\MarkupScanner;
+
+$args = array_slice($argv, 1);
+$flag = fn (string $name) => in_array("--{$name}", $args, true);
+$root = realpath($args[0] ?? '.') ?: '';
+$write = $flag('write');
+
+if ($root === '' || ! is_dir($root)) {
+    fwrite(STDERR, "No such directory: ".($args[0] ?? '.')."\n");
+    exit(1);
+}
+
+$skip = ['node_modules', 'vendor', '.git', 'dist', 'build'];
+$files = [];
+
+$walk = function (string $dir) use (&$walk, &$files, $skip) {
+    foreach (scandir($dir) ?: [] as $entry) {
+        if ($entry === '.' || $entry === '..' || in_array($entry, $skip, true) || str_starts_with($entry, '.')) {
+            continue;
+        }
+
+        $path = $dir.'/'.$entry;
+
+        if (is_dir($path)) {
+            $walk($path);
+        } elseif (preg_match('/\.html?$/i', $entry)) {
+            $files[] = $path;
+        }
+    }
+};
+
+$walk($root);
+
+$tagged = 0;
+$touched = 0;
+$skipped = [];
+
+foreach ($files as $file) {
+    $relative = ltrim(substr($file, strlen($root)), '/');
+    $html = (string) file_get_contents($file);
+
+    if (str_contains($html, 'data-edit=')) {
+        // Already done. Re-tagging would issue new keys for elements a client
+        // has already edited, and quietly orphan their words.
+        $skipped[] = $relative.' (already tagged)';
+
+        continue;
+    }
+
+    try {
+        // The page name scopes keys, so the same heading on two pages is two
+        // things a client can edit separately.
+        $result = (new MarkupScanner)->apply($html, ['text', 'image', 'link', 'icon'], true, null, $relative);
+    } catch (Throwable $e) {
+        $skipped[] = $relative.' ('.$e->getMessage().')';
+
+        continue;
+    }
+
+    $count = preg_match_all('/data-edit="/', $result['html'] ?? '');
+
+    if ($count === 0) {
+        continue;
+    }
+
+    $touched++;
+    $tagged += $count;
+    printf("%s  %d\n", $relative, $count);
+
+    if ($write) {
+        file_put_contents($file, $result['html']);
+    }
+}
+
+printf("\n%d element%s in %d file%s\n", $tagged, $tagged === 1 ? '' : 's', $touched, $touched === 1 ? '' : 's');
+
+if ($skipped !== []) {
+    // Never silently: a file passed over is coverage the caller does not have.
+    printf("\n%d file%s left alone:\n", count($skipped), count($skipped) === 1 ? '' : 's');
+    foreach (array_slice($skipped, 0, 10) as $line) {
+        echo '  '.$line."\n";
+    }
+}
+
+echo $write
+    ? "\nWritten. Review the diff before committing.\n"
+    : "\nNothing written. Re-run with --write to apply.\n";

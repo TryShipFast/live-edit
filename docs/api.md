@@ -99,6 +99,47 @@ words underneath it did.
 `Cache-Control` pairs a short `max-age` with a long `stale-while-revalidate`, so
 a busy site serves from its cache at once and refreshes behind the scenes.
 
+## A site that is just files
+
+A server-rendered site has something that can tag its markup and substitute
+words before the page is sent. A folder of HTML on a CDN has neither, so it
+needs two things — and until both existed, "static sites are supported" was
+true of the engine and false of anything a customer could run.
+
+**Tag it once**, with the same scanner every other adapter uses:
+
+```bash
+vendor/bin/kb-tag public            # show what would change
+vendor/bin/kb-tag public --write    # apply it
+```
+
+Keys are written into the files and never regenerated: a second run leaves
+tagged pages alone, so re-running cannot orphan a client's saved words. Keys
+are scoped by page, so the same heading on two pages stays two things.
+
+**Then let the page fetch its own content:**
+
+```html
+<script>
+  window.liveEditContent = { base: '…/api/live-edit/v1', site: 'acme', key: 'kbp_…' };
+</script>
+<script type="module" src="/editor/content.js"></script>
+```
+
+That is a separate, small file from the editor, because every visitor loads it
+and almost none of them will ever edit anything. Published values are written
+as text, never as markup — a content service that can put HTML into a page is
+a way to run scripts in every visitor's browser.
+
+The words in the file are what shows if the service is slow or unreachable, so
+a static site degrades to exactly what it was before.
+
+**What still needs a server.** Minting an edit session, and publishing, both
+need the secret key, and a folder of files has nowhere to keep one. A static
+customer needs a single small function — on Netlify, Vercel, Workers, anywhere
+— that checks whoever is asking and calls `POST /{site}/sessions`. Without it
+a static site can be read and rendered, but not edited.
+
 ## Whose content is it
 
 Content belongs to a site, not to the installation. Two customers can be served
