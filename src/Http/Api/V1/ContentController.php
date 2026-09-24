@@ -42,6 +42,10 @@ class ContentController
         return response()->json([
             'version' => $payload['version'],
             'locale' => $payload['locale'],
+            // What a consumer should key a cache on. A version alone is not
+            // enough: a site with publishing off changes its words without
+            // moving one.
+            'fingerprint' => $read->fingerprint($payload),
         ])->withHeaders([
             // The pointer is the one thing that moves, so it is the one thing
             // that must not be cached for long.

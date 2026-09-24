@@ -5,9 +5,7 @@
     "license": "MIT",
     "require": {
         "php": "^8.3",
-        "illuminate/support": "^11.0 || ^12.0 || ^13.0",
-        "illuminate/database": "^11.0 || ^12.0 || ^13.0",
-        "illuminate/http": "^11.0 || ^12.0 || ^13.0"
+        "illuminate/support": "^11.0 || ^12.0 || ^13.0"
     },
     "autoload": {
         "psr-4": {
@@ -25,7 +23,9 @@
     "require-dev": {
         "orchestra/testbench": "^10.0",
         "laravel/pint": "^1.0",
-        "league/flysystem-aws-s3-v3": "^3.35"
+        "league/flysystem-aws-s3-v3": "^3.35",
+        "illuminate/database": "^11.0 || ^12.0 || ^13.0",
+        "illuminate/http": "^11.0 || ^12.0 || ^13.0"
     },
     "autoload-dev": {
         "psr-4": {
@@ -37,6 +37,8 @@
     },
     "suggest": {
         "league/flysystem-aws-s3-v3": "Required to store snapshots and images on S3 (set LIVE_EDIT_SNAPSHOT_DISK=s3).",
-        "aws/aws-sdk-php": "Required only to sign CloudFront URLs for a private distribution."
+        "aws/aws-sdk-php": "Required only to sign CloudFront URLs for a private distribution.",
+        "illuminate/database": "Provided by any Laravel application; needed only for the Eloquent-backed side of the engine.",
+        "illuminate/http": "Provided by any Laravel application; needed only for the HTTP API and the remote content driver."
     }
 }

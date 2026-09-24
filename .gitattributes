@@ -1,0 +1,16 @@
+# Keep a published package to its source. A consumer installing this needs the
+# engine, not our test suite, our JavaScript toolchain, or the adapters they
+# did not ask for — and a WordPress plugin that vendors all of it is not a
+# plugin anyone will install.
+/tests            export-ignore
+/tools            export-ignore
+/docs             export-ignore
+/packages         export-ignore
+/node_modules     export-ignore
+/.github          export-ignore
+/phpunit.xml      export-ignore
+/vitest.config.js export-ignore
+/playwright.config.js export-ignore
+/package.json     export-ignore
+/package-lock.json export-ignore
+/.gitattributes   export-ignore

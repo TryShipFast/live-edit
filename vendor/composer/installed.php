@@ -3,7 +3,7 @@
         'name' => 'shipfast/live-edit',
         'pretty_version' => 'dev-main',
         'version' => 'dev-main',
-        'reference' => '500fb06b04eca040e39b1fa92e7cba127af949f4',
+        'reference' => 'e10843c8b30500f7633fff4339de76e060ff5d43',
         'type' => 'library',
         'install_path' => __DIR__ . '/../../',
         'aliases' => array(),
@@ -1064,7 +1064,7 @@
         'shipfast/live-edit' => array(
             'pretty_version' => 'dev-main',
             'version' => 'dev-main',
-            'reference' => '500fb06b04eca040e39b1fa92e7cba127af949f4',
+            'reference' => 'e10843c8b30500f7633fff4339de76e060ff5d43',
             'type' => 'library',
             'install_path' => __DIR__ . '/../../',
             'aliases' => array(),

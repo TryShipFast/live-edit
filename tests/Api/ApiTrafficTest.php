@@ -187,6 +187,24 @@ class ApiTrafficTest extends TestCase
         );
     }
 
+    public function test_the_version_endpoint_reports_something_that_moves_with_the_content(): void
+    {
+        // A consumer caching whole rendered pages needs to know when to stop.
+        // With publishing off the version never moves, so keying on it alone
+        // serves yesterday's page until a timer runs out.
+        $before = $this->getJson($this->url('/content/version'), $this->as($this->publishable))
+            ->assertOk()->json('fingerprint');
+
+        $this->assertNotEmpty($before);
+
+        $this->postJson($this->url(), ['key' => 'heroTitle', 'value' => 'Changed words'],
+            $this->as($this->session, ['Origin' => 'https://client.test']))->assertOk();
+
+        $after = $this->getJson($this->url('/content/version'), $this->as($this->publishable))->json('fingerprint');
+
+        $this->assertNotSame($before, $after, 'a cached page would never be rebuilt');
+    }
+
     public function test_content_is_cacheable_with_a_stale_window(): void
     {
         $response = $this->getJson($this->url(), $this->as($this->publishable))->assertOk();

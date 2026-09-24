@@ -71,11 +71,25 @@ class ReadPublishedContent
             return '"'.$site->slug.'-v'.((int) ($payload['version'] ?? 0)).'-'.$locale.'"';
         }
 
-        $fingerprint = substr(hash('xxh128', json_encode([
+        return '"'.$site->slug.'-'.$locale.'-'.self::fingerprint($payload).'"';
+    }
+
+    /**
+     * A short token that changes whenever the content does.
+     *
+     * Consumers cache whole rendered pages, and a version number is not enough
+     * to tell them when to stop: a site with publishing off changes its words
+     * without ever moving a version, so anything keyed on the version alone
+     * serves yesterday's page until its timer runs out. This moves on every
+     * change, in either mode.
+     *
+     * @param  array<string, mixed>  $payload
+     */
+    public static function fingerprint(array $payload): string
+    {
+        return substr(hash('xxh128', json_encode([
             $payload['settings'] ?? [],
             $payload['styles'] ?? [],
         ])), 0, 16);
-
-        return '"'.$site->slug.'-'.$locale.'-'.$fingerprint.'"';
     }
 }
