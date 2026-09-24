@@ -166,3 +166,47 @@ export const declaredStyleProps = (attribute, configured) => {
 
     return declared.length ? declared : Object.keys(configured ?? {});
 };
+
+/**
+ * Where a save should go when the editor is not running inside the site.
+ *
+ * On a Laravel page the overlay posts to same-origin routes and the session
+ * cookie carries who you are. A React or WordPress page has neither: it is a
+ * different origin and there is no session, so the same action becomes a call
+ * to the content API with a bearer key.
+ *
+ * Only the endpoints the API actually has are mapped. An unmapped one throws
+ * by name rather than quietly posting to a URL that does not exist and
+ * reporting success.
+ */
+export const apiRequestFor = (url, options = {}, api) => {
+    const base = String(api?.base ?? '').replace(/\/$/, '');
+    const routes = {
+        '/live-edit/setting': `${base}/${api?.site}/content`,
+        '/live-edit/publish': `${base}/${api?.site}/publish`,
+    };
+
+    const target = routes[url];
+
+    if (!base || !api?.site || !api?.token) {
+        throw new Error('The content API is not configured on this page.');
+    }
+
+    if (!target) {
+        throw new Error(`Editing that is not available over the content API yet (${url}).`);
+    }
+
+    return {
+        url: target,
+        init: {
+            ...options,
+            headers: {
+                // Ours last, so a caller cannot drop the key and turn the save
+                // into an anonymous request.
+                ...(options.headers ?? {}),
+                Authorization: `Bearer ${api.token}`,
+                Accept: 'application/json',
+            },
+        },
+    };
+};

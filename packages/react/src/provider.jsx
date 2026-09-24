@@ -23,11 +23,21 @@ export function LiveEditProvider({
     sessionKey = null,
     content: initial = {},
     locale = 'en',
+    // How to ask the server for the page again. Defaults to a reload; a Next
+    // app passes router.refresh, which re-renders server components without
+    // throwing away what the visitor was doing.
+    onRefresh = null,
     children,
 }) {
     const [content, setContent] = useState(initial);
     const pending = useRef(new Map());
     const timers = useRef(new Map());
+
+    // Which keys a hook is actually reading. An element inside a server
+    // component has a marker but no hook, so setting state for it would change
+    // nothing — and the editor needs to be told that, or it reports success
+    // while the old words stay on screen.
+    const bound = useRef(new Set());
 
     // Whoever can write is the one holding a session key. A page with only a
     // publishable key can read and nothing else, which is what makes that key
@@ -39,14 +49,22 @@ export function LiveEditProvider({
         [apiBase, site, sessionKey, publishableKey]
     );
 
+    const register = useCallback((key) => {
+        bound.current.add(key);
+
+        return () => bound.current.delete(key);
+    }, []);
+
     const set = useCallback(
         (key, value) => {
             // Shown immediately and sent shortly. Waiting for the network to
             // confirm before the words change makes typing feel broken.
             setContent((current) => ({ ...current, [key]: value }));
 
+            const isBound = bound.current.has(key);
+
             if (!editable) {
-                return;
+                return isBound;
             }
 
             pending.current.set(key, value);
@@ -69,6 +87,8 @@ export function LiveEditProvider({
                     });
                 }, 600)
             );
+
+            return isBound;
         },
         [client, editable, locale]
     );
@@ -91,9 +111,27 @@ export function LiveEditProvider({
 
     // The overlay writes through this instead of into the DOM, so an edit
     // becomes state rather than something React is about to undo.
-    useEffect(() => publishBridge({ set, get: (key) => content[key], editable }), [set, content, editable]);
+    const refresh_ = useCallback(() => {
+        if (onRefresh) {
+            onRefresh();
 
-    const value = useMemo(() => ({ content, set, refresh, editable, locale, site }), [content, set, refresh, editable, locale, site]);
+            return;
+        }
+
+        if (typeof window !== 'undefined') {
+            window.location.reload();
+        }
+    }, [onRefresh]);
+
+    useEffect(
+        () => publishBridge({ set, get: (key) => content[key], refresh: refresh_, editable }),
+        [set, content, refresh_, editable]
+    );
+
+    const value = useMemo(
+        () => ({ content, set, refresh, register, editable, locale, site }),
+        [content, set, refresh, register, editable, locale, site]
+    );
 
     return <LiveEditContext.Provider value={value}>{children}</LiveEditContext.Provider>;
 }

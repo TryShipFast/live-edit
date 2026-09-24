@@ -221,3 +221,105 @@ describe('LiveEditProvider', () => {
         vi.useRealTimers();
     });
 });
+
+describe('telling the editor what happened', () => {
+    beforeEach(() => {
+        globalThis.fetch = vi.fn(() =>
+            Promise.resolve({
+                ok: true,
+                status: 200,
+                headers: new Headers({ 'content-type': 'application/json' }),
+                json: () => Promise.resolve({ settings: {} }),
+            })
+        );
+    });
+
+    afterEach(() => {
+        cleanup();
+        vi.restoreAllMocks();
+    });
+
+    it('reports a key a hook is reading as bound', async () => {
+        await act(async () => {
+            render(
+                <LiveEditProvider site="a" apiBase="https://x.test" publishableKey="k" content={{ 'auto:abc': 'x' }}>
+                    <Heading />
+                </LiveEditProvider>
+            );
+        });
+
+        let bound;
+        await act(async () => {
+            bound = readBridge().set('auto:abc', 'new');
+        });
+
+        expect(bound).toBe(true);
+    });
+
+    it('reports a key nothing is reading as unbound', async () => {
+        // An element inside a server component: same marker, no hook. Setting
+        // state changes nothing, and the editor has to know to fetch the page
+        // again rather than report success over unchanged words.
+        await act(async () => {
+            render(
+                <LiveEditProvider site="a" apiBase="https://x.test" publishableKey="k" content={{}}>
+                    <Heading />
+                </LiveEditProvider>
+            );
+        });
+
+        let bound;
+        await act(async () => {
+            bound = readBridge().set('auto:server-only', 'new');
+        });
+
+        expect(bound).toBe(false);
+    });
+
+    it('stops reporting a key once the element leaves the page', async () => {
+        const Toggle = () => {
+            const [on, setOn] = useState(true);
+            return (
+                <>
+                    {on ? <Heading /> : null}
+                    <button onClick={() => setOn(false)}>hide</button>
+                </>
+            );
+        };
+
+        await act(async () => {
+            render(
+                <LiveEditProvider site="a" apiBase="https://x.test" publishableKey="k" content={{ 'auto:abc': 'x' }}>
+                    <Toggle />
+                </LiveEditProvider>
+            );
+        });
+
+        await act(async () => screen.getByRole('button').click());
+
+        let bound;
+        await act(async () => {
+            bound = readBridge().set('auto:abc', 'new');
+        });
+
+        expect(bound).toBe(false);
+    });
+
+    it('refreshes the way the host asked', async () => {
+        const onRefresh = vi.fn();
+
+        await act(async () => {
+            render(
+                <LiveEditProvider site="a" apiBase="https://x.test" publishableKey="k" content={{ 'auto:abc': 'x' }} onRefresh={onRefresh}>
+                    <Heading />
+                </LiveEditProvider>
+            );
+        });
+
+        await act(async () => readBridge().refresh());
+
+        // A Next app passes router.refresh here, so server components re-render
+        // without throwing away what the visitor was doing.
+        expect(onRefresh).toHaveBeenCalledOnce();
+    });
+});

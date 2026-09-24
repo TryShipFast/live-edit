@@ -103,3 +103,26 @@ parsed is reported and skipped, never guessed at.
 A client component gets the hook and edits appear instantly. A server component
 gets the marker only — it renders once, on the server, so there is no React on
 the client to re-render it and its edits land on the next render.
+
+## The editor itself
+
+The overlay is the same one every adapter uses. On a page this application does
+not serve, tell it where to save:
+
+```html
+<script>
+  window.liveEditApi = { base: 'https://cms.example.com/api/live-edit/v1', site: 'acme', token: sessionKey };
+</script>
+```
+
+It then posts to the content API with the session key instead of to same-origin
+routes with a session cookie. Text and links work that way today; images and
+collections do not yet have API endpoints, and the editor says so by name
+rather than posting to a URL that does not exist and reporting success.
+
+After a save it asks the provider whether anything is actually reading that
+key. A client component is, so the words change in place and the page is not
+reloaded — scroll position, open menus and whatever the visitor was doing stay
+as they were. An element inside a server component is not, so the page is
+fetched again instead. Pass `onRefresh={() => router.refresh()}` in Next and
+that happens without a full navigation.

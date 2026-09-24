@@ -1,5 +1,5 @@
 import { createChrome } from './chrome.js';
-import { classListWith, declaredStyleProps, displayedValue, iconNamesIn, isJsonResponse, orderedIcons, ownTextOf, parseEditKey, requestInit } from './support.js';
+import { apiRequestFor, classListWith, declaredStyleProps, displayedValue, iconNamesIn, isJsonResponse, orderedIcons, ownTextOf, parseEditKey, requestInit } from './support.js';
 
 /**
  * Start only once the host page has finished loading.
@@ -69,6 +69,38 @@ const bootLiveEdit = () => {
         const reloadWithToast = (message) => {
             sessionStorage.setItem('tb_toast', message);
             reloadPreservingScroll();
+        };
+
+        /**
+         * What to do once a change is stored.
+         *
+         * A server-rendered page has to be asked again to show new words, so
+         * it reloads. A React page must not: the words are state, and handing
+         * them to the provider re-renders just that element while the rest of
+         * the page — scroll, open menus, whatever the visitor was doing —
+         * stays where it was.
+         *
+         * An element that React does not drive, such as one inside a server
+         * component, is not bound to any hook. The provider says so, and then
+         * the page is refreshed after all rather than silently keeping the old
+         * text on screen.
+         */
+        const settle = (message, key = null, value = null) => {
+            const bridge = window.__liveEditReact;
+
+            if (!bridge) {
+                reloadWithToast(message);
+
+                return;
+            }
+
+            const bound = key !== null && bridge.set(key, value);
+
+            ui.toast(message);
+
+            if (!bound) {
+                bridge.refresh();
+            }
         };
         const { drawer, drawerTitle, drawerTrail, drawerFields, drawerDelete, toggleButton, statusText, linkHandle, bgHandle } = ui;
 
@@ -771,7 +803,14 @@ const bootLiveEdit = () => {
         };
 
         const request = async (url, options) => {
-            const response = await fetch(url, requestInit(csrf, options));
+            // Same-origin with a session cookie on a Laravel page; the content
+            // API with a bearer key when the editor is running inside a site
+            // this application does not serve.
+            const api = window.liveEditApi;
+            const mapped = api ? apiRequestFor(url, options, api) : null;
+            const response = mapped
+                ? await fetch(mapped.url, mapped.init)
+                : await fetch(url, requestInit(csrf, options));
             if (response.status === 419 || response.status === 401) {
                 window.alert('Your session expired. The page will reload — sign in and try again.');
                 window.location.reload();
@@ -809,7 +848,7 @@ const bootLiveEdit = () => {
                         // and reading one anyway saved nothing.
                         body: JSON.stringify({
                             key: current.key,
-                            value: current.value ?? drawerFields.querySelector('textarea, input[name=icon]')?.value ?? '',
+                            value: (current.savedValue = current.value ?? drawerFields.querySelector('textarea, input[name=icon]')?.value ?? ''),
                             locale: window.liveEditLocale,
                         }),
                     });
@@ -873,7 +912,7 @@ const bootLiveEdit = () => {
                         body: JSON.stringify({ key: current.styleKey, props: collectStyleProps() }),
                     });
                 }
-                reloadWithToast('Saved \u2713');
+                settle('Saved \u2713', current.key ?? null, current.savedValue ?? null);
             } catch (error) {
                 restoreButton();
                 window.alert(error.message);

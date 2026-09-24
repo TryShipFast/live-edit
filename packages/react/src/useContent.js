@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import { useLiveEdit } from './context.js';
 
 /**
@@ -10,6 +11,12 @@ import { useLiveEdit } from './context.js';
  */
 export const useContent = (key, fallback = '') => {
     const context = useLiveEdit();
+    const register = context?.register;
+
+    // Says "this key is on screen and driven by React". The editor asks,
+    // because an element inside a server component carries the same marker but
+    // no hook, and there the page has to be fetched again instead.
+    useEffect(() => register?.(key), [register, key]);
 
     if (!context) {
         return fallback;
