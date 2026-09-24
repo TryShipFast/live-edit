@@ -1,0 +1,13 @@
+{
+  "name": "@kastsbuild/react",
+  "version": "0.1.0",
+  "type": "module",
+  "description": "In-place editing for static content in React and Next.js apps.",
+  "main": "src/index.js",
+  "exports": {
+    ".": "./src/index.js"
+  },
+  "peerDependencies": {
+    "react": ">=18"
+  }
+}
