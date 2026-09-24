@@ -135,3 +135,46 @@ to be safe going in.
 
 Uploads are counted on their own throttle, far tighter than a text save, because
 one costs bandwidth, storage and CPU rather than a row.
+
+## Provisioning
+
+Creating sites and minting their keys, for whatever runs a signup. Behind a
+different credential from anything a site holds, because it is a different kind
+of power: a site's own keys reach that site's content, while these bring sites
+into existence. Sharing one credential between them would mean a leak from any
+customer's server could provision against everybody.
+
+```
+LIVE_EDIT_ADMIN_TOKEN=…
+```
+
+Empty — the default — and these endpoints are not merely forbidden but absent,
+answering 404. That is right for the single-site installations that provision
+from the console.
+
+| | |
+|---|---|
+| `POST /sites` | `{slug, name?, origins?}` — creates the site and both keys |
+| `GET /sites/{slug}` | origins, state, and key identities (never the keys) |
+| `PATCH /sites/{slug}` | `{origins?, suspended?}` |
+| `POST /sites/{slug}/keys` | `{type, label?}` — issue another |
+| `DELETE /sites/{slug}/keys/{id}` | revoke one |
+
+Both keys are created together, because a site with only one cannot be used:
+the publishable key reads, and the secret vouches for editors. They are shown
+once. Afterwards only their identities can be listed — a listing that leaked
+them would make "shown once" decoration.
+
+Rotation is issue-then-revoke rather than replace: the new key works
+immediately and the old one keeps working until revoked, so a running site is
+never without one mid-deploy.
+
+Suspending stops every key at once without destroying anything, so a dispute or
+a compromise can be halted and then put back exactly as it was.
+
+Refused from a browser, whatever the credential. An `Origin` header means a
+provisioning key is sitting in a page, and it is already lost.
+
+An origin that is not an origin is refused rather than stored. Stored, it would
+match nothing, and the symptom is a CORS error on the customer's own site that
+looks like a bug in their page.

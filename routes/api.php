@@ -1,11 +1,14 @@
 <?php
 
+use Illuminate\Routing\Middleware\SubstituteBindings;
 use Illuminate\Support\Facades\Route;
 use ShipFast\LiveEdit\Http\Api\Middleware\AuthenticateApiToken;
+use ShipFast\LiveEdit\Http\Api\Middleware\AuthenticateProvisioner;
 use ShipFast\LiveEdit\Http\Api\Middleware\ThrottleApi;
 use ShipFast\LiveEdit\Http\Api\V1\ContentController;
 use ShipFast\LiveEdit\Http\Api\V1\MediaController;
 use ShipFast\LiveEdit\Http\Api\V1\SessionController;
+use ShipFast\LiveEdit\Http\Api\V1\SiteController;
 
 /*
  * The site is named in the path rather than inferred from the key, because a
@@ -63,4 +66,32 @@ Route::prefix(config('live-edit.api.prefix', 'api/live-edit/v1').'/{site}')
             AuthenticateApiToken::class.':publish',
             ThrottleApi::class.':publish',
         ])->post('/publish', [ContentController::class, 'publish'])->name('live-edit.api.publish');
+    });
+
+/*
+ * Provisioning: creating sites and minting their keys.
+ *
+ * Not site-scoped, and behind a different credential — a site's own keys reach
+ * that site's content, while these bring sites into existence. Sharing one
+ * credential between those would mean a leak from any customer's server could
+ * provision against everybody.
+ *
+ * Absent entirely unless a provisioning token is configured, so a single-site
+ * installation that provisions from the console exposes nothing.
+ */
+Route::middleware([
+    ThrottleApi::class.':provision',
+    AuthenticateProvisioner::class,
+    // These routes name a site in the path, and resolving that from the slug
+    // is not automatic outside the framework's own middleware groups: without
+    // it the controller is handed a blank model and writes rows with no owner.
+    SubstituteBindings::class,
+])
+    ->prefix(config('live-edit.api.prefix', 'api/live-edit/v1'))
+    ->group(function () {
+        Route::post('/sites', [SiteController::class, 'store'])->name('live-edit.api.sites.store');
+        Route::get('/sites/{site:slug}', [SiteController::class, 'show'])->name('live-edit.api.sites.show');
+        Route::patch('/sites/{site:slug}', [SiteController::class, 'update'])->name('live-edit.api.sites.update');
+        Route::post('/sites/{site:slug}/keys', [SiteController::class, 'issueKey'])->name('live-edit.api.sites.keys');
+        Route::delete('/sites/{site:slug}/keys/{keyId}', [SiteController::class, 'revokeKey'])->name('live-edit.api.sites.keys.revoke');
     });

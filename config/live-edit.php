@@ -186,6 +186,12 @@ return [
         // that can write and the only one a page ever holds.
         'session_ttl' => (int) env('LIVE_EDIT_API_SESSION_TTL', 1800),
 
+        // Creating sites and minting their keys. A different credential from
+        // anything a site holds, because it is a different kind of power.
+        // Empty means the provisioning endpoints are not there at all, which
+        // is right for an installation that serves one site.
+        'admin_token' => env('LIVE_EDIT_ADMIN_TOKEN', ''),
+
         // Two windows per bucket. The short one is sized for a person editing
         // in bursts; the long one for what a site really consumes in an hour.
         // A caller passes both or waits.
@@ -213,6 +219,12 @@ return [
             'upload' => [
                 'burst' => ['max' => 12, 'seconds' => 60],
                 'sustained' => ['max' => 200, 'seconds' => 3600],
+            ],
+            // Provisioning is rare and expensive to get wrong; a flood of it is
+            // someone guessing.
+            'provision' => [
+                'burst' => ['max' => 10, 'seconds' => 60],
+                'sustained' => ['max' => 100, 'seconds' => 3600],
             ],
         ],
 
