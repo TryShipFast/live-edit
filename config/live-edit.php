@@ -39,6 +39,17 @@ return [
      */
     'snapshot_url' => env('LIVE_EDIT_SNAPSHOT_URL'),
 
+    /*
+     * Signing for a distribution that is not public. Published content usually
+     * is — it is a website — so these are optional, and without them a plain
+     * URL is returned rather than failing.
+     */
+    'cloudfront' => [
+        'key_pair_id' => env('CLOUDFRONT_KEY_PAIR_ID'),
+        'private_key' => env('CLOUDFRONT_PRIVATE_KEY'),
+        'private_key_path' => env('CLOUDFRONT_PRIVATE_KEY_PATH'),
+    ],
+
     'theme' => env('LIVE_EDIT_THEME'),
     'chrome_view' => 'live-edit-chrome',
 

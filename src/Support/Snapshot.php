@@ -122,21 +122,19 @@ class Snapshot
      * another framework — needs an address rather than a disk. Set
      * snapshot_url to a CDN in front of the bucket and nothing else changes.
      */
+    /**
+     * Where a published file can be fetched from.
+     *
+     * The path is the key; this is the only place it becomes an address, and
+     * the address is never written back into storage.
+     */
     public static function url(?int $number = null, ?string $locale = null): ?string
     {
-        $base = rtrim((string) config('live-edit.snapshot_url', ''), '/');
+        $relative = $number === null
+            ? 'current.json'
+            : 'v'.$number.'/'.($locale ?? config('live-edit.default_locale', 'en')).'.json';
 
-        if ($base === '') {
-            // Fall back to whatever the disk itself can address, which is only
-            // the case for a disk that is served (public, s3).
-            $path = $number === null ? self::directory().'/current.json' : self::path($number, $locale ?? config('live-edit.default_locale', 'en'));
-
-            return method_exists(self::disk(), 'url') ? rescue(fn () => self::disk()->url($path), null, false) : null;
-        }
-
-        return $number === null
-            ? $base.'/current.json'
-            : $base.'/v'.$number.'/'.($locale ?? config('live-edit.default_locale', 'en')).'.json';
+        return SnapshotUrl::for($relative);
     }
 
     /** @return array<int, string> */
