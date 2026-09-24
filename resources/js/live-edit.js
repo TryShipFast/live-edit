@@ -94,7 +94,9 @@ const bootLiveEdit = () => {
                 return;
             }
 
-            const bound = key !== null && bridge.set(key, value);
+            // apply(), not set(): the change is already stored, and set()
+            // would send it a second time.
+            const bound = key !== null && (bridge.apply ?? bridge.set)(key, value);
 
             ui.toast(message);
 

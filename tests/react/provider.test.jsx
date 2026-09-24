@@ -323,3 +323,43 @@ describe('telling the editor what happened', () => {
         expect(onRefresh).toHaveBeenCalledOnce();
     });
 });
+
+describe('applying a value the editor already stored', () => {
+    beforeEach(() => {
+        globalThis.fetch = vi.fn(() =>
+            Promise.resolve({ ok: true, status: 200, headers: new Headers({ 'content-type': 'application/json' }), json: () => Promise.resolve({ settings: {} }) })
+        );
+    });
+
+    afterEach(() => {
+        cleanup();
+        vi.restoreAllMocks();
+    });
+
+    it('shows it without sending it a second time', async () => {
+        // The editor saves through its own request and then tells React what
+        // it wrote. Calling set() there would write again: two requests per
+        // edit, double the throttle spent, and two versions of the truth.
+        vi.useFakeTimers();
+
+        await act(async () => {
+            render(
+                <LiveEditProvider site="a" apiBase="https://x.test" publishableKey="k" sessionKey="kbe_x" content={{ 'auto:abc': 'Published' }}>
+                    <Heading />
+                </LiveEditProvider>
+            );
+        });
+
+        let bound;
+        await act(async () => {
+            bound = readBridge().apply('auto:abc', 'Already saved');
+        });
+        await act(async () => vi.advanceTimersByTime(2000));
+
+        expect(screen.getByRole('heading').textContent).toBe('Already saved');
+        expect(bound).toBe(true);
+        expect(globalThis.fetch).not.toHaveBeenCalled();
+
+        vi.useRealTimers();
+    });
+});

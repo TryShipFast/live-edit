@@ -104,6 +104,20 @@ A client component gets the hook and edits appear instantly. A server component
 gets the marker only — it renders once, on the server, so there is no React on
 the client to re-render it and its edits land on the next render.
 
+Measured on two real templates: 88% of text-bearing elements on a marketing
+landing page, 80% on a blog starter. What is left out is genuinely dynamic —
+a sentence built from a constant in code — plus form labels carrying a
+decorative asterisk in a nested span.
+
+Most App Router projects are almost entirely server components, so by default
+very little is live. `--client` makes the files it touches into client
+components — the directive is added along with the hook, since a hook without
+it is not a working component — and then every edit appears in place.
+
+```bash
+npx kb-codemod components --write --client
+```
+
 ## The editor itself
 
 The overlay is the same one every adapter uses. On a page this application does

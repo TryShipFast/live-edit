@@ -110,8 +110,14 @@ export const transform = (source, { relativePath = 'unknown', force = null } = {
     // A server component renders once, on the server; there is no React on the
     // client to re-render it, so a hook there would neither run nor help. Those
     // files get the marker only, and their edits land on the next render.
-    const isClient =
-        force ?? source.slice(0, 400).match(/^\s*['"]use client['"]/m) !== null;
+    const alreadyClient = source.slice(0, 400).match(/^\s*['"]use client['"]/m) !== null;
+    const isClient = force ?? alreadyClient;
+
+    // Asked to make a server file live, it has to become a client component
+    // too. A hook without the directive is not a working component — it fails
+    // at build with a message about useContext — so the flag was offering
+    // something it could not deliver.
+    const needsDirective = isClient && ! alreadyClient;
 
     const edits = [];
     const changes = [];
@@ -172,6 +178,10 @@ export const transform = (source, { relativePath = 'unknown', force = null } = {
         const importEdit = importFor(source, ast);
         if (importEdit) {
             edits.push(importEdit);
+        }
+
+        if (needsDirective) {
+            edits.push({ start: 0, end: 0, text: "'use client';\n\n" });
         }
     }
 

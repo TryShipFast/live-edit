@@ -64,6 +64,25 @@ describe('codemod', () => {
         expect(code).not.toContain('@kastsbuild/react');
     });
 
+    it('makes a server file a client component when asked to make it live', () => {
+        // A hook without the directive is not a working component: it fails at
+        // build with a message about useContext. The flag was offering
+        // something it could not deliver.
+        const source = `export default function Hero() {\n    return <h1>Words</h1>;\n}\n`;
+        const { code, mode } = transform(source, { relativePath: 'a.tsx', force: true });
+
+        expect(mode).toBe('client');
+        expect(code.startsWith("'use client';")).toBe(true);
+        expect(code).toContain('useContent');
+        expect(code.indexOf("'use client'")).toBeLessThan(code.indexOf('import {'));
+    });
+
+    it('does not add a second directive to a file that already has one', () => {
+        const { code } = transform(client('        <h1>Words</h1>'), { relativePath: 'a.jsx', force: true });
+
+        expect(code.match(/use client/g)).toHaveLength(1);
+    });
+
     it('is idempotent', () => {
         // Running it twice must not tag the same element again, or a client's
         // edits would be orphaned by a second pass.

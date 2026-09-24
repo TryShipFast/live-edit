@@ -111,6 +111,20 @@ export function LiveEditProvider({
 
     // The overlay writes through this instead of into the DOM, so an edit
     // becomes state rather than something React is about to undo.
+    /**
+     * Show a value that has already been stored.
+     *
+     * The editor saves through its own request and then tells React what it
+     * wrote. Without this it would call set(), which saves again — two writes
+     * for one edit, double the throttle spent, and a second chance for the
+     * two to disagree about what the words are.
+     */
+    const apply = useCallback((key, value) => {
+        setContent((current) => ({ ...current, [key]: value }));
+
+        return bound.current.has(key);
+    }, []);
+
     const refresh_ = useCallback(() => {
         if (onRefresh) {
             onRefresh();
@@ -124,13 +138,13 @@ export function LiveEditProvider({
     }, [onRefresh]);
 
     useEffect(
-        () => publishBridge({ set, get: (key) => content[key], refresh: refresh_, editable }),
-        [set, content, refresh_, editable]
+        () => publishBridge({ set, apply, get: (key) => content[key], refresh: refresh_, editable }),
+        [set, apply, content, refresh_, editable]
     );
 
     const value = useMemo(
-        () => ({ content, set, refresh, register, editable, locale, site }),
-        [content, set, refresh, register, editable, locale, site]
+        () => ({ content, set, apply, refresh, register, editable, locale, site }),
+        [content, set, apply, refresh, register, editable, locale, site]
     );
 
     return <LiveEditContext.Provider value={value}>{children}</LiveEditContext.Provider>;
