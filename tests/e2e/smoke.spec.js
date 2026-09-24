@@ -205,6 +205,18 @@ test.describe('a site running the editor', () => {
         await page.locator('.le-drawer textarea').first().fill(original);
         await page.getByRole('button', { name: /save changes/i }).click();
         await expect(page.locator('body')).not.toContainText(edited, { timeout: 15000 });
+
+        // Where the site holds edits back, both the change and the change back
+        // are drafts. Leaving them would show a client a pile of pending work
+        // that is only the test's, so they are thrown away; the published site
+        // was never touched.
+        await page.evaluate(async () => {
+            if (!window.liveEditPublishing) return;
+            await fetch('/live-edit/draft/discard', {
+                method: 'POST',
+                headers: { 'X-CSRF-TOKEN': document.body.dataset.csrf, Accept: 'application/json' },
+            });
+        });
     });
 
     test('throws nothing while the client edits', async ({ page }) => {
