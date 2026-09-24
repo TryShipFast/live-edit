@@ -2,6 +2,7 @@
 
 namespace ShipFast\LiveEdit;
 
+use Illuminate\Support\Facades\Blade;
 use Illuminate\Support\ServiceProvider;
 use ShipFast\LiveEdit\Console\Commands\ImportTheme;
 use ShipFast\LiveEdit\Console\Commands\PruneOrphanedUploads;
@@ -17,6 +18,10 @@ class LiveEditServiceProvider extends ServiceProvider
 
     public function boot(): void
     {
+        // One line in a host's editor markup, instead of knowing what the
+        // editor expects on the window object.
+        Blade::directive('liveEditPublishing', fn () => '<?php echo \\ShipFast\\LiveEdit\\Support\\EditorConfig::publishingScript(); ?>');
+
         $this->loadRoutesFrom(__DIR__.'/../routes/live-edit.php');
         $this->loadMigrationsFrom(__DIR__.'/../database/migrations');
         $this->loadViewsFrom(__DIR__.'/../resources/views', 'live-edit');
