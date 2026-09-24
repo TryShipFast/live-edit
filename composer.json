@@ -24,7 +24,8 @@
     "minimum-stability": "stable",
     "require-dev": {
         "orchestra/testbench": "^10.0",
-        "laravel/pint": "^1.0"
+        "laravel/pint": "^1.0",
+        "league/flysystem-aws-s3-v3": "^3.35"
     },
     "autoload-dev": {
         "psr-4": {
@@ -33,5 +34,9 @@
     },
     "scripts": {
         "test": "phpunit"
+    },
+    "suggest": {
+        "league/flysystem-aws-s3-v3": "Required to store snapshots and images on S3 (set LIVE_EDIT_SNAPSHOT_DISK=s3).",
+        "aws/aws-sdk-php": "Required only to sign CloudFront URLs for a private distribution."
     }
 }
