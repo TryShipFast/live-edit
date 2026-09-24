@@ -376,7 +376,12 @@ class ScanForEditables extends Command
             return true;
         }
 
-        return (bool) preg_match('/\{\{.*?\}\}|@(if|foreach|for|while|section|php|include|extends|component|auth|can)\b|<x-[\w.-]+|<\?php/s', $html);
+        // The name is the reliable signal. Reading the markup for template
+        // syntax refused pages that merely contain it, which is most of the
+        // web: documentation about templating, anything built with Vue, Alpine
+        // or Angular, every tutorial showing {{ }} in a code block. A raw PHP
+        // tag is the one thing that cannot survive being rendered.
+        return (bool) preg_match('/<\?php|<\?=/', $html);
     }
 
     /**

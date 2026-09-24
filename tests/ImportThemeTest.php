@@ -104,4 +104,24 @@ class ImportThemeTest extends TestCase
         $this->assertStringContainsString('src="https://cdn.test/images/hero.jpg"', $html);
         $this->assertStringContainsString('href="https://cdn.test/shared/main.css"', $html);
     }
+
+    public function test_it_leaves_javascript_alone(): void
+    {
+        // URL.createObjectURL(r) became createObjecturl(https://cdn.test/r),
+        // a syntax error that stopped every script after it on the page.
+        $html = $this->rewrite('<script>const a = URL.createObjectURL(r); new URL(x, y);</script>');
+
+        $this->assertStringContainsString('URL.createObjectURL(r)', $html);
+        $this->assertStringContainsString('new URL(x, y)', $html);
+        $this->assertStringNotContainsString('cdn.test/r', $html);
+    }
+
+    public function test_it_still_absolutises_css_urls_where_css_lives(): void
+    {
+        $inStyleTag = $this->rewrite('<style>.a{background:url(img/a.png)}</style>');
+        $this->assertStringContainsString('url(https://cdn.test/demo/img/a.png)', $inStyleTag);
+
+        $inAttribute = $this->rewrite('<div style="background:url(img/b.png)"></div>');
+        $this->assertStringContainsString('url(https://cdn.test/demo/img/b.png)', $inAttribute);
+    }
 }

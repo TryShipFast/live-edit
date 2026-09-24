@@ -339,10 +339,30 @@ class ImportTheme extends Command
             $html
         );
 
-        return preg_replace_callback(
-            '/url\((["\']?)([^"\')]+)\1\)/i',
-            fn ($m) => 'url('.$m[1].$this->resolve($m[2], $base, true).$m[1].')',
+        // CSS url() only where CSS lives. Run over the whole document it also
+        // matched JavaScript: URL.createObjectURL(r) came out as
+        // createObjecturl(https://site/r), which is a syntax error, and every
+        // script after it on the page stopped running.
+        $html = preg_replace_callback(
+            '/<style\b[^>]*>(.*?)<\/style>/is',
+            fn ($m) => str_replace($m[1], $this->absolutiseCssUrls($m[1], $base), $m[0]),
             $html
+        );
+
+        return preg_replace_callback(
+            '/\sstyle=(["\'])(.*?)\1/is',
+            fn ($m) => ' style='.$m[1].$this->absolutiseCssUrls($m[2], $base).$m[1],
+            $html
+        );
+    }
+
+    /** Rewrite the url() references inside a piece of CSS. */
+    protected function absolutiseCssUrls(string $css, string $base): string
+    {
+        return (string) preg_replace_callback(
+            '/\burl\((["\']?)([^"\')]+)\1\)/i',
+            fn (array $m) => 'url('.$m[1].$this->resolve($m[2], $base, true).$m[1].')',
+            $css
         );
     }
 

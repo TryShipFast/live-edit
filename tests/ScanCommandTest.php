@@ -139,4 +139,27 @@ class ScanCommandTest extends TestCase
         $this->assertSame(['https://x.test/cta.jpg', 'https://x.test/hero.jpg', 'https://x.test/inline.jpg'], $urls);
         $this->assertSame(3, $merged['summary']['background']);
     }
+
+    public function test_it_tags_a_page_that_merely_talks_about_templates(): void
+    {
+        // Documentation, Vue, Alpine, any tutorial with {{ }} in a code block:
+        // refusing these refused most of the web.
+        $path = $this->dir.'/docs.html';
+        file_put_contents($path, '<html><body><h1>Using {{ name }} in your layout</h1>'
+            .'<p>Write @if and &lt;x-button&gt; like this.</p></body></html>');
+
+        $this->artisan('live-edit:scan', ['path' => $path, '--apply' => true, '--auto' => true])
+            ->assertSuccessful();
+
+        $this->assertStringContainsString('data-edit=', file_get_contents($this->dir.'/docs.tagged.html'));
+    }
+
+    public function test_it_still_refuses_a_php_template(): void
+    {
+        $path = $this->dir.'/page.html';
+        file_put_contents($path, '<html><body><h1><?php echo $title; ?></h1></body></html>');
+
+        $this->artisan('live-edit:scan', ['path' => $path, '--apply' => true, '--auto' => true])
+            ->assertFailed();
+    }
 }
