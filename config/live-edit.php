@@ -232,6 +232,12 @@ return [
             ],
             // Asking for links is the one thing here that sends email, so it
             // is the one thing worth being ungenerous about.
+            // Parsing a whole document is the most expensive thing a page can
+            // ask for, and a correctly behaving one asks once per version.
+            'tag' => [
+                'burst' => ['max' => 20, 'seconds' => 60],
+                'sustained' => ['max' => 300, 'seconds' => 3600],
+            ],
             'sign_in' => [
                 'burst' => ['max' => 5, 'seconds' => 60],
                 'sustained' => ['max' => 30, 'seconds' => 3600],

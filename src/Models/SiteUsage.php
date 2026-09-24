@@ -11,12 +11,13 @@ class SiteUsage extends Model
 {
     protected $table = 'live_edit_site_usage';
 
-    protected $fillable = ['site_id', 'period', 'writes', 'publishes', 'uploads', 'bytes_added'];
+    protected $fillable = ['site_id', 'period', 'writes', 'publishes', 'uploads', 'tags', 'bytes_added'];
 
     protected $casts = [
         'writes' => 'integer',
         'publishes' => 'integer',
         'uploads' => 'integer',
+        'tags' => 'integer',
         'bytes_added' => 'integer',
     ];
 }

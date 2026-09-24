@@ -25,6 +25,15 @@ class Meter
 
     public const UPLOAD = 'uploads';
 
+    /**
+     * Tagging a page the customer never prepared.
+     *
+     * Counted because it costs real work — parsing and scanning a whole
+     * document — and because a site that tags on every view rather than
+     * caching is a site worth noticing.
+     */
+    public const TAG = 'tags';
+
     /** Record one billable act, and any bytes it put into storage. */
     public static function record(Site $site, string $kind, int $bytes = 0): void
     {
@@ -70,6 +79,7 @@ class Meter
             'writes' => (int) ($row->writes ?? 0),
             'publishes' => (int) ($row->publishes ?? 0),
             'uploads' => (int) ($row->uploads ?? 0),
+            'tags' => (int) ($row->tags ?? 0),
             'bytes_added' => (int) ($row->bytes_added ?? 0),
             'bytes_stored' => (int) $site->bytes_stored,
         ];

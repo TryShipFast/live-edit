@@ -28,6 +28,7 @@ class EmbedController
         'embed.js' => 'boot.js',
         'content.js' => 'content.js',
         'session.js' => 'session.js',
+        'autotag.js' => 'autotag.js',
         'live-edit.js' => 'live-edit.js',
         'chrome.js' => 'chrome.js',
         'support.js' => 'support.js',

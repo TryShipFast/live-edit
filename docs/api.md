@@ -141,7 +141,34 @@ The file is cached for an hour rather than forever, because it is the one
 thing a customer cannot redeploy themselves: a fix has to be able to reach
 them without anyone being asked to do anything.
 
-**Tag it once**, with the same scanner every other adapter uses:
+**A site nobody prepared tags itself.** Somebody who bought a template
+elsewhere has no build step and will not install PHP to run a command — so
+their page sends what it has and is told which of its own elements are
+editable:
+
+```
+POST /{site}/tag   { html, page }
+   → [{ at: [0,2,1], attributes: { "data-edit": "setting:auto:055b65…" } }, … ]
+```
+
+Nothing is written to their files. Elements come back as positions rather than
+selectors, because the server computed them from the very markup the page sent,
+so the two agree by construction — where a generated selector can still match
+the wrong thing on a page nobody wrote carefully.
+
+Asked once per version of a page and kept against a fingerprint of the markup,
+so a redeploy asks again and an unchanged page does not. A remembered answer is
+used even when the service is unreachable, because the words are already in the
+markup and the markers were right last time.
+
+A marker already in the page is never overwritten, so a site prepared properly
+keeps the keys it shipped with and a client's saved words stay attached to them.
+
+Counted and throttled on its own: parsing a whole document is the most
+expensive thing a page can ask for, and a site tagging on every view rather
+than caching is worth noticing.
+
+**Or tag it ahead of time**, with the same scanner:
 
 ```bash
 vendor/bin/kb-tag public            # show what would change

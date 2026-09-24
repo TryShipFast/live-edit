@@ -42,6 +42,9 @@ Route::prefix(config('live-edit.api.prefix', 'api/live-edit/v1').'/{site}')
             // Where the published files are, so a CDN or a build can fetch
             // them without going through this application again.
             Route::get('/versions', [ContentController::class, 'versions'])->name('live-edit.api.versions');
+            // A page asking which of its own elements are editable. Costs a
+            // full parse, so it is counted and throttled on its own.
+            Route::post('/tag', [ContentController::class, 'tag'])->name('live-edit.api.tag');
         });
 
         // Writing: a session key, which only the customer's own server can mint.

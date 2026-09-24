@@ -59,8 +59,18 @@
         return import(base + file);
     };
 
-    // Words first, always. A visitor waits for nothing else.
-    load('content.js');
+    // A page nobody prepared has to be told what is editable before anything
+    // can be put into it, so that comes first — and only for such a page.
+    var ready = document.querySelector('[data-edit], [data-edit-img]')
+        ? Promise.resolve()
+        : load('autotag.js')
+            .then(function (m) { return m.autoTag({ base: config.api, site: config.site, key: config.key }); })
+            .catch(function (error) {
+                console.warn('[live-edit] could not tag this page:', error.message);
+            });
+
+    // Words next. A visitor waits for nothing else.
+    ready.then(function () { return load('content.js'); });
 
     load('session.js').then(function (session) {
         var token = session.currentSession(window);

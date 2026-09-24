@@ -8,9 +8,11 @@ use Illuminate\Validation\ValidationException;
 use ShipFast\LiveEdit\Application\Api\ApplyEdit;
 use ShipFast\LiveEdit\Application\Api\PublishSite;
 use ShipFast\LiveEdit\Application\Api\ReadPublishedContent;
+use ShipFast\LiveEdit\Application\Api\TagMarkup;
 use ShipFast\LiveEdit\Domain\Content\SiteSnapshot;
 use ShipFast\LiveEdit\Domain\Content\SiteStore;
 use ShipFast\LiveEdit\Domain\Site\Ability;
+use ShipFast\LiveEdit\Domain\Site\Meter;
 use ShipFast\LiveEdit\Domain\Site\OverLimit;
 use ShipFast\LiveEdit\Http\Api\ApiContext;
 use ShipFast\LiveEdit\Models\Version;
@@ -179,6 +181,31 @@ class ContentController
         }
 
         return response()->json(['restored_from' => (int) $validated['version'], 'changed' => $changed]);
+    }
+
+    /**
+     * Tell a page which of its own elements are editable.
+     *
+     * For a site nobody prepared: no build step, no command to run, nothing
+     * written to their files. They paste one line and the page asks.
+     */
+    public function tag(Request $request, TagMarkup $tag): JsonResponse
+    {
+        $validated = $request->validate([
+            'html' => ['required', 'string', 'max:'.TagMarkup::MAX_BYTES],
+            'page' => ['nullable', 'string', 'max:200'],
+        ]);
+
+        $site = ApiContext::site($request);
+        $result = $tag($site, $validated['html'], $validated['page'] ?? '');
+
+        Meter::record($site, Meter::TAG);
+
+        return response()->json($result)->withHeaders([
+            // The answer depends on markup the caller sent, so only they can
+            // usefully keep it — and they do, against a hash of that markup.
+            'Cache-Control' => 'private, max-age=600',
+        ]);
     }
 
     private function locale(Request $request): ?string
