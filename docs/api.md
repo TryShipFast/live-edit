@@ -119,6 +119,40 @@ key — SQLite does not enforce foreign keys by default and neither do some MySQ
 configurations, and leaving a departed customer's words behind is not a
 tidiness problem but data nobody has a right to hold.
 
+## Usage and limits
+
+Billing needs a number that can be defended, so each site's use is counted per
+month:
+
+```
+GET  /sites/{slug}/usage            what this month cost
+GET  /sites/{slug}/usage?period=2026-03   what March cost
+PATCH /sites/{slug}  {"limits": {"writes": 5000, "bytes_stored": 524288000}}
+```
+
+**Saves, publishes and uploads are counted. Reads are not.** Reads are cached
+and served from a CDN and never touch this application on a busy site —
+charging for them would bill a customer for the work done to avoid work, and
+quietly punish the sites that behave best.
+
+Counts are per month because an invoice is for a month and a total cannot be
+un-added; "what did we use in March" has to be a row rather than a
+reconstruction. Stored bytes are the exception and accumulate, because storage
+is what a customer pays to keep regardless of when they uploaded it.
+
+Counters move by atomic increment, never read-then-write: two editors saving at
+the same moment must not each read 4 and both write 5.
+
+A site over a limit gets **402**, not 403 or 429. Nothing is wrong with the
+request and trying again will not help — the account needs attention, and the
+other two codes send a caller looking for a bug that is not there. A refused
+save is not counted, and a refused upload is rejected before the file is
+written, since storage already spent costs the same whether the response was
+200 or not.
+
+A site with no limits set is never refused. A limit nobody configured must
+never be the reason a customer cannot save their own words.
+
 ## Images
 
 `POST /media` takes a file and answers with a URL. What comes back is an

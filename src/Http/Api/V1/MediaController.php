@@ -6,6 +6,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\ValidationException;
 use ShipFast\LiveEdit\Application\Api\StoreMedia;
+use ShipFast\LiveEdit\Domain\Site\OverLimit;
 use ShipFast\LiveEdit\Http\Api\ApiContext;
 
 class MediaController
@@ -28,6 +29,8 @@ class MediaController
                 $validated['fitWidth'] ?? null,
                 $validated['fitHeight'] ?? null,
             );
+        } catch (OverLimit $e) {
+            return ContentController::overLimit($e);
         } catch (ValidationException $e) {
             return response()->json([
                 'error' => [

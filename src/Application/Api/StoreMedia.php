@@ -5,6 +5,8 @@ namespace ShipFast\LiveEdit\Application\Api;
 use Illuminate\Http\UploadedFile;
 use ShipFast\LiveEdit\Domain\Content\ImageStore;
 use ShipFast\LiveEdit\Domain\Content\SiteStore;
+use ShipFast\LiveEdit\Domain\Site\Meter;
+use ShipFast\LiveEdit\Domain\Site\OverLimit;
 use ShipFast\LiveEdit\Domain\Site\Site;
 
 /**
@@ -27,7 +29,17 @@ class StoreMedia
         // Into this site's own folder. Random names already make a collision
         // impossible; separate folders make a customer's files identifiable,
         // and removable when they leave.
+        $bytes = (int) $file->getSize();
+
+        // Checked before the file is written, not after: refusing an upload
+        // that is already in the bucket costs the storage anyway.
+        if (! Meter::allows($site, Meter::UPLOAD, $bytes)) {
+            throw new OverLimit('This site has reached its storage limit.');
+        }
+
         $path = $this->images->store($file, $fitWidth, $fitHeight, (new SiteStore($site))->mediaDirectory());
+
+        Meter::record($site, Meter::UPLOAD, $bytes);
 
         return ['url' => $this->images->url($path), 'path' => $path];
     }

@@ -92,6 +92,7 @@ Route::middleware([
         Route::post('/sites', [SiteController::class, 'store'])->name('live-edit.api.sites.store');
         Route::get('/sites/{site:slug}', [SiteController::class, 'show'])->name('live-edit.api.sites.show');
         Route::patch('/sites/{site:slug}', [SiteController::class, 'update'])->name('live-edit.api.sites.update');
+        Route::get('/sites/{site:slug}/usage', [SiteController::class, 'usage'])->name('live-edit.api.sites.usage');
         Route::post('/sites/{site:slug}/keys', [SiteController::class, 'issueKey'])->name('live-edit.api.sites.keys');
         Route::delete('/sites/{site:slug}/keys/{keyId}', [SiteController::class, 'revokeKey'])->name('live-edit.api.sites.keys.revoke');
     });

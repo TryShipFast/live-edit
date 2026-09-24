@@ -6,6 +6,8 @@ use Illuminate\Validation\ValidationException;
 use ShipFast\LiveEdit\Domain\Content\EditPolicy;
 use ShipFast\LiveEdit\Domain\Content\SiteStore;
 use ShipFast\LiveEdit\Domain\Site\ApiToken;
+use ShipFast\LiveEdit\Domain\Site\Meter;
+use ShipFast\LiveEdit\Domain\Site\OverLimit;
 use ShipFast\LiveEdit\Domain\Site\Site;
 use ShipFast\LiveEdit\Models\EditRevision;
 use ShipFast\LiveEdit\Support\DraftStore;
@@ -31,6 +33,10 @@ class ApplyEdit
             throw ValidationException::withMessages(['locale' => 'Unknown locale.']);
         }
 
+        if (! Meter::allows($site, Meter::WRITE)) {
+            throw new OverLimit('This site has reached its limit of saved changes for this month.');
+        }
+
         $stored = $this->policy->localeKey($key, $locale);
         $hold = DraftStore::enabled();
 
@@ -44,6 +50,8 @@ class ApplyEdit
             'subject' => $stored,
             'payload' => ['site' => $site->slug, 'held' => $hold],
         ]);
+
+        Meter::record($site, Meter::WRITE);
 
         return ['saved' => true, 'key' => $stored, 'held' => $hold];
     }

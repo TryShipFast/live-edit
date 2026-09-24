@@ -9,6 +9,7 @@ use ShipFast\LiveEdit\Application\Api\ApplyEdit;
 use ShipFast\LiveEdit\Application\Api\PublishSite;
 use ShipFast\LiveEdit\Application\Api\ReadPublishedContent;
 use ShipFast\LiveEdit\Domain\Site\Ability;
+use ShipFast\LiveEdit\Domain\Site\OverLimit;
 use ShipFast\LiveEdit\Http\Api\ApiContext;
 
 /**
@@ -98,6 +99,8 @@ class ContentController
                     'errors' => $e->errors(),
                 ],
             ], 422);
+        } catch (OverLimit $e) {
+            return self::overLimit($e);
         }
 
         return response()->json($result);
@@ -105,7 +108,23 @@ class ContentController
 
     public function publish(Request $request, PublishSite $publish): JsonResponse
     {
-        return response()->json($publish(ApiContext::site($request)));
+        try {
+            return response()->json($publish(ApiContext::site($request)));
+        } catch (OverLimit $e) {
+            return self::overLimit($e);
+        }
+    }
+
+    /**
+     * Nothing is wrong with the request; the account needs attention. 402 says
+     * that, and says it differently from "you may not" and "try again later",
+     * both of which send a caller looking for a bug that is not there.
+     */
+    public static function overLimit(OverLimit $e): JsonResponse
+    {
+        return response()->json([
+            'error' => ['type' => 'over_limit', 'message' => $e->getMessage()],
+        ], 402);
     }
 
     private function locale(Request $request): ?string

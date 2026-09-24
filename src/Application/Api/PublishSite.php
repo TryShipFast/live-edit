@@ -3,6 +3,8 @@
 namespace ShipFast\LiveEdit\Application\Api;
 
 use ShipFast\LiveEdit\Domain\Content\SiteStore;
+use ShipFast\LiveEdit\Domain\Site\Meter;
+use ShipFast\LiveEdit\Domain\Site\OverLimit;
 use ShipFast\LiveEdit\Domain\Site\Site;
 
 /**
@@ -23,6 +25,14 @@ class PublishSite
      */
     public function __invoke(Site $site): array
     {
-        return (new SiteStore($site))->publish();
+        if (! Meter::allows($site, Meter::PUBLISH)) {
+            throw new OverLimit('This site has reached its limit of publishes for this month.');
+        }
+
+        $result = (new SiteStore($site))->publish();
+
+        Meter::record($site, Meter::PUBLISH);
+
+        return $result;
     }
 }

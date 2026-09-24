@@ -6,6 +6,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\ValidationException;
 use ShipFast\LiveEdit\Domain\Site\ApiToken;
+use ShipFast\LiveEdit\Domain\Site\Meter;
 use ShipFast\LiveEdit\Domain\Site\Provisioner;
 use ShipFast\LiveEdit\Domain\Site\Site;
 
@@ -55,6 +56,8 @@ class SiteController
             'origins' => ['nullable', 'array', 'max:20'],
             'origins.*' => ['string', 'max:200'],
             'suspended' => ['nullable', 'boolean'],
+            'limits' => ['nullable', 'array'],
+            'limits.*' => ['nullable', 'integer', 'min:0'],
         ]);
 
         try {
@@ -69,7 +72,24 @@ class SiteController
             $this->provisioner->suspend($site, (bool) $validated['suspended']);
         }
 
+        if (array_key_exists('limits', $validated) && $validated['limits'] !== null) {
+            // An empty object removes them, which must stay possible: a plan
+            // change should not require deleting a site.
+            $site->forceFill(['limits' => $validated['limits'] ?: null])->save();
+        }
+
         return response()->json(['site' => self::describe($site->fresh()->load('tokens'))]);
+    }
+
+    public function usage(Request $request, Site $site): JsonResponse
+    {
+        $period = (string) $request->query('period', '');
+
+        return response()->json([
+            'site' => $site->slug,
+            'usage' => $period !== '' ? Meter::forPeriod($site, $period) : Meter::current($site),
+            'limits' => $site->limits,
+        ]);
     }
 
     public function issueKey(Request $request, Site $site): JsonResponse
@@ -113,6 +133,10 @@ class SiteController
             'name' => $site->name,
             'origins' => $site->allowed_origins ?? [],
             'suspended' => ! $site->isActive(),
+            'limits' => $site->limits,
+            // What to put on an invoice, without having to reconstruct it.
+            'usage' => Meter::current($site),
+            'last_active_at' => $site->last_active_at?->toIso8601String(),
             // Identities and states, never the keys themselves.
             'keys' => $site->tokens->map(fn (ApiToken $t) => [
                 'id' => $t->public_id,

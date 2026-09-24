@@ -23,7 +23,10 @@ class Site extends Model
 
     protected $casts = [
         'allowed_origins' => 'array',
+        'limits' => 'array',
+        'bytes_stored' => 'integer',
         'suspended_at' => 'datetime',
+        'last_active_at' => 'datetime',
     ];
 
     public function tokens(): HasMany
