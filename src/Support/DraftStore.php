@@ -97,7 +97,49 @@ class DraftStore
         $count = $drafts->count();
         Draft::query()->delete();
 
+        // What just went live is written as a version, so there is a record of
+        // the state rather than only of the changes that produced it.
+        Snapshot::publish($count);
+
         return $count;
+    }
+
+    /**
+     * Put an earlier version back.
+     *
+     * Applied forward rather than by rewinding: the restore becomes the newest
+     * version, so history stays append-only and going back from a bad rollback
+     * is the same operation again.
+     */
+    public static function restore(int $number): ?int
+    {
+        $snapshot = Snapshot::read($number);
+        if ($snapshot === null) {
+            return null;
+        }
+
+        $model = config('live-edit.setting_model');
+        $changed = 0;
+
+        foreach (($snapshot['settings'] ?? []) as $key => $value) {
+            $existing = $model::query()->where('key', $key)->value('value');
+            if ((string) $existing === (string) $value) {
+                continue;
+            }
+            $model::query()->updateOrCreate(['key' => $key], ['value' => $value]);
+            $changed++;
+        }
+
+        foreach (($snapshot['styles'] ?? []) as $key => $props) {
+            ElementStyle::query()->updateOrCreate(['key' => $key], ['props' => $props]);
+        }
+
+        // Pending work is not what was asked for: restoring is a decision about
+        // what is live, and leaving drafts on top would immediately undo it.
+        Draft::query()->delete();
+        Snapshot::publish($changed, $number);
+
+        return $changed;
     }
 
     /** Throw the held changes away, leaving the published site as it was. */

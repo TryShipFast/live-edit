@@ -25,6 +25,13 @@ return [
      */
     'publishing' => env('LIVE_EDIT_PUBLISHING', false),
 
+    /*
+     * Where published snapshots are written. A local disk today; point it at S3
+     * behind a CDN and nothing else changes.
+     */
+    'snapshot_disk' => env('LIVE_EDIT_SNAPSHOT_DISK'),
+    'snapshot_directory' => 'live-edit/content',
+
     'theme' => env('LIVE_EDIT_THEME'),
     'chrome_view' => 'live-edit-chrome',
 
