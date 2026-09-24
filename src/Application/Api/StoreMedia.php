@@ -4,6 +4,7 @@ namespace ShipFast\LiveEdit\Application\Api;
 
 use Illuminate\Http\UploadedFile;
 use ShipFast\LiveEdit\Domain\Content\ImageStore;
+use ShipFast\LiveEdit\Domain\Content\SiteStore;
 use ShipFast\LiveEdit\Domain\Site\Site;
 
 /**
@@ -23,7 +24,10 @@ class StoreMedia
      */
     public function __invoke(Site $site, UploadedFile $file, ?int $fitWidth = null, ?int $fitHeight = null): array
     {
-        $path = $this->images->store($file, $fitWidth, $fitHeight);
+        // Into this site's own folder. Random names already make a collision
+        // impossible; separate folders make a customer's files identifiable,
+        // and removable when they leave.
+        $path = $this->images->store($file, $fitWidth, $fitHeight, (new SiteStore($site))->mediaDirectory());
 
         return ['url' => $this->images->url($path), 'path' => $path];
     }

@@ -35,7 +35,7 @@ class ImageStore
      *
      * @throws ValidationException
      */
-    public function store(UploadedFile $file, ?int $fitWidth = null, ?int $fitHeight = null): string
+    public function store(UploadedFile $file, ?int $fitWidth = null, ?int $fitHeight = null, ?string $directory = null): string
     {
         $extension = strtolower($file->getClientOriginalExtension() ?: $file->guessExtension() ?: '');
 
@@ -53,8 +53,13 @@ class ImageStore
             ]);
         }
 
+        // A site's own folder when one is given, so one customer's pictures
+        // are never mixed with another's — and so removing a site can remove
+        // its files.
+        $directory ??= $this->directory();
+
         if ($extension === 'svg') {
-            return $this->storeSvg($file);
+            return $this->storeSvg($file, $directory);
         }
 
         // Before storing, while there is still a real file to work on.
@@ -67,7 +72,7 @@ class ImageStore
         // this application again, so anything not said here cannot be said
         // later — a picture without a cache header is re-fetched by every
         // visitor for the life of the site.
-        return Storage::disk($this->disk())->putFile($this->directory(), $file, $this->objectOptions($file->getMimeType()));
+        return Storage::disk($this->disk())->putFile($directory, $file, $this->objectOptions($file->getMimeType()));
     }
 
     /**
@@ -109,7 +114,7 @@ class ImageStore
      * is stored, so what lands in the bucket is already safe — a file served
      * straight from a CDN is never passed through anything again.
      */
-    private function storeSvg(UploadedFile $file): string
+    private function storeSvg(UploadedFile $file, string $directory): string
     {
         $clean = SvgSanitiser::clean((string) file_get_contents($file->getRealPath()));
 
@@ -117,7 +122,7 @@ class ImageStore
             throw ValidationException::withMessages(['file' => 'That SVG could not be read.']);
         }
 
-        $path = $this->directory().'/'.bin2hex(random_bytes(16)).'.svg';
+        $path = $directory.'/'.bin2hex(random_bytes(16)).'.svg';
 
         // The type is stored explicitly: a bucket guessing this wrong serves
         // an SVG as something a browser will not render, or worse, will.

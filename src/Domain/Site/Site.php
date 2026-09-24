@@ -4,6 +4,10 @@ namespace ShipFast\LiveEdit\Domain\Site;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use ShipFast\LiveEdit\Models\Draft;
+use ShipFast\LiveEdit\Models\SiteSetting;
+use ShipFast\LiveEdit\Models\SiteStyle;
+use ShipFast\LiveEdit\Models\Version;
 
 /**
  * A customer's site: the thing a key belongs to and content is scoped by.
@@ -25,6 +29,26 @@ class Site extends Model
     public function tokens(): HasMany
     {
         return $this->hasMany(ApiToken::class, 'site_id');
+    }
+
+    /**
+     * A removed site takes its content with it.
+     *
+     * The tables cascade, but only where the database is enforcing foreign
+     * keys — which SQLite does not by default, and neither do some MySQL
+     * configurations. Leaving one customer's words behind after they have
+     * gone is not a tidiness problem; it is data nobody has a right to hold.
+     * So it is done here as well, where nothing has to be switched on.
+     */
+    protected static function booted(): void
+    {
+        static::deleting(function (self $site) {
+            SiteSetting::query()->where('site_id', $site->id)->delete();
+            SiteStyle::query()->where('site_id', $site->id)->delete();
+            Draft::query()->where('site_id', $site->id)->delete();
+            Version::query()->where('site_id', $site->id)->delete();
+            ApiToken::query()->where('site_id', $site->id)->delete();
+        });
     }
 
     public function originPolicy(): OriginPolicy

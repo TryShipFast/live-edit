@@ -4,18 +4,15 @@ namespace ShipFast\LiveEdit\Application\Api;
 
 use Illuminate\Validation\ValidationException;
 use ShipFast\LiveEdit\Domain\Content\EditPolicy;
+use ShipFast\LiveEdit\Domain\Content\SiteStore;
 use ShipFast\LiveEdit\Domain\Site\ApiToken;
 use ShipFast\LiveEdit\Domain\Site\Site;
 use ShipFast\LiveEdit\Models\EditRevision;
 use ShipFast\LiveEdit\Support\DraftStore;
 
 /**
- * Writes one change, through the same rules the editor writes through.
- *
- * With publishing on, the change is held as a draft and the live site does not
- * move until someone releases it — the same for an API caller as for a person
- * clicking in the page, because "who wrote it" should not decide "when does the
- * public see it".
+ * Writes one change, to one site, through the same rules the editor writes
+ * through.
  */
 class ApplyEdit
 {
@@ -35,28 +32,19 @@ class ApplyEdit
         }
 
         $stored = $this->policy->localeKey($key, $locale);
+        $hold = DraftStore::enabled();
 
-        if (DraftStore::enabled()) {
-            DraftStore::put('setting', $stored, ['value' => $value]);
+        (new SiteStore($site))->put($stored, $value, $hold);
 
-            return ['saved' => true, 'key' => $stored, 'held' => true];
-        }
-
-        $model = config('live-edit.setting_model');
-        $existing = $model::query()->where('key', $stored)->first();
-
-        // Recorded against the key that made the change, not a user: a site's
-        // own people are not accounts here, and "which integration did this"
-        // is the question an operator actually needs answered.
+        // Recorded against the key that made the change and the site it
+        // belongs to, not a user: a site's own people are not accounts here.
         EditRevision::query()->create([
-            'batch' => 'api:'.$token->public_id,
+            'batch' => 'api:'.$site->slug.':'.$token->public_id,
             'action' => 'setting',
             'subject' => $stored,
-            'payload' => ['value' => $existing?->value, 'existed' => $existing !== null],
+            'payload' => ['site' => $site->slug, 'held' => $hold],
         ]);
 
-        $model::query()->updateOrCreate(['key' => $stored], ['value' => $value]);
-
-        return ['saved' => true, 'key' => $stored, 'held' => false];
+        return ['saved' => true, 'key' => $stored, 'held' => $hold];
     }
 }

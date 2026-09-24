@@ -5,8 +5,7 @@ namespace ShipFast\LiveEdit\Tests\Api;
 use ShipFast\LiveEdit\Domain\Site\Ability;
 use ShipFast\LiveEdit\Domain\Site\Site;
 use ShipFast\LiveEdit\Domain\Site\TokenType;
-use ShipFast\LiveEdit\Support\Snapshot;
-use ShipFast\LiveEdit\Tests\Fixtures\Setting;
+use ShipFast\LiveEdit\Models\SiteSetting;
 use ShipFast\LiveEdit\Tests\TestCase;
 
 /**
@@ -19,6 +18,8 @@ class ApiTrafficTest extends TestCase
     protected string $publishable;
 
     protected string $session;
+
+    protected string $secret;
 
     protected function defineEnvironment($app): void
     {
@@ -55,8 +56,9 @@ class ApiTrafficTest extends TestCase
 
         [, $this->publishable] = $this->site->issueToken(TokenType::Publishable, 'Web');
         [, $this->session] = $this->site->issueToken(TokenType::Session, 'Edit', [Ability::Read, Ability::Write], now()->addHour());
+        [, $this->secret] = $this->site->issueToken(TokenType::Secret, 'Server');
 
-        Setting::query()->create(['key' => 'heroTitle', 'value' => 'Published']);
+        SiteSetting::query()->create(['site_id' => $this->site->id, 'key' => 'heroTitle', 'value' => 'Published']);
     }
 
     protected function url(string $path = '/content'): string
@@ -178,7 +180,7 @@ class ApiTrafficTest extends TestCase
             'an unpublished draft must not invalidate anybody cache'
         );
 
-        Snapshot::publish();
+        $this->postJson($this->url('/publish'), [], $this->as($this->secret))->assertOk();
 
         $this->assertNotSame(
             $before,

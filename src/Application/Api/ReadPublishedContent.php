@@ -2,65 +2,52 @@
 
 namespace ShipFast\LiveEdit\Application\Api;
 
+use ShipFast\LiveEdit\Domain\Content\SiteStore;
 use ShipFast\LiveEdit\Domain\Site\Site;
 use ShipFast\LiveEdit\Support\DraftStore;
-use ShipFast\LiveEdit\Support\PublishedContent;
-use ShipFast\LiveEdit\Support\Snapshot;
 
 /**
- * The published content of a site, in the shape anything can render.
+ * The content of one site, in the shape anything can render.
  *
- * Drafts are included only for a caller that can write — which is the editor,
- * and nobody else. A publishable key is in the page for everyone, so it sees
- * published content alone; including drafts there would put a half-typed
- * sentence on a customer's live site the moment anything cached it.
+ * Every value read here belongs to the site that asked. That is not a detail:
+ * a missing scope in a multi-tenant system does not fail, it succeeds with
+ * somebody else's words.
  *
- * Leaving them out for the editor too was worse, and not obviously so: they
- * save, the words they just typed are replaced by the published ones, and
- * nothing says why. The save worked. It looks exactly like a save that did
- * not.
+ * Drafts are included only for a caller that can write — which is the editor.
+ * A publishable key is in the page for every visitor, so it sees published
+ * content alone; including drafts there would put a half-typed sentence on a
+ * live site the moment anything cached it. Leaving them out for the editor was
+ * worse and less obvious: they save, the published words come back, and it
+ * looks exactly like a save that failed.
  */
 class ReadPublishedContent
 {
     /**
-     * @return array{version: int|null, locale: string, settings: array<string, string>, styles: array<string, mixed>}
+     * @return array{version: int|null, locale: string, pending: int, settings: array<string, string>, styles: array<string, mixed>}
      */
     public function __invoke(Site $site, ?string $locale = null, bool $includeDrafts = false): array
     {
         $locale ??= (string) config('live-edit.default_locale', 'en');
+        $store = new SiteStore($site);
 
-        // Which store is "live" depends on whether the site holds changes
-        // back. With publishing on, the snapshot is live and a save is a draft
-        // that nobody sees until it is released. With publishing off there is
-        // no held state — a save IS live — so reading the last snapshot would
-        // report success and then serve the old words, which is the silent
-        // failure this endpoint exists to avoid.
-        if (! DraftStore::enabled()) {
-            $composed = Snapshot::compose($locale);
+        $settings = $store->published($locale);
+        $styles = $store->publishedStyles();
 
-            return [
-                'version' => PublishedContent::version(),
-                'locale' => $locale,
-                'pending' => 0,
-                'settings' => $composed['settings'] ?? [],
-                'styles' => $composed['styles'] ?? [],
-            ];
-        }
+        // With publishing off there is no held state, so nothing to merge and
+        // nothing waiting.
+        $holding = DraftStore::enabled();
 
-        $settings = PublishedContent::settings($locale);
-        $styles = PublishedContent::styles($locale);
-
-        if ($includeDrafts) {
-            $settings = array_merge($settings, DraftStore::settings());
-            $styles = array_merge($styles, DraftStore::styles());
+        if ($holding && $includeDrafts) {
+            $settings = array_merge($settings, $store->draftedSettings());
+            $styles = array_merge($styles, $store->draftedStyles());
         }
 
         return [
-            'version' => PublishedContent::version(),
+            'version' => $store->version(),
             'locale' => $locale,
-            // How many changes are waiting, so an editor can be offered a way
-            // to release them rather than wondering where they went.
-            'pending' => DraftStore::pending(),
+            // So an editor can be offered a way to release held work rather
+            // than left to wonder where it went.
+            'pending' => $holding ? $store->pending() : 0,
             'settings' => $settings,
             'styles' => $styles,
         ];
@@ -69,24 +56,14 @@ class ReadPublishedContent
     /**
      * A tag for this exact content.
      *
-     * With publishing on, the version is enough: a version never changes once
-     * written, so two responses with the same number are the same bytes, and
-     * nothing has to be hashed to know it.
-     *
-     * With publishing off there is no version to move — a save goes straight
-     * to live content — so the tag is taken from the content itself. Reusing
-     * the version there would hand every cache a tag that never changes while
-     * the words underneath it do, and the site would appear frozen.
+     * The site is part of it, so two sites can never be handed each other's
+     * cached response by anything sitting in front of this.
      *
      * @param  array<string, mixed>  $payload
      */
     public function etag(Site $site, array $payload): string
     {
         $locale = (string) ($payload['locale'] ?? 'en');
-
-        if (DraftStore::enabled()) {
-            return '"'.$site->slug.'-v'.((int) ($payload['version'] ?? 0)).'-'.$locale.'"';
-        }
 
         return '"'.$site->slug.'-'.$locale.'-'.self::fingerprint($payload).'"';
     }
@@ -97,8 +74,7 @@ class ReadPublishedContent
      * Consumers cache whole rendered pages, and a version number is not enough
      * to tell them when to stop: a site with publishing off changes its words
      * without ever moving a version, so anything keyed on the version alone
-     * serves yesterday's page until its timer runs out. This moves on every
-     * change, in either mode.
+     * serves yesterday's page until its timer runs out.
      *
      * @param  array<string, mixed>  $payload
      */

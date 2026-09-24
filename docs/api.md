@@ -99,6 +99,26 @@ words underneath it did.
 `Cache-Control` pairs a short `max-age` with a long `stale-while-revalidate`, so
 a busy site serves from its cache at once and refreshes behind the scenes.
 
+## Whose content is it
+
+Content belongs to a site, not to the installation. Two customers can be served
+from one deployment without either being able to reach the other's words,
+drafts, versions or pictures — and the same key on both sites is two different
+things, which matters because auto keys come from content signatures and two
+sites running the same bought theme generate identical ones.
+
+A bespoke Laravel site keeps using its own models; the whole point of those is
+that they are the customer's own shape. These site-scoped tables are for sites
+served over the API, where this installation holds content on their behalf.
+
+Version numbers count per site, so every site has its own v1. A shared sequence
+would leak how often other customers publish and make a rollback ambiguous.
+
+Removing a site removes its content, in application code as well as by foreign
+key — SQLite does not enforce foreign keys by default and neither do some MySQL
+configurations, and leaving a departed customer's words behind is not a
+tidiness problem but data nobody has a right to hold.
+
 ## Images
 
 `POST /media` takes a file and answers with a URL. What comes back is an

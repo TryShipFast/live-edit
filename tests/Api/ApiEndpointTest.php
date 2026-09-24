@@ -5,7 +5,7 @@ namespace ShipFast\LiveEdit\Tests\Api;
 use ShipFast\LiveEdit\Domain\Site\Ability;
 use ShipFast\LiveEdit\Domain\Site\Site;
 use ShipFast\LiveEdit\Domain\Site\TokenType;
-use ShipFast\LiveEdit\Tests\Fixtures\Setting;
+use ShipFast\LiveEdit\Models\SiteSetting;
 use ShipFast\LiveEdit\Tests\TestCase;
 
 class ApiEndpointTest extends TestCase
@@ -62,7 +62,8 @@ class ApiEndpointTest extends TestCase
         [, $this->secret] = $this->site->issueToken(TokenType::Secret, 'Server');
         [, $this->session] = $this->site->issueToken(TokenType::Session, 'Edit', [Ability::Read, Ability::Write], now()->addHour());
 
-        Setting::query()->create(['key' => 'heroTitle', 'value' => 'Published']);
+        // Content belongs to a site now, not to the installation.
+        SiteSetting::query()->create(['site_id' => $this->site->id, 'key' => 'heroTitle', 'value' => 'Published']);
     }
 
     protected function url(string $path = '/content'): string
@@ -73,6 +74,15 @@ class ApiEndpointTest extends TestCase
     protected function as(string $token, array $headers = []): array
     {
         return array_merge(['Authorization' => 'Bearer '.$token], $headers);
+    }
+
+    /** What this site has stored for a key — never another site's. */
+    protected function valueOf(string $key, ?int $siteId = null): ?string
+    {
+        return SiteSetting::query()
+            ->where('site_id', $siteId ?? $this->site->id)
+            ->where('key', $key)
+            ->value('value');
     }
 
     // --- reading -------------------------------------------------------
@@ -118,7 +128,7 @@ class ApiEndpointTest extends TestCase
             ->assertOk()
             ->assertJsonPath('saved', true);
 
-        $this->assertSame('Changed', Setting::query()->where('key', 'heroTitle')->value('value'));
+        $this->assertSame('Changed', $this->valueOf('heroTitle'));
     }
 
     public function test_a_publishable_key_cannot_write(): void
@@ -127,7 +137,7 @@ class ApiEndpointTest extends TestCase
             $this->as($this->publishable, ['Origin' => 'https://client.test']))
             ->assertStatus(403);
 
-        $this->assertSame('Published', Setting::query()->where('key', 'heroTitle')->value('value'));
+        $this->assertSame('Published', $this->valueOf('heroTitle'));
     }
 
     public function test_a_write_from_an_unlisted_origin_is_refused(): void
@@ -136,7 +146,7 @@ class ApiEndpointTest extends TestCase
             $this->as($this->session, ['Origin' => 'https://attacker.test']))
             ->assertStatus(403);
 
-        $this->assertSame('Published', Setting::query()->where('key', 'heroTitle')->value('value'));
+        $this->assertSame('Published', $this->valueOf('heroTitle'));
     }
 
     public function test_an_undeclared_key_cannot_be_written(): void
@@ -154,7 +164,7 @@ class ApiEndpointTest extends TestCase
                 $this->as($this->session, ['Origin' => 'https://client.test']))
                 ->assertStatus(422);
 
-            $this->assertNull(Setting::query()->where('key', $key)->value('value'), "{$key} was written");
+            $this->assertNull($this->valueOf($key), "{$key} was written");
         }
     }
 
@@ -284,7 +294,7 @@ class ApiEndpointTest extends TestCase
             $this->as($this->session, ['Origin' => 'https://attacker.test']))
             ->assertStatus(403);
 
-        $this->assertSame('Published', Setting::query()->where('key', 'heroTitle')->value('value'));
+        $this->assertSame('Published', $this->valueOf('heroTitle'));
     }
 
     public function test_a_preflight_from_an_unlisted_origin_is_not_blessed(): void

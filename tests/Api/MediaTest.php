@@ -189,6 +189,22 @@ class MediaTest extends TestCase
             ->assertStatus(429);
     }
 
+    public function test_two_sites_keep_their_pictures_apart(): void
+    {
+        $other = Site::query()->create(['slug' => 'other', 'name' => 'Other', 'allowed_origins' => ['https://other.test']]);
+        [, $theirSession] = $other->issueToken(TokenType::Session, 'Edit', [Ability::Read, Ability::Write], now()->addHour());
+
+        $ours = $this->post($this->url(), ['file' => UploadedFile::fake()->image('a.jpg')], $this->as($this->session))
+            ->assertOk()->json('path');
+
+        $theirs = $this->post('/api/live-edit/v1/other/media', ['file' => UploadedFile::fake()->image('b.jpg')],
+            ['Authorization' => 'Bearer '.$theirSession, 'Origin' => 'https://other.test'])
+            ->assertOk()->json('path');
+
+        $this->assertStringContainsString('/sites/client/', $ours);
+        $this->assertStringContainsString('/sites/other/', $theirs);
+    }
+
     public function test_images_are_addressed_through_the_cdn_when_one_is_configured(): void
     {
         // The reason for the bucket: served from an edge near the visitor,

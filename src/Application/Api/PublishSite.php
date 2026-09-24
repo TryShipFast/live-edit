@@ -2,36 +2,27 @@
 
 namespace ShipFast\LiveEdit\Application\Api;
 
+use ShipFast\LiveEdit\Domain\Content\SiteStore;
 use ShipFast\LiveEdit\Domain\Site\Site;
-use ShipFast\LiveEdit\Support\DraftStore;
-use ShipFast\LiveEdit\Support\PublishedContent;
-use ShipFast\LiveEdit\Support\Snapshot;
 
 /**
- * Puts held changes live and writes the version that records it.
+ * Puts one site's held changes live.
  *
  * Requires a secret key rather than a session, which is the point of splitting
  * the two: a browser may write drafts all day, but deciding that the public
  * sees them is an act the customer's own server has to take.
+ *
+ * Scoped to the site that asked. Publishing one customer's work must never
+ * release another's, and with a shared store that is exactly what a forgotten
+ * scope would do.
  */
 class PublishSite
 {
     /**
-     * @return array{published: int, version: int|null}
+     * @return array{published: int, version: int}
      */
     public function __invoke(Site $site): array
     {
-        if (! DraftStore::enabled()) {
-            // Nothing is held back, so publishing means recording the current
-            // state as a version — which is still worth doing, since that is
-            // what gives the site something to roll back to.
-            $version = Snapshot::publish();
-
-            return ['published' => 0, 'version' => $version->number];
-        }
-
-        $count = DraftStore::publish();
-
-        return ['published' => $count, 'version' => PublishedContent::version()];
+        return (new SiteStore($site))->publish();
     }
 }
