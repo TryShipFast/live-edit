@@ -47,6 +47,20 @@ button, input, select, textarea { font: inherit; color: inherit; margin: 0; }
   scrollbar-width: none;
 }
 .le-toolbar::-webkit-scrollbar { display: none; }
+/* On a narrow screen the bar clipped its own controls behind a scrollbar it
+   hides, so a phone showed the status sentence and no buttons at all. The
+   sentence is the widest thing in it and the least useful — the dot already
+   says whether editing is on — so it goes, and what is left wraps rather than
+   scrolling out of reach. */
+@media (max-width: 760px) {
+  .le-toolbar {
+    left: 10px; right: 10px; transform: none; max-width: none;
+    flex-wrap: wrap; justify-content: center; gap: 6px;
+    border-radius: 18px; padding: 8px; overflow-x: visible; white-space: normal;
+  }
+  .le-status { padding-right: 0; }
+  .le-status span { display: none; }
+}
 .le-status { display: flex; align-items: center; gap: 8px; font-weight: 600; color: #e6ebf3; padding-right: 4px; }
 .le-dot { width: 7px; height: 7px; border-radius: 999px; background: #64748b; flex: none; box-shadow: 0 0 0 3px rgba(100,116,139,.18); transition: background .2s ease, box-shadow .2s ease; }
 .le-toolbar.is-editing .le-dot { background: var(--le-live); box-shadow: 0 0 0 3px rgba(34,197,94,.22); }

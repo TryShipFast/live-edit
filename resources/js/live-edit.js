@@ -625,6 +625,11 @@ const bootLiveEdit = () => {
         };
 
         const openDrawer = () => {
+            // The floating handles point at the page, and the panel is now the
+            // subject. On a phone the panel is full width, so a handle left
+            // showing sits on top of it and looks like a fault.
+            hideHandle();
+            hideBgHandle();
             drawer.classList.add('is-open');
             drawerFields.querySelector('textarea, input:not([type=checkbox]), select')?.focus();
         };
