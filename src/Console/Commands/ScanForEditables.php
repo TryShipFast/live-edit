@@ -265,7 +265,7 @@ class ScanForEditables extends Command
         // same layout do not overwrite each other. index is the site's baseline
         // and stays unscoped.
         $page = pathinfo($path, PATHINFO_FILENAME);
-        $result = $scanner->apply($html, ['text', 'image', 'link'], (bool) $this->option('auto'), $labeller, $page === 'index' ? '' : $page);
+        $result = $scanner->apply($html, ['text', 'image', 'link', 'icon'], (bool) $this->option('auto'), $labeller, $page === 'index' ? '' : $page);
 
         $target = $this->targetFor($path);
 

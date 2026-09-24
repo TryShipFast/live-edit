@@ -231,6 +231,7 @@ const bootLiveEdit = () => {
             if (element.dataset.editRegion) return element.dataset.editRegion;
             if (element.hasAttribute('data-edit-item')) return 'Card';
             if (element.hasAttribute('data-edit-icon')) return 'Icon';
+            if (element.hasAttribute('data-edit-svg')) return 'Drawing';
             if (element.hasAttribute('data-edit')) return 'Text';
             if (element.hasAttribute('data-has-bg') || element.hasAttribute('data-edit-bg')) return 'Background';
             if (tag === 'SECTION' || tag === 'MAIN' || tag === 'ARTICLE') return 'Section';
@@ -630,7 +631,7 @@ const bootLiveEdit = () => {
             current = null;
         };
 
-        const editables = () => document.querySelectorAll('[data-edit], [data-edit-img], [data-edit-bg], [data-edit-href], [data-edit-icon]');
+        const editables = () => document.querySelectorAll('[data-edit], [data-edit-img], [data-edit-bg], [data-edit-href], [data-edit-icon], [data-edit-svg]');
 
         /**
          * Every icon name the theme's own stylesheets define.
@@ -791,12 +792,14 @@ const bootLiveEdit = () => {
                     await request('/live-edit/setting', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
-                        // Words come from a textarea, an icon from the picker's
-                        // hidden field. Reading only the textarea threw on
-                        // every icon setting.
+                        // Words come from a textarea and an icon from the
+                        // picker's hidden field, but a panel that chooses
+                        // rather than types carries the value itself — a
+                        // drawing picked from the page has no field to read,
+                        // and reading one anyway saved nothing.
                         body: JSON.stringify({
                             key: current.key,
-                            value: drawerFields.querySelector('textarea, input[name=icon]').value,
+                            value: current.value ?? drawerFields.querySelector('textarea, input[name=icon]')?.value ?? '',
                             locale: window.liveEditLocale,
                         }),
                     });
@@ -1312,6 +1315,93 @@ const bootLiveEdit = () => {
             openDrawer();
         };
 
+        /**
+         * Swap an inline drawing.
+         *
+         * The page is the catalogue, as it is for an icon font: whatever
+         * drawings the theme already uses are the ones that will look right in
+         * it. Pasting one is there for anything else, and the server rebuilds
+         * whatever arrives from an allowed list before it reaches a page.
+         */
+        const editDrawing = (element) => {
+            const was = element.outerHTML;
+            current = { kind: 'setting', key: element.dataset.editSvg.replace(/^setting:/, ''), element };
+            drawerTitle.textContent = element.dataset.editLabel ?? 'Drawing';
+            drawerFields.replaceChildren();
+            drawerDelete.classList.add('le-hidden');
+
+            const restore = () => { element.outerHTML = was; };
+            current.restore = restore;
+
+            // One of each distinct drawing on the page, the current one first.
+            const seen = new Set();
+            const drawings = [];
+            document.querySelectorAll('svg').forEach((svg) => {
+                const markup = svg.outerHTML;
+                const shape = markup.replace(/\s+(class|style|width|height|data-[\w-]+)="[^"]*"/g, '');
+                if (seen.has(shape) || svg.getBoundingClientRect().width < 4) return;
+                seen.add(shape);
+                drawings.push(markup);
+            });
+
+            const grid = document.createElement('div');
+            grid.className = 'le-icon-grid';
+            let chosen = null;
+
+            drawings.slice(0, 120).forEach((markup) => {
+                const choice = document.createElement('button');
+                choice.type = 'button';
+                choice.className = 'le-icon-choice';
+                choice.innerHTML = markup;
+                const drawn = choice.firstElementChild;
+                if (drawn) {
+                    drawn.removeAttribute('class');
+                    drawn.setAttribute('width', '20');
+                    drawn.setAttribute('height', '20');
+                }
+                choice.classList.toggle('is-current', markup === was);
+                choice.addEventListener('click', () => {
+                    chosen = markup;
+                    current.value = markup;
+                    current.dirty = true;
+                    // Show it in place, keeping whatever sized it.
+                    const live = document.querySelector(`[data-edit-svg="${element.dataset.editSvg}"]`) ?? element;
+                    const next = new DOMParser().parseFromString(markup, 'image/svg+xml').documentElement;
+                    ['class', 'width', 'height', 'style', 'data-edit-svg', 'data-edit-label'].forEach((name) => {
+                        if (live.hasAttribute(name)) next.setAttribute(name, live.getAttribute(name));
+                    });
+                    live.replaceWith(next);
+                    grid.querySelectorAll('.le-icon-choice').forEach((other) => other.classList.remove('is-current'));
+                    choice.classList.add('is-current');
+                });
+                grid.append(choice);
+            });
+
+            const pasteWrap = document.createElement('label');
+            pasteWrap.className = 'le-field le-divided';
+            pasteWrap.append('Or paste an SVG');
+            const paste = document.createElement('textarea');
+            paste.className = 'le-input le-prose';
+            paste.placeholder = '<svg viewBox="0 0 24 24">…</svg>';
+            paste.addEventListener('input', () => {
+                if (paste.value.trim() === '') return;
+                current.value = paste.value.trim();
+                current.dirty = true;
+            });
+            const note = document.createElement('div');
+            note.className = 'le-hint';
+            note.textContent = 'Anything that could run or fetch is stripped before it is saved.';
+            pasteWrap.append(paste, note);
+
+            const heading = document.createElement('div');
+            heading.className = 'le-section-heading';
+            heading.textContent = drawings.length ? 'Drawings on this site' : 'No other drawings here';
+
+            drawerFields.append(heading, grid, pasteWrap);
+            setTrail(element);
+            openDrawer();
+        };
+
         const editImage = (element) => {
             // A background reuses the image endpoint — it's a setting holding a URL,
             // rendered as a CSS background rather than an <img>. It skips the alt/
@@ -1465,6 +1555,8 @@ const bootLiveEdit = () => {
             if (image) return { element: image, kind: 'image' };
             const icon = node.closest('[data-edit-icon]');
             if (icon) return { element: icon, kind: 'icon' };
+            const drawing = node.closest('[data-edit-svg]');
+            if (drawing) return { element: drawing, kind: 'svg' };
             const text = node.closest('[data-edit]');
             if (text) return { element: text, kind: 'text' };
             const link = node.closest('[data-edit-href]:not([data-edit])');
@@ -1479,6 +1571,7 @@ const bootLiveEdit = () => {
         const openTarget = ({ element, kind }) => {
             if (kind === 'image') editImage(element);
             else if (kind === 'icon') void editIcon(element);
+            else if (kind === 'svg') editDrawing(element);
             else if (kind === 'text') editText(element);
             else if (kind === 'link') editLink(element);
             else editStyle(element);

@@ -601,4 +601,53 @@ class MarkupScannerTest extends TestCase
 
         $this->assertStringNotContainsString('data-edit-attr', $html);
     }
+
+    public function test_an_inline_drawing_is_tagged_for_editing(): void
+    {
+        // The scanner always found these and had nowhere to put them, so a
+        // button with an icon offered its words and not its picture.
+        $html = (new MarkupScanner)->apply('<a href="/x">Learn more <svg viewBox="0 0 24 24"><path d="M5 12h14"/></svg></a>', ['text', 'link', 'icon'], true)['html'];
+
+        $this->assertMatchesRegularExpression('/<svg[^>]*data-edit-svg="setting:auto:[a-f0-9]{12}"/', $html);
+    }
+
+    public function test_a_stored_drawing_replaces_the_one_in_the_markup(): void
+    {
+        $tagged = (new MarkupScanner)->apply('<svg class="size-4" viewBox="0 0 24 24"><path d="M5 12h14"/></svg>', ['text', 'icon'], true)['html'];
+        preg_match('/data-edit-svg="setting:(auto:[a-f0-9]+)"/', $tagged, $m);
+
+        $rendered = (new MarkupScanner)->applyOverrides($tagged, [
+            $m[1] => '<svg viewBox="0 0 16 16"><circle cx="8" cy="8" r="7"/></svg>',
+        ]);
+
+        $this->assertStringContainsString('<circle', $rendered);
+        $this->assertStringNotContainsString('M5 12h14', $rendered);
+        // The theme sized it; that survives the swap.
+        $this->assertStringContainsString('class="size-4"', $rendered);
+    }
+
+    public function test_a_stored_drawing_cannot_carry_anything_executable(): void
+    {
+        $tagged = (new MarkupScanner)->apply('<svg viewBox="0 0 24 24"><path d="M5 12h14"/></svg>', ['text', 'icon'], true)['html'];
+        preg_match('/data-edit-svg="setting:(auto:[a-f0-9]+)"/', $tagged, $m);
+
+        $rendered = (new MarkupScanner)->applyOverrides($tagged, [
+            $m[1] => '<svg onload="alert(1)"><script>alert(2)</script><path d="M0 0" onclick="x()"/></svg>',
+        ]);
+
+        $this->assertStringNotContainsString('onload', $rendered);
+        $this->assertStringNotContainsString('onclick', $rendered);
+        $this->assertStringNotContainsString('alert', $rendered);
+        $this->assertStringNotContainsString('<script', $rendered);
+    }
+
+    public function test_an_unusable_drawing_leaves_the_original_alone(): void
+    {
+        $tagged = (new MarkupScanner)->apply('<svg viewBox="0 0 24 24"><path d="M5 12h14"/></svg>', ['text', 'icon'], true)['html'];
+        preg_match('/data-edit-svg="setting:(auto:[a-f0-9]+)"/', $tagged, $m);
+
+        $rendered = (new MarkupScanner)->applyOverrides($tagged, [$m[1] => '<div>not a drawing</div>']);
+
+        $this->assertStringContainsString('M5 12h14', $rendered);
+    }
 }

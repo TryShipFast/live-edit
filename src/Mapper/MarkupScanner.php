@@ -8,6 +8,7 @@ use DOMNode;
 use DOMXPath;
 use Illuminate\Support\Str;
 use ShipFast\LiveEdit\Support\ContentSignature;
+use ShipFast\LiveEdit\Support\SvgSanitiser;
 
 /**
  * Recognises the editable surface of arbitrary HTML — the core of the
@@ -63,7 +64,7 @@ class MarkupScanner
      * @param  array<int, string>  $kinds
      * @return array{html: string, applied: int, skipped: array<string, int>}
      */
-    public function apply(string $html, array $kinds = ['text', 'image', 'link'], bool $auto = false, ?callable $labeller = null, string $page = ''): array
+    public function apply(string $html, array $kinds = ['text', 'image', 'link', 'icon'], bool $auto = false, ?callable $labeller = null, string $page = ''): array
     {
         $this->page = $page;
         $this->sharedKeys = [];
@@ -198,6 +199,11 @@ class MarkupScanner
             'text' => $this->setAttrs($node, [
                 'data-edit' => 'setting:'.$key,
             ] + $counted + $label),
+            'icon' => $this->setAttrs($node, [
+                // An inline drawing is replaceable like any other asset. The
+                // scanner found these already and had nowhere to put them.
+                'data-edit-svg' => 'setting:'.$key,
+            ] + $label),
             'image' => $this->setAttrs($node, [
                 'data-edit-img' => 'setting:'.$key,
                 'data-edit-preview' => $node->getAttribute('src'),
@@ -322,6 +328,42 @@ class MarkupScanner
                 $node->setAttribute($attribute, $overrides[$key]);
                 $node->setAttribute('data-edit-value', $overrides[$key]);
             }
+        }
+
+        foreach ($xpath->query('//*[@data-edit-svg]') as $node) {
+            $value = $node->getAttribute('data-edit-svg');
+            if (! str_starts_with($value, 'setting:')) {
+                continue;
+            }
+            $key = substr($value, strlen('setting:'));
+            if (! array_key_exists($key, $overrides) || trim((string) $overrides[$key]) === '') {
+                continue;
+            }
+
+            // Rebuilt from the allowed list before it goes near the page: this
+            // is the only stored value that is markup rather than text.
+            $clean = SvgSanitiser::clean((string) $overrides[$key]);
+            if ($clean === '') {
+                continue;
+            }
+
+            $fragment = $this->doc->createDocumentFragment();
+            if (! @$fragment->appendXML($clean)) {
+                continue;
+            }
+            $replacement = $fragment->firstChild;
+            if (! $replacement instanceof DOMElement) {
+                continue;
+            }
+
+            // The theme's own sizing and classes stay on the element; only the
+            // drawing inside it changes.
+            foreach (['class', 'width', 'height', 'style', 'data-edit-svg', 'data-edit-label'] as $keep) {
+                if ($node->hasAttribute($keep)) {
+                    $replacement->setAttribute($keep, $node->getAttribute($keep));
+                }
+            }
+            $node->parentNode?->replaceChild($replacement, $node);
         }
 
         foreach ($xpath->query('//*[@data-edit-img]') as $node) {
