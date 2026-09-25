@@ -153,6 +153,55 @@ describe('the pictures only a browser can see', () => {
         expect(doc.querySelectorAll('[data-kb-bg]').length).toBe(0);
     });
 
+    it('still finds them on a page the server already tagged', async () => {
+        // A server tags from markup, and a builder's backgrounds are not in
+        // the markup. On a real WordPress install the plugin tagged 107 pieces
+        // of text and none of the pictures the theme draws from CSS — the hero
+        // among them. "Already prepared" has to mean prepared for the things a
+        // server could see, not for everything.
+        globalThis.fetch = vi.fn(() => Promise.resolve({
+            ok: true,
+            json: () => Promise.resolve({
+                elements: [{ at: [1, 0], attributes: { 'data-edit-bg': 'setting:auto:hero' } }],
+            }),
+        }));
+
+        const doc = page(`<head><style>.hero{background-image:url("/hero.jpg")}</style></head>
+            <body><div class="hero"><h1 data-edit="setting:auto:already">Tagged by the server</h1></div></body>`);
+
+        expect(await autoTag({ base: 'https://cms.test', site: 'a', key: 'k' }, doc)).toBe(1);
+        expect(globalThis.fetch).toHaveBeenCalled();
+        expect(doc.querySelector('.hero').getAttribute('data-kb-bg')).toBe('/hero.jpg');
+    });
+
+    it('does not pay for an answer when a prepared page has nothing new', async () => {
+        // The common case by far: every view of an already-tagged page with no
+        // CSS backgrounds on it must cost nothing.
+        globalThis.fetch = vi.fn();
+        const doc = page('<body><h1 data-edit="setting:auto:already">Tagged</h1></body>');
+
+        expect(await autoTag({ base: 'https://cms.test', site: 'a', key: 'k' }, doc)).toBe(0);
+        expect(globalThis.fetch).not.toHaveBeenCalled();
+    });
+
+    it('leaves a key the page already had exactly where it was', async () => {
+        // The whole reason asking again is safe. A client's saved work hangs
+        // off these keys; re-tagging must never move one.
+        globalThis.fetch = vi.fn(() => Promise.resolve({
+            ok: true,
+            json: () => Promise.resolve({
+                elements: [{ at: [1, 0, 0], attributes: { 'data-edit': 'setting:auto:different' } }],
+            }),
+        }));
+
+        const doc = page(`<head><style>.hero{background-image:url("/hero.jpg")}</style></head>
+            <body><div class="hero"><h1 data-edit="setting:auto:already">Tagged by the server</h1></div></body>`);
+
+        await autoTag({ base: 'https://cms.test', site: 'a', key: 'k' }, doc);
+
+        expect(doc.querySelector('h1').getAttribute('data-edit')).toBe('setting:auto:already');
+    });
+
     it('marks the backgrounds before asking what is editable', async () => {
         // If this ran after the markup was taken, the server would be asked
         // about a page that still had no backgrounds in it — and the answer

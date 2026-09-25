@@ -71,15 +71,17 @@
         }
 
         // A page nobody prepared has to be told what is editable before
-        // anything can be put into it, so that comes first — and only for
-        // such a page.
-        var ready = document.querySelector('[data-edit], [data-edit-img]')
-            ? Promise.resolve()
-            : load('autotag.js')
-                .then(function (m) { return m.autoTag({ base: config.api, site: config.site, key: token || config.key }); })
-                .catch(function (error) {
-                    console.warn('[live-edit] could not tag this page:', error.message);
-                });
+        // anything can be put into it, so that comes first.
+        //
+        // Asked for every page, not only an untagged one: a page tagged on the
+        // server still has its backgrounds to find, because those live in a
+        // stylesheet and the server was reading markup. autoTag decides — it
+        // returns immediately when there is nothing new to ask about.
+        var ready = load('autotag.js')
+            .then(function (m) { return m.autoTag({ base: config.api, site: config.site, key: token || config.key }); })
+            .catch(function (error) {
+                console.warn('[live-edit] could not tag this page:', error.message);
+            });
 
         return ready
             .then(function () { return load('content.js'); })

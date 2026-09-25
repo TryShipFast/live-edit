@@ -163,15 +163,25 @@ export const resolveBackgrounds = (doc = document) => {
  * of the markup, so a redeploy asks again and an unchanged page does not.
  */
 export const autoTag = async ({ base, site, key, page }, doc = document) => {
-    if (doc.querySelector('[data-edit], [data-edit-img]')) {
-        // Already prepared — by the CLI, by a framework, or by whoever sold it.
-        return 0;
-    }
+    // Already prepared — by the CLI, by a framework, or by whoever sold it.
+    const prepared = doc.querySelector('[data-edit], [data-edit-img]') !== null;
 
     // Before the markup is sent, not after: the fingerprint has to cover these
     // too, or a page whose only change is a swapped hero is served a cached
     // answer that still points at the old one.
-    resolveBackgrounds(doc);
+    //
+    // This runs even on a prepared page, because a page tagged on the SERVER
+    // cannot have found its backgrounds: they live in a stylesheet, and the
+    // server was looking at markup. Measured on a WordPress install, the
+    // plugin tagged 107 pieces of text and not one of the pictures the theme
+    // draws from CSS, the hero among them. Asking again is safe — applyTags
+    // never overwrites a marker the page already had, so keys a client's work
+    // is already saved against are left exactly as they were.
+    const backgrounds = resolveBackgrounds(doc);
+
+    if (prepared && backgrounds === 0) {
+        return 0;
+    }
 
     const html = doc.documentElement.outerHTML;
     const id = CACHE_PREFIX + fingerprint(html);
