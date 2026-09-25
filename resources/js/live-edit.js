@@ -804,6 +804,40 @@ const bootLiveEdit = () => {
             if (!on) closeDrawer(true);
         };
 
+        /**
+         * Stop editing cleanly when the key is no longer good.
+         *
+         * On a site with its own sign-in a reload is enough — they are still
+         * logged in there. On a site that has none, a reload achieves nothing
+         * and "sign in again" is advice they cannot act on, so they are asked
+         * where to send a new link.
+         */
+        const endSession = async () => {
+            const api = window.liveEditApi;
+            const session = await import('./session.js').catch(() => null);
+
+            session?.forget(window);
+
+            if (!api || !session) {
+                window.location.reload();
+
+                return;
+            }
+
+            const email = window.prompt(
+                'Your editing session has ended. Enter your email address and we will send you a new link.'
+            );
+
+            if (email) {
+                await session.requestLink(api, email, window).catch(() => {});
+                window.alert('If that address can edit this site, a link is on its way.');
+            }
+
+            // Back to how a visitor sees it, rather than a page that still
+            // believes it is being edited.
+            window.location.reload();
+        };
+
         const request = async (url, options) => {
             // Same-origin with a session cookie on a Laravel page; the content
             // API with a bearer key when the editor is running inside a site
@@ -814,9 +848,11 @@ const bootLiveEdit = () => {
                 ? await fetch(mapped.url, mapped.init)
                 : await fetch(url, requestInit(csrf, options));
             if (response.status === 419 || response.status === 401) {
-                window.alert('Your session expired. The page will reload — sign in and try again.');
-                window.location.reload();
-                throw new Error('Session expired.');
+                // The key is dead. Left in storage it would put the page back
+                // into editing mode on reload, where every save fails the same
+                // way and nothing offers a way out.
+                await endSession();
+                throw new Error('Your editing session has ended.');
             }
             if (!response.ok) {
                 const data = await response.json().catch(() => ({}));

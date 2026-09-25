@@ -55,6 +55,8 @@ class AuthenticateApiToken
 
         ApiContext::set($request, $result->token, $result->site);
         $result->token->touchUsage();
+        // Somebody who is working should not be thrown out for working.
+        $result->token->renewIfActive();
 
         return $next($request);
     }

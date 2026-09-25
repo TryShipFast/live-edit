@@ -5,6 +5,7 @@ namespace ShipFast\LiveEdit\Tests\Api;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Testing\TestResponse;
 use ShipFast\LiveEdit\Domain\Site\Ability;
+use ShipFast\LiveEdit\Domain\Site\ApiToken;
 use ShipFast\LiveEdit\Domain\Site\Editor;
 use ShipFast\LiveEdit\Domain\Site\SignInToken;
 use ShipFast\LiveEdit\Domain\Site\Site;
@@ -266,6 +267,53 @@ class SignInTest extends TestCase
             [], ['Authorization' => 'Bearer '.self::ADMIN])->assertOk();
 
         $this->assertSame(1, Editor::query()->where('site_id', $this->site->id)->count());
+    }
+
+    public function test_a_session_slides_while_somebody_is_working(): void
+    {
+        // Being thrown out mid-sentence, with a dead key still in storage and
+        // no way back, is a worse outcome than a key that lives while in use.
+        $this->ask()->assertOk();
+        $location = $this->get('/live-edit/sign-in/'.$this->linkFor($this->editor))->headers->get('Location');
+        $key = urldecode(explode('#kb_session=', $location)[1]);
+
+        $token = ApiToken::query()->where('type', 'session')->latest('id')->firstOrFail();
+
+        // This site's sessions last half an hour, so five minutes left is
+        // well past halfway and the next use should extend it.
+        $token->forceFill(['expires_at' => now()->addMinutes(5)])->save();
+
+        // Through HTTP, because that is where renewal happens and where an
+        // editor's saves actually arrive.
+        $this->getJson('/api/live-edit/v1/acme/content', [
+            'Authorization' => 'Bearer '.$key,
+            'Origin' => 'https://acme.test',
+        ])->assertOk();
+
+        $this->assertTrue(
+            $token->fresh()->expires_at->greaterThan(now()->addMinutes(20)),
+            'an editor who is working was not kept signed in'
+        );
+    }
+
+    public function test_a_session_still_dies_eventually(): void
+    {
+        // However long it slides, a key taken out of a page must not be kept
+        // alive forever by using it.
+        config()->set('live-edit.api.session_max_life', 3600);
+
+        $this->ask()->assertOk();
+        $this->get('/live-edit/sign-in/'.$this->linkFor($this->editor));
+
+        $token = ApiToken::query()->where('type', 'session')->latest('id')->firstOrFail();
+        $token->forceFill(['created_at' => now()->subHours(5), 'expires_at' => now()->addMinute()])->save();
+        $ends = $token->expires_at;
+
+        $token->renewIfActive();
+
+        // Long past its ceiling, so using it buys nothing: it still dies in a
+        // minute, as it was always going to.
+        $this->assertEquals($ends->timestamp, $token->fresh()->expires_at->timestamp);
     }
 
     public function test_editors_cannot_be_managed_without_the_provisioning_key(): void

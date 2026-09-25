@@ -235,6 +235,17 @@ A link to an inbox rather than a password: nothing for us to store on a
 customer's behalf, and no reset flow to get right. It proves the same thing —
 whoever opened it reads that mailbox.
 
+**A session slides while somebody is working.** Half an hour was a security
+token's lifetime rather than a person's: being thrown out mid-sentence, with a
+dead key still in storage and no way back, is a worse outcome than a key that
+lives a few hours while in use. It extends on use once past halfway, and dies
+a day after it was issued whatever happens — so a key taken out of a page
+cannot be kept alive forever by using it.
+
+When one does end, the page stops editing rather than looping. On a site with
+its own sign-in a reload is enough. On a site that has none, "sign in again"
+is advice nobody can act on, so they are asked where to send a new link.
+
 The key arrives in the **fragment**, which is never sent to a server, appears
 in no access log and is passed on in no Referer header. The page takes it out
 of the address bar immediately, because URLs get copied into chats and

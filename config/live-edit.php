@@ -184,7 +184,16 @@ return [
         // How long a browser edit session lasts before their server has to
         // vouch for the person again. Short on purpose: this is the only key
         // that can write and the only one a page ever holds.
-        'session_ttl' => (int) env('LIVE_EDIT_API_SESSION_TTL', 1800),
+        // How long an edit session lasts, and how far it slides while
+        // somebody is actually working. Thirty minutes was a security token's
+        // lifetime rather than a person's: being thrown out mid-sentence is a
+        // worse outcome than a key that lives a few hours while in use.
+        'session_ttl' => (int) env('LIVE_EDIT_API_SESSION_TTL', 7200),
+
+        // However long it slides for, a session dies this long after it was
+        // issued — so a key taken out of a page cannot be kept alive forever
+        // by using it.
+        'session_max_life' => (int) env('LIVE_EDIT_API_SESSION_MAX_LIFE', 86400),
 
         // Creating sites and minting their keys. A different credential from
         // anything a site holds, because it is a different kind of power.

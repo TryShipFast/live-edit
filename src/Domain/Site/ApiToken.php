@@ -47,6 +47,48 @@ class ApiToken extends Model
         return Ability::grantedIn($this->abilities ?? [], $ability);
     }
 
+    /**
+     * Keep an active editor signed in.
+     *
+     * A session is short because it sits in a browser, but somebody writing
+     * the copy for their own website is not a threat model — being thrown out
+     * mid-sentence, with a dead key still in storage and no way back, is a
+     * worse outcome than a key that lives a few hours while in use.
+     *
+     * So it slides while somebody is working, and still dies when they stop.
+     * Capped from when it was issued, so a key taken out of a page cannot be
+     * kept alive forever by using it.
+     */
+    public function renewIfActive(): void
+    {
+        if ($this->tokenType() !== TokenType::Session || $this->expires_at === null) {
+            return;
+        }
+
+        $window = (int) config('live-edit.api.session_ttl', 7200);
+        $ceiling = $this->created_at?->copy()->addSeconds((int) config('live-edit.api.session_max_life', 86400));
+
+        // How much is LEFT, said in the direction that cannot be misread:
+        // a signed difference from now, positive while it is still alive.
+        $remaining = now()->diffInSeconds($this->expires_at, false);
+
+        // Only once past halfway, so an editor saving every few seconds is not
+        // writing to this row every time.
+        if ($remaining > $window / 2) {
+            return;
+        }
+
+        $extended = now()->addSeconds($window);
+
+        if ($ceiling !== null && $extended->greaterThan($ceiling)) {
+            $extended = $ceiling;
+        }
+
+        if ($extended->greaterThan($this->expires_at)) {
+            $this->forceFill(['expires_at' => $extended])->saveQuietly();
+        }
+    }
+
     public function revoke(): void
     {
         $this->forceFill(['revoked_at' => now()])->save();
