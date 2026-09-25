@@ -1,3 +1,5 @@
+import { cleanSvg } from './svg.js';
+
 /**
  * Puts published content into a static page.
  *
@@ -40,11 +42,91 @@ export const applyValue = (element, value) => {
         return;
     }
 
-    // Anything else is words. textContent rather than innerHTML: published
-    // values come from an API, and writing markup from a network response into
-    // a page is how a content service becomes a way to run scripts on every
-    // visitor's browser.
-    element.textContent = value;
+    applyWords(element, value);
+};
+
+/**
+ * Put new words where the old ones were, leaving alone whatever else the
+ * element holds.
+ *
+ * textContent, which this used to be, replaces the element's entire contents —
+ * so a paragraph with a picture floated inside it lost the picture the first
+ * time anybody corrected a typo, and a button written as
+ * "<a data-edit><span>Book</span></a>" lost the span that carried its icon and
+ * its classes. Neither is recoverable from the page afterwards.
+ *
+ * The server's applier has done it this way for a while. The two disagreeing
+ * is worse than either: the same edit destroyed the picture in the browser and
+ * kept it in an export.
+ *
+ * Text nodes only, never markup: published values come from an API, and
+ * writing markup from a network response into a page is how a content service
+ * becomes a way to run scripts on every visitor's browser.
+ */
+const applyWords = (element, value) => {
+    const ownText = [...element.childNodes].filter((node) => node.nodeType === TEXT_NODE);
+
+    if (ownText.length === 0) {
+        // No words of its own. A wrapper around a single element that holds
+        // them — the button above — is the one case where where they go is not
+        // a guess; anything else is left alone rather than rearranged.
+        const children = [...element.children];
+
+        if (children.length === 1 && children[0].children.length === 0) {
+            applyWords(children[0], value);
+
+            return;
+        }
+
+        element.append(value);
+
+        return;
+    }
+
+    ownText.forEach((node, index) => {
+        if (index > 0) {
+            node.remove();
+
+            return;
+        }
+
+        // Keep the space that separated these words from a sibling link, or
+        // the sentence closes up against it.
+        node.nodeValue = value + (/\s$/.test(node.nodeValue) ? ' ' : '');
+    });
+};
+
+const TEXT_NODE = 3;
+
+/**
+ * Replace an inline drawing, keeping the sizing the theme gave it.
+ *
+ * The theme's own class, width, height and style stay on the element and only
+ * the drawing inside changes — swapping the whole element would drop the
+ * sizing with it and leave an icon rendering at its natural size, which for a
+ * 24px glyph in a 1000-unit viewBox is the width of the page.
+ *
+ * Rebuilt from an allowed list first. This is the only stored value that is
+ * markup, and it arrives over the network.
+ */
+export const applySvg = (element, value) => {
+    const clean = cleanSvg(value);
+
+    if (!clean) {
+        return false;
+    }
+
+    const replacement = document.importNode(clean, true);
+
+    for (const keep of ['class', 'width', 'height', 'style', 'data-edit-svg', 'data-edit-label']) {
+        if (element.hasAttribute(keep)) {
+            replacement.setAttribute(keep, element.getAttribute(keep));
+        }
+    }
+
+    element.replaceWith(replacement);
+
+    return true;
 };
 
 /**
@@ -217,6 +299,23 @@ export const applyContent = (root, settings) => {
                 }
                 applied++;
             }
+        }
+    }
+
+    // An inline drawing, which a theme uses where another would use an icon
+    // font. The scanner marks these and the drawer edits them, and nothing
+    // here applied them: the change was stored, the export showed it, and the
+    // live page never did.
+    for (const element of root.querySelectorAll('[data-edit-svg]')) {
+        const key = (element.getAttribute('data-edit-svg') ?? '').replace(/^setting:/, '');
+        const value = settings[key];
+
+        if (!Object.hasOwn(settings, key) || String(value ?? '').trim() === '') {
+            continue;
+        }
+
+        if (applySvg(element, value)) {
+            applied++;
         }
     }
 

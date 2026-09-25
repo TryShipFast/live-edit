@@ -77,6 +77,51 @@ describe('what a visitor sees, applied by the server and by the browser', () => 
         expect(b).toBe('/new.jpg');
     });
 
+    it('keeps a picture that lives inside the words being replaced', () => {
+        // A paragraph with a picture floated inside it. Replacing the whole
+        // contents took the picture with it, and the client had no way back:
+        // the markup that held it was gone from the page.
+        const { server: s, browser: b } = both(
+            '<p data-edit="setting:auto:t">Some words <span class="image"><img src="/pic.jpg" alt=""></span> and more.</p>',
+            { 'auto:t': 'New sentence.' }, {},
+            (doc) => {
+                const p = doc.querySelector('p');
+                return `${p.querySelectorAll('img').length}|${p.textContent.trim()}`;
+            },
+        );
+
+        expect(b).toBe(s);
+        expect(b).toBe('1|New sentence.');
+    });
+
+    it('agrees on a button whose words live in a span', () => {
+        // The panel shows the words it wraps, so that is what the client
+        // edits. Appending rendered "BookReserve"; replacing the contents
+        // threw away the span carrying the icon and the classes.
+        const { server: s, browser: b } = both(
+            '<a data-edit="setting:auto:t" href="/book"><span class="label">Book</span></a>',
+            { 'auto:t': 'Reserve' }, {},
+            (doc) => {
+                const a = doc.querySelector('a');
+                return `${a.querySelector('span.label')?.textContent}|${a.textContent.trim()}`;
+            },
+        );
+
+        expect(b).toBe(s);
+        expect(b).toBe('Reserve|Reserve');
+    });
+
+    it('agrees on words that sit beside a link', () => {
+        const { server: s, browser: b } = both(
+            '<p data-edit="setting:auto:t">Designed by <a href="/x">HTML5 UP</a></p>',
+            { 'auto:t': 'Written by' }, {},
+            (doc) => doc.querySelector('p').textContent,
+        );
+
+        expect(b).toBe(s);
+        expect(b).toBe('Written by HTML5 UP');
+    });
+
     it('agrees on how a picture is described', () => {
         // The browser applies the description on a live page; the server
         // applies it when a customer exports their files. One rule written

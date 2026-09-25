@@ -299,27 +299,7 @@ class MarkupScanner
             if (! array_key_exists($key, $overrides)) {
                 continue;
             }
-            // Put the new words where the old ones were. Appending instead
-            // pushed them past any child element, so a paragraph ending in a
-            // link rendered as "HTML5 UPMy new sentence".
-            $replaced = false;
-            foreach (iterator_to_array($node->childNodes) as $child) {
-                if ($child->nodeType !== XML_TEXT_NODE) {
-                    continue;
-                }
-                if ($replaced) {
-                    $node->removeChild($child);
-
-                    continue;
-                }
-                // Keep the spacing that separated the text from a sibling link.
-                $trailing = preg_match('/\s$/', $child->nodeValue) ? ' ' : '';
-                $child->nodeValue = $overrides[$key].$trailing;
-                $replaced = true;
-            }
-            if (! $replaced) {
-                $node->appendChild($this->doc->createTextNode($overrides[$key]));
-            }
+            $this->writeWords($node, (string) $overrides[$key]);
 
             // A counter renders from its attribute, so text alone would be
             // overwritten the moment the theme's script ran.
@@ -936,7 +916,12 @@ class MarkupScanner
                 // A counter sits inside a wrapper whose own words are a suffix
                 // ("3670" + "K"). The wrapper is editable for the suffix, but
                 // the number is a separate thing and has to be reached.
-                if ($this->hasCounterInside($child)) {
+                //
+                // A picture floated inside a paragraph is the same shape: the
+                // paragraph is editable for its words, and stopping here left
+                // the picture unreachable — a client could see it, could not
+                // replace it, and nothing said why.
+                if ($this->hasCounterInside($child) || $this->hasMediaInside($child)) {
                     $this->walk($child);
                 }
 
@@ -966,6 +951,76 @@ class MarkupScanner
     }
 
     /** Whether a counter sits somewhere below this element. */
+    /**
+     * Put new words where the old ones were, leaving alone whatever else the
+     * element holds.
+     *
+     * Replacing the contents outright pushed the words past any child element,
+     * so a paragraph ending in a link rendered as "HTML5 UPMy new sentence" —
+     * and a paragraph with a picture floated inside it lost the picture
+     * altogether. The browser's applier does exactly this; the two disagreeing
+     * would mean the same edit reading differently live and in an export.
+     */
+    protected function writeWords(DOMElement $node, string $value): void
+    {
+        $replaced = false;
+
+        foreach (iterator_to_array($node->childNodes) as $child) {
+            if ($child->nodeType !== XML_TEXT_NODE) {
+                continue;
+            }
+            if ($replaced) {
+                $node->removeChild($child);
+
+                continue;
+            }
+            // Keep the spacing that separated the text from a sibling link.
+            $trailing = preg_match('/\s$/', $child->nodeValue) ? ' ' : '';
+            $child->nodeValue = $value.$trailing;
+            $replaced = true;
+        }
+
+        if ($replaced) {
+            return;
+        }
+
+        // No words of its own. A wrapper around a single element that holds
+        // them — a button written as "<a><span>Book</span></a>", which is what
+        // the panel showed the client — is the one case where where they go is
+        // not a guess. Appending instead rendered "BookReserve".
+        $children = [];
+        foreach ($node->childNodes as $child) {
+            if ($child instanceof DOMElement) {
+                $children[] = $child;
+            }
+        }
+
+        if (count($children) === 1 && $children[0]->getElementsByTagName('*')->length === 0) {
+            $this->writeWords($children[0], $value);
+
+            return;
+        }
+
+        $node->appendChild($this->doc->createTextNode($value));
+    }
+
+    /**
+     * Whether this element has a picture or a player inside it.
+     *
+     * Only the kinds the walk itself knows what to do with: listing a tag here
+     * that nothing tags would descend for nothing.
+     */
+    protected function hasMediaInside(DOMElement $element): bool
+    {
+        foreach (['img', 'svg', 'video', 'iframe', 'audio'] as $tag) {
+            if ($element->getElementsByTagName($tag)->length > 0) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
     protected function hasCounterInside(DOMElement $element): bool
     {
         foreach ($element->getElementsByTagName('*') as $descendant) {
