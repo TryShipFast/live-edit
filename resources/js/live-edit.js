@@ -12,6 +12,30 @@ import { apiRequestFor, attributeOf, classListWith, declaredStyleProps, displaye
  */
 const bootLiveEdit = () => {
 
+    /* --------------------- the pictures a stylesheet holds --------------------- */
+
+    /*
+     * Asked for here as well as in boot.js, because there are two ways in and
+     * only one of them went through boot.
+     *
+     * WordPress loads this file directly: its plugin has already done the
+     * tagging on the server and hands us a token, which boot.js would
+     * overwrite with a null. So the background pass — written because a page
+     * builder keeps its hero in a stylesheet, which is exactly what a bought
+     * WordPress template does — ran everywhere except there.
+     *
+     * The call is idempotent, so a page that did come through boot.js does not
+     * pay for it twice, and a failure costs the backgrounds rather than the
+     * editor.
+     */
+    const api = window.liveEditApi;
+
+    if (api?.base && api?.site) {
+        import('./autotag.js')
+            .then((m) => m.ensureBackgroundsAreFound({ base: api.base, site: api.site, key: api.token }))
+            .catch((error) => console.warn('[live-edit] could not look for backgrounds:', error.message));
+    }
+
     /* ------------------------------- login modal ------------------------------- */
 
     const loginModal = document.querySelector('[data-login-modal]');
@@ -874,6 +898,20 @@ const bootLiveEdit = () => {
                 markLiveBackgrounds();
                 // Read the theme's icons now, so the picker opens instantly later.
                 if (document.querySelector('[data-edit-icon]')) void iconCatalogue();
+
+                // And look once more for pictures living in a stylesheet. A
+                // builder decides for itself when to load a section's
+                // background, so at boot some of them are not there yet —
+                // pressing this button is the one moment we know the page has
+                // finished. Anything found is asked about and appears without
+                // a reload; if the answer is "nothing new", it costs a pass
+                // and no request at all.
+                if (api?.base && api?.site) {
+                    import('./autotag.js')
+                        .then((m) => m.refreshBackgrounds({ base: api.base, site: api.site, key: api.token }))
+                        .then((added) => { if (added) markLiveBackgrounds(); })
+                        .catch((error) => console.warn('[live-edit] could not look again for backgrounds:', error.message));
+                }
             }
             else {
                 hideBgHandle();

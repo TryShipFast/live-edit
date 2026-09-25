@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { applyTags, autoTag, elementAt, fingerprint, resolveBackgrounds } from '../../resources/js/autotag.js';
+import { applyTags, autoTag, elementAt, fingerprint, resolveBackgrounds, watchForLateBackgrounds, ensureBackgroundsAreFound, refreshBackgrounds } from '../../resources/js/autotag.js';
 
 const page = (html) => {
     document.documentElement.innerHTML = html;
@@ -202,6 +202,33 @@ describe('the pictures only a browser can see', () => {
         expect(doc.querySelector('h1').getAttribute('data-edit')).toBe('setting:auto:already');
     });
 
+    it('asks again for a picture it wrote down but never got a key for', async () => {
+        // The late-background case from the other side. Counting what a pass
+        // FOUND would say nothing changed, because the watcher already wrote
+        // the attribute down before asking — so the question has to be
+        // "is anything still unanswered", not "did I just find something".
+        globalThis.fetch = vi.fn(() => Promise.resolve({
+            ok: true,
+            json: () => Promise.resolve({ elements: [] }),
+        }));
+
+        const doc = page('<body><h1 data-edit="setting:auto:already">Tagged</h1>'
+            + '<div data-kb-bg="/found-later.jpg"></div></body>');
+
+        await autoTag({ base: 'https://cms.test', site: 'a', key: 'k' }, doc);
+
+        expect(globalThis.fetch).toHaveBeenCalled();
+    });
+
+    it('stops asking once every picture has a key', async () => {
+        globalThis.fetch = vi.fn();
+        const doc = page('<body><h1 data-edit="setting:auto:already">Tagged</h1>'
+            + '<div data-kb-bg="/hero.jpg" data-edit-bg="setting:auto:hero"></div></body>');
+
+        expect(await autoTag({ base: 'https://cms.test', site: 'a', key: 'k' }, doc)).toBe(0);
+        expect(globalThis.fetch).not.toHaveBeenCalled();
+    });
+
     it('marks the backgrounds before asking what is editable', async () => {
         // If this ran after the markup was taken, the server would be asked
         // about a page that still had no backgrounds in it — and the answer
@@ -219,5 +246,266 @@ describe('the pictures only a browser can see', () => {
 
         const sent = JSON.parse(globalThis.fetch.mock.calls[0][1].body).html;
         expect(sent).toContain('data-kb-bg="http://site.test/uploads/hero-section-min.jpg"');
+    });
+});
+
+describe('a background that only appears when you scroll to it', () => {
+    beforeEach(() => window.sessionStorage?.clear());
+
+    /**
+     * A stand-in for the browser's own observer, so a test can say "this
+     * element just came into view" without a viewport.
+     */
+    const withFakeObserver = () => {
+        const watched = [];
+        let notify = null;
+
+        window.IntersectionObserver = class {
+            constructor(callback) {
+                notify = callback;
+                this.callback = callback;
+            }
+
+            observe(el) { watched.push(el); }
+
+            unobserve(el) {
+                const i = watched.indexOf(el);
+                if (i >= 0) watched.splice(i, 1);
+            }
+
+            disconnect() { watched.length = 0; }
+        };
+
+        return {
+            watched,
+            scrollTo: (el) => notify([{ target: el, isIntersecting: true }]),
+        };
+    };
+
+    it('finds the picture that was not there when the page loaded', async () => {
+        // Measured on a real Elementor page: five CSS backgrounds, one of
+        // which read as "none" from the top of the document because the
+        // builder had not loaded it yet. A full-width banner, plainly on the
+        // page, that the editor simply did not offer.
+        // How a builder actually does it: a stylesheet rule that starts
+        // matching once its own script marks the section as loaded. An inline
+        // style would be the wrong test — the server can read those from the
+        // markup we post, which is why they are deliberately skipped.
+        const doc = page('<head><style>.e-loaded { background-image: url("/banner.jpg"); }</style></head>'
+            + '<body><div id="late"></div></body>');
+        const late = doc.querySelector('#late');
+
+        const observer = withFakeObserver();
+        const found = [];
+        watchForLateBackgrounds(doc, (batch) => found.push(...batch));
+
+        expect(observer.watched).toContain(late);
+        expect(late.hasAttribute('data-kb-bg')).toBe(false);
+
+        // The builder loads it as the section arrives.
+        late.classList.add('e-loaded');
+        observer.scrollTo(late);
+
+        await new Promise((r) => setTimeout(r, 400));
+
+        expect(late.getAttribute('data-kb-bg')).toBe('/banner.jpg');
+        expect(found).toContain(late);
+    });
+
+    it('hands back a whole scroll of them at once, not one at a time', async () => {
+        // Scrolling a long page crosses many sections. Re-tagging per section
+        // would be one request per section, on somebody's own website.
+        const doc = page('<head><style>.e-loaded { background-image: url("/section.jpg"); }</style></head>'
+            + '<body><div id="a"></div><div id="b"></div><div id="c"></div></body>');
+        const observer = withFakeObserver();
+        const batches = [];
+        watchForLateBackgrounds(doc, (batch) => batches.push(batch));
+
+        ['#a', '#b', '#c'].forEach((id) => {
+            const el = doc.querySelector(id);
+            el.classList.add('e-loaded');
+            observer.scrollTo(el);
+        });
+
+        await new Promise((r) => setTimeout(r, 400));
+
+        expect(batches.length).toBe(1);
+        expect(batches[0].length).toBe(3);
+    });
+
+    it('says nothing when a section comes into view with no picture in it', async () => {
+        // Most of a page is not a background. This must not report work it
+        // did not do, or every scroll would cost a tagging request.
+        const doc = page('<body><div id="plain">Words</div></body>');
+        const observer = withFakeObserver();
+        const found = [];
+        watchForLateBackgrounds(doc, (batch) => found.push(...batch));
+
+        observer.scrollTo(doc.querySelector('#plain'));
+        await new Promise((r) => setTimeout(r, 600));
+
+        expect(found).toEqual([]);
+    });
+
+    it('never watches a picture the markup already declares', async () => {
+        // The markup stays the source of truth wherever it has an answer, and
+        // watching those would be paying to re-learn what we already know.
+        const doc = page('<body><div data-bg="/theme.jpg"></div><div data-kb-bg="/known.jpg"></div>'
+            + '<div id="unknown"></div></body>');
+        const observer = withFakeObserver();
+        watchForLateBackgrounds(doc);
+
+        expect(observer.watched).toEqual([doc.querySelector('#unknown')]);
+    });
+
+    it('does nothing at all in a browser without an observer', () => {
+        // Rather than throwing during boot and taking the editor with it.
+        delete window.IntersectionObserver;
+
+        expect(watchForLateBackgrounds(page('<body><div></div></body>'))).toBeNull();
+    });
+});
+
+describe('both ways into the editor find the pictures', () => {
+    beforeEach(() => {
+        window.sessionStorage?.clear();
+        delete window.liveEditBackgroundsWatched;
+    });
+
+    it('does the work once, however many entries ask', async () => {
+        // A site we sold comes through boot.js; WordPress loads the editor on
+        // its own, because its plugin already tagged the page on the server
+        // and supplies a token boot.js would overwrite with a null. Both ask,
+        // and asking twice must not cost twice.
+        globalThis.fetch = vi.fn(() => Promise.resolve({ ok: true, json: () => Promise.resolve({ elements: [] }) }));
+        window.IntersectionObserver = class {
+            observe() {} unobserve() {} disconnect() {}
+        };
+
+        const doc = page('<head><style>.hero{background-image:url("/hero.jpg")}</style></head>'
+            + '<body><div class="hero"></div></body>');
+
+        await ensureBackgroundsAreFound({ base: 'https://cms.test', site: 'a', key: 'k' }, doc);
+        const afterFirst = globalThis.fetch.mock.calls.length;
+
+        await ensureBackgroundsAreFound({ base: 'https://cms.test', site: 'a', key: 'k' }, doc);
+
+        expect(afterFirst).toBeGreaterThan(0);
+        expect(globalThis.fetch.mock.calls.length).toBe(afterFirst);
+    });
+});
+
+describe('looking again when somebody presses Edit site', () => {
+    beforeEach(() => window.sessionStorage?.clear());
+
+    it('finds a picture that only turned up after the page settled', async () => {
+        // The case watching for a scroll could not catch. One banner on the
+        // test site simply had its background a second after load, without
+        // ever crossing the viewport in a way an observer reported.
+        globalThis.fetch = vi.fn(() => Promise.resolve({
+            ok: true,
+            json: () => Promise.resolve({ elements: [{ at: [1, 0], attributes: { 'data-edit-bg': 'setting:auto:banner' } }] }),
+        }));
+
+        const doc = page('<head><style>.late{background-image:url("/banner.jpg")}</style></head>'
+            + '<body><div id="b"></div></body>');
+
+        // Nothing to find while the builder has not decided yet.
+        expect(await refreshBackgrounds({ base: 'https://cms.test', site: 'a', key: 'k' }, doc)).toBe(0);
+        expect(globalThis.fetch).not.toHaveBeenCalled();
+
+        // The builder gets round to it; then somebody presses Edit site.
+        doc.querySelector('#b').classList.add('late');
+
+        await refreshBackgrounds({ base: 'https://cms.test', site: 'a', key: 'k' }, doc);
+
+        expect(doc.querySelector('#b').getAttribute('data-kb-bg')).toBe('/banner.jpg');
+        expect(globalThis.fetch).toHaveBeenCalled();
+    });
+
+    it('costs nothing when every picture already has a key', async () => {
+        // Pressed repeatedly, as people do with a toggle.
+        globalThis.fetch = vi.fn();
+        const doc = page('<body><div data-kb-bg="/hero.jpg" data-edit-bg="setting:auto:hero"></div></body>');
+
+        expect(await refreshBackgrounds({ base: 'https://cms.test', site: 'a', key: 'k' }, doc)).toBe(0);
+        expect(globalThis.fetch).not.toHaveBeenCalled();
+    });
+
+    it('asks again for one that was written down but never keyed', async () => {
+        globalThis.fetch = vi.fn(() => Promise.resolve({ ok: true, json: () => Promise.resolve({ elements: [] }) }));
+        const doc = page('<body><div data-kb-bg="/orphan.jpg"></div></body>');
+
+        await refreshBackgrounds({ base: 'https://cms.test', site: 'a', key: 'k' }, doc);
+
+        expect(globalThis.fetch).toHaveBeenCalled();
+    });
+});
+
+describe('a background that is only there while you are looking at it', () => {
+    beforeEach(() => window.sessionStorage?.clear());
+
+    it('keeps asking as the section crosses, instead of giving up first time', async () => {
+        // Measured on a real Elementor page: a full-width banner whose
+        // computed background reads "none" from anywhere except while it is
+        // actually on screen — and which is not there yet on the first
+        // crossing, because the builder is reacting to the same scroll we are.
+        // Asking once meant asking at the one moment the answer was still no.
+        const doc = page('<head><style>.on-screen{background-image:url("/banner.jpg")}</style></head>'
+            + '<body><div id="flicker"></div></body>');
+        const el = doc.querySelector('#flicker');
+
+        let notify = null;
+        const unobserved = [];
+        window.IntersectionObserver = class {
+            constructor(cb) { notify = cb; }
+            observe() {}
+            unobserve(node) { unobserved.push(node); }
+            disconnect() {}
+        };
+
+        const found = [];
+        watchForLateBackgrounds(doc, (batch) => found.push(...batch));
+
+        // First crossing: the builder has not got there yet.
+        notify([{ target: el, isIntersecting: true }]);
+        await new Promise((r) => setTimeout(r, 500));
+
+        expect(found).toEqual([]);
+        expect(unobserved).not.toContain(el);
+
+        // It comes back past, and this time the picture is on it.
+        el.classList.add('on-screen');
+        notify([{ target: el, isIntersecting: true }]);
+        await new Promise((r) => setTimeout(r, 400));
+
+        expect(el.getAttribute('data-kb-bg')).toBe('/banner.jpg');
+        expect(found).toContain(el);
+        expect(unobserved).toContain(el);
+    });
+
+    it('stops asking about one that never has a picture', async () => {
+        // Most of a page is not a background, and scrolling must not cost a
+        // style recalculation per element forever.
+        const doc = page('<body><div id="plain">Words</div></body>');
+        const el = doc.querySelector('#plain');
+
+        let notify = null;
+        const unobserved = [];
+        window.IntersectionObserver = class {
+            constructor(cb) { notify = cb; }
+            observe() {}
+            unobserve(node) { unobserved.push(node); }
+            disconnect() {}
+        };
+
+        watchForLateBackgrounds(doc);
+
+        for (let i = 0; i < 6; i++) {
+            notify([{ target: el, isIntersecting: true }]);
+            await new Promise((r) => setTimeout(r, 450));
+        }
+
+        expect(unobserved).toContain(el);
     });
 });

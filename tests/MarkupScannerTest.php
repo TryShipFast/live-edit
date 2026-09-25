@@ -810,6 +810,44 @@ class MarkupScannerTest extends TestCase
         $this->assertNotNull($this->keyOfText($html, 'Details'), 'its words should still be editable');
     }
 
+    public function test_a_page_already_scanned_once_is_still_asked_about_its_pictures(): void
+    {
+        // The case that made every earlier background fix worthless on the
+        // sites they were written for. A WordPress page is prepared on the
+        // server, so it comes back with a style key on every element. Only
+        // then can the browser see a background that lives in a stylesheet,
+        // write it down, and ask again — and this pass skipped any element
+        // that already had a style key, so it never looked. The picture was
+        // written down and never given a key, on the exact page builders the
+        // feature exists for.
+        $prepared = (new MarkupScanner)->apply('<div class="hero"></div>', ['text', 'image'], true)['html'];
+
+        $this->assertStringContainsString('data-style="s', $prepared, 'the first pass did not key anything, so this proves nothing');
+        $this->assertStringNotContainsString('data-edit-bg', $prepared);
+
+        // The browser resolves the stylesheet and writes down what it found.
+        $withPicture = str_replace('<div ', '<div data-kb-bg="/hero.jpg" ', $prepared);
+
+        $again = (new MarkupScanner)->apply($withPicture, ['text', 'image'], true)['html'];
+
+        $this->assertStringContainsString('data-edit-bg="setting:auto:', $again, 'a picture found on the second look was never offered');
+        $this->assertStringContainsString('data-edit-preview="/hero.jpg"', $again);
+    }
+
+    public function test_a_second_look_never_renames_what_the_first_one_keyed(): void
+    {
+        // The reason that skip was there. A client's styling hangs off these
+        // keys, so asking again must add without disturbing.
+        $first = (new MarkupScanner)->apply('<div class="hero"><p>Words</p></div>', ['text', 'image'], true)['html'];
+        preg_match_all('/data-style="(s[a-f0-9]+)"/', $first, $before);
+
+        $again = (new MarkupScanner)->apply($first, ['text', 'image'], true)['html'];
+        preg_match_all('/data-style="(s[a-f0-9]+)"/', $again, $after);
+
+        $this->assertNotEmpty($before[1]);
+        $this->assertSame($before[1], $after[1], 'a second look renamed keys the first one gave');
+    }
+
     public function test_a_background_the_browser_resolved_is_offered_like_any_other(): void
     {
         // A page builder writes its backgrounds into a generated stylesheet,

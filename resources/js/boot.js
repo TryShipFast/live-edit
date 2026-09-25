@@ -77,8 +77,18 @@
         // server still has its backgrounds to find, because those live in a
         // stylesheet and the server was reading markup. autoTag decides — it
         // returns immediately when there is nothing new to ask about.
+        var tagging = { base: config.api, site: config.site, key: token || config.key };
+        var editing = token || /[?&]edit(=1)?(&|$)/.test(window.location.search);
+
         var ready = load('autotag.js')
-            .then(function (m) { return m.autoTag({ base: config.api, site: config.site, key: token || config.key }); })
+            .then(function (m) {
+                // Backgrounds are watched as well as read, because a builder
+                // loads a section's picture when it scrolls into view — but
+                // only for somebody editing. A visitor has no use for a
+                // background they cannot change and should not pay to watch
+                // for it.
+                return editing ? m.ensureBackgroundsAreFound(tagging) : m.autoTag(tagging);
+            })
             .catch(function (error) {
                 console.warn('[live-edit] could not tag this page:', error.message);
             });
@@ -88,7 +98,7 @@
             .then(function () {
                 // The editor itself, only for somebody who is actually
                 // editing, which is almost nobody.
-                if (token || /[?&]edit(=1)?(&|$)/.test(window.location.search)) {
+                if (editing) {
                     return load('live-edit.js');
                 }
             });

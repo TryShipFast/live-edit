@@ -141,6 +141,21 @@ button, input, select, textarea { font: inherit; color: inherit; margin: 0; }
 }
 .le-close:hover { background: var(--le-soft); color: var(--le-ink); }
 .le-fields { flex: 1; overflow: auto; padding: 22px 24px; display: flex; flex-direction: column; gap: 18px; }
+/*
+ * Nothing in this column gets squeezed; the column scrolls instead.
+ *
+ * A flex child shrinks by default, so every fixed height in here was a
+ * suggestion that held only while the panel was short enough. The image
+ * preview is 190px tall and was measured at 2px — its own borders, nothing in
+ * between — so a client replacing a picture could not see the picture they
+ * were replacing. Nothing errored and the field worked; it was simply blank.
+ *
+ * It appeared the day the panel started showing an element's styling and its
+ * contents as well as its own fields, which made panels tall enough to
+ * overflow. The height was never really being honoured — it just had not been
+ * asked to prove it yet.
+ */
+.le-fields > * { flex-shrink: 0; }
 .le-foot {
   display: flex; align-items: center; justify-content: flex-end; gap: 10px;
   padding: 14px 24px; border-top: 1px solid var(--le-line); background: var(--le-soft);

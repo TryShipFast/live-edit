@@ -941,7 +941,7 @@ class MarkupScanner
             }
 
             $tag = strtolower($el->tagName);
-            if (in_array($tag, $skip, true) || $el->hasAttribute('data-style')) {
+            if (in_array($tag, $skip, true)) {
                 continue;
             }
 
@@ -953,9 +953,28 @@ class MarkupScanner
                 continue;
             }
 
-            $el->setAttribute('data-style', 's'.$this->autoKey($el));
-            $el->setAttribute('data-style-props', self::STYLE_PROPS);
-            $tagged++;
+            /*
+             * An element that already has a style key keeps it — but is still
+             * asked the other questions.
+             *
+             * This used to skip the whole element, which was fine while every
+             * page arrived unmarked. It stopped being fine the moment a page
+             * could be scanned twice: WordPress is prepared on the server, so
+             * every element comes back carrying a style key, and then the
+             * browser — the only thing that can see a background living in a
+             * stylesheet — writes down what it found and asks again. Every one
+             * of those elements was skipped on the second pass, so the
+             * backgrounds were written down and never given a key. Nothing
+             * errored; the pictures were simply never offered.
+             *
+             * An icon is the same shape of answer for the same reason: it can
+             * appear after the first look.
+             */
+            if (! $el->hasAttribute('data-style')) {
+                $el->setAttribute('data-style', 's'.$this->autoKey($el));
+                $el->setAttribute('data-style-props', self::STYLE_PROPS);
+                $tagged++;
+            }
 
             // An icon in a bought theme is a class on an empty element, not
             // content, so nothing above would ever offer it for editing.

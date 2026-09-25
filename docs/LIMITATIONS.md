@@ -22,20 +22,43 @@ report names the builder when it finds one so the risk is at least stated
 before anybody relies on it. For a site the client edits only through us, this
 never fires.
 
-## A background only exists while it is on screen
+## ~~A background only exists while it is on screen~~ — mostly fixed
 
 **What happens.** A builder loads a container's background image when it
 scrolls into view and lets it go again. Asked from the top of the document, the
-element honestly reports no background at all.
+element honestly reports no background at all — and one banner on the test page
+reported `none` from anywhere except while it was actually on screen.
 
-**Measured.** Five CSS backgrounds on one page; one of them came and went
-depending on where the page was scrolled.
+**Where we stand.** Three things now look, because no one of them is enough:
 
-**Where we stand.** The runtime resolves backgrounds at boot, so anything in or
-near the first screen is found. Everything further down is found only if the
-page has been scrolled past it. The report sweeps the whole page and resolves
-as it goes, which is why its count can exceed what the editor offers on a cold
-load.
+- at boot, for everything already resolved;
+- as sections cross the viewport, asking again on each crossing rather than
+  once — the flickering banner was never there on the first crossing, because
+  the builder is reacting to the same scroll we are. Five tries per element,
+  then it is left alone;
+- when somebody presses **Edit site**, which is the one moment we know the page
+  has finished doing whatever it was going to do.
+
+Measured on the install: five of five, the flickering banner included, through
+the plugin rather than the report tool.
+
+**What is still true.** A background that has *never* been on screen in this
+session and only exists while it is cannot be found — there is no moment at
+which the browser would tell us about it. Scrolling past it once is enough, and
+the editor picks it up without a reload.
+
+## The editor is only wired into one of the two ways in
+
+**What happens.** A site we sold loads `boot.js`, which walks through session,
+tagging, content and then the editor. WordPress loads the editor directly,
+because its plugin has already tagged the page and supplies its own token that
+`boot.js` would overwrite with a null.
+
+**Where we stand.** This bit us once already: the background pass lived only in
+`boot.js`, so it ran everywhere *except* WordPress — the one place bought
+templates actually live. Both entries now call the same idempotent function.
+The lesson is the entry, not the feature: anything added to one path needs
+asking of the other.
 
 ## A marked-up word inside a sentence is not separately editable
 
