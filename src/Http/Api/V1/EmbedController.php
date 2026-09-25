@@ -18,15 +18,12 @@ use Symfony\Component\HttpFoundation\Response;
 class EmbedController
 {
     /**
-     * Bumped whenever the runtime changes.
-     *
-     * Stamped onto every asset URL so a new version is a new address, which is
-     * what lets the files be cached properly and still arrive the moment they
-     * change. Without it a fix waits out whatever cache a customer's browser
-     * happens to hold, and the only honest response was to cache for minutes
-     * and pay for it on every page view.
+     * The release these files belong to, for people rather than for browsers.
      */
     public const VERSION = '0.2.0';
+
+    /** Computed once per process; the files cannot change under a running one. */
+    private static ?string $fingerprint = null;
 
     /**
      * The files that may be asked for.
@@ -44,6 +41,57 @@ class EmbedController
         'chrome.js' => 'chrome.js',
         'support.js' => 'support.js',
     ];
+
+    /**
+     * The address every asset is served under.
+     *
+     * Stamped onto every asset URL so a new version is a new address, which is
+     * what lets the files be cached for a year and still arrive the moment
+     * they change.
+     *
+     * The version used to be the constant above, which made correct caching a
+     * promise somebody had to keep by hand on every release — and the failure
+     * is silent and total: the files say "immutable, one year", so a browser
+     * that already holds them never asks again. Editing the runtime without
+     * bumping the constant leaves every customer running the old build until
+     * next year, with nothing anywhere to say so. It is not a thing to
+     * remember, so it is derived: the version is the bytes.
+     */
+    public static function assetVersion(): string
+    {
+        return self::VERSION.'-'.(self::$fingerprint ??= self::fingerprint());
+    }
+
+    /**
+     * A short digest of everything this endpoint will serve.
+     *
+     * Of all of them together rather than one per file: boot.js passes its own
+     * version to the siblings it loads, so the set has to move as a set. A
+     * half-updated runtime — new editor, old session — is the failure this is
+     * here to prevent, and it is worse than a stale one.
+     */
+    public static function fingerprintOf(array $paths): string
+    {
+        $hash = hash_init('sha256');
+
+        foreach ($paths as $path) {
+            // The name is hashed too, so files swapping content is a change.
+            hash_update($hash, basename($path));
+            is_file($path) ? hash_update_file($hash, $path) : hash_update($hash, "\0");
+        }
+
+        return substr(hash_final($hash), 0, 12);
+    }
+
+    private static function fingerprint(): string
+    {
+        return self::fingerprintOf(array_map(self::path(...), self::FILES));
+    }
+
+    private static function path(string $name): string
+    {
+        return __DIR__.'/../../../../resources/js/'.$name;
+    }
 
     /**
      * A site's own one-line install.
@@ -82,7 +130,7 @@ class EmbedController
 
         return $this->script(sprintf(
             "(function(){var s=document.createElement('script');s.src=%s;%s s.defer=true;document.head.appendChild(s);})();",
-            json_encode(url('live-edit/embed.js').'?v='.self::VERSION),
+            json_encode(url('live-edit/embed.js').'?v='.self::assetVersion()),
             implode(' ', array_map(
                 fn ($k, $v) => sprintf('s.dataset[%s]=%s;', json_encode($k), json_encode((string) $v)),
                 array_keys(array_filter($config, fn ($v) => $v !== null && $v !== '')),
@@ -110,23 +158,30 @@ class EmbedController
             return response('Not found', 404);
         }
 
-        $path = __DIR__.'/../../../../resources/js/'.$name;
+        $path = self::path($name);
 
         if (! is_file($path)) {
             return response('Not found', 404);
         }
+
+        // Only an address that names this exact build may be kept forever.
+        //
+        // The one-line install stamps the version, so that is the ordinary
+        // case. A customer who pasted the bare embed.js by hand has no stamp
+        // on it, and neither do the siblings it loads; caching those for a
+        // year would pin them to whatever they first downloaded, which is the
+        // fault this whole scheme exists to avoid. An unstamped address is not
+        // a version, so it is not treated as one.
+        $stamped = (string) request()->query('v') === self::assetVersion();
 
         return response()->file($path, [
             'Content-Type' => 'text/javascript; charset=utf-8',
             // A browser fetching a module from another origin will not run it
             // without this, and the failure reads as an ordinary script error.
             'Access-Control-Allow-Origin' => '*',
-            // Held for an hour rather than forever: this is the one thing a
-            // customer cannot re-deploy themselves, so a fix has to be able to
-            // reach them without anybody being asked to do anything.
-            // A year, safely: the version is in the URL, so a change is a
-            // different file rather than the same one arriving late.
-            'Cache-Control' => 'public, max-age=31536000, immutable',
+            'Cache-Control' => $stamped
+                ? 'public, max-age=31536000, immutable'
+                : 'public, max-age=300, must-revalidate',
         ]);
     }
 }
