@@ -25,6 +25,11 @@ class LiveEditServiceProvider extends ServiceProvider
         // editor expects on the window object.
         Blade::directive('liveEditPublishing', fn () => '<?php echo \\ShipFast\\LiveEdit\\Support\\EditorConfig::publishingScript(); ?>');
 
+        // The one line a Laravel application adds to become editable by a
+        // content service. Renders nothing when this application is its own
+        // store, so the same layout serves both ways of using the package.
+        Blade::directive('liveEdit', fn () => '<?php echo \\ShipFast\\LiveEdit\\Support\\CloudInstall::script(); ?>');
+
         $this->loadRoutesFrom(__DIR__.'/../routes/live-edit.php');
 
         // The API is off unless asked for: an install that does not need it

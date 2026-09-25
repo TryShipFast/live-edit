@@ -445,6 +445,47 @@ test('an item added to a list is on the page, and can be taken off again', async
     expect(await count(), 'the item could not be taken off again').toBe(before);
 });
 
+
+/* ------------------------- the editor is a guest here ------------------------ */
+
+test('the panel looks like itself, not like the site it is on', async ({ page, request }) => {
+    // A rule in the page that MATCHES the host element beats a :host rule —
+    // that is the cascade, not a bug — and almost every bought template ships
+    // a reset like "html, body, div, span, … { font: inherit }", which matches
+    // the div the shadow root is attached to. Every inheritable property then
+    // crossed the boundary, and the panel wore the site's typeface: Merriweather
+    // on one theme, something else on the next, none of them ours.
+    await asEditor(page, request);
+
+    const key = await page.evaluate(() => document.querySelector('[data-edit^="setting:"]')?.getAttribute('data-edit') ?? null);
+    expect(key).not.toBeNull();
+    await openDrawer(page, `[data-edit="${key}"]`);
+
+    const seen = await page.evaluate(() => {
+        const host = document.getElementById('live-edit-ui');
+        const drawer = host.shadowRoot.querySelector('.le-drawer');
+        const title = host.shadowRoot.querySelector('.le-title');
+
+        return {
+            page: getComputedStyle(document.body).fontFamily,
+            drawer: getComputedStyle(drawer).fontFamily,
+            title: getComputedStyle(title).fontFamily,
+            drawerSize: getComputedStyle(drawer).fontSize,
+        };
+    });
+
+    // Its own stack, whatever the site is using.
+    expect(seen.drawer).toContain('ui-sans-serif');
+    expect(seen.title).toContain('ui-sans-serif');
+    expect(seen.drawerSize).toBe('14px');
+
+    // And where the site uses something else, the two must not agree — which
+    // is the whole point, and is what silently stopped being true.
+    if (!seen.page.includes('ui-sans-serif')) {
+        expect(seen.drawer, 'the panel is wearing the site\'s typeface').not.toBe(seen.page);
+    }
+});
+
 /* ------------------------------ and the visitor ----------------------------- */
 
 test('a visitor is shown the published site and none of the editing', async ({ page, browser, request }) => {

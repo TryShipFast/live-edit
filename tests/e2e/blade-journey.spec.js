@@ -205,6 +205,39 @@ test('the client is told when a save does not reach the page', async ({ page }) 
         .toBeVisible({ timeout: 15000 });
 });
 
+
+test('the panel looks like itself, not like the site it is on', async ({ page }) => {
+    // A rule in the page that MATCHES the host element beats a :host rule, and
+    // a reset like "html, body, div, span, … { font: inherit }" matches the
+    // div the shadow root is attached to. Every inheritable property then
+    // crossed the boundary and the panel wore the site's typeface — a
+    // different one on every site, none of them ours. Checked on both hosts
+    // because the two use different fonts, which is exactly what made the
+    // difference visible in the first place.
+    await asEditor(page);
+
+    const key = await page.evaluate(() => document.querySelector('[data-edit^="setting:"]')?.getAttribute('data-edit') ?? null);
+    expect(key).not.toBeNull();
+    await openDrawer(page, `[data-edit="${key}"]`);
+
+    const seen = await page.evaluate(() => {
+        const host = document.getElementById('live-edit-ui');
+
+        return {
+            page: getComputedStyle(document.body).fontFamily,
+            drawer: getComputedStyle(host.shadowRoot.querySelector('.le-drawer')).fontFamily,
+            size: getComputedStyle(host.shadowRoot.querySelector('.le-drawer')).fontSize,
+        };
+    });
+
+    expect(seen.drawer).toContain('ui-sans-serif');
+    expect(seen.size).toBe('14px');
+
+    if (!seen.page.includes('ui-sans-serif')) {
+        expect(seen.drawer, 'the panel is wearing the site\'s typeface').not.toBe(seen.page);
+    }
+});
+
 test('a visitor is shown the site and none of the editing', async ({ browser }) => {
     const visitor = await (await browser.newContext()).newPage();
     await visitor.goto(SITE);

@@ -169,6 +169,23 @@ return [
     // WordPress plugin, a static build, a React front end. Off until it is
     // turned on, because an install that does not need it should not expose it.
     // ------------------------------------------------------------------
+    // ------------------------------------------------------------------
+    // Using a content service rather than this application's own database.
+    //
+    // Installing the package and being connected to a site are different
+    // things. Left empty, this application is its own store and @liveEdit
+    // renders nothing — which is the right answer for a bespoke site holding
+    // its content in its own tables. Filled in, the page talks to the service
+    // exactly as a folder of static HTML does.
+    //
+    // No key here on purpose: the per-site install script carries the site's
+    // current publishable key, so rotating one does not mean a deploy.
+    // ------------------------------------------------------------------
+    'cloud' => [
+        'host' => env('LIVE_EDIT_CLOUD_HOST'),
+        'site' => env('LIVE_EDIT_CLOUD_SITE'),
+    ],
+
     'api' => [
         'enabled' => env('LIVE_EDIT_API', false),
 

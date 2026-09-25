@@ -36,6 +36,29 @@ const CHROME_CSS = `
   font-size: 14px; line-height: 1.5; color: var(--le-body);
   -webkit-font-smoothing: antialiased;
 }
+/* The overlay's own typography, set on what it draws rather than on :host.
+ *
+ * A rule in the page that MATCHES the host element beats a :host rule — that
+ * is the cascade, not a bug — and almost every bought template ships a reset
+ * like "html, body, div, span, … { font: inherit }", which matches the div the
+ * shadow root is attached to. The host then inherits the site's typeface and
+ * every inheritable property crosses the boundary with it, so the panel wore
+ * Merriweather on one site and something else on the next.
+ *
+ * These children live in the shadow tree, where no rule in the page can reach
+ * them. Stated rather than reset, because the point is that the editor looks
+ * the same on every site it is a guest on. */
+:host > * {
+  font-family: ui-sans-serif, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+  font-size: 14px;
+  font-weight: 400;
+  font-style: normal;
+  line-height: 1.5;
+  letter-spacing: normal;
+  text-transform: none;
+  text-align: left;
+  color: var(--le-body);
+}
 button, input, select, textarea { font: inherit; color: inherit; margin: 0; }
 @media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
 
