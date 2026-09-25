@@ -651,6 +651,13 @@ const bootLiveEdit = () => {
             if (node.dataset.editImg !== undefined) editImage(node);
             else if (node.dataset.edit !== undefined) editText(node);
             else if (node.dataset.svgEdit !== undefined || node.dataset.editSvg !== undefined) editDrawing(node);
+            // A link with no words of its own — a social icon is the usual one
+            // — has data-edit-href and nothing else this list matched, so it
+            // fell through to the style branch. The crumb called it "Link",
+            // opened a panel with no address field in it, and the client had
+            // no way at all to put their Facebook page in. Naming a thing and
+            // then not offering it is worse than never offering it.
+            else if (node.dataset.editHref !== undefined) editLink(node);
             else if (node.dataset.style !== undefined) {
                 // A chip is how a section offers its styling, but plenty of
                 // styleable elements have none. Requiring one made them
@@ -667,7 +674,23 @@ const bootLiveEdit = () => {
             openNode(node);
         };
 
+        /**
+         * Where the drawer was before this, so "back" means something.
+         *
+         * The trail is built from the CURRENT element's ancestors, which is
+         * not the path anybody walked. Opening a section, jumping to a social
+         * link inside it and pressing the first crumb landed on the link's own
+         * card — the section was several steps further up and had been trimmed
+         * off the end of the trail. There was no way back to where you came
+         * from, and the panel you arrived at looked like the one you left with
+         * things missing from it.
+         */
+        let cameFrom = null;
+
         const setTrail = (selfNode) => {
+            const from = cameFrom;
+            cameFrom = selfNode ?? null;
+
             const items = [];
             let node = selfNode?.parentElement;
             while (node && node !== document.body) {
@@ -689,6 +712,15 @@ const bootLiveEdit = () => {
                 trail.push({ node, label });
             });
             const shown = trail.slice(-3);
+
+            // The place you came from, kept at the front when the ancestry
+            // does not already lead back to it. Descending into a container's
+            // contents and climbing back out is the normal way around this
+            // drawer, and it has to be the same two steps in both directions.
+            if (from && from !== selfNode && document.contains(from)
+                && !shown.some((entry) => entry.node === from)) {
+                shown.unshift({ node: from, label: `← ${labelForNode(from)}` });
+            }
 
             drawerTrail.replaceChildren();
             drawerTrail.classList.toggle('is-visible', shown.length > 0);
@@ -1099,9 +1131,7 @@ const bootLiveEdit = () => {
             drawerTitle.textContent = element.dataset.editLabel ?? 'Link';
             drawerFields.replaceChildren();
             drawerDelete.classList.add('le-hidden');
-            appendLinkFields(element);
-            setTrail(element);
-            openDrawer();
+            finishPanel(element);
         };
 
         const editText = (element) => {
@@ -1189,16 +1219,7 @@ const bootLiveEdit = () => {
                 moveRow.append(moveLabel, moveButton('up', '\u2191 Move up'), moveButton('down', '\u2193 Move down'));
                 drawerFields.prepend(moveRow);
             }
-            if (element.dataset.editHref) {
-                appendLinkFields(element);
-            }
-            appendVisitLink(element);
-            if (element.dataset.style && element.dataset.styleProps) {
-                addStyleFields(element.dataset.style, element.dataset.styleProps.split(','), element);
-            }
-            appendListControls(element);
-            setTrail(element);
-            openDrawer();
+            finishPanel(element);
         };
 
         /**
@@ -1315,6 +1336,143 @@ const bootLiveEdit = () => {
             drawerFields.append(row);
         };
 
+        /**
+         * The rest of what this element offers, whatever brought us here.
+         *
+         * An element does not have ONE kind. A button is words and a
+         * destination; a social icon is a drawing and a destination; a card is
+         * a background, a style, and a row in a list. The drawer used to
+         * decide what to show by running down a priority list — image, else
+         * text, else drawing, else link, else style — and each branch then
+         * built its own ending by hand. Seven endings, no two alike.
+         *
+         * Everything reported while this was being driven on a real template
+         * came out of that one decision: a link that opened as a style box and
+         * so had no address field, a group that opened with nothing in it at
+         * all, a button whose link or whose words went missing depending on
+         * which attribute won the race.
+         *
+         * So the priority list now chooses only ONE thing — which aspect the
+         * panel is titled after and which a save writes — and every panel ends
+         * here, where each remaining aspect is offered if the element has it.
+         * Adding an aspect later means adding it once.
+         */
+        const finishPanel = (element, { styleKey = null, styleOn = element } = {}) => {
+            if (element.dataset.editHref !== undefined) {
+                appendLinkFields(element);
+            }
+
+            appendVisitLink(element);
+
+            const key = styleKey ?? styleOn.dataset.styleEdit ?? styleOn.dataset.style;
+            const props = declaredStyleProps(styleOn.dataset.styleProps, window.liveEditStyleProps);
+
+            if (key && props.length) {
+                addStyleFields(key, props, styleOn);
+            }
+
+            appendContents(element);
+            appendListControls(element);
+            setTrail(element.dataset.styleEdit ? (element.closest('[data-style]') ?? element.parentElement) : element);
+            openDrawer();
+        };
+
+        /**
+         * What to call one thing in that list.
+         *
+         * The words on the page beat any label we could invent — a client
+         * looks for "Book a lesson", not for "Link". A social icon has no
+         * words at all, though, and four rows reading "Link" are no more
+         * useful than the empty panel they replaced, so the page is asked what
+         * it calls the thing: the name it gives a screen reader, then the
+         * brand in its own icon class.
+         */
+        const nameInside = (node) => {
+            const words = (ownTextOf(node) || node.textContent || '').replace(/\s+/g, ' ').trim();
+
+            if (words) {
+                return words.slice(0, 28);
+            }
+
+            const spoken = (node.getAttribute('aria-label') ?? node.getAttribute('title') ?? '').trim();
+
+            if (spoken) {
+                return spoken.slice(0, 28);
+            }
+
+            // "elementor-social-icon-facebook" / "fab fa-instagram" — the last
+            // word of an icon class is the only name these ever carry.
+            const brand = node.className.toString()
+                .match(/(?:social-icon-|fa-|bi-|icon-)([a-z][a-z0-9-]{2,})/i)?.[1]
+                ?? [...node.querySelectorAll('[class]')]
+                    .map((child) => child.className.toString().match(/(?:social-icon-|fa-|bi-|icon-)([a-z][a-z0-9-]{2,})/i)?.[1])
+                    .find(Boolean);
+
+            if (brand) {
+                return brand.charAt(0).toUpperCase() + brand.slice(1);
+            }
+
+            return labelForNode(node);
+        };
+
+        /**
+         * What a container holds, so naming it is never a dead end.
+         *
+         * Clicking a section or a group opens it as a styleable box, and
+         * plenty of them have nothing of their own to offer: the panel said
+         * "Group", then "Nothing on this element can be restyled", and beneath
+         * that a button to delete it. Everything a client actually wanted was
+         * inside, one or two elements down, with no way to get there but
+         * guessing where to click on the page.
+         *
+         * So the drawer lists them. Only the outermost editable things — the
+         * ones a client would recognise — and each jumps to its own panel. It
+         * adds nothing to the page and no affordance the design lacked; it
+         * names what the scanner already found.
+         */
+        const appendContents = (element) => {
+            const selector = '[data-edit], [data-edit-img], [data-edit-bg], [data-edit-href], [data-edit-icon], [data-edit-svg]';
+            const inside = [...element.querySelectorAll(selector)]
+                // Outermost only. A heading inside a card inside a group would
+                // otherwise be offered three times over.
+                .filter((node) => node.parentElement?.closest(selector) === null
+                    || !element.contains(node.parentElement.closest(selector)))
+                // Something a visitor cannot see is not something a client is
+                // looking for: a theme's screen-reader labels and its closed
+                // menus would otherwise crowd out the real content.
+                .filter((node) => node !== element && node.getBoundingClientRect().width > 0);
+
+            if (inside.length === 0) {
+                return;
+            }
+
+            // A row of social links is four things; cutting the list at
+            // twelve dropped YouTube and said nothing, which reads as "we
+            // could not find it" rather than "we did not show it".
+            const shown = inside.slice(0, 24);
+
+            const heading = document.createElement('div');
+            heading.className = 'le-section-heading';
+            heading.textContent = inside.length > shown.length
+                ? `Inside this — first ${shown.length} of ${inside.length}`
+                : 'Inside this';
+            drawerFields.append(heading);
+
+            const row = document.createElement('div');
+            row.className = 'le-row';
+
+            shown.forEach((node) => {
+                const button = document.createElement('button');
+                button.type = 'button';
+                button.className = 'le-chip-btn';
+                button.textContent = nameInside(node);
+                button.addEventListener('click', () => switchToNode(node));
+                row.append(button);
+            });
+
+            drawerFields.append(row);
+        };
+
         const editStyle = (element) => {
             current = { kind: 'style' };
             // A chip carries data-style-edit; a styleable element carries data-style.
@@ -1322,10 +1480,7 @@ const bootLiveEdit = () => {
             drawerTitle.textContent = element.dataset.editLabel ?? describeElement(element);
             drawerFields.replaceChildren();
             drawerDelete.classList.add('le-hidden');
-            addStyleFields(styleKey, declaredStyleProps(element.dataset.styleProps, window.liveEditStyleProps), element);
-            appendListControls(element);
-            setTrail(element.dataset.styleEdit ? (element.closest('[data-style]') ?? element.parentElement) : element);
-            openDrawer();
+            finishPanel(element, { styleKey });
         };
 
         /**
@@ -1453,8 +1608,7 @@ const bootLiveEdit = () => {
                 });
                 field.append(input, hint);
                 drawerFields.append(field);
-                setTrail(element);
-                openDrawer();
+                finishPanel(element);
 
                 return;
             }
@@ -1524,8 +1678,7 @@ const bootLiveEdit = () => {
             search.addEventListener('input', () => draw(search.value));
             draw('');
             drawerFields.append(search, grid, more);
-            setTrail(element);
-            openDrawer();
+            finishPanel(element);
         };
 
         /**
@@ -1611,8 +1764,7 @@ const bootLiveEdit = () => {
             heading.textContent = drawings.length ? 'Drawings on this site' : 'No other drawings here';
 
             drawerFields.append(heading, grid, pasteWrap);
-            setTrail(element);
-            openDrawer();
+            finishPanel(element);
         };
 
         const editImage = (element) => {
@@ -1716,8 +1868,7 @@ const bootLiveEdit = () => {
                 });
                 drawerFields.append(removeButton);
             }
-            setTrail(element);
-            openDrawer();
+            finishPanel(element);
         };
 
         // A floating pencil handle edits links without hijacking their click:
