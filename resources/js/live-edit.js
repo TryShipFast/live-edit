@@ -1,5 +1,5 @@
 import { createChrome } from './chrome.js';
-import { apiRequestFor, classListWith, declaredStyleProps, displayedValue, iconNamesIn, isJsonResponse, orderedIcons, ownTextOf, parseEditKey, requestInit } from './support.js';
+import { apiRequestFor, attributeOf, classListWith, declaredStyleProps, displayedValue, iconNamesIn, isJsonResponse, orderedIcons, ownTextOf, parseEditKey, requestInit } from './support.js';
 
 /**
  * Start only once the host page has finished loading.
@@ -1578,8 +1578,14 @@ const bootLiveEdit = () => {
 
             if (current.target.startsWith('setting:') && !isBackground) {
                 drawerFields.append(
-                    textInput('alt', 'Alt text', element.dataset.editAlt, 'Describes the image for search engines and screen readers.'),
-                    textInput('imgTitle', 'Title attribute', element.dataset.editTitle, 'Optional tooltip shown on hover.')
+                    // What the picture says right now, not what a host
+                    // happened to write into a data attribute. Only a page
+                    // rendered by Blade ever set those, so on every other kind
+                    // of site both fields opened empty — and an empty field is
+                    // sent on save, so opening the drawer to change the
+                    // picture silently wiped the description of it.
+                    textInput('alt', 'Alt text', attributeOf(element, 'alt', 'editAlt'), 'Describes the image for search engines and screen readers.'),
+                    textInput('imgTitle', 'Title attribute', attributeOf(element, 'title', 'editTitle'), 'Optional tooltip shown on hover.')
                 );
             }
 

@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+    attributeOf,
     classListWith,
     declaredStyleProps,
     displayedValue,
@@ -225,5 +226,38 @@ describe('declaredStyleProps', () => {
 
     it('copes with a site that configured none', () => {
         expect(declaredStyleProps('', undefined)).toEqual([]);
+    });
+});
+
+describe('what a field opens with', () => {
+    it('shows what the picture says now, not what a host wrote down', () => {
+        document.body.innerHTML = '<img alt="A beach at dawn" src="/a.jpg">';
+        const img = document.querySelector('img');
+
+        expect(attributeOf(img, 'alt', 'editAlt')).toBe('A beach at dawn');
+    });
+
+    it('treats a deliberately empty description as an answer', () => {
+        // alt="" means "skip me". Falling through to the host's bookkeeping
+        // here would put words back on an image somebody marked decorative.
+        document.body.innerHTML = '<img alt="" data-edit-alt="Old words" src="/a.jpg">';
+        const img = document.querySelector('img');
+
+        expect(attributeOf(img, 'alt', 'editAlt')).toBe('');
+    });
+
+    it('falls back to the host when the page says nothing', () => {
+        document.body.innerHTML = '<img data-edit-title="Tooltip" src="/a.jpg">';
+        const img = document.querySelector('img');
+
+        expect(attributeOf(img, 'title', 'editTitle')).toBe('Tooltip');
+    });
+
+    it('is empty when neither has anything, rather than undefined', () => {
+        // The value is sent on save. undefined would post the string
+        // "undefined" as somebody's alt text.
+        document.body.innerHTML = '<img src="/a.jpg">';
+
+        expect(attributeOf(document.querySelector('img'), 'alt', 'editAlt')).toBe('');
     });
 });

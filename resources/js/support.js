@@ -232,3 +232,21 @@ export const apiRequestFor = (url, options = {}, api) => {
         },
     };
 };
+
+/**
+ * What an element says for one of its attributes, preferring the page over a
+ * host's bookkeeping.
+ *
+ * A Blade host renders the stored value into a data attribute; nothing else
+ * does, so reading only that opened every field empty on every other kind of
+ * site — and an empty field is sent on save, which quietly wiped whatever was
+ * there. The attribute itself is what the picture actually says, including the
+ * empty string, which for alt is a real answer rather than a missing one.
+ */
+export const attributeOf = (element, attribute, datasetKey) => {
+    if (element.hasAttribute(attribute)) {
+        return element.getAttribute(attribute);
+    }
+
+    return element.dataset?.[datasetKey] ?? '';
+};
