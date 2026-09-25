@@ -18,6 +18,17 @@ use Symfony\Component\HttpFoundation\Response;
 class EmbedController
 {
     /**
+     * Bumped whenever the runtime changes.
+     *
+     * Stamped onto every asset URL so a new version is a new address, which is
+     * what lets the files be cached properly and still arrive the moment they
+     * change. Without it a fix waits out whatever cache a customer's browser
+     * happens to hold, and the only honest response was to cache for minutes
+     * and pay for it on every page view.
+     */
+    public const VERSION = '0.2.0';
+
+    /**
      * The files that may be asked for.
      *
      * An allow-list rather than a path: this endpoint takes a name from the
@@ -71,7 +82,7 @@ class EmbedController
 
         return $this->script(sprintf(
             "(function(){var s=document.createElement('script');s.src=%s;%s s.defer=true;document.head.appendChild(s);})();",
-            json_encode(url('live-edit/embed.js')),
+            json_encode(url('live-edit/embed.js').'?v='.self::VERSION),
             implode(' ', array_map(
                 fn ($k, $v) => sprintf('s.dataset[%s]=%s;', json_encode($k), json_encode((string) $v)),
                 array_keys(array_filter($config, fn ($v) => $v !== null && $v !== '')),
@@ -113,7 +124,9 @@ class EmbedController
             // Held for an hour rather than forever: this is the one thing a
             // customer cannot re-deploy themselves, so a fix has to be able to
             // reach them without anybody being asked to do anything.
-            'Cache-Control' => 'public, max-age=3600',
+            // A year, safely: the version is in the URL, so a change is a
+            // different file rather than the same one arriving late.
+            'Cache-Control' => 'public, max-age=31536000, immutable',
         ]);
     }
 }

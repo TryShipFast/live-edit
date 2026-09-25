@@ -25,6 +25,9 @@
     }
 
     var here = new URL(tag.src, window.location.href);
+    // Carried through to the files this loads, so one version of the runtime
+    // is one set of addresses.
+    var version = here.searchParams.get('v') || '';
     // Siblings live under assets/, so this works whether the tag points at
     // /live-edit/embed.js or at a CDN path ending the same way.
     var base = here.href.replace(/\/embed\.js.*$/, '/assets/');
@@ -56,7 +59,7 @@
     window.liveEditApi = { base: config.api, site: config.site, token: null };
 
     var load = function (file) {
-        return import(base + file);
+        return import(base + file + (version ? '?v=' + encodeURIComponent(version) : ''));
     };
 
     // A page nobody prepared has to be told what is editable before anything

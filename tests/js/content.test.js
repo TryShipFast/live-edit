@@ -356,3 +356,76 @@ describe('icons and backgrounds, which are not words', () => {
         expect(document.querySelector('section').getAttribute('data-background')).toBe('/new.jpg');
     });
 })
+
+describe('putting a list in the order somebody chose', () => {
+    const list = () => {
+        document.body.innerHTML =
+            '<ul data-edit-list="auto:l">' +
+            '<li data-edit-item="i0">Twitter</li>' +
+            '<li data-edit-item="i1">Facebook</li>' +
+            '<li data-edit-item="i2">Instagram</li>' +
+            '</ul>';
+        return document;
+    };
+
+    const order = (doc) => [...doc.querySelector('ul').children].map((c) => c.textContent);
+
+    it('reorders the items', () => {
+        const doc = list();
+
+        applyContent(doc, { 'auto:l': JSON.stringify(['i2', 'i0', 'i1']) });
+
+        expect(order(doc)).toEqual(['Instagram', 'Twitter', 'Facebook']);
+    });
+
+    it('leaves a list alone when nothing was published for it', () => {
+        const doc = list();
+
+        applyContent(doc, {});
+
+        expect(order(doc)).toEqual(['Twitter', 'Facebook', 'Instagram']);
+    });
+
+    it('drops an item that was removed in the editor', () => {
+        const doc = list();
+
+        applyContent(doc, { 'auto:l': JSON.stringify(['i0', 'i2']) });
+
+        expect(order(doc)).toEqual(['Twitter', 'Instagram']);
+    });
+
+    it('copies the first item for one that was added', () => {
+        // The page's markup only ever had the originals, so an item added in
+        // the editor has to come from somewhere.
+        const doc = list();
+
+        applyContent(doc, { 'auto:l': JSON.stringify(['i0', 'i1', 'i2', 'i3']) });
+
+        expect(order(doc)).toHaveLength(4);
+        expect(doc.querySelector('[data-edit-item="i3"]')).not.toBeNull();
+    });
+
+    it('ignores an order that is not a list of items', () => {
+        const doc = list();
+
+        applyContent(doc, { 'auto:l': 'not json at all' });
+
+        expect(order(doc)).toEqual(['Twitter', 'Facebook', 'Instagram']);
+    });
+
+    it('orders before filling in, so moved items keep their own words', () => {
+        document.body.innerHTML =
+            '<ul data-edit-list="auto:l">' +
+            '<li data-edit-item="i0" data-edit="setting:auto:a">One</li>' +
+            '<li data-edit-item="i1" data-edit="setting:auto:b">Two</li>' +
+            '</ul>';
+
+        applyContent(document, {
+            'auto:l': JSON.stringify(['i1', 'i0']),
+            'auto:a': 'First, moved second',
+            'auto:b': 'Second, moved first',
+        });
+
+        expect(order(document)).toEqual(['Second, moved first', 'First, moved second']);
+    });
+})

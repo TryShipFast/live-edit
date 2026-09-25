@@ -91,9 +91,82 @@ export const applyBackground = (element, url) => {
     element.setAttribute('style', `${style ? style.replace(/;?$/, ';') : ''}background-image:url('${url}')`);
 };
 
+/**
+ * Put a list back in the order somebody chose.
+ *
+ * The server does this first, before filling anything in, because an item
+ * moved or added changes what the content underneath has to land on. Same
+ * order here, for the same reason.
+ *
+ * An item named in the order but missing from the page is copied from the
+ * first one — that is how an item added in the editor appears on a page whose
+ * markup only ever had the originals.
+ */
+export const applyOrder = (root, settings) => {
+    let moved = 0;
+
+    for (const container of root.querySelectorAll('[data-edit-list]')) {
+        const key = container.getAttribute('data-edit-list');
+
+        if (!Object.hasOwn(settings, key)) {
+            continue;
+        }
+
+        let order;
+
+        try {
+            order = JSON.parse(settings[key]);
+        } catch {
+            continue;
+        }
+
+        if (!Array.isArray(order) || order.length === 0) {
+            continue;
+        }
+
+        const items = new Map();
+
+        for (const child of [...container.children]) {
+            if (child.hasAttribute('data-edit-item')) {
+                items.set(child.getAttribute('data-edit-item'), child);
+                container.removeChild(child);
+            }
+        }
+
+        if (items.size === 0) {
+            continue;
+        }
+
+        const template = items.values().next().value;
+
+        for (const id of order) {
+            const existing = items.get(String(id));
+
+            if (existing) {
+                container.appendChild(existing);
+                continue;
+            }
+
+            // Added in the editor: copy the first and give the copy its own
+            // identity, so editing it cannot disturb the original.
+            const clone = template.cloneNode(true);
+            clone.setAttribute('data-edit-item', String(id));
+            container.appendChild(clone);
+        }
+
+        moved++;
+    }
+
+    return moved;
+};
+
 /** @param {Record<string, string>} settings */
 export const applyContent = (root, settings) => {
     let applied = 0;
+
+    // Lists first: an item moved or added changes what everything below has
+    // to land on.
+    applyOrder(root, settings);
 
     for (const element of root.querySelectorAll('[data-edit]')) {
         const declared = element.getAttribute('data-edit') ?? '';

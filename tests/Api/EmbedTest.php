@@ -61,12 +61,13 @@ class EmbedTest extends TestCase
         }
     }
 
-    public function test_a_fix_can_reach_customers_without_them_doing_anything(): void
+    public function test_a_fix_reaches_customers_by_changing_address(): void
     {
-        // Held for an hour, not forever: this is the one file a customer
-        // cannot redeploy themselves.
-        $cache = $this->get('/live-edit/embed.js')->headers->get('Cache-Control');
+        // Cached hard, because a new version is a new URL. Caching the same
+        // address for a shorter time would mean paying for the request on
+        // every page view and still waiting out whatever the browser held.
+        $cache = $this->get('/live-edit/assets/content.js')->headers->get('Cache-Control');
 
-        $this->assertStringContainsString('max-age=3600', $cache);
+        $this->assertStringContainsString('immutable', $cache);
     }
 }
