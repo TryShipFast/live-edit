@@ -493,12 +493,27 @@ class MarkupScanner
         }
 
         $band = $this->bandFor($node);
-        $signature = strtolower($band?->tagName ?? 'shared').'/'.ContentSignature::of($node);
+
+        return $this->sharedKeys[$path] = 'shared:'.$this->signatureFor($node, strtolower($band?->tagName ?? 'shared'));
+    }
+
+    /**
+     * Name an element by what the theme put in it, numbered where that is not
+     * unique.
+     *
+     * Used wherever position is a bad name. The words themselves are safe to
+     * key on because a tagged document always holds the THEME's text: content
+     * is applied when a page is served, never written back, so a client can
+     * replace every word of an element and its signature does not move.
+     */
+    protected function signatureFor(DOMElement $node, string $scope): string
+    {
+        $signature = $scope.'/'.ContentSignature::of($node);
         // The same words can appear twice in one footer, so each repeat is
         // numbered in document order.
         $occurrence = $this->sharedSeen[$signature] = ($this->sharedSeen[$signature] ?? -1) + 1;
 
-        return $this->sharedKeys[$path] = 'shared:'.$signature.'#'.$occurrence;
+        return $signature.'#'.$occurrence;
     }
 
     /** Whether this element sits inside a list item, which keys its own way. */
@@ -580,7 +595,21 @@ class MarkupScanner
             return $scope.$region['token'].'/'.$this->structuralPath($node, $region['element']);
         }
 
-        return $scope.$this->structuralPath($node);
+        // Nothing distinctive anywhere above it — no id, no builder handle, no
+        // class of its own, not even a region. Naming it by its position in
+        // the whole document is what made a key move the moment anything above
+        // it changed, and on a page built entirely from anonymous divs that is
+        // most of the page.
+        //
+        // A list container is the costly case: every item is named partly by
+        // its list, so one list named by position takes all of its items' keys
+        // with it whenever the page is rearranged. Measured on a real builder
+        // page, inserting a single element at the top moved 82% of the visible
+        // keys, almost all of them inside lists.
+        //
+        // So name it by what the theme put in it, the way a repeated region is
+        // already named. That cannot move when something above it does.
+        return $scope.'sig:'.$this->signatureFor($node, 'anon');
     }
 
     /**
@@ -710,12 +739,25 @@ class MarkupScanner
                 continue;
             }
 
-            // A repeated region's list is named by its contents for the same
-            // reason its text is: the menu is the menu on every page, however
-            // the markup around it shifts.
+            // Named the way everything else is named, rather than by its
+            // position in the whole document.
+            //
+            // This was the costly line. Every item of a list carries its
+            // list's name in its own key, so a list named by a path from the
+            // body takes all of its items' content with it whenever anything
+            // above it changes — and on a page built from anonymous divs,
+            // almost everything a client edits is inside one. Measured on a
+            // real builder page: inserting a single element at the top moved
+            // 82% of the visible keys, nearly all of them for this reason.
+            //
+            // keyPath already knows how to name a thing without measuring from
+            // the body: a landmark if there is one, the region it sits in, a
+            // class that appears once, and failing all of those, what the
+            // theme put inside it. A repeated region keeps its own rule — the
+            // menu is the menu on every page, however the markup shifts.
             $identity = $this->isShared($container)
                 ? 'shared-list:'.ContentSignature::ofSubtree($container)
-                : $this->structuralPath($container).'#list';
+                : $this->keyPath($container).'#list';
             $container->setAttribute('data-edit-list', 'auto:'.substr(hash('sha256', $identity), 0, 12));
 
             $index = 0;

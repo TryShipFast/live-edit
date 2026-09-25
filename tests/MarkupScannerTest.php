@@ -125,15 +125,35 @@ class MarkupScannerTest extends TestCase
         $this->assertSame($this->autoKeyOfHeading($before), $this->autoKeyOfHeading($after));
     }
 
-    public function test_a_class_shared_by_many_elements_is_not_an_anchor(): void
+    public function test_an_element_with_nothing_above_it_is_named_by_what_it_holds(): void
     {
-        // The honest boundary. A class on forty cards says nothing about which
-        // card this is, so it cannot stand in for a name — and an element with
-        // nothing distinctive above it is still identified by where it sits.
+        // A class on forty cards says nothing about which card this is, so it
+        // cannot stand in for a name. What is left is the element's own words —
+        // and naming it by those survives the page being rearranged, where
+        // naming it by position did not.
+        //
+        // Safe to key on because a tagged document always holds the THEME's
+        // text: content is applied when the page is served and never written
+        // back, so a client can replace every word and the name does not move.
         $before = '<div class="card"><h1>Welcome</h1></div><div class="card"><p>x</p></div>';
         $after = '<div class="promo"><p>New band</p></div>'.$before;
 
-        $this->assertNotSame($this->autoKeyOfHeading($before), $this->autoKeyOfHeading($after));
+        $this->assertSame($this->autoKeyOfHeading($before), $this->autoKeyOfHeading($after));
+    }
+
+    public function test_two_elements_that_are_alike_in_every_way_still_get_their_own_keys(): void
+    {
+        // Naming an element by its words raises an obvious question: what about
+        // two elements with the same words and nothing to tell them apart?
+        // They are numbered, so they keep separate content. Getting this wrong
+        // would be worse than a moved key — editing one would rewrite the other.
+        $html = '<div><h1>Welcome</h1></div><div><h1>Welcome</h1></div>';
+        $tagged = (new MarkupScanner)->apply($html, ['text'], true)['html'];
+
+        preg_match_all('/data-edit="setting:(auto:[a-f0-9]+)"/', $tagged, $matches);
+
+        $this->assertCount(2, $matches[1]);
+        $this->assertNotSame($matches[1][0], $matches[1][1], 'two identical headings share one key');
     }
 
     public function test_two_lists_do_not_share_keys_for_their_first_items(): void
