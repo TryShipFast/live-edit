@@ -54,6 +54,15 @@ Route::prefix(config('live-edit.api.prefix', 'api/live-edit/v1').'/{site}')
             ThrottleApi::class.':write',
         ])->post('/content', [ContentController::class, 'update'])->name('live-edit.api.content.update');
 
+        // How a section looks. The same key and the same cost as a word: the
+        // reading half of this was always here, so only the write was missing
+        // and a static site could be edited in every way but this one.
+        Route::middleware([
+            ThrottleApi::class.':write',
+            AuthenticateApiToken::class.':write',
+            ThrottleApi::class.':write',
+        ])->post('/styles', [ContentController::class, 'style'])->name('live-edit.api.styles.update');
+
         // Uploading is counted separately and far more tightly than a text
         // save: it costs bandwidth, storage and CPU rather than a row.
         Route::middleware([

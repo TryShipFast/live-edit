@@ -11,6 +11,7 @@ use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use ShipFast\LiveEdit\Domain\Content\EditPolicy;
 use ShipFast\LiveEdit\Domain\Content\ImageStore;
+use ShipFast\LiveEdit\Domain\Content\StylePolicy;
 use ShipFast\LiveEdit\Models\EditRevision;
 use ShipFast\LiveEdit\Models\ElementStyle;
 use ShipFast\LiveEdit\Support\DraftStore;
@@ -277,28 +278,12 @@ class LiveEditController extends Controller
             'props.*' => ['nullable', 'string', 'max:2000'],
         ]);
 
-        $allowed = config('live-edit.style_props');
-        $props = [];
-
-        foreach (array_intersect_key($validated['props'], $allowed) as $prop => $value) {
-            if ($value === null || $value === '') {
-                continue;
-            }
-
-            $valid = match ($allowed[$prop]) {
-                'color' => (bool) preg_match('/^#[0-9A-Fa-f]{3,8}$/', $value),
-                'px' => ctype_digit($value) && (int) $value <= 400,
-                'toggle' => $value === '1',
-                // An image URL rendered into CSS url(): http(s) or a site-root
-                // path only, and no characters that could break out of url().
-                'url' => (bool) preg_match('#^(https?://|/)[^\s\'"()\\\\]+$#', $value),
-                default => false,
-            };
-
-            throw_unless($valid, ValidationException::withMessages(['props' => "Invalid value for {$prop}."]));
-
-            $props[$prop] = $value;
-        }
+        // The same object the HTTP API asks. These rules are not tidiness —
+        // a background is rendered into CSS url(), and a value carrying a
+        // quote closes it and continues as a stylesheet on every visitor's
+        // page — so a second write path with its own copy is a hole that
+        // would not look like one.
+        $props = app(StylePolicy::class)->clean($validated['props']);
 
         if (DraftStore::enabled()) {
             DraftStore::put('style', $validated['key'], ['props' => $props]);

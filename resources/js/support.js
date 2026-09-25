@@ -183,6 +183,7 @@ export const apiRequestFor = (url, options = {}, api) => {
     const base = String(api?.base ?? '').replace(/\/$/, '');
     const routes = {
         '/live-edit/setting': `${base}/${api?.site}/content`,
+        '/live-edit/style': `${base}/${api?.site}/styles`,
         '/live-edit/publish': `${base}/${api?.site}/publish`,
         '/live-edit/image': `${base}/${api?.site}/media`,
         '/live-edit/upload': `${base}/${api?.site}/media`,

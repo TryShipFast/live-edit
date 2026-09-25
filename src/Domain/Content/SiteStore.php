@@ -103,6 +103,39 @@ class SiteStore
     }
 
     /**
+     * Write how an element looks, held back as a draft when the site publishes
+     * deliberately.
+     *
+     * An empty set removes the style rather than storing nothing: "no
+     * background" has to be expressible, and a row of empty props would keep
+     * overriding the theme with nothing.
+     *
+     * @param  array<string, string>  $props
+     */
+    public function putStyle(string $key, array $props, bool $hold): void
+    {
+        if ($hold) {
+            Draft::query()->updateOrCreate(
+                ['site_id' => $this->site->id, 'kind' => 'style', 'subject' => $key],
+                ['payload' => ['props' => $props]]
+            );
+
+            return;
+        }
+
+        if ($props === []) {
+            $this->styles()->where('key', $key)->delete();
+
+            return;
+        }
+
+        SiteStyle::query()->updateOrCreate(
+            ['site_id' => $this->site->id, 'key' => $key],
+            ['props' => $props]
+        );
+    }
+
+    /**
      * Put held changes live and record the state as a version.
      *
      * @return array{published: int, version: int}

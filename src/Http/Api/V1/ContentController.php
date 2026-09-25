@@ -6,6 +6,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\ValidationException;
 use ShipFast\LiveEdit\Application\Api\ApplyEdit;
+use ShipFast\LiveEdit\Application\Api\ApplyStyle;
 use ShipFast\LiveEdit\Application\Api\ExportMarkup;
 use ShipFast\LiveEdit\Application\Api\PublishSite;
 use ShipFast\LiveEdit\Application\Api\ReadPublishedContent;
@@ -79,6 +80,36 @@ class ContentController
             'Cache-Control' => "public, max-age={$seconds}, s-maxage={$seconds}",
             'X-Live-Edit-Version' => (string) ($payload['version'] ?? 0),
         ]);
+    }
+
+    public function style(Request $request, ApplyStyle $apply): JsonResponse
+    {
+        $validated = $request->validate([
+            'key' => ['required', 'string', 'max:120'],
+            'props' => ['present', 'array'],
+            'props.*' => ['nullable', 'string', 'max:2000'],
+        ]);
+
+        try {
+            $result = $apply(
+                ApiContext::site($request),
+                ApiContext::token($request),
+                $validated['key'],
+                $validated['props'],
+            );
+        } catch (ValidationException $e) {
+            return response()->json([
+                'error' => [
+                    'type' => 'invalid_request_error',
+                    'message' => collect($e->errors())->flatten()->first(),
+                    'errors' => $e->errors(),
+                ],
+            ], 422);
+        } catch (OverLimit $e) {
+            return self::overLimit($e);
+        }
+
+        return response()->json($result)->withHeaders(['Cache-Control' => 'no-store']);
     }
 
     public function update(Request $request, ApplyEdit $apply): JsonResponse
