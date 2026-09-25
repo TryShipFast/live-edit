@@ -90,3 +90,28 @@ export const requestLink = async ({ base, site }, email, win = window) => {
 
 /** The key for this page, from the address bar or from an earlier arrival. */
 export const currentSession = (win = window) => collectFromFragment(win) ?? stored(win);
+
+/**
+ * Which content a page should ask for, and with which key.
+ *
+ * An editor must be shown their own unpublished work. Reading with the
+ * publishable key hands the person who just saved the same page every visitor
+ * gets — their words replaced by the published ones, with nothing to say why.
+ * It is the same fault that was fixed in the WordPress plugin, one layer up.
+ *
+ * It also settles when to publish: a snapshot holds published content only, so
+ * somebody editing has to come through the API, whose answers for a
+ * write-capable key are never cached. A visitor keeps the files.
+ */
+export const contentConfigFor = (config, token) => {
+    const base = { base: config.api, site: config.site, locale: config.locale ?? null };
+
+    if (token) {
+        // No snapshot: it cannot contain work that has not been published, and
+        // a cached answer would show stale words to the one person who knows
+        // they are stale.
+        return { ...base, key: token, snapshot: null };
+    }
+
+    return { ...base, key: config.key, snapshot: config.snapshot ?? null };
+};

@@ -46,56 +46,46 @@
         return;
     }
 
-    window.liveEditContent = {
-        // The files first, and the application only if a site has not
-        // published yet. A busy site should never reach the application.
-        snapshot: config.snapshot,
-        base: config.api,
-        site: config.site,
-        key: config.key,
-        locale: config.locale,
-    };
-
     window.liveEditApi = { base: config.api, site: config.site, token: null };
 
     var load = function (file) {
         return import(base + file + (version ? '?v=' + encodeURIComponent(version) : ''));
     };
 
-    // A page nobody prepared has to be told what is editable before anything
-    // can be put into it, so that comes first — and only for such a page.
-    var ready = document.querySelector('[data-edit], [data-edit-img]')
-        ? Promise.resolve()
-        : load('autotag.js')
-            .then(function (m) { return m.autoTag({ base: config.api, site: config.site, key: config.key }); })
-            .catch(function (error) {
-                console.warn('[live-edit] could not tag this page:', error.message);
-            });
-
-    // Words next. A visitor waits for nothing else.
-    ready.then(function () { return load('content.js'); });
-
+    // Whoever is here decides what the page should ask for: an editor sees
+    // their own unpublished work, a visitor sees the published files.
     load('session.js').then(function (session) {
         var token = session.currentSession(window);
 
-        // Someone who has just followed a link from their inbox, or who was
-        // already editing in this tab. Anyone else gets no editor at all.
-        var wants = token || /[?&]edit(=1)?(&|$)/.test(window.location.search);
-
-        if (!wants) {
-            return;
-        }
+        window.liveEditContent = session.contentConfigFor(config, token);
 
         if (token) {
             window.liveEditApi.token = token;
+            document.body.setAttribute('data-admin', '');
         }
 
-        document.body.setAttribute('data-admin', '');
+        // A page nobody prepared has to be told what is editable before
+        // anything can be put into it, so that comes first — and only for
+        // such a page.
+        var ready = document.querySelector('[data-edit], [data-edit-img]')
+            ? Promise.resolve()
+            : load('autotag.js')
+                .then(function (m) { return m.autoTag({ base: config.api, site: config.site, key: token || config.key }); })
+                .catch(function (error) {
+                    console.warn('[live-edit] could not tag this page:', error.message);
+                });
 
-        return load('live-edit.js');
+        return ready
+            .then(function () { return load('content.js'); })
+            .then(function () {
+                // The editor itself, only for somebody who is actually
+                // editing, which is almost nobody.
+                if (token || /[?&]edit(=1)?(&|$)/.test(window.location.search)) {
+                    return load('live-edit.js');
+                }
+            });
     }).catch(function (error) {
-        // The page is the point; the editor is not. A visitor must never see
-        // a broken site because an editor failed to load.
+        // The page is the point; the editor is not.
         console.warn('[live-edit] editor unavailable:', error.message);
     });
 })();

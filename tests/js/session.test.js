@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { collectFromFragment, currentSession, forget, requestLink, store, stored } from '../../resources/js/session.js';
+import { collectFromFragment, contentConfigFor, currentSession, forget, requestLink, store, stored } from '../../resources/js/session.js';
 
 const fakeWindow = (hash = '') => {
     const store = new Map();
@@ -91,3 +91,48 @@ describe('picking up an edit session', () => {
         });
     });
 });
+
+describe('deciding what a page should ask for', () => {
+    const config = {
+        api: 'https://cms.test/api/v1',
+        site: 'acme',
+        key: 'kbp_public',
+        snapshot: 'https://cdn.test/sites/acme',
+    };
+
+    it('a visitor reads the published files', () => {
+        const chosen = contentConfigFor(config, null);
+
+        expect(chosen.snapshot).toBe('https://cdn.test/sites/acme');
+        expect(chosen.key).toBe('kbp_public');
+    });
+
+    it('an editor reads with their own key, so they see their own drafts', () => {
+        // Reading with the publishable key hands the person who just saved the
+        // same page every visitor gets — their words replaced by the published
+        // ones, with nothing to say why.
+        const chosen = contentConfigFor(config, 'kbe_session');
+
+        expect(chosen.key).toBe('kbe_session');
+    });
+
+    it('an editor does not read the files', () => {
+        // A snapshot holds published content only, and a cached answer would
+        // show stale words to the one person who knows they are stale.
+        expect(contentConfigFor(config, 'kbe_session').snapshot).toBeNull();
+    });
+
+    it('carries the locale either way', () => {
+        const withLocale = { ...config, locale: 'fr' };
+
+        expect(contentConfigFor(withLocale, null).locale).toBe('fr');
+        expect(contentConfigFor(withLocale, 'kbe_x').locale).toBe('fr');
+    });
+
+    it('works for a site with no files published yet', () => {
+        const chosen = contentConfigFor({ ...config, snapshot: undefined }, null);
+
+        expect(chosen.snapshot).toBeNull();
+        expect(chosen.base).toBe('https://cms.test/api/v1');
+    });
+})
