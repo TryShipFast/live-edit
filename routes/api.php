@@ -155,6 +155,21 @@ Route::get('/live-edit/sign-in/{token}', [SignInController::class, 'redeem'])
  * line into their site is the whole point of it being here rather than in
  * their repository.
  */
+/*
+ * The version lives in the PATH, not in a query string.
+ *
+ * A module's static imports resolve against its own URL and do not inherit its
+ * query, so "live-edit.js?v=2" fetching "./support.js" asked for an unversioned
+ * address. Only the files boot.js loaded by name were versioned at all, and the
+ * rest could come from cache — a new editor running beside an old helper, which
+ * is the one failure worse than a stale build. A directory in the path is
+ * inherited for free.
+ */
+Route::get('/live-edit/assets/{version}/{file}', fn (string $version, string $file) => app(EmbedController::class)($file))
+    ->where('version', '[A-Za-z0-9._-]+')
+    ->where('file', '[a-z-]+\.js')
+    ->name('live-edit.assets.versioned');
+
 Route::get('/live-edit/assets/{file}', EmbedController::class)
     ->where('file', '[a-z-]+\.js')
     ->name('live-edit.assets');

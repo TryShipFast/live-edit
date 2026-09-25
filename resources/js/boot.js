@@ -30,7 +30,13 @@
     var version = here.searchParams.get('v') || '';
     // Siblings live under assets/, so this works whether the tag points at
     // /live-edit/embed.js or at a CDN path ending the same way.
-    var base = here.href.replace(/\/embed\.js.*$/, '/assets/');
+    //
+    // The version goes in the PATH. A module's static imports resolve against
+    // its own URL and do not inherit its query string, so a version carried as
+    // "?v=" reached only the files named here — their imports were fetched
+    // from an unversioned address and could come from cache, giving a new
+    // editor beside an old helper. A directory is inherited for free.
+    var base = here.href.replace(/\/embed\.js.*$/, '/assets/') + (version ? encodeURIComponent(version) + '/' : '');
 
     var config = {
         site: tag.dataset.site,
@@ -49,7 +55,7 @@
     window.liveEditApi = { base: config.api, site: config.site, token: null };
 
     var load = function (file) {
-        return import(base + file + (version ? '?v=' + encodeURIComponent(version) : ''));
+        return import(base + file);
     };
 
     // Whoever is here decides what the page should ask for: an editor sees

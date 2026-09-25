@@ -485,18 +485,35 @@ const start = async () => {
         return;
     }
 
+    let applied = null;
+    let failed = null;
+
     try {
         const payload = await resolve(config);
 
         if (payload) {
-            applyContent(document, payload.settings ?? {});
+            applied = applyContent(document, payload.settings ?? {});
             applyStyles(document, payload.styles ?? {});
         }
     } catch (error) {
+        failed = error;
         // The words already in the file are perfectly good. A page must never
         // break because a content service is briefly unreachable.
         console.warn('[live-edit] serving the words already in the page:', error.message);
     }
+
+    // Say when the page has finished becoming itself.
+    //
+    // Anything that needs to look at the finished page — the editor checking
+    // that a change actually arrived — otherwise has to guess how long to
+    // wait, and would read the page mid-flight. The flag is for whoever
+    // attaches after this has already run.
+    announce({ applied, failed: failed ? failed.message : null });
+};
+
+const announce = (detail) => {
+    window.liveEditContentDone = detail;
+    document.dispatchEvent(new CustomEvent('live-edit:content', { detail }));
 };
 
 /**

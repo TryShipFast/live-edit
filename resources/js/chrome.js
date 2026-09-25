@@ -513,11 +513,13 @@ export function createChrome() {
 
     shadow.append(toolbar, drawer, linkHandle, bgHandle, hoverBox);
 
-    const toast = (message) => {
+    // "Saved" can go by in a second; "this didn't take effect" is a sentence
+    // somebody has to finish reading before it disappears.
+    const toast = (message, hold = 1800) => {
         const node = el('div', 'le-toast', message);
         shadow.append(node);
-        setTimeout(() => (node.style.opacity = '0'), 1800);
-        setTimeout(() => node.remove(), 2400);
+        setTimeout(() => (node.style.opacity = '0'), hold);
+        setTimeout(() => node.remove(), hold + 600);
     };
 
     return {

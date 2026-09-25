@@ -40,6 +40,8 @@ class EmbedController
         'live-edit.js' => 'live-edit.js',
         'chrome.js' => 'chrome.js',
         'support.js' => 'support.js',
+        'svg.js' => 'svg.js',
+        'verify.js' => 'verify.js',
     ];
 
     /**
@@ -83,9 +85,21 @@ class EmbedController
         return substr(hash_final($hash), 0, 12);
     }
 
+    /**
+     * Over everything in the runtime directory, not over the served list.
+     *
+     * The two are nearly the same and the difference is the trap: a module
+     * that exists but is not yet listed still changes how the editor behaves,
+     * and a version that ignored it would hand browsers a stale build under a
+     * name that claimed to be current. Reading the directory means adding a
+     * file is enough.
+     */
     private static function fingerprint(): string
     {
-        return self::fingerprintOf(array_map(self::path(...), self::FILES));
+        $files = glob(self::path('*.js')) ?: [];
+        sort($files);
+
+        return self::fingerprintOf($files);
     }
 
     private static function path(string $name): string
@@ -172,7 +186,10 @@ class EmbedController
         // year would pin them to whatever they first downloaded, which is the
         // fault this whole scheme exists to avoid. An unstamped address is not
         // a version, so it is not treated as one.
-        $stamped = (string) request()->query('v') === self::assetVersion();
+        // A version in the path is what the siblings inherit; the query form
+        // is kept working for anything already deployed with it.
+        $stamped = request()->route('version') === self::assetVersion()
+            || (string) request()->query('v') === self::assetVersion();
 
         return response()->file($path, [
             'Content-Type' => 'text/javascript; charset=utf-8',

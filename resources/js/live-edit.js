@@ -1,4 +1,5 @@
 import { createChrome } from './chrome.js';
+import { confirm as confirmChange, expectChange, takeExpected } from './verify.js';
 import { apiRequestFor, attributeOf, classListWith, declaredStyleProps, displayedValue, iconNamesIn, isJsonResponse, orderedIcons, ownTextOf, parseEditKey, requestInit } from './support.js';
 
 /**
@@ -65,6 +66,51 @@ const bootLiveEdit = () => {
             sessionStorage.removeItem('tb_toast');
             ui.toast(toastMessage);
         }
+
+        /**
+         * Did the last change actually arrive?
+         *
+         * "Saved" has meant "the request returned 200", and every serious
+         * fault this editor has had lived in the gap between the two: the data
+         * really was stored, the page really did show the old version, and
+         * nothing anywhere said so. This is the editor looking.
+         *
+         * A page that fetches its words is not itself until that has finished,
+         * so this waits for the content applier to say it is done — and gives
+         * up waiting rather than holding the editor hostage to it.
+         */
+        const pageSettled = () => new Promise((resolve) => {
+            if (!window.liveEditContent || window.liveEditContentDone) {
+                // Server-rendered, or already finished before this attached.
+                resolve(window.liveEditContentDone ?? null);
+
+                return;
+            }
+
+            const done = (event) => resolve(event?.detail ?? null);
+            document.addEventListener('live-edit:content', done, { once: true });
+            setTimeout(() => resolve(null), 5000);
+        });
+
+        pageSettled().then((content) => {
+            const expected = takeExpected();
+
+            // The words on the page are whatever was already in the file: the
+            // change may be perfectly saved and simply not fetched. Saying so
+            // is the point — this is the case that used to pass in silence.
+            if (content?.failed) {
+                ui.toast('Saved, but this page could not load the latest content \u2014 it may be showing an older version. Reload to try again.', 9000);
+
+                return;
+            }
+
+            const result = expected ? confirmChange(document, expected) : null;
+
+            if (result && !result.ok) {
+                console.warn('[live-edit] the change was saved but the page still shows:', result.saw, '\n  expected:', result.wanted);
+                ui.toast('Saved \u2014 but this page is still showing the old version. Your change is stored; reload, and tell us if it stays this way.', 9000);
+            }
+        });
 
         const reloadWithToast = (message) => {
             sessionStorage.setItem('tb_toast', message);
@@ -871,6 +917,63 @@ const bootLiveEdit = () => {
             return response;
         };
 
+        /**
+         * What the page should show once this save has been applied.
+         *
+         * Only the kinds whose value is visible on the page and comparable
+         * without guessing. A record writes several fields at once, a style is
+         * a computed rule, rich text is markup — checking those would mean
+         * deciding what "the same" means, and a check that cries wolf is a
+         * check nobody reads.
+         */
+        const expectationFor = (subject, fields) => {
+            if (!subject?.element) {
+                return null;
+            }
+
+            const marker = (attribute) => {
+                const value = subject.element.getAttribute(attribute);
+
+                return value === null ? null : { attr: attribute, marker: value };
+            };
+
+            if (subject.kind === 'image') {
+                const url = fields.querySelector('input[type=url]')?.value.trim();
+                const file = fields.querySelector('input[type=file]')?.files?.[0];
+                const where = marker('data-edit-img') ?? marker('data-edit-bg');
+
+                // An upload is stored under a name the server chooses, so
+                // there is nothing here to compare it against yet.
+                return url && where ? { ...where, kind: 'image', value: url } : null;
+            }
+
+            if (subject.kind === 'icon') {
+                const where = marker('data-edit-icon');
+
+                return where && subject.value ? { ...where, kind: 'icon', value: subject.value } : null;
+            }
+
+            if (subject.kind === 'setting' && typeof subject.savedValue === 'string') {
+                const where = marker('data-edit');
+
+                // Markup, not words: comparing it to what the page renders
+                // would be comparing two different things.
+                if (!where || /<[a-z][\s\S]*>/i.test(subject.savedValue)) {
+                    return null;
+                }
+
+                // A counter renders from an attribute and its words are a
+                // placeholder the theme's own script rewrites.
+                if (subject.element.hasAttribute('data-edit-attr')) {
+                    return null;
+                }
+
+                return { ...where, kind: 'text', value: subject.savedValue };
+            }
+
+            return null;
+        };
+
         const save = async () => {
             if (!current) return;
             const saveButton = ui.saveButton;
@@ -956,6 +1059,7 @@ const bootLiveEdit = () => {
                         body: JSON.stringify({ key: current.styleKey, props: collectStyleProps() }),
                     });
                 }
+                expectChange(expectationFor(current, drawerFields));
                 settle('Saved \u2713', current.key ?? null, current.savedValue ?? null);
             } catch (error) {
                 restoreButton();

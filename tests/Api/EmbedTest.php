@@ -44,6 +44,29 @@ class EmbedTest extends TestCase
         }
     }
 
+    public function test_every_file_the_runtime_asks_for_can_be_served(): void
+    {
+        // The allow-list is a second place to remember, and forgetting it does
+        // not fail quietly in one module: a browser refuses the whole graph,
+        // so a missing sibling takes the editor and the content applier down
+        // with it and the page just shows its original words. Adding an import
+        // has to be enough.
+        $directory = __DIR__.'/../../resources/js';
+        $missing = [];
+
+        foreach (glob($directory.'/*.js') as $file) {
+            preg_match_all('#\bfrom\s+[\'"]\./([A-Za-z0-9_.-]+\.js)[\'"]#', (string) file_get_contents($file), $matches);
+
+            foreach ($matches[1] as $imported) {
+                if ($this->get('/live-edit/assets/'.$imported)->baseResponse->getStatusCode() !== 200) {
+                    $missing[] = basename($file).' imports '.$imported;
+                }
+            }
+        }
+
+        $this->assertSame([], $missing, 'the runtime imports files this endpoint will not serve');
+    }
+
     public function test_only_the_listed_files_are_served(): void
     {
         // This endpoint turns a URL into a file path, and anything doing that
@@ -101,15 +124,10 @@ class EmbedTest extends TestCase
         // scheme against itself. This is the one that does not: the address
         // customers are given has to be derived from the bytes of the files
         // this endpoint will actually hand them.
-        $directory = __DIR__.'/../../resources/js';
-        $paths = array_map(
-            fn ($name) => $directory.'/'.$name,
-            ['boot.js', 'content.js', 'session.js', 'autotag.js', 'live-edit.js', 'chrome.js', 'support.js']
-        );
+        $paths = glob(__DIR__.'/../../resources/js/*.js') ?: [];
+        sort($paths);
 
-        foreach ($paths as $path) {
-            $this->assertFileExists($path, 'the runtime this test fingerprints has moved');
-        }
+        $this->assertNotSame([], $paths, 'the runtime this test fingerprints has moved');
 
         $this->assertStringContainsString(
             EmbedController::fingerprintOf($paths),
@@ -143,9 +161,34 @@ class EmbedTest extends TestCase
         $this->assertNotSame($before, $after, 'changing one file left the set at its old address');
     }
 
+    public function test_a_module_and_the_ones_it_imports_come_from_one_build(): void
+    {
+        // A module's static imports resolve against its own URL and do not
+        // inherit its query string. While the version was carried as "?v=",
+        // only the files boot.js named were versioned — "./support.js" was
+        // fetched from an unversioned address and could come from cache,
+        // giving a new editor beside a helper that predated it. That is the
+        // one failure worse than a stale build, and it is what shipped.
+        $version = EmbedController::assetVersion();
+
+        $response = $this->get('/live-edit/assets/'.$version.'/live-edit.js');
+        $response->assertOk();
+        $this->assertStringContainsString('immutable', $response->headers->get('Cache-Control'));
+
+        // What the browser resolves "./support.js" to from there.
+        $sibling = $this->get('/live-edit/assets/'.$version.'/support.js');
+        $sibling->assertOk();
+        $this->assertStringContainsString('immutable', $sibling->headers->get('Cache-Control'));
+
+        // And the install line points at that directory, so the whole graph
+        // lands inside one build.
+        Site::query()->create(['slug' => 'acme', 'name' => 'Acme', 'allowed_origins' => []]);
+        $this->assertStringContainsString('?v='.$version, $this->get('/s/acme.js')->getContent());
+    }
+
     public function test_an_address_that_names_this_build_is_kept_and_one_that_does_not_is_checked(): void
     {
-        $stamped = $this->get('/live-edit/assets/content.js?v='.EmbedController::assetVersion());
+        $stamped = $this->get('/live-edit/assets/'.EmbedController::assetVersion().'/content.js');
         $this->assertStringContainsString('immutable', $stamped->headers->get('Cache-Control'));
 
         // A customer who pasted the bare script tag has no version on it, and
@@ -155,7 +198,7 @@ class EmbedTest extends TestCase
         $this->assertStringNotContainsString('immutable', $bare->headers->get('Cache-Control'));
 
         // A version from a previous release is not this build either.
-        $stale = $this->get('/live-edit/assets/content.js?v=0.1.0-abcdef123456');
+        $stale = $this->get('/live-edit/assets/0.1.0-abcdef123456/content.js');
         $this->assertStringNotContainsString('immutable', $stale->headers->get('Cache-Control'));
     }
 
