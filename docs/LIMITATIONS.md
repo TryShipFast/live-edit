@@ -83,16 +83,40 @@ sets its own text or swaps its own images wins.
 and says how many rewrites it saw, with examples. When it reports none, a saved
 edit will stick. There is no retry or re-application yet.
 
-## The WordPress plugin carries its own copy of the engine
+## ~~The WordPress plugin carries its own copy of the engine~~ — fixed
 
-**What happens.** The plugin ships the scanner source inside its zip, so a
-scanner improvement reaches a WordPress site only when the plugin is updated —
-unlike the editor runtime, which is fetched from the service and is current on
-every page view.
+The plugin used to ship the scanner inside its zip, so a scanner improvement
+reached a WordPress site only when somebody pressed update in wp-admin, while
+the editor runtime beside it was fetched from the service on every page view.
+One product at two speeds, and the slow half was the one deciding what a client
+could edit.
 
-**Where we stand.** Known and asymmetric. The runtime half was fixed; the
-scanner half still needs a plugin update. A test fails the build if any adapter
-reintroduces a bundled copy of the *runtime*.
+The plugin now posts the page its theme rendered to `POST /{site}/prepare` and
+serves what comes back — marked up, with the client's words already in it. It
+carries no engine and no dependencies: 1712 files became 8.
+
+Proven on the install by changing the scanner and reloading the site without
+touching the plugin. Two tests hold it: the download must contain no
+`vendor/shipfast/` and no `MarkupScanner.php`, and it must stay under sixty
+files.
+
+**What it costs.** A round trip on a cache miss, and a page render that depends
+on the service being reachable. The finished page is cached against the
+published version, so it is one call per page per publish, and an unreachable
+service returns the theme's own markup — the visitor loses the editor, not the
+website.
+
+## Every page render needs the service
+
+**What happens.** Falls out of the entry above, and out of content being ours
+to hold rather than theirs. On a cache miss the host asks us for the prepared
+page; if we are slow, their render is slow.
+
+**Where we stand.** Cached for six hours or until a publish, and the timeout is
+short enough that an outage degrades to the plain theme rather than a hang.
+Measured: a 271KB Elementor page prepares in 0.23s. Not yet load-tested, and
+there is no stale-while-revalidate — the first visitor after a publish pays the
+round trip.
 
 ## Content saved before element names were remembered
 

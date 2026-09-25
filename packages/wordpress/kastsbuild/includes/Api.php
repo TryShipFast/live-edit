@@ -101,6 +101,38 @@ class Api
     }
 
     /** @return array<string, mixed> */
+    /**
+     * The page this theme just rendered, handed back ready to be edited.
+     *
+     * Marked up and carrying the client's words, in one answer. This plugin
+     * used to do both halves itself out of a copy of the engine inside its own
+     * zip, which meant a scanner improvement reached a WordPress site only
+     * when somebody pressed update in wp-admin — while the editor runtime
+     * beside it was refreshed on every page view. One product moving at two
+     * speeds, with the slow half being the one that decides what is editable.
+     *
+     * An editor asks with their own session key, because only a write-capable
+     * key is given unpublished work back. Asking with the publishable key
+     * would hand the person who just saved the same page every visitor gets,
+     * with nothing to say why.
+     *
+     * Returns null rather than a page when the service cannot be reached, so
+     * the caller can serve the theme's own markup. Losing the editor for one
+     * page view is a small thing; losing the website is not.
+     */
+    public static function prepare(string $html, string $page, bool $editing): ?string
+    {
+        $key = $editing
+            ? (Session::forCurrentUser() ?? Settings::get('publishable_key'))
+            : Settings::get('publishable_key');
+
+        $body = self::post('/prepare', $key, ['html' => $html, 'page' => $page]);
+        $prepared = $body['html'] ?? null;
+
+        return is_string($prepared) && $prepared !== '' ? $prepared : null;
+    }
+
+    /** @return array<string, mixed> */
     public static function get(string $path, string $key): array
     {
         return self::request('GET', $path, $key);

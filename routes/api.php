@@ -45,6 +45,11 @@ Route::prefix(config('live-edit.api.prefix', 'api/live-edit/v1').'/{site}')
             // A page asking which of its own elements are editable. Costs a
             // full parse, so it is counted and throttled on its own.
             Route::post('/tag', [ContentController::class, 'tag'])->name('live-edit.api.tag');
+            // The same parse, but the host wants the finished page rather than
+            // a list of positions — a server that renders HTML and has no way
+            // to run the scanner itself. Costs a parse for the same reason, so
+            // it is metered and throttled alongside tagging.
+            Route::post('/prepare', [ContentController::class, 'prepare'])->name('live-edit.api.prepare');
         });
 
         // Writing: a session key, which only the customer's own server can mint.

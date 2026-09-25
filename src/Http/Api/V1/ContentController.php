@@ -8,6 +8,7 @@ use Illuminate\Validation\ValidationException;
 use ShipFast\LiveEdit\Application\Api\ApplyEdit;
 use ShipFast\LiveEdit\Application\Api\ApplyStyle;
 use ShipFast\LiveEdit\Application\Api\ExportMarkup;
+use ShipFast\LiveEdit\Application\Api\PrepareMarkup;
 use ShipFast\LiveEdit\Application\Api\PublishSite;
 use ShipFast\LiveEdit\Application\Api\ReadPublishedContent;
 use ShipFast\LiveEdit\Application\Api\TagMarkup;
@@ -237,6 +238,42 @@ class ContentController
             // The answer depends on markup the caller sent, so only they can
             // usefully keep it — and they do, against a hash of that markup.
             'Cache-Control' => 'private, max-age=600',
+        ]);
+    }
+
+    /**
+     * A page a server just rendered, handed back ready to be edited.
+     *
+     * For a host that cannot run the scanner itself. The WordPress plugin used
+     * to carry a copy of the engine to do this locally, which meant the half
+     * of the product that decides what is editable only moved when somebody
+     * pressed update in wp-admin, while the editor runtime beside it updated
+     * on every page view.
+     *
+     * One call rather than two: the host used to tag, then fetch content, then
+     * apply it. Whether unpublished work is included follows the token, the
+     * same way the content endpoint decides it.
+     */
+    public function prepare(Request $request, PrepareMarkup $prepare): JsonResponse
+    {
+        $validated = $request->validate([
+            'html' => ['required', 'string', 'max:'.PrepareMarkup::MAX_BYTES],
+            'page' => ['nullable', 'string', 'max:200'],
+        ]);
+
+        $site = ApiContext::site($request);
+        $editing = ApiContext::token($request)->can(Ability::Write);
+
+        $result = $prepare($site, $validated['html'], $validated['page'] ?? '', $editing);
+
+        Meter::record($site, Meter::TAG);
+
+        return response()->json($result)->withHeaders([
+            // One person's unfinished work must never be held anywhere. A
+            // visitor's copy depends on markup only the caller has, so only
+            // the caller can usefully keep it — and the plugin does, against
+            // the published version, so a publish drops every page at once.
+            'Cache-Control' => $editing ? 'no-store, private' : 'private, max-age=600',
         ]);
     }
 

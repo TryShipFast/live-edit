@@ -193,8 +193,13 @@ class BoundedToTheSiteTest extends TestCase
                 continue;
             }
 
-            // Tagging is a read of markup the caller already has.
-            if (str_contains($route['uri'], '/tag')) {
+            // Two POSTs that are reads. Both take markup the caller already
+            // has and hand it back — /tag as a list of positions, /prepare as
+            // the finished page — carrying only content the publishable key
+            // could fetch from /content anyway. They are POSTs because a whole
+            // document does not fit in a query string, not because they change
+            // anything.
+            if (str_ends_with($route['uri'], '/tag') || str_ends_with($route['uri'], '/prepare')) {
                 continue;
             }
 

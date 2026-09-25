@@ -2,20 +2,21 @@
 
 namespace KastsBuild;
 
-use ShipFast\LiveEdit\Mapper\MarkupScanner;
-
 /**
- * Tagging the rendered page and putting published words into it.
+ * Handing the theme's page to the service and serving back what it returns.
  *
- * The theme's markup is buffered and run through the same scanner every other
- * adapter uses, rather than a WordPress-shaped reimplementation. That is worth
- * insisting on: the tagging rules are the product, and a second copy of them
- * would drift, quietly, in a way nobody would notice until a client's edits
- * landed on the wrong element.
+ * The tagging rules are the product, so this plugin does not own a copy of
+ * them. It used to: the engine travelled inside the zip, which meant every
+ * WordPress site was running whichever scanner it happened to have installed,
+ * while the editor runtime beside it was fetched fresh on every page view. One
+ * product at two speeds, and the slow half was the one deciding what a client
+ * could edit. Now the page goes out and comes back ready, and improving the
+ * scanner reaches every site at once, WordPress included.
  *
- * Parsing a whole document is not free, so the finished page is cached against
- * the published version. A publish moves the version and every cached page
- * falls away on its own — no purging, and nothing to get wrong.
+ * Parsing a whole document is not free and now costs a round trip as well, so
+ * the finished page is cached against the published version. A publish moves
+ * the version and every cached page falls away on its own — no purging, and
+ * nothing to get wrong.
  */
 class Frontend
 {
@@ -54,25 +55,28 @@ class Frontend
             }
         }
 
-        $scanner = new MarkupScanner;
+        // The service prepares the page: it marks up what is editable and
+        // puts the client's words in, in one answer.
+        //
+        // This plugin used to do both itself, from a copy of the engine inside
+        // its own zip. The editor runtime beside it is fetched from the
+        // service on every page view, so the half of the product that draws
+        // the drawer was never more than a page load old while the half that
+        // decides what is editable was frozen until somebody pressed update in
+        // wp-admin. A scanner fix would reach a WordPress site weeks after
+        // every other kind of site already had it — if the customer ever
+        // updated at all.
+        $prepared = Api::prepare($html, self::pagePath(), $editing);
 
-        // auto: true — keys are derived from the content itself, so nothing
-        // has to be declared for a theme this plugin has never seen.
-        $result = $scanner->apply($html, ['text', 'image', 'link', 'icon'], true);
-        $tagged = is_array($result) ? ($result['html'] ?? $html) : $html;
-
-        $content = Api::content($editing);
-
-        if ($content !== []) {
-            // Bare keys. The attribute is written as "setting:auto:abc" but
-            // the lookup happens after that prefix is stripped, and adding it
-            // here would mean nothing ever matched — the page would tag
-            // correctly and then show the theme's original words forever.
-            $tagged = $scanner->applyOverrides($tagged, $content);
+        if ($prepared === null) {
+            // The page is the point; the editor is not. A service that cannot
+            // be reached costs this visitor the editor, not the website.
+            return $html;
         }
 
+        $tagged = $prepared;
+
         if ($editing) {
-            $tagged = self::untagAdminBar($tagged);
             $tagged = self::markBodyForEditing($tagged);
         } else {
             set_transient(self::cacheKey(), $tagged, HOUR_IN_SECONDS * 6);
@@ -81,46 +85,12 @@ class Frontend
         return $tagged;
     }
 
-    /**
-     * WordPress's own toolbar is not this site's content.
-     *
-     * It is only in the page for signed-in users, which is exactly who is
-     * editing — so left alone it is the majority of what the editor offers.
-     * Someone would be invited to reword "Howdy", change it, and find nothing
-     * had happened to their website, because no visitor ever sees that markup.
-     *
-     * Only done while editing: a visitor's page has no toolbar in it, so there
-     * is nothing to strip and no reason to parse the document again.
-     */
-    private static function untagAdminBar(string $html): string
+    /** Which page this is, so keys scoped to a page stay on it. */
+    private static function pagePath(): string
     {
-        if (stripos($html, 'id="wpadminbar"') === false) {
-            return $html;
-        }
+        $path = parse_url((string) ($_SERVER['REQUEST_URI'] ?? '/'), PHP_URL_PATH);
 
-        $doc = new \DOMDocument;
-        libxml_use_internal_errors(true);
-        $doc->loadHTML('<?xml encoding="UTF-8">'.$html, LIBXML_NOWARNING | LIBXML_NOERROR);
-        libxml_clear_errors();
-
-        $xpath = new \DOMXPath($doc);
-        $nodes = $xpath->query('//*[@id="wpadminbar"]//*[@*[starts-with(name(), "data-edit")]] | //*[@id="wpadminbar"]');
-
-        foreach ($nodes as $node) {
-            if (! $node instanceof \DOMElement) {
-                continue;
-            }
-
-            foreach (iterator_to_array($node->attributes) as $attribute) {
-                if (str_starts_with($attribute->name, 'data-edit')) {
-                    $node->removeAttribute($attribute->name);
-                }
-            }
-        }
-
-        $out = $doc->saveHTML();
-
-        return is_string($out) ? $out : $html;
+        return is_string($path) ? substr($path, 0, 200) : '/';
     }
 
     /** The attribute the editor looks for before it will start. */

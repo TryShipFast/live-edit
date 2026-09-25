@@ -25,17 +25,23 @@ if (! defined('ABSPATH')) {
 define('KASTSBUILD_PATH', plugin_dir_path(__FILE__));
 define('KASTSBUILD_URL', plugin_dir_url(__FILE__));
 
-$autoload = KASTSBUILD_PATH.'vendor/autoload.php';
-
-if (! is_file($autoload)) {
-    add_action('admin_notices', function () {
-        echo '<div class="notice notice-error"><p><strong>KastsBuild:</strong> dependencies are missing. Run <code>composer install</code> in the plugin directory.</p></div>';
-    });
-
-    return;
+/*
+ * This plugin has no dependencies, and that is the point.
+ *
+ * It used to carry the whole engine — seventeen hundred files — because it did
+ * the marking up itself. That copy was frozen at whatever version happened to
+ * be installed, while the editor runtime beside it was fetched from the
+ * service on every page view. The scanner now stays on the service too, so
+ * what is left here is a few files of WordPress plumbing: buffer the page,
+ * send it, serve what comes back.
+ *
+ * The autoload file is still loaded if one is present, so an installation that
+ * has one from an earlier version keeps working, but nothing requires it and a
+ * missing one is no longer a reason to refuse to start.
+ */
+if (is_file(KASTSBUILD_PATH.'vendor/autoload.php')) {
+    require KASTSBUILD_PATH.'vendor/autoload.php';
 }
-
-require $autoload;
 
 require KASTSBUILD_PATH.'includes/Settings.php';
 require KASTSBUILD_PATH.'includes/Api.php';
