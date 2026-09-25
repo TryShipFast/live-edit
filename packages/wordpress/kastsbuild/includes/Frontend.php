@@ -145,10 +145,23 @@ class Frontend
             return;
         }
 
+        $runtime = self::runtimeUrl();
+
+        if ($runtime === null) {
+            return;
+        }
+
         // A module, because the editor is one — it imports its own chrome and
         // helpers — and modules are deferred, so this cannot block the page
         // the visitor came for.
-        wp_enqueue_script('kastsbuild-editor', KASTSBUILD_URL.'assets/live-edit.js', [], '0.1.0', true);
+        //
+        // Loaded from the service rather than from this plugin. It used to be
+        // three files copied into assets/ by hand, which is a version nobody
+        // can update: they fell eight kilobytes and several fixes behind
+        // without anyone noticing, so a WordPress site was running a broken
+        // image editor and a save that never checked itself while every other
+        // kind of site had both. A copy is the bug.
+        wp_enqueue_script('kastsbuild-editor', $runtime, [], null, true);
 
         // The tag has to say so. wp_script_add_data('type', 'module') does not
         // do it: the script is emitted as an ordinary one, the browser reaches
@@ -180,6 +193,57 @@ class Frontend
                 'previewUrl' => null,
             ])
         ), 'before');
+    }
+
+    /**
+     * Where the current editor lives, asked of the service and remembered for
+     * an hour.
+     *
+     * The address carries the version, so the browser may keep the files for
+     * a year and still get a fix the moment one ships — that is the whole
+     * point of asking rather than guessing. An hour is short enough that a
+     * release reaches editors the same morning and long enough that this is
+     * not a request per page view.
+     *
+     * Returns null when the service cannot be reached, and the editor simply
+     * does not appear. There is nothing useful it could do anyway: the content
+     * it edits lives there too.
+     */
+    private static function runtimeUrl(): ?string
+    {
+        $cached = get_transient('kastsbuild_runtime_url');
+
+        if (is_string($cached) && $cached !== '') {
+            return $cached;
+        }
+
+        $base = rtrim((string) Settings::get('api_base'), '/');
+
+        if ($base === '') {
+            return null;
+        }
+
+        // The runtime is served from the host, beside the API rather than
+        // inside it.
+        $host = preg_replace('#/api/live-edit/v\d+$#', '', $base);
+
+        $response = wp_remote_get($host.'/live-edit/runtime.json', ['timeout' => 5]);
+
+        if (is_wp_error($response) || wp_remote_retrieve_response_code($response) !== 200) {
+            return null;
+        }
+
+        $body = json_decode((string) wp_remote_retrieve_body($response), true);
+        $assets = is_array($body) ? ($body['assets'] ?? null) : null;
+
+        if (! is_string($assets) || $assets === '') {
+            return null;
+        }
+
+        $url = $assets.'/live-edit.js';
+        set_transient('kastsbuild_runtime_url', $url, HOUR_IN_SECONDS);
+
+        return $url;
     }
 
     /**

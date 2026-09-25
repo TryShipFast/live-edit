@@ -67,6 +67,51 @@ class EmbedTest extends TestCase
         $this->assertSame([], $missing, 'the runtime imports files this endpoint will not serve');
     }
 
+    public function test_a_host_can_ask_which_build_of_the_editor_is_current(): void
+    {
+        // A host that renders its own content and wants only the overlay — the
+        // WordPress plugin — needs the versioned address, and the version is
+        // the bytes of the runtime rather than a number anybody publishes.
+        // Asking is how such a host stops carrying its own copy.
+        $answer = $this->getJson('/live-edit/runtime.json')->assertOk();
+
+        $this->assertSame(EmbedController::assetVersion(), $answer->json('version'));
+
+        // And the address it gives out has to actually serve the editor.
+        $path = parse_url((string) $answer->json('assets'), PHP_URL_PATH);
+        $this->get($path.'/live-edit.js')->assertOk();
+    }
+
+    public function test_no_adapter_carries_its_own_copy_of_the_runtime(): void
+    {
+        // A copy is the bug. The WordPress plugin shipped three files copied
+        // from here by hand, and they fell eight kilobytes and several fixes
+        // behind without anyone noticing — a WordPress site was running a
+        // broken image editor and a save that never checked itself, while
+        // every other kind of site had both fixed.
+        //
+        // Most faults in this codebase have been two implementations of one
+        // thing disagreeing. This is the cheapest of them to prevent.
+        $runtime = array_map(
+            fn (string $path) => basename($path),
+            glob(__DIR__.'/../../resources/js/*.js') ?: []
+        );
+
+        $copies = [];
+
+        foreach (glob(__DIR__.'/../../packages/*/*/**/*.js') ?: [] as $file) {
+            if (str_contains($file, '/node_modules/') || str_contains($file, '/vendor/')) {
+                continue;
+            }
+
+            if (in_array(basename($file), $runtime, true)) {
+                $copies[] = str_replace(__DIR__.'/../../', '', $file);
+            }
+        }
+
+        $this->assertSame([], $copies, 'an adapter is carrying its own copy of the runtime');
+    }
+
     public function test_only_the_listed_files_are_served(): void
     {
         // This endpoint turns a URL into a file path, and anything doing that

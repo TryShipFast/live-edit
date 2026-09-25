@@ -187,6 +187,25 @@ Route::get('/live-edit/embed.js', fn () => app(EmbedController::class)('embed.js
     ->name('live-edit.embed');
 
 /*
+ * Which build of the editor is current.
+ *
+ * A host that loads the editor itself — a WordPress plugin, anything that
+ * renders its own content and wants only the overlay — needs the versioned
+ * address, and the version is the bytes of the runtime rather than a number
+ * anybody publishes. Asking is how such a host stops carrying its own copy,
+ * and a copy is what goes stale: the plugin's was eight kilobytes and several
+ * fixes behind before this existed.
+ */
+Route::get('/live-edit/runtime.json', fn () => response()->json([
+    'version' => EmbedController::assetVersion(),
+    'assets' => url('live-edit/assets/'.EmbedController::assetVersion()),
+])->withHeaders([
+    'Access-Control-Allow-Origin' => '*',
+    // Short: this is how a fix reaches a host that caches the answer.
+    'Cache-Control' => 'public, max-age=300',
+]))->name('live-edit.runtime');
+
+/*
  * A site's own install: one URL, nothing to fill in.
  *
  * Which also means a rotated key or a moved snapshot reaches a site nobody is
