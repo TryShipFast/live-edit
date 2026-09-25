@@ -229,7 +229,11 @@ class TokenDomainTest extends TestCase
         $value = TokenValue::generate(TokenType::Secret);
 
         $this->assertStringContainsString($value->id, $value->hint());
-        $secret = explode('_', $value->plain())[2];
+        // Limit 3: the secret is url-safe base64 and may contain an
+        // underscore of its own, so splitting on every one of them compares
+        // a fragment — and occasionally an empty string, which every haystack
+        // contains. The same trap this codebase has hit before.
+        $secret = explode('_', $value->plain(), 3)[2];
         $this->assertStringNotContainsString($secret, $value->hint());
     }
 }

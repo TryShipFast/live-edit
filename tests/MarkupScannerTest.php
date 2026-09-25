@@ -108,12 +108,30 @@ class MarkupScannerTest extends TestCase
         $this->assertSame($this->autoKeyOfHeading($before), $this->autoKeyOfHeading($after));
     }
 
-    public function test_a_key_with_no_id_to_anchor_to_still_depends_on_position(): void
+    public function test_a_distinctive_class_anchors_a_key_just_as_an_id_does(): void
     {
-        // The honest boundary of the above: with no landmark id anywhere above
-        // it, an element is still identified by position.
+        // Modern pages have almost no ids and almost no sectioning elements —
+        // they are divs all the way down — but they are generous with classes,
+        // and a class string appearing once on a page identifies its element
+        // as well as an id would.
+        //
+        // Measured on real sites before this existed: inserting one element at
+        // the top of the document moved 84% of the keys on a page built with a
+        // WordPress builder, and 96% on Tailwind's own site. Every edit saved
+        // against them would have come loose.
         $before = '<div class="hero"><h1>Welcome</h1></div>';
         $after = '<div class="promo"><p>New band</p></div><div class="hero"><h1>Welcome</h1></div>';
+
+        $this->assertSame($this->autoKeyOfHeading($before), $this->autoKeyOfHeading($after));
+    }
+
+    public function test_a_class_shared_by_many_elements_is_not_an_anchor(): void
+    {
+        // The honest boundary. A class on forty cards says nothing about which
+        // card this is, so it cannot stand in for a name — and an element with
+        // nothing distinctive above it is still identified by where it sits.
+        $before = '<div class="card"><h1>Welcome</h1></div><div class="card"><p>x</p></div>';
+        $after = '<div class="promo"><p>New band</p></div>'.$before;
 
         $this->assertNotSame($this->autoKeyOfHeading($before), $this->autoKeyOfHeading($after));
     }

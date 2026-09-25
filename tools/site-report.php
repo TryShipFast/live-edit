@@ -96,7 +96,19 @@ function keysIn(string $taggedHtml): array
         'data-edit-svg' => 'icon',
     ] as $attribute => $kind) {
         foreach ($xpath->query('//*[@'.$attribute.']') as $node) {
-            $keys[str_replace('setting:', '', $node->getAttribute($attribute))] = $kind;
+            // Whether a visitor can see it, decided in the browser before the
+            // page was handed over. Content in a cookie dialog is repeated,
+            // identical and never looked at, and counting it alongside a
+            // headline says nothing about either.
+            $unseen = false;
+            for ($el = $node; $el instanceof DOMElement; $el = $el->parentNode) {
+                if ($el->hasAttribute('data-report-unseen')) {
+                    $unseen = true;
+                    break;
+                }
+            }
+
+            $keys[str_replace('setting:', '', $node->getAttribute($attribute))] = ['kind' => $kind, 'seen' => ! $unseen];
         }
     }
 
@@ -121,6 +133,11 @@ function coverage(string $taggedHtml): array
         $marked[] = $node->getNodePath();
     }
 
+    $unseen = [];
+    foreach ($xpath->query('//*[@data-report-unseen]') as $node) {
+        $unseen[] = $node->getNodePath();
+    }
+
     $total = 0;
     $covered = 0;
 
@@ -134,8 +151,16 @@ function coverage(string $taggedHtml): array
             continue;
         }
 
-        $total += mb_strlen($words);
         $path = $parent->getNodePath();
+
+        // Words a visitor never sees are not words a client would edit.
+        foreach ($unseen as $u) {
+            if ($path === $u || str_starts_with($path, $u.'/')) {
+                continue 2;
+            }
+        }
+
+        $total += mb_strlen($words);
 
         foreach ($marked as $m) {
             if ($path === $m || str_starts_with($path, $m.'/')) {
@@ -209,11 +234,15 @@ function stability(string $html): array
         $perturb($doc);
         $after = keysIn(tag((string) $doc->saveHTML())['html']);
 
+        $seenBefore = array_filter($before, fn ($v) => $v['seen']);
+        $keptSeen = count(array_intersect_key($seenBefore, $after));
         $kept = count(array_intersect_key($before, $after));
+
         $results[$label] = [
-            'kept' => $kept,
-            'of' => count($before),
-            'percent' => count($before) ? round(100 * $kept / count($before)) : 0,
+            'kept' => $keptSeen,
+            'of' => count($seenBefore),
+            'percent' => count($seenBefore) ? round(100 * $keptSeen / count($seenBefore)) : 0,
+            'includingUnseen' => count($before) ? round(100 * $kept / count($before)) : 0,
         ];
     }
 
@@ -287,7 +316,9 @@ function risks(string $html, DOMXPath $xpath): array
 
 $cover = coverage($tagged['html']);
 $percent = $cover['total'] ? round(100 * $cover['covered'] / $cover['total'], 1) : 0;
-$byKind = array_count_values($keys);
+$seen = array_filter($keys, fn ($v) => $v['seen']);
+$byKind = array_count_values(array_map(fn ($v) => $v['kind'], $seen));
+$unseenCount = count($keys) - count($seen);
 $images = $doc->getElementsByTagName('img')->length;
 $stability = stability($html);
 $risks = risks($html, $xpath);
@@ -296,6 +327,7 @@ $payload = [
     'source' => $source,
     'reachable' => ['percent' => $percent] + $cover,
     'found' => $byKind,
+    'unseen' => $unseenCount,
     'images' => ['marked' => $byKind['image'] ?? 0, 'onPage' => $images],
     'stability' => $stability,
     'risks' => $risks,

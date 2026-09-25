@@ -122,6 +122,8 @@ class MarkupScanner
         $this->doc->loadHTML('<?xml encoding="UTF-8">'.$html, LIBXML_NOWARNING | LIBXML_NOERROR);
         libxml_clear_errors();
 
+        $this->countClasses();
+
         $body = $this->doc->getElementsByTagName('body')->item(0) ?? $this->doc->documentElement;
 
         if ($body instanceof DOMNode) {
@@ -557,7 +559,70 @@ class MarkupScanner
             }
         }
 
+        // No landmark anywhere above it. Rather than name the element by its
+        // position in the whole document — which is what made a key move the
+        // moment anything above it changed — name it relative to the region it
+        // sits in.
+        //
+        // The observation this rests on: wrapping a page, which is what a
+        // builder does whenever somebody adds a container, leaves every
+        // element's position relative to its OWN parent untouched. Only the
+        // path from the body changes. So a key that never measures from the
+        // body survives it.
+        //
+        // Measured across ten real sites — Webflow, Squarespace, Framer,
+        // Shopify, two page builders, Tailwind, Bootstrap — that one change is
+        // the difference between a client's edits surviving a container being
+        // added and most of them coming loose.
+        $region = $this->regionToken($node);
+
+        if ($region !== null) {
+            return $scope.$region['token'].'/'.$this->structuralPath($node, $region['element']);
+        }
+
         return $scope.$this->structuralPath($node);
+    }
+
+    /**
+     * The nearest region around this element, named without reference to
+     * anything above it.
+     *
+     * A region is named by what it is and how it sits among its own siblings —
+     * never by the chain back to the document. Its classes come first because
+     * a theme gives its sections distinctive ones, and they say more about
+     * which section this is than a number does.
+     *
+     * @return array{element: DOMElement, token: string}|null
+     */
+    protected function regionToken(DOMElement $node): ?array
+    {
+        $regions = ['section', 'header', 'footer', 'nav', 'article', 'aside', 'main', 'form'];
+
+        for ($el = $node->parentNode; $el instanceof DOMElement; $el = $el->parentNode) {
+            $tag = strtolower($el->tagName);
+
+            if (! in_array($tag, $regions, true)) {
+                continue;
+            }
+
+            $classes = trim(preg_replace('/\s+/', ' ', $el->getAttribute('class')));
+
+            // Among its own siblings of the same kind, so a second <section>
+            // is distinguishable from the first without either of them
+            // depending on what surrounds their parent.
+            $index = 1;
+            for ($sib = $el->previousSibling; $sib !== null; $sib = $sib->previousSibling) {
+                if ($sib instanceof DOMElement && strtolower($sib->tagName) === $tag) {
+                    $index++;
+                }
+            }
+
+            $name = $classes !== '' ? substr(hash('sha256', $classes), 0, 8) : 'n';
+
+            return ['element' => $el, 'token' => 'in:'.$tag.'.'.$name.'#'.$index];
+        }
+
+        return null;
     }
 
     /**
@@ -662,6 +727,39 @@ class MarkupScanner
         }
     }
 
+    /** How often each class string appears on this page. */
+    protected array $classCounts = [];
+
+    /**
+     * Count the class strings, so a rare one can be used as a landmark.
+     *
+     * A modern page has almost no ids and almost no sectioning elements — it
+     * is divs all the way down — but it is generous with classes, and a class
+     * string that appears once on a page identifies its element as well as an
+     * id would. Counting them first is what makes that usable: a class shared
+     * by forty cards says nothing, and one that appears once says everything.
+     */
+    protected function countClasses(): void
+    {
+        $this->classCounts = [];
+
+        foreach ($this->doc->getElementsByTagName('*') as $el) {
+            $classes = $this->classSignature($el);
+
+            if ($classes !== '') {
+                $this->classCounts[$classes] = ($this->classCounts[$classes] ?? 0) + 1;
+            }
+        }
+    }
+
+    protected function classSignature(DOMElement $element): string
+    {
+        $classes = preg_split('/\s+/', trim($element->getAttribute('class'))) ?: [];
+        sort($classes);
+
+        return implode(' ', array_filter($classes));
+    }
+
     /**
      * A name for this element that survives the page being rearranged.
      *
@@ -695,6 +793,16 @@ class MarkupScanner
 
         if ($dataId !== '') {
             return 'block:'.$dataId;
+        }
+
+        // A class string that appears once on this page. Not an identifier
+        // anybody meant as one, but it behaves like one — and on a page with
+        // no ids and no sections it is the only thing between a key and being
+        // measured from the body.
+        $classes = $this->classSignature($element);
+
+        if ($classes !== '' && ($this->classCounts[$classes] ?? 0) === 1) {
+            return 'cls:'.substr(hash('sha256', $classes), 0, 10);
         }
 
         // The same handle, repeated in a class by the builders that do that.

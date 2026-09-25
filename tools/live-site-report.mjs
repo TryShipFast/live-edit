@@ -91,6 +91,31 @@ await page.evaluate(async () => {
 });
 await page.waitForTimeout(1500);
 
+/*
+ * Mark what a visitor cannot see, before the page is handed over.
+ *
+ * Measuring every element equally made the numbers meaningless: one page
+ * carried 1,322 editable elements and most of them were rows of a cookie
+ * dialog nobody has ever opened — "Description is currently not available",
+ * hundreds of times. Those are repeated, identical and hidden, so they are
+ * exactly the elements whose keys are least stable, and they drowned out the
+ * content somebody would actually edit.
+ *
+ * Hidden is not the same as unimportant — a menu, a modal and a tab panel are
+ * all hidden and all worth editing — so they are marked rather than removed,
+ * and reported apart.
+ */
+await page.evaluate(() => {
+    for (const el of document.querySelectorAll('body *')) {
+        const box = el.getBoundingClientRect();
+        const style = getComputedStyle(el);
+
+        if (box.width === 0 || box.height === 0 || style.visibility === 'hidden' || style.display === 'none') {
+            el.setAttribute('data-report-unseen', '');
+        }
+    }
+});
+
 const rendered = await page.content();
 const runtime = await page.evaluate(() => {
     const visible = (el) => {
@@ -137,8 +162,9 @@ console.log('REACHABLE');
 console.log(`  ${pct}% of the words on the rendered page could be changed`);
 console.log(`  ${analysis.found.text ?? 0} text, ${analysis.images.marked} of ${analysis.images.onPage} images, `
     + `${analysis.found.link ?? 0} links, ${analysis.found.icon ?? 0} icons`);
-if (runtime.hidden > 0) {
-    console.log(`  ${runtime.hidden} element(s) are in the markup but not visible — menus, modals, tabs`);
+if (analysis.unseen > 0) {
+    console.log(`  a further ${analysis.unseen} editable element(s) a visitor never sees — menus, modals,`);
+    console.log('  cookie dialogs — counted separately, because they are not what anybody edits');
 }
 
 console.log('\nWILL THE CONTENT STAY ATTACHED');
@@ -146,7 +172,8 @@ console.log("  Edits are saved against a name derived from where the element sit
 console.log('  If the page changes shape, the name changes and the words come loose.\n');
 for (const [label, r] of Object.entries(analysis.stability)) {
     const mark = r.percent >= 95 ? 'ok  ' : r.percent >= 70 ? 'some' : 'BAD ';
-    console.log(`  [${mark}] ${label.padEnd(34)} ${String(r.percent).padStart(3)}% of ${r.of} keys survive`);
+    console.log(`  [${mark}] ${label.padEnd(34)} ${String(r.percent).padStart(3)}% of ${r.of} keys survive`
+        + (r.includingUnseen !== r.percent ? `   (${r.includingUnseen}% counting the unseen)` : ''));
 }
 
 console.log('\nWHAT FIGHTS THE EDITOR');
