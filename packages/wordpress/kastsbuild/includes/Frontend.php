@@ -69,8 +69,30 @@ class Frontend
         $prepared = Api::prepare($html, self::pagePath(), $editing);
 
         if ($prepared === null) {
-            // The page is the point; the editor is not. A service that cannot
-            // be reached costs this visitor the editor, not the website.
+            /*
+             * The last page we were given for this address, however old.
+             *
+             * Falling back to the theme's own markup was the obvious thing and
+             * the wrong one: it replaces every word the client has ever
+             * written with the words the template shipped with. A visitor sees
+             * a different website; the client sees their work gone. Serving
+             * what we were told last time is wrong only by however much has
+             * changed since, which on a site somebody edits occasionally is
+             * usually nothing at all.
+             *
+             * Kept under an address-only key, deliberately outside the one
+             * that carries the content stamp: that key is meant to fall away
+             * the moment anything is published, and this copy exists precisely
+             * for the times we cannot ask what the current stamp is.
+             */
+            $lastGood = get_transient(self::lastGoodKey());
+
+            if (is_string($lastGood) && $lastGood !== '') {
+                return $editing ? self::markBodyForEditing($lastGood) : $lastGood;
+            }
+
+            // Nothing to fall back to. The page is the point and the editor is
+            // not, so the visitor gets the website.
             return $html;
         }
 
@@ -80,9 +102,19 @@ class Frontend
             $tagged = self::markBodyForEditing($tagged);
         } else {
             set_transient(self::cacheKey(), $tagged, HOUR_IN_SECONDS * 6);
+            // The copy of last resort, kept far longer than the ordinary page
+            // cache, because its whole job is to still be there on the day the
+            // service is not.
+            set_transient(self::lastGoodKey(), $tagged, WEEK_IN_SECONDS);
         }
 
         return $tagged;
+    }
+
+    /** The last page the service gave us for this address, whatever its age. */
+    private static function lastGoodKey(): string
+    {
+        return self::CACHE_PREFIX.'last_'.md5((string) ($_SERVER['REQUEST_URI'] ?? '/'));
     }
 
     /** Which page this is, so keys scoped to a page stay on it. */

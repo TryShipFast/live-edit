@@ -271,3 +271,54 @@ export const attributeOf = (element, attribute, datasetKey) => {
 
     return element.dataset?.[datasetKey] ?? '';
 };
+
+/**
+ * Ask again, because the first answer was probably not the real one.
+ *
+ * A single failed request shows the theme's own words for that page view. To
+ * anybody reading it that is indistinguishable from their work having been
+ * lost — and the first thing a person does about lost work is type it again,
+ * which is how one dropped connection turns into a client who no longer
+ * believes the product keeps anything.
+ *
+ * Only what is worth asking again about. A 401 or a 403 is a wrong key and a
+ * 404 is a wrong address: neither improves by being asked twice, and hammering
+ * a rejected key is how a site gets itself throttled. A dropped connection, a
+ * server error, a rate limit and a gateway timeout are all conditions that
+ * pass.
+ *
+ * Short waits, because somebody is looking at the page while this happens. Two
+ * retries at a fifth and half a second cost less than a second in the worst
+ * case and cover the overwhelming majority of blips.
+ */
+export const worthAskingAgain = (error, status) => {
+    if (status === undefined || status === null) {
+        // No status at all is a connection that never arrived.
+        return true;
+    }
+
+    return status === 408 || status === 425 || status === 429 || status >= 500;
+};
+
+export const retrying = async (attempt, { tries = 3, waits = [200, 500], sleep = null } = {}) => {
+    const wait = sleep ?? ((ms) => new Promise((resolve) => setTimeout(resolve, ms)));
+    let last = null;
+
+    for (let i = 0; i < tries; i++) {
+        try {
+            return await attempt();
+        } catch (error) {
+            last = error;
+
+            const isLast = i === tries - 1;
+
+            if (isLast || !worthAskingAgain(error, error.status)) {
+                throw error;
+            }
+
+            await wait(waits[Math.min(i, waits.length - 1)]);
+        }
+    }
+
+    throw last;
+};

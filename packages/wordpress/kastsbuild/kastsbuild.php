@@ -1,4 +1,5 @@
 <?php
+
 /**
  * Plugin Name: KastsBuild Live Edit
  * Description: Edit the words and pictures on this site in place, without a dashboard.
@@ -17,6 +18,9 @@
  * It deliberately does not touch posts, pages or any other content WordPress
  * already manages. That is theirs.
  */
+use KastsBuild\Frontend;
+use KastsBuild\Publishing;
+use KastsBuild\Settings;
 
 if (! defined('ABSPATH')) {
     exit;
@@ -50,14 +54,14 @@ require KASTSBUILD_PATH.'includes/Frontend.php';
 require KASTSBUILD_PATH.'includes/Publishing.php';
 
 add_action('plugins_loaded', function () {
-    KastsBuild\Settings::boot();
-    KastsBuild\Frontend::boot();
-    KastsBuild\Publishing::boot();
+    Settings::boot();
+    Frontend::boot();
+    Publishing::boot();
 });
 
 register_deactivation_hook(__FILE__, function () {
     // Cached pages carry editing markup. Left behind after the plugin is
     // switched off, visitors would be served attributes for an editor that is
     // no longer there.
-    KastsBuild\Frontend::forgetCache();
+    Frontend::forgetCache();
 });

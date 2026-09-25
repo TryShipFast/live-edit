@@ -155,5 +155,32 @@ can orphan content. Everything saved since is covered, and a test holds it.
 
 - The React adapter has not been re-run since the shared code changed.
 - CloudFront in front of the asset addresses is untested.
-- Content fetch has no retry: one failed request shows the theme's own words
-  for that page view.
+
+## ~~One failed request looks like lost work~~ — fixed
+
+A dropped connection used to show the theme's own words for that page view,
+which to the person reading it is indistinguishable from their work having been
+lost — and the first thing anybody does about lost work is type it again.
+
+Three things now stand between a blip and that impression:
+
+- **Asked again.** Both the browser and the WordPress plugin repeat a request
+  that failed for a reason that passes — a dropped connection, a 5xx, a 429, a
+  timeout. Never a 401, 403 or 404: those are a wrong key or a wrong address,
+  and repeating them only hammers a service that has already answered. Two
+  retries, under a second in total, because somebody is watching the page.
+- **The last page we were given.** When WordPress cannot reach the service at
+  all, it serves the last prepared copy of that address rather than the raw
+  theme. Kept for a week under an address-only key, deliberately outside the
+  cache key that carries the content stamp — that one is meant to fall away on
+  publish, and this copy exists for the times we cannot ask what the stamp is.
+  Proven by stopping the service: 81 editable elements survived, and 0 survived
+  with the fallback removed.
+- **Said out loud.** An editor whose page could not load its content is told
+  so, and told nothing has been lost. The wording distinguishes a failure after
+  a save from one on an ordinary load — opening with "Saved, but…" when nobody
+  saved anything describes an action they did not take.
+
+**What is still true.** A first-ever view of a page while the service is down
+has nothing to fall back to and shows the theme's own words. The site renders;
+the client's content does not.

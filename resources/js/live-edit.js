@@ -123,7 +123,15 @@ const bootLiveEdit = () => {
             // change may be perfectly saved and simply not fetched. Saying so
             // is the point — this is the case that used to pass in silence.
             if (content?.failed) {
-                ui.toast('Saved, but this page could not load the latest content \u2014 it may be showing an older version. Reload to try again.', 9000);
+                // Two different things, and saying the wrong one is its own
+                // fault. After a save, the save is the thing they are anxious
+                // about. On an ordinary load nobody saved anything, and
+                // opening with "Saved, but..." describes an action they did
+                // not take \u2014 which reads as the editor having done something
+                // behind their back.
+                ui.toast(expected
+                    ? 'Saved \u2014 but this page could not load the latest content, so it may be showing an older version. Reload to try again.'
+                    : 'This page could not load your saved content, so it is showing the original. Nothing has been lost \u2014 reload to try again.', 9000);
 
                 return;
             }

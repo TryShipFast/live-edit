@@ -100,7 +100,6 @@ class Api
         return (int) (self::get('/content/version', $key)['pending'] ?? 0);
     }
 
-    /** @return array<string, mixed> */
     /**
      * The page this theme just rendered, handed back ready to be edited.
      *
@@ -165,17 +164,44 @@ class Api
             $args['body'] = wp_json_encode($body);
         }
 
-        $response = wp_remote_request(self::base().$path, $args);
+        // Asked again, because one dropped connection shows the theme's own
+        // words for that page view — and to anybody reading it that is
+        // indistinguishable from their work having been lost.
+        //
+        // Only what is worth asking again about: a 401 or 403 is a wrong key
+        // and a 404 a wrong address, and neither improves by being repeated.
+        // A dropped connection, a server error, a rate limit or a gateway
+        // timeout all pass. Short waits, because a visitor is waiting on this
+        // render — two retries cost at most half a second.
+        foreach ([0, 200, 300] as $waitMs) {
+            if ($waitMs > 0) {
+                usleep($waitMs * 1000);
+            }
 
-        if (is_wp_error($response) || wp_remote_retrieve_response_code($response) >= 400) {
-            // A page must not fail because the content service is briefly
-            // unreachable: the theme's own words are still in the markup, so
-            // the visitor sees the site rather than an error.
-            return [];
+            $response = wp_remote_request(self::base().$path, $args);
+
+            if (is_wp_error($response)) {
+                continue;
+            }
+
+            $code = wp_remote_retrieve_response_code($response);
+
+            if ($code < 400) {
+                $decoded = json_decode((string) wp_remote_retrieve_body($response), true);
+
+                return is_array($decoded) ? $decoded : [];
+            }
+
+            if (! in_array($code, [408, 425, 429], true) && $code < 500) {
+                // A wrong key or a wrong address. Asking again would only
+                // hammer a service that has already given its answer.
+                break;
+            }
         }
 
-        $decoded = json_decode((string) wp_remote_retrieve_body($response), true);
-
-        return is_array($decoded) ? $decoded : [];
+        // A page must not fail because the content service is unreachable: the
+        // theme's own words are still in the markup, so the visitor sees the
+        // site rather than an error.
+        return [];
     }
 }

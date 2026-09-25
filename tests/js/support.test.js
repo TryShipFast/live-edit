@@ -9,6 +9,8 @@ import {
     orderedIcons,
     parseEditKey,
     requestInit,
+    retrying,
+    worthAskingAgain,
 } from '../../resources/js/support.js';
 
 /*
@@ -267,5 +269,84 @@ describe('what a field opens with', () => {
         document.body.innerHTML = '<img src="/a.jpg">';
 
         expect(attributeOf(document.querySelector('img'), 'alt', 'editAlt')).toBe('');
+    });
+});
+
+describe('asking again when the first answer was probably not the real one', () => {
+    const fail = (status) => Object.assign(new Error(`answered ${status}`), { status });
+
+    it('keeps a blip from looking like lost work', async () => {
+        // One failed request shows the theme's own words for that page view,
+        // which to anybody reading it is indistinguishable from their work
+        // having been lost — and the first thing a person does about lost work
+        // is type it again.
+        let attempts = 0;
+        const value = await retrying(async () => {
+            attempts++;
+            if (attempts < 3) throw fail(503);
+            return 'their words';
+        }, { sleep: () => Promise.resolve() });
+
+        expect(value).toBe('their words');
+        expect(attempts).toBe(3);
+    });
+
+    it('does not hammer a service that has already given its answer', async () => {
+        // A 401 is a wrong key and a 404 a wrong address. Neither improves by
+        // being asked twice, and repeating a rejected key is how a site gets
+        // itself throttled.
+        for (const status of [400, 401, 403, 404, 422]) {
+            let attempts = 0;
+            await expect(retrying(async () => {
+                attempts++;
+                throw fail(status);
+            }, { sleep: () => Promise.resolve() })).rejects.toThrow();
+
+            expect(attempts, `${status} should not have been repeated`).toBe(1);
+        }
+    });
+
+    it('asks again for the conditions that pass', async () => {
+        for (const status of [408, 425, 429, 500, 502, 503, 504]) {
+            let attempts = 0;
+            await expect(retrying(async () => {
+                attempts++;
+                throw fail(status);
+            }, { sleep: () => Promise.resolve() })).rejects.toThrow();
+
+            expect(attempts, `${status} should have been repeated`).toBe(3);
+        }
+    });
+
+    it('asks again when nothing answered at all', async () => {
+        // A dropped connection has no status to judge by.
+        let attempts = 0;
+        await expect(retrying(async () => {
+            attempts++;
+            throw new Error('NetworkError when attempting to fetch resource');
+        }, { sleep: () => Promise.resolve() })).rejects.toThrow('NetworkError');
+
+        expect(attempts).toBe(3);
+    });
+
+    it('gives up rather than holding the page open forever', async () => {
+        let attempts = 0;
+        await expect(retrying(async () => {
+            attempts++;
+            throw fail(503);
+        }, { sleep: () => Promise.resolve() })).rejects.toThrow('503');
+
+        expect(attempts).toBe(3);
+    });
+
+    it('waits a little longer each time, and not long in total', async () => {
+        // Somebody is looking at the page while this happens.
+        const waited = [];
+        await expect(retrying(async () => { throw fail(503); }, {
+            sleep: (ms) => { waited.push(ms); return Promise.resolve(); },
+        })).rejects.toThrow();
+
+        expect(waited).toEqual([200, 500]);
+        expect(waited.reduce((a, b) => a + b, 0)).toBeLessThan(1000);
     });
 });

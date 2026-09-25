@@ -1,4 +1,13 @@
 import { cleanSvg } from './svg.js';
+import { retrying } from './support.js';
+
+/**
+ * An error that remembers what the server said.
+ *
+ * Whether a request is worth repeating depends entirely on the status, and a
+ * message with the number inside it is not something to parse back out.
+ */
+const failure = (message, status) => Object.assign(new Error(message), { status });
 
 /**
  * Puts published content into a static page.
@@ -441,13 +450,13 @@ export const applyStyles = (root, styles) => {
 
 export const fetchSnapshot = async ({ snapshot, locale }) => {
     const base = String(snapshot).replace(/\/$/, '');
-    const pointer = await fetch(`${base}/current.json`).then((r) => {
+    const pointer = await retrying(() => fetch(`${base}/current.json`).then((r) => {
         if (!r.ok) {
-            throw new Error(`Pointer answered ${r.status}`);
+            throw failure(`Pointer answered ${r.status}`, r.status);
         }
 
         return r.json();
-    });
+    }));
 
     // A site that has published nothing has a pointer saying so. Its words
     // are the ones already in the file, which is exactly right.
@@ -456,26 +465,32 @@ export const fetchSnapshot = async ({ snapshot, locale }) => {
     }
 
     const language = locale ?? 'en';
-    const response = await fetch(`${base}/v${pointer.version}/${language}.json`);
+    return retrying(async () => {
+        const response = await fetch(`${base}/v${pointer.version}/${language}.json`);
 
-    if (!response.ok) {
-        throw new Error(`Version answered ${response.status}`);
-    }
+        if (!response.ok) {
+            throw failure(`Version answered ${response.status}`, response.status);
+        }
 
-    return response.json();
+        return response.json();
+    });
 };
 
 export const fetchContent = async ({ base, site, key, locale }) => {
     const url = `${String(base).replace(/\/$/, '')}/${site}/content${locale ? `?locale=${encodeURIComponent(locale)}` : ''}`;
-    const response = await fetch(url, { headers: { Authorization: `Bearer ${key}`, Accept: 'application/json' } });
 
-    if (!response.ok) {
-        // A page must not break because the content service is briefly
-        // unreachable: the words already in the file are perfectly good.
-        throw new Error(`Content service answered ${response.status}`);
-    }
+    return retrying(async () => {
+        const response = await fetch(url, { headers: { Authorization: `Bearer ${key}`, Accept: 'application/json' } });
 
-    return response.json();
+        if (!response.ok) {
+            // A page must not break because the content service is briefly
+            // unreachable: the words already in the file are perfectly good.
+            // But it is asked again first — see retrying().
+            throw failure(`Content service answered ${response.status}`, response.status);
+        }
+
+        return response.json();
+    });
 };
 
 const start = async () => {
