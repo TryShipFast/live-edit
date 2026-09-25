@@ -1,5 +1,5 @@
 import { cleanSvg } from './svg.js';
-import { retrying } from './support.js';
+import { ownTextOf, retrying } from './support.js';
 
 /**
  * An error that remembers what the server said.
@@ -371,6 +371,146 @@ export const applyContent = (root, settings) => {
 };
 
 /**
+ * Put the client's words back when the theme puts its own back.
+ *
+ * Content is applied once, as the page finishes loading. Anything that runs
+ * afterwards wins — and a bought theme is full of things that run afterwards:
+ * a typing effect that rewrites a headline character by character, a slider
+ * swapping the picture in a panel, a lazy loader replacing a source it decides
+ * is stale. The client's sentence appears, then the theme's sentence replaces
+ * it a second later, and the page settles on the words they thought they had
+ * changed. Nothing errors. They save it again, and it happens again.
+ *
+ * So the elements we wrote to are watched, and if something else writes over
+ * one, everything is applied again. Applying is idempotent, so there is no
+ * need to work out which element was hit — and working it out would mean a
+ * second copy of the rules for what each kind of marker means.
+ *
+ * Three things keep this a guard rather than a war:
+ *
+ *   Our own writes are consumed before the observer can see them, so a repair
+ *   cannot trigger another repair.
+ *
+ *   Repairs are capped. A slider that rewrites its caption on every rotation
+ *   would otherwise be fought forever, at a cost paid by every visitor. After
+ *   the cap it is left alone and said out loud, because "we gave up" is a
+ *   thing somebody needs to be able to find out.
+ *
+ *   Nothing is repaired while somebody is editing. The value being defended is
+ *   the one that was published; the value in the page is the one they are
+ *   typing. Putting the published one back over their sentence as they write
+ *   it would be far worse than the problem this solves.
+ *
+ * Only the attributes we actually write are watched. Class and style are not:
+ * a theme changes those constantly for animations and scroll reveals, and
+ * treating that as damage would mean repairing the page all the way down a
+ * scroll for no reason at all.
+ */
+export const defendContent = (doc, { limit = 12, debounce = 60 } = {}) => {
+    const view = doc.defaultView ?? (typeof window === 'undefined' ? null : window);
+
+    if (!view?.MutationObserver) {
+        return null;
+    }
+
+    const watched = doc.querySelectorAll('[data-edit], [data-edit-img], [data-edit-href]');
+
+    if (watched.length === 0) {
+        return null;
+    }
+
+    /*
+     * What the page said when it was handed over, rather than what the
+     * settings say.
+     *
+     * The same guard has to work from both ways in, and they know different
+     * things. A static page fetches its content and applies it here, so the
+     * settings are in hand. A WordPress page arrives with the client's words
+     * already baked in by the server and never fetches anything — there are no
+     * settings on that side at all.
+     *
+     * What both have is a correct page, at the moment just after it was made
+     * correct. So that is what is remembered, and anything that writes over it
+     * afterwards is the theme.
+     */
+    const delivered = new Map();
+
+    for (const element of watched) {
+        delivered.set(element, {
+            words: element.hasAttribute('data-edit') ? ownTextOf(element) : null,
+            src: element.getAttribute('src'),
+            href: element.hasAttribute('data-edit-href') ? element.getAttribute('href') : null,
+        });
+    }
+
+    let repairs = 0;
+    let writing = false;
+    let pending = null;
+
+    const restore = () => {
+        pending = null;
+
+        if (doc.body?.classList?.contains('editing')) {
+            return;
+        }
+
+        repairs++;
+        writing = true;
+
+        for (const [element, was] of delivered) {
+            if (!element.isConnected) {
+                continue;
+            }
+
+            if (was.words !== null && ownTextOf(element) !== was.words) {
+                applyWords(element, was.words);
+            }
+
+            if (was.src !== null && element.getAttribute('src') !== was.src) {
+                element.setAttribute('src', was.src);
+                // A responsive source list outranks src, so a picture put back
+                // without clearing it snaps straight to the theme's again.
+                element.removeAttribute('srcset');
+            }
+
+            if (was.href !== null && element.getAttribute('href') !== was.href) {
+                element.setAttribute('href', was.href);
+            }
+        }
+
+        // Consume the records our own writing just produced, so they are never
+        // delivered and cannot be mistaken for the theme writing again.
+        observer.takeRecords();
+        writing = false;
+
+        if (repairs >= limit) {
+            observer.disconnect();
+            console.warn(`[live-edit] this page keeps rewriting itself; the client's content was put back ${repairs} times and is now being left alone.`);
+        }
+    };
+
+    const observer = new view.MutationObserver(() => {
+        if (writing || pending || repairs >= limit) {
+            return;
+        }
+
+        pending = view.setTimeout(restore, debounce);
+    });
+
+    for (const element of watched) {
+        observer.observe(element, {
+            characterData: true,
+            childList: true,
+            subtree: true,
+            attributes: true,
+            attributeFilter: ['src', 'srcset', 'href'],
+        });
+    }
+
+    return observer;
+};
+
+/**
  * Published content from the files, without troubling the application.
  *
  * Two requests, both cacheable and neither of them ours to serve: the pointer,
@@ -525,6 +665,10 @@ const start = async () => {
 
             applied = applyContent(document, payload.settings ?? {});
             applyStyles(document, payload.styles ?? {});
+
+            // And keep them. A bought theme runs its own scripts after this
+            // one, and several of them write text and swap pictures.
+            defendContent(document);
         }
     } catch (error) {
         failed = error;

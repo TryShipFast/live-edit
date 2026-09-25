@@ -97,14 +97,40 @@ The report counts both so the gap is visible rather than silent.
 **Canvas and WebGL.** Pictures drawn rather than placed. Not addressable at
 all.
 
-## A theme that rewrites the page after we have written to it
+## ~~A theme that rewrites the page after we have written to it~~ — mostly fixed
 
-**What happens.** Content is applied once. Anything that runs afterwards and
-sets its own text or swaps its own images wins.
+**What happened.** Content was applied once. Anything that ran afterwards won —
+a typing effect rewriting a headline, a slider swapping a picture, a lazy
+loader replacing a source. The client's sentence appeared, the theme's replaced
+it a second later, and the page settled on the words they thought they had
+changed. Nothing errored. They saved it again, and it happened again.
 
-**Where we stand.** The report watches for this from before the page settles
-and says how many rewrites it saw, with examples. When it reports none, a saved
-edit will stick. There is no retry or re-application yet.
+**Where we stand.** The elements we wrote to are watched, and if something else
+writes over one, the page as delivered is put back. It remembers the page
+rather than the settings, because the two ways in know different things: a
+static page fetches content and applies it, while a WordPress page arrives with
+the words already baked in by the server and has no settings on that side at
+all. What both have is a correct page at the moment it was made correct.
+
+Three things keep it a guard rather than a war:
+
+- our own writes are consumed before the observer sees them, so a repair cannot
+  trigger another repair;
+- repairs are capped at twelve, then the page is left alone and told so — a
+  slider rewriting its caption on every rotation would otherwise be fought for
+  as long as the page is open, at a cost every visitor pays;
+- nothing is repaired while somebody is editing. The value being defended is
+  the published one; the value in the page is the one they are typing.
+
+Proven on the install by rewriting a headline and swapping a picture from the
+console: both put back, and `srcset` cleared with the picture — a responsive
+source list outranks `src`, so restoring one without the other changes nothing
+visible, which is the worst of both.
+
+**What is still true.** Only the words, pictures and links are defended. Class
+and style are not watched: a theme changes those constantly for animations and
+scroll reveals, and treating that as damage would mean repairing the page all
+the way down a scroll. A background set by a script therefore still wins.
 
 ## ~~The WordPress plugin carries its own copy of the engine~~ — fixed
 

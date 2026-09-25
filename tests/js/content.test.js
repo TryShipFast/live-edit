@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { applyContent, applyStyles, applyValue, fetchContent, resolve, styleRules } from '../../resources/js/content.js';
+import { applyContent, applyStyles, applyValue, defendContent, fetchContent, resolve, styleRules } from '../../resources/js/content.js';
 
 const page = (html) => {
     document.body.innerHTML = html;
@@ -501,5 +501,190 @@ describe('what editing mode does to the page it is a guest on', () => {
         const { PAGE_CSS } = await import('../../resources/js/chrome.js');
 
         expect(hides(PAGE_CSS, '<section data-edit-bg="setting:auto:b">Words</section>')).toBe(false);
+    });
+});
+
+describe('a theme that puts its own words back', () => {
+    const settle = () => new Promise((r) => setTimeout(r, 200));
+
+    // An earlier case in this file leaves the page in editing mode, and the
+    // defence deliberately does nothing while somebody is editing — so
+    // without this these would all pass for the wrong reason.
+    beforeEach(() => document.body.classList.remove('editing'));
+
+    it('puts the client\'s headline back when a typing effect overwrites it', async () => {
+        // The commonest reason a saved edit does not stick on a bought theme:
+        // the client's sentence appears, then a script rewrites it a second
+        // later and the page settles on the words they thought they changed.
+        const doc = page('<h1 data-edit="setting:auto:hero">Theme headline</h1>');
+        const settings = { 'auto:hero': 'Their headline' };
+
+        applyContent(doc, settings);
+        defendContent(doc);
+        expect(doc.querySelector('h1').textContent).toBe('Their headline');
+
+        // The theme's own script, a moment later.
+        doc.querySelector('h1').textContent = 'Theme headline';
+        await settle();
+
+        expect(doc.querySelector('h1').textContent).toBe('Their headline');
+    });
+
+    it('puts the client\'s picture back when a slider swaps the source', async () => {
+        const doc = page('<img data-edit-img="setting:auto:pic" src="/theme.jpg">');
+        const settings = { 'auto:pic': '/theirs.jpg' };
+
+        applyContent(doc, settings);
+        defendContent(doc);
+
+        doc.querySelector('img').setAttribute('src', '/theme.jpg');
+        await settle();
+
+        expect(doc.querySelector('img').getAttribute('src')).toBe('/theirs.jpg');
+    });
+
+    it('stops rather than fighting a page forever', async () => {
+        // A slider rewriting its caption on every rotation would otherwise be
+        // fought for as long as the page is open, at a cost every visitor
+        // pays. Said out loud, because "we gave up" is a thing somebody needs
+        // to be able to find out.
+        const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+        const doc = page('<h1 data-edit="setting:auto:hero">Theme</h1>');
+        const settings = { 'auto:hero': 'Theirs' };
+
+        applyContent(doc, settings);
+        defendContent(doc, { limit: 3, debounce: 5 });
+
+        for (let i = 0; i < 8; i++) {
+            doc.querySelector('h1').textContent = 'Theme';
+            await new Promise((r) => setTimeout(r, 30));
+        }
+
+        expect(warn).toHaveBeenCalledWith(expect.stringContaining('left alone'));
+        expect(warn.mock.calls[0][0]).toContain('put back 3 times');
+        warn.mockRestore();
+    });
+
+    it('never writes over a sentence somebody is typing', async () => {
+        // The value being defended is the published one; the value in the page
+        // is the one they are writing. Putting the published one back over
+        // their own sentence would be far worse than the problem this solves.
+        const doc = page('<h1 data-edit="setting:auto:hero">Theme</h1>');
+        const settings = { 'auto:hero': 'Published words' };
+
+        applyContent(doc, settings);
+        defendContent(doc, { debounce: 5 });
+        doc.body.classList.add('editing');
+
+        doc.querySelector('h1').textContent = 'What they are typing now';
+        await settle();
+
+        expect(doc.querySelector('h1').textContent).toBe('What they are typing now');
+        doc.body.classList.remove('editing');
+    });
+
+    it('does not mistake its own repair for the theme writing again', async () => {
+        // Without this the first repair triggers the next, and the page spends
+        // its life applying content to itself — reaching the cap and giving up
+        // on a page that only ever rewrote itself once.
+        //
+        // Measured by the cap, because that is the observable consequence: one
+        // foreign rewrite with a cap of three must never exhaust it.
+        const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+        const doc = page('<h1 data-edit="setting:auto:hero">Theme</h1>');
+        const settings = { 'auto:hero': 'Theirs' };
+
+        applyContent(doc, settings);
+        defendContent(doc, { limit: 3, debounce: 5 });
+
+        doc.querySelector('h1').textContent = 'Theme';
+        await new Promise((r) => setTimeout(r, 400));
+
+        expect(doc.querySelector('h1').textContent).toBe('Theirs');
+        expect(warn, 'one rewrite used up the whole repair budget').not.toHaveBeenCalled();
+
+        // And it is still watching, because it never spent its budget.
+        doc.querySelector('h1').textContent = 'Theme';
+        await settle();
+        expect(doc.querySelector('h1').textContent).toBe('Theirs');
+
+        warn.mockRestore();
+    });
+
+    it('ignores the classes and styles a theme changes all day', async () => {
+        // Scroll reveals and animations rewrite those constantly. Treating it
+        // as damage would mean repairing the page all the way down a scroll.
+        const doc = page('<h1 data-edit="setting:auto:hero">Theme</h1>');
+        const settings = { 'auto:hero': 'Theirs' };
+
+        applyContent(doc, settings);
+        const observer = defendContent(doc, { limit: 2, debounce: 5 });
+
+        for (let i = 0; i < 6; i++) {
+            doc.querySelector('h1').classList.toggle('revealed');
+            doc.querySelector('h1').style.opacity = String(i / 6);
+            await new Promise((r) => setTimeout(r, 20));
+        }
+
+        // Still watching: none of that counted as damage.
+        doc.querySelector('h1').textContent = 'Theme';
+        await settle();
+
+        expect(doc.querySelector('h1').textContent).toBe('Theirs');
+        observer?.disconnect();
+    });
+
+    it('does nothing at all on a page with no content of its own', () => {
+        expect(defendContent(page('<h1>Nothing tagged</h1>'))).toBeNull();
+    });
+});
+
+describe('defending a page the server already baked', () => {
+    // WordPress never fetches content: the plugin sends its page to the
+    // service and serves back what it gets, with the client's words already
+    // in it. There are no settings on that side at all — which is why the
+    // guard remembers the page as delivered rather than what it applied.
+    beforeEach(() => document.body.classList.remove('editing'));
+
+    it('puts back words it was never told the value of', async () => {
+        const doc = page('<h1 data-edit="setting:auto:hero">Words the server baked in</h1>');
+
+        defendContent(doc, { debounce: 5 });
+
+        doc.querySelector('h1').textContent = 'The theme had other ideas';
+        await new Promise((r) => setTimeout(r, 200));
+
+        expect(doc.querySelector('h1').textContent).toBe('Words the server baked in');
+    });
+
+    it('clears a responsive source list when it puts a picture back', async () => {
+        // srcset outranks src, so a picture restored without clearing it snaps
+        // straight back to the theme's — the repair would run and change
+        // nothing visible, which is the worst of both.
+        const doc = page('<img data-edit-img="setting:auto:pic" src="/theirs.jpg">');
+
+        defendContent(doc, { debounce: 5 });
+
+        const img = doc.querySelector('img');
+        img.setAttribute('src', '/theme.jpg');
+        img.setAttribute('srcset', '/theme-800.jpg 800w, /theme-1600.jpg 1600w');
+        await new Promise((r) => setTimeout(r, 200));
+
+        expect(img.getAttribute('src')).toBe('/theirs.jpg');
+        expect(img.hasAttribute('srcset')).toBe(false);
+    });
+
+    it('keeps the markup inside a sentence it repairs', async () => {
+        // A paragraph's own words are editable and the tag inside it is not,
+        // so putting the words back must not take the tag with them.
+        const doc = page('<p data-edit="setting:auto:p">Use <code>wp-config.php</code> here.</p>');
+
+        defendContent(doc, { debounce: 5 });
+
+        doc.querySelector('p').childNodes[0].nodeValue = 'Theme text ';
+        await new Promise((r) => setTimeout(r, 200));
+
+        expect(doc.querySelector('p code')).not.toBeNull();
+        expect(doc.querySelector('p code').textContent).toBe('wp-config.php');
     });
 });

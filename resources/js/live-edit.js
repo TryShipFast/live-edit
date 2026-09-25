@@ -36,6 +36,25 @@ const bootLiveEdit = () => {
             .catch((error) => console.warn('[live-edit] could not look for backgrounds:', error.message));
     }
 
+    /*
+     * And keep the words the page arrived with.
+     *
+     * A page that fetches its content sets this up itself once it has applied
+     * it. A page baked by a server never runs that file at all — WordPress
+     * loads this one directly — so without asking here, the adapter serving
+     * the most theme-heavy sites in the product would be the only one with no
+     * defence against a theme rewriting them.
+     *
+     * Only for somebody editing, which is who this file loads for: a visitor
+     * seeing a theme's own words for a moment is a smaller thing than every
+     * visitor paying to watch for it.
+     */
+    if (!window.liveEditContent) {
+        import('./content.js')
+            .then((m) => m.defendContent(document))
+            .catch((error) => console.warn('[live-edit] could not guard this page\'s content:', error.message));
+    }
+
     /* ------------------------------- login modal ------------------------------- */
 
     const loginModal = document.querySelector('[data-login-modal]');
