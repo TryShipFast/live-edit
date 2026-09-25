@@ -450,3 +450,26 @@ provisioning key is sitting in a page, and it is already lost.
 An origin that is not an origin is refused rather than stored. Stored, it would
 match nothing, and the symptom is a CORS error on the customer's own site that
 looks like a bug in their page.
+
+## Checking the journey
+
+Unit tests compare how content is applied; the parity cases compare the server
+and the browser applying it. Neither could see the fault where a page fetched
+with the wrong key — that was configuration, a level above what either looks
+at, and it meant an editor was shown the same page as every visitor.
+
+So the journey is walked in a browser, against a running site:
+
+```bash
+KB_API=… KB_SITE=acme KB_SECRET=kbs_… BASE_URL=https://acme.test \
+  npx playwright test tests/e2e/static-journey.spec.js
+```
+
+Five things, of which two are the point and neither can be checked without a
+browser: an editor must see their own unpublished work, and a visitor must
+not. The rest are that a visitor gets no editor and no key that can write,
+that a sign-in key leaves the address bar, that publishing reaches everyone,
+and that the page keeps its own words when this service cannot be reached.
+
+Checked by putting the last two faults back and watching it go red, because a
+test that cannot fail is the same mistake in a different place.
