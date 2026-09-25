@@ -91,6 +91,10 @@ function keysIn(string $taggedHtml): array
     foreach ([
         'data-edit' => 'text',
         'data-edit-img' => 'image',
+        // A page builder's hero is a stylesheet rule, not an <img>, so
+        // counting only <img> made the biggest picture on the page invisible
+        // to this report even once it had become editable.
+        'data-edit-bg' => 'background',
         'data-edit-href' => 'link',
         'data-edit-icon' => 'icon',
         'data-edit-svg' => 'icon',

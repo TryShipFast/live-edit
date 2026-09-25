@@ -92,6 +92,71 @@ const remember = (key, value) => {
 };
 
 /**
+ * Write down the pictures that only a browser can see.
+ *
+ * The scanner reads markup, and a page builder does not put its background
+ * images in the markup. Elementor writes
+ *
+ *   .elementor-16 .elementor-element-20e6f5a:not(.…){background-image:url(…)}
+ *
+ * into a generated stylesheet, and leaves the element itself with no style
+ * attribute at all. On the site this was found on, that rule was the hero:
+ * 1440x1000, the first thing anybody sees, and the first thing anybody would
+ * want to change after buying the template. The scanner could not see it, so
+ * the client could not replace it, and nothing on the page said why.
+ *
+ * Resolving a stylesheet means matching selectors, following the cascade and
+ * knowing which rules won — which is precisely what the browser has already
+ * done by the time this runs. So it is asked, and the answer is written onto
+ * the element as an attribute the scanner already understands. The scanner
+ * stays the authority on what is editable; this only tells it what is there.
+ *
+ * Gradients and data: URIs are skipped — one is not a picture anybody
+ * replaces, the other is already in the markup and would be sent back to the
+ * server in full, a few hundred kilobytes at a time.
+ */
+export const resolveBackgrounds = (doc = document) => {
+    const view = doc.defaultView ?? window;
+
+    if (!view?.getComputedStyle) {
+        return 0;
+    }
+
+    let found = 0;
+
+    for (const el of doc.querySelectorAll('body *')) {
+        // Anything the scanner can already read for itself is left alone, so
+        // the markup stays the source of truth wherever it has an answer.
+        if (el.hasAttribute('data-kb-bg') || el.hasAttribute('data-background')
+            || el.hasAttribute('data-bg') || el.hasAttribute('data-background-image')
+            // An element declaring its own background-image is one the scanner
+            // can already read. A background-COLOUR is not, and matching on
+            // "background" alone quietly skipped those — the element still had
+            // a picture, just not one it mentioned itself.
+            || /background-image|url\(/i.test(el.getAttribute('style') ?? '')) {
+            continue;
+        }
+
+        const image = view.getComputedStyle(el).backgroundImage;
+
+        if (!image || image === 'none' || !image.includes('url(')) {
+            continue;
+        }
+
+        const url = image.match(/url\(\s*["']?([^"')]+)/)?.[1];
+
+        if (!url || url.startsWith('data:')) {
+            continue;
+        }
+
+        el.setAttribute('data-kb-bg', url);
+        found++;
+    }
+
+    return found;
+};
+
+/**
  * Ask what is editable here, and mark it.
  *
  * Asked once per version of a page: the answer is kept against a fingerprint
@@ -102,6 +167,11 @@ export const autoTag = async ({ base, site, key, page }, doc = document) => {
         // Already prepared — by the CLI, by a framework, or by whoever sold it.
         return 0;
     }
+
+    // Before the markup is sent, not after: the fingerprint has to cover these
+    // too, or a page whose only change is a swapped hero is served a cached
+    // answer that still points at the old one.
+    resolveBackgrounds(doc);
 
     const html = doc.documentElement.outerHTML;
     const id = CACHE_PREFIX + fingerprint(html);

@@ -728,6 +728,37 @@ class MarkupScannerTest extends TestCase
         $this->assertMatchesRegularExpression('/<code[^>]*>wp-config\.php<\/code>/', $html, 'the marked-up word lost its tag');
     }
 
+    public function test_a_background_the_browser_resolved_is_offered_like_any_other(): void
+    {
+        // A page builder writes its backgrounds into a generated stylesheet,
+        // so the hero — the biggest picture on the page and the first thing
+        // anybody would change — is nowhere in the markup. The runtime asks
+        // the browser what actually won the cascade and writes the answer
+        // here; this class does not learn to match selectors.
+        $html = (new MarkupScanner)->apply(
+            '<div class="elementor-element" data-kb-bg="http://site.test/uploads/hero-section-min.jpg"></div>',
+            ['text', 'image'],
+            true,
+        )['html'];
+
+        $this->assertStringContainsString('data-edit-bg="setting:auto:', $html);
+        $this->assertStringContainsString('data-edit-preview="http://site.test/uploads/hero-section-min.jpg"', $html);
+    }
+
+    public function test_the_markup_still_wins_where_it_has_an_answer(): void
+    {
+        // A theme's own lazy-loading attribute is what that theme will act on
+        // when it loads the picture, so it stays authoritative over anything
+        // the browser computed afterwards.
+        $html = (new MarkupScanner)->apply(
+            '<div data-bg="/theme-says.jpg" data-kb-bg="/browser-says.jpg"></div>',
+            ['text', 'image'],
+            true,
+        )['html'];
+
+        $this->assertStringContainsString('data-edit-preview="/theme-says.jpg"', $html);
+    }
+
     public function test_preformatted_text_and_an_address_are_editable(): void
     {
         // Both hold words a client would want to change — a code sample, a

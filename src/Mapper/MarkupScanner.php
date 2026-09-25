@@ -994,10 +994,20 @@ class MarkupScanner
      * The background image URL of an element, whether set inline
      * (style="background-image:url()") or via a common lazy-bg data attribute
      * (data-background / data-bg / data-background-image) that theme JS applies.
+     *
+     * data-kb-bg is the browser's answer rather than the theme's: a page
+     * builder puts its backgrounds in a generated stylesheet, so the biggest
+     * picture on the page is often nowhere in the markup. The runtime resolves
+     * those against the live cascade and writes them here before the page is
+     * sent, which keeps selector matching out of this class entirely.
      */
     protected function backgroundImageUrl(DOMElement $el): ?string
     {
-        foreach (['data-background', 'data-bg', 'data-background-image'] as $attr) {
+        // The theme's own attribute first: it is what that theme will act on
+        // when it loads the picture, so it stays authoritative over anything
+        // the browser computed from a stylesheet afterwards. The runtime skips
+        // these elements for the same reason, so the two rules agree.
+        foreach (['data-background', 'data-bg', 'data-background-image', 'data-kb-bg'] as $attr) {
             if ($el->hasAttribute($attr) && $el->getAttribute($attr) !== '') {
                 return $el->getAttribute($attr);
             }

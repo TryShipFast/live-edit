@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { applyTags, autoTag, elementAt, fingerprint } from '../../resources/js/autotag.js';
+import { applyTags, autoTag, elementAt, fingerprint, resolveBackgrounds } from '../../resources/js/autotag.js';
 
 const page = (html) => {
     document.documentElement.innerHTML = html;
@@ -95,5 +95,80 @@ describe('tagging a page nobody prepared', () => {
         const doc = page('<body><h1>Hello</h1></body>');
 
         await expect(autoTag({ base: 'https://cms.test', site: 'a', key: 'k' }, doc)).rejects.toThrow('429');
+    });
+});
+
+describe('the pictures only a browser can see', () => {
+    beforeEach(() => window.sessionStorage?.clear());
+
+    // The real thing, from a real install: Elementor's generated stylesheet,
+    // its compound :not() selector, and an element carrying no style at all.
+    const elementorHero = `<head><style>
+        .elementor-16 .elementor-element.elementor-element-20e6f5a:not(.elementor-motion-effects-element-type-background)
+            { background-image: url("http://site.test/uploads/hero-section-min.jpg"); background-size: cover; }
+    </style></head><body class="elementor-16">
+        <div class="elementor-element elementor-element-20e6f5a" data-id="20e6f5a"></div>
+    </body>`;
+
+    it('writes down a background the markup never mentioned', () => {
+        // The hero: biggest picture on the page, first thing a client would
+        // change, and nowhere in the markup for the scanner to find.
+        const doc = page(elementorHero);
+
+        expect(resolveBackgrounds(doc)).toBe(1);
+        expect(doc.querySelector('[data-id="20e6f5a"]').getAttribute('data-kb-bg'))
+            .toBe('http://site.test/uploads/hero-section-min.jpg');
+    });
+
+    it('leaves alone anything the scanner can already read', () => {
+        // The markup stays the source of truth wherever it has an answer, so
+        // a lazy-loading theme's own attribute is never second-guessed.
+        const doc = page(`<body>
+            <div data-bg="/theme-says.jpg"></div>
+            <div style="background-image:url('/inline-says.jpg')"></div>
+        </body>`);
+
+        resolveBackgrounds(doc);
+
+        expect(doc.querySelectorAll('[data-kb-bg]').length).toBe(0);
+    });
+
+    it('ignores a gradient, which is not a picture anybody replaces', () => {
+        const doc = page(`<head><style>.overlay { background-image: linear-gradient(180deg, #000, #fff); }</style></head>
+            <body><div class="overlay"></div></body>`);
+
+        resolveBackgrounds(doc);
+
+        expect(doc.querySelectorAll('[data-kb-bg]').length).toBe(0);
+    });
+
+    it('ignores a picture already spelled out in the page', () => {
+        // A data: URI is in the markup already, and sending it back to be
+        // scanned means posting it in full, a few hundred kilobytes at a time.
+        const doc = page(`<head><style>.icon { background-image: url("data:image/gif;base64,R0lGOD"); }</style></head>
+            <body><div class="icon"></div></body>`);
+
+        resolveBackgrounds(doc);
+
+        expect(doc.querySelectorAll('[data-kb-bg]').length).toBe(0);
+    });
+
+    it('marks the backgrounds before asking what is editable', async () => {
+        // If this ran after the markup was taken, the server would be asked
+        // about a page that still had no backgrounds in it — and the answer
+        // would be cached against that version for as long as the page stood.
+        globalThis.fetch = vi.fn((url, init) => {
+            const { html } = JSON.parse(init.body);
+
+            return Promise.resolve({
+                ok: true,
+                json: () => Promise.resolve({ elements: [], sawBackground: html.includes('data-kb-bg') }),
+            });
+        });
+
+        await autoTag({ base: 'https://cms.test', site: 'a', key: 'k' }, page(elementorHero));
+
+        const sent = JSON.parse(globalThis.fetch.mock.calls[0][1].body).html;
+        expect(sent).toContain('data-kb-bg="http://site.test/uploads/hero-section-min.jpg"');
     });
 });

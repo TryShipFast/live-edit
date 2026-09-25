@@ -81,13 +81,36 @@ await page.waitForLoadState('networkidle').catch(() => {});
 
 // Everything a visitor would cause: reveal animations, lazy images, anything
 // that waits for the viewport.
+//
+// The backgrounds are read here, during the sweep, rather than once at the
+// end. Elementor loads a container's background when it comes into view and
+// lets it go again afterwards, so a picture that is plainly on the page reads
+// as "none" from the top of the document — measured on a real install, one of
+// five backgrounds came and went depending on where the page was scrolled.
+// Asking while each element is in view is the only moment the answer is true.
 await page.evaluate(async () => {
+    window.__readBackgrounds = () => {
+        for (const el of document.querySelectorAll('body *')) {
+            if (el.hasAttribute('data-kb-bg') || el.hasAttribute('data-background')
+                || el.hasAttribute('data-bg') || el.hasAttribute('data-background-image')
+                || /background-image|url\(/i.test(el.getAttribute('style') ?? '')) {
+                continue;
+            }
+
+            const url = getComputedStyle(el).backgroundImage.match(/url\(\s*["']?([^"')]+)/)?.[1];
+
+            if (url && !url.startsWith('data:')) el.setAttribute('data-kb-bg', url);
+        }
+    };
+
     const step = window.innerHeight * 0.8;
     for (let y = 0; y < document.body.scrollHeight; y += step) {
         window.scrollTo(0, y);
         await new Promise((r) => setTimeout(r, 120));
+        window.__readBackgrounds();
     }
     window.scrollTo(0, 0);
+    window.__readBackgrounds();
 });
 await page.waitForTimeout(1500);
 
@@ -186,7 +209,13 @@ if (rewrites.text > 0 || rewrites.images > 0) {
     console.log('  nothing rewrites the page after load');
 }
 if (runtime.images.background > 0) {
-    console.log(`  ${runtime.images.background} element(s) draw a picture from CSS rather than an <img>`);
+    const offered = analysis.found.background ?? 0;
+    console.log(`  ${runtime.images.background} element(s) draw a picture from CSS rather than an <img>`
+        + `; ${offered} of them can be replaced`);
+    if (offered < runtime.images.background) {
+        console.log('    the rest resolve only while in view — a builder that loads a');
+        console.log('    container background on scroll has nothing to read from the top');
+    }
 }
 if (runtime.images.unresolved > 0) {
     console.log(`  ${runtime.images.unresolved} image(s) never resolved a source, even after scrolling`);
