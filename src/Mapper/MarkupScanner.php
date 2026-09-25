@@ -545,14 +545,15 @@ class MarkupScanner
             }
         }
 
-        // Otherwise anchor to the nearest id. A template's ids are landmarks
-        // (#banner, #footer), so a developer editing one part of the document
-        // cannot shift keys in another part and orphan the content saved
-        // against them. Without this the whole page is one brittle chain.
+        // Otherwise anchor to the nearest landmark. A template's ids are
+        // landmarks (#banner, #footer), so a developer editing one part of the
+        // document cannot shift keys in another part and orphan the content
+        // saved against them. Without this the whole page is one brittle chain.
         for ($el = $node; $el instanceof DOMElement; $el = $el->parentNode) {
-            $id = $el->getAttribute('id');
-            if ($id !== '') {
-                return $scope.'id:'.$id.'/'.$this->structuralPath($node, $el);
+            $landmark = $this->landmarkOf($el);
+
+            if ($landmark !== null) {
+                return $scope.$landmark.'/'.$this->structuralPath($node, $el);
             }
         }
 
@@ -659,6 +660,54 @@ class MarkupScanner
                 }
             }
         }
+    }
+
+    /**
+     * A name for this element that survives the page being rearranged.
+     *
+     * An id is the obvious one, and on a hand-written template it is the only
+     * one. A page builder writes almost none — and gives every block an
+     * identity of its own instead, because it needs to find them again itself:
+     * Elementor puts it in data-id and repeats it in a class, Bricks and
+     * Oxygen do the same with their own prefixes.
+     *
+     * Anchoring only to id meant walking straight past hundreds of perfectly
+     * stable names. Measured on one Elementor page: wrapping the content in a
+     * new div — which a builder does whenever somebody adds a container —
+     * moved half of the keys, and every edit saved against them would have
+     * come loose. Nothing would have errored; the page would simply have gone
+     * back to the theme's own words.
+     *
+     * The nearest one wins, whichever kind it is, because the nearer the
+     * anchor the less of the page can move underneath it.
+     */
+    protected function landmarkOf(DOMElement $element): ?string
+    {
+        $id = trim($element->getAttribute('id'));
+
+        if ($id !== '') {
+            return 'id:'.$id;
+        }
+
+        // A builder's own handle for this block. Stable across edits, because
+        // it is how the builder itself finds the block again.
+        $dataId = trim($element->getAttribute('data-id'));
+
+        if ($dataId !== '') {
+            return 'block:'.$dataId;
+        }
+
+        // The same handle, repeated in a class by the builders that do that.
+        // Matched by shape rather than by name so a builder nobody has heard
+        // of still benefits: a prefix, then something that looks like a
+        // generated id rather than a word somebody typed.
+        foreach (preg_split('/\s+/', trim($element->getAttribute('class'))) ?: [] as $class) {
+            if (preg_match('/^(elementor-element|brxe|ct|oxy|fl-node|et_pb_module)-([a-f0-9]{5,}|[a-z0-9]{6,})$/i', $class, $m)) {
+                return 'block:'.$m[2];
+            }
+        }
+
+        return null;
     }
 
     protected function structuralPath(DOMElement $node, ?DOMElement $stopAt = null): string
