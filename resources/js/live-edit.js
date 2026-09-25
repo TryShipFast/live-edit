@@ -1110,7 +1110,12 @@ const bootLiveEdit = () => {
             drawerDelete.classList.add('le-hidden');
 
             if (kind === 'setting') {
-                current = { kind, key };
+                // The element is carried so the save can be checked against
+                // the page afterwards. Without it the check quietly did
+                // nothing for words — the commonest edit there is — and
+                // "never recorded" is indistinguishable from "checked and
+                // fine" from the outside, which is how it went unnoticed.
+                current = { kind, key, element };
                 drawerTitle.textContent = element.dataset.editLabel ?? describeElement(element);
                 const richSetting = (window.liveEditRich?.settings ?? []).includes(rest[0]);
                 // Theme markup is full of tabs and newlines; collapse them so the

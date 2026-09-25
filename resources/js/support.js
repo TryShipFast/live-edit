@@ -169,6 +169,14 @@ export const declaredStyleProps = (attribute, configured) => {
         return offered;
     }
 
+    // Nothing known about what the site supports. That is not the same as
+    // "it supports none of these", and treating it that way emptied the panel
+    // on every site that does not publish its vocabulary — no controls at all,
+    // which is a worse answer than a control that might not apply.
+    if (offered.length === 0) {
+        return declared;
+    }
+
     // Narrowed to what the site actually supports. An element can name a prop
     // the site does not offer — markup outlives a config, and a theme marks up
     // everything it might ever allow — and the panel drew a control for it

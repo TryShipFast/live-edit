@@ -492,6 +492,14 @@ const start = async () => {
         const payload = await resolve(config);
 
         if (payload) {
+            // What this site will accept, for the panel that offers it. A
+            // server-rendered page is handed this in its layout; a static page
+            // has no layout, so without it the panel drew controls the server
+            // would silently drop.
+            if (payload.styleProps) {
+                window.liveEditStyleProps = payload.styleProps;
+            }
+
             applied = applyContent(document, payload.settings ?? {});
             applyStyles(document, payload.styles ?? {});
         }

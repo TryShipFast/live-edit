@@ -59,6 +59,13 @@ class ReadPublishedContent
             'pending' => $holding ? $store->pending() : 0,
             'settings' => $settings,
             'styles' => $styles,
+            // What the site will actually accept, for the panel that offers
+            // it. A page rendered by this application is handed the list in
+            // its layout; a static site has no layout to be handed anything
+            // in, so its panel drew a control for every prop the markup named
+            // and the server dropped the ones it did not recognise. Only for
+            // somebody editing: a visitor has no panel.
+            'styleProps' => $includeDrafts ? (array) config('live-edit.style_props') : null,
         ];
     }
 
