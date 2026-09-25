@@ -20,10 +20,25 @@ use ShipFast\LiveEdit\Support\SvgSanitiser;
 class MarkupScanner
 {
     /** Leaf elements whose text is worth editing. */
-    protected const TEXT_TAGS = ['h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'p', 'li', 'blockquote', 'figcaption', 'figure', 'span', 'div', 'button', 'label', 'th', 'td', 'dt', 'dd', 'summary', 'caption', 'cite', 'q'];
+    protected const TEXT_TAGS = ['h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'p', 'pre', 'address', 'li', 'blockquote', 'figcaption', 'figure', 'span', 'div', 'button', 'label', 'th', 'td', 'dt', 'dd', 'summary', 'caption', 'cite', 'q'];
 
-    /** Inline tags that don't disqualify an element from being a text leaf. */
-    protected const INLINE_TAGS = ['b', 'strong', 'i', 'em', 'u', 'small', 'br', 'span', 'a', 'sup', 'sub', 'mark'];
+    /**
+     * Inline tags that don't disqualify an element from being a text leaf.
+     *
+     * This is the HTML phrasing set rather than a handful of favourites,
+     * because a short list is indistinguishable from a bug. A paragraph
+     * carrying one <code> or one <abbr> used to be disqualified here, and
+     * since <code> is not a text tag either the words fell through both rules
+     * and the whole paragraph became uneditable — no warning, no mark on the
+     * page, just a client asking why that one sentence cannot be changed. On
+     * real WordPress content that was half the words on the page.
+     *
+     * Widening this is safe in a way that widening TEXT_TAGS is not: it only
+     * ever admits an element whose own words are already editable, and the
+     * applier replaces text nodes while leaving child markup alone, so the
+     * <code> keeps its tag and its styling.
+     */
+    protected const INLINE_TAGS = ['b', 'strong', 'i', 'em', 'u', 's', 'small', 'br', 'wbr', 'span', 'a', 'sup', 'sub', 'mark', 'code', 'kbd', 'samp', 'var', 'abbr', 'acronym', 'cite', 'q', 'del', 'ins', 'dfn', 'time', 'data', 'bdi', 'bdo', 'ruby', 'rt', 'rp', 'big', 'tt', 'strike', 'font', 'nobr'];
 
     /** @var array<int, array<string, mixed>> */
     protected array $candidates = [];

@@ -688,4 +688,55 @@ class MarkupScannerTest extends TestCase
 
         $this->assertStringContainsString('M5 12h14', $rendered);
     }
+
+    /**
+     * A sentence does not stop being editable because one word is marked up.
+     *
+     * Measured on a real WordPress install: a page of ordinary prose came back
+     * 52% reachable, and every missing run was a paragraph holding a <code>,
+     * an <abbr> or a <del>. The paragraph was not a text leaf because of the
+     * child, and the child was not a text tag, so the words fell through both
+     * rules and nothing on the page said why that sentence could not be
+     * changed. Any bought template with a link or a bolded word inside a
+     * paragraph — which is most of them — meets the same edge.
+     */
+    public function test_a_paragraph_stays_editable_when_a_word_inside_it_is_marked_up(): void
+    {
+        foreach (['code', 'abbr', 'del', 'ins', 'kbd', 'var', 'samp', 'cite', 'q', 'time', 's'] as $inline) {
+            $html = (new MarkupScanner)->apply(
+                "<div><p>This sentence is following a <{$inline}>marked</{$inline}> word.</p></div>",
+                ['text'],
+                true,
+            )['html'];
+
+            $this->assertNotNull(
+                $this->keyOfText($html, 'This sentence'),
+                "a paragraph holding a <{$inline}> was left uneditable",
+            );
+        }
+    }
+
+    public function test_the_marked_up_word_keeps_its_tag_rather_than_being_offered_separately(): void
+    {
+        // Tagging both the paragraph and the child would let one edit append a
+        // stray phrase beside the other. The paragraph is the editable thing;
+        // the applier replaces its text nodes and leaves the child alone, so
+        // the <code> keeps its tag and whatever the theme styles it with.
+        $html = (new MarkupScanner)->apply('<div><p>Use <code>wp-config.php</code> here.</p></div>', ['text'], true)['html'];
+
+        $this->assertSame(1, substr_count($html, 'data-edit="setting:'), 'the marked-up word was offered as a second edit');
+        $this->assertMatchesRegularExpression('/<code[^>]*>wp-config\.php<\/code>/', $html, 'the marked-up word lost its tag');
+    }
+
+    public function test_preformatted_text_and_an_address_are_editable(): void
+    {
+        // Both hold words a client would want to change — a code sample, a
+        // shop's address in the footer — and neither was reachable. The <pre>
+        // alone was the single largest run of uneditable text on the page.
+        foreach (['pre' => 'two roads diverged', 'address' => 'Cupertino, CA 95014'] as $tag => $words) {
+            $html = (new MarkupScanner)->apply("<div><{$tag}>{$words}</{$tag}></div>", ['text'], true)['html'];
+
+            $this->assertNotNull($this->keyOfText($html, $words), "<{$tag}> was left uneditable");
+        }
+    }
 }
