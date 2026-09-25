@@ -213,6 +213,14 @@ describe('declaredStyleProps', () => {
         expect(declaredStyleProps('background,hidden', configured)).toEqual(['background', 'hidden']);
     });
 
+    it('does not offer a control the site cannot honour', () => {
+        // Markup outlives a config, and a theme marks up everything it might
+        // ever allow. The server drops a prop it does not recognise, so the
+        // panel was drawing a control that did nothing: the client picked a
+        // background image, saved, was told it saved, and nothing changed.
+        expect(declaredStyleProps('background,backgroundImage,hidden', configured)).toEqual(['background', 'hidden']);
+    });
+
     it('offers everything when the element narrows nothing', () => {
         // A section tagged as styleable with no narrowing opened a panel with
         // nothing in it.

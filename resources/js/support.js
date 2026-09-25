@@ -159,12 +159,24 @@ export const orderedIcons = (groups) => {
  * narrowing means everything the site offers.
  */
 export const declaredStyleProps = (attribute, configured) => {
+    const offered = Object.keys(configured ?? {});
     const declared = String(attribute ?? '')
         .split(',')
         .map((name) => name.trim())
         .filter(Boolean);
 
-    return declared.length ? declared : Object.keys(configured ?? {});
+    if (declared.length === 0) {
+        return offered;
+    }
+
+    // Narrowed to what the site actually supports. An element can name a prop
+    // the site does not offer — markup outlives a config, and a theme marks up
+    // everything it might ever allow — and the panel drew a control for it
+    // anyway. The server drops a prop it does not recognise, so that control
+    // did nothing at all: the client picked a background image, saved, was
+    // told it saved, and nothing changed, with no way to tell why. Better not
+    // to offer it.
+    return declared.filter((name) => offered.includes(name));
 };
 
 /**
