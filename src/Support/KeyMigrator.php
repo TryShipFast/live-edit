@@ -53,6 +53,20 @@ class KeyMigrator
     /**
      * Signature => [attribute => key] for every tagged element.
      *
+     * Public because a site whose pages are tagged as they load has no
+     * previous file to compare against — it has to remember what it handed
+     * out last time, and this is the thing worth remembering.
+     *
+     * @return array<string, array<string, string>>
+     */
+    public static function indexOf(string $html): array
+    {
+        return self::index($html);
+    }
+
+    /**
+     * Signature => [attribute => key] for every tagged element.
+     *
      * @return array<string, array<string, string>>
      */
     protected static function index(string $html): array

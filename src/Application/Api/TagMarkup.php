@@ -5,6 +5,8 @@ namespace ShipFast\LiveEdit\Application\Api;
 use DOMDocument;
 use DOMElement;
 use DOMXPath;
+use ShipFast\LiveEdit\Domain\Content\CarryContentAcrossRetag;
+use ShipFast\LiveEdit\Domain\Content\SiteStore;
 use ShipFast\LiveEdit\Domain\Site\Site;
 use ShipFast\LiveEdit\Mapper\MarkupScanner;
 
@@ -40,6 +42,18 @@ class TagMarkup
         if ($tagged === '') {
             return ['elements' => [], 'count' => 0];
         }
+
+        // Before answering, make sure the answer still points at the client's
+        // work. A page tagged as it loads has no previous file to compare
+        // against, so the names it was given last time are remembered here —
+        // and when the scanner improves and an element is renamed, its content
+        // follows it. Otherwise improving the scanner would quietly revert
+        // every site to its theme's own words, which is the one failure this
+        // product cannot have.
+        //
+        // Costs a hash and a comparison on an ordinary view; writes only when
+        // the names actually move, which is almost never.
+        rescue(fn () => app(CarryContentAcrossRetag::class)(new SiteStore($site), $page, $tagged), null, false);
 
         $doc = new DOMDocument;
         libxml_use_internal_errors(true);
