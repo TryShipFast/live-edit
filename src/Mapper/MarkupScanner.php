@@ -945,6 +945,14 @@ class MarkupScanner
                 continue;
             }
 
+            // This pass walks the document flat rather than descending, so
+            // refusing the chrome element itself is not enough — everything
+            // under it has to be refused too. That is how ninety-four pieces
+            // of the WordPress toolbar came to be styleable on a real site.
+            if ($this->insideChrome($el)) {
+                continue;
+            }
+
             $el->setAttribute('data-style', 's'.$this->autoKey($el));
             $el->setAttribute('data-style-props', self::STYLE_PROPS);
             $tagged++;
@@ -1052,6 +1060,50 @@ class MarkupScanner
         return Str::of($key)->snake(' ')->replace('href', '')->squish()->ucfirst()->toString();
     }
 
+    /**
+     * Somebody else's furniture, which is not the site.
+     *
+     * A signed-in WordPress page carries an admin toolbar, and a document may
+     * carry a debug bar, a cookie banner's own shell, or our editor's chrome.
+     * None of it belongs to the client and none of it is theirs to change.
+     *
+     * The WordPress adapter used to strip its toolbar after the fact, and only
+     * of content — leaving ninety-four styleable elements behind, so a client
+     * could restyle the WordPress toolbar. Every adapter would have to
+     * remember to do the same thing, and each would forget a different half of
+     * it. Refusing to tag it in the first place is one rule in one place, and
+     * data-no-edit lets any host mark its own furniture without us knowing the
+     * name of it.
+     */
+    protected function isChrome(DOMElement $element): bool
+    {
+        if ($element->hasAttribute('data-no-edit') || $element->hasAttribute('data-live-edit-chrome')) {
+            return true;
+        }
+
+        $id = strtolower($element->getAttribute('id'));
+
+        if (in_array($id, ['wpadminbar', 'wp-toolbar', 'query-monitor', 'debug-bar', 'adminmenumain'], true)) {
+            return true;
+        }
+
+        $classes = preg_split('/\s+/', strtolower(trim($element->getAttribute('class')))) ?: [];
+
+        return (bool) array_intersect($classes, ['live-edit-chrome', 'le-chrome', 'kastsbuild-chrome']);
+    }
+
+    /** The same question asked of an element and everything above it. */
+    protected function insideChrome(DOMElement $element): bool
+    {
+        for ($node = $element; $node instanceof DOMElement; $node = $node->parentNode) {
+            if ($this->isChrome($node)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
     protected function walk(DOMNode $node): void
     {
         foreach ($node->childNodes as $child) {
@@ -1062,6 +1114,10 @@ class MarkupScanner
             $tag = strtolower($child->tagName);
 
             if ($tag === 'script' || $tag === 'style' || $tag === 'noscript') {
+                continue;
+            }
+
+            if ($this->isChrome($child)) {
                 continue;
             }
 

@@ -728,6 +728,56 @@ class MarkupScannerTest extends TestCase
         $this->assertMatchesRegularExpression('/<code[^>]*>wp-config\.php<\/code>/', $html, 'the marked-up word lost its tag');
     }
 
+    public function test_the_hosts_own_furniture_is_never_offered_for_editing(): void
+    {
+        // A signed-in WordPress page carries an admin toolbar. It is not the
+        // client's site and not theirs to change — and a client who restyles
+        // the WordPress toolbar by accident has been handed a mess with no
+        // obvious way back.
+        $html = (new MarkupScanner)->apply(
+            '<body><div id="wpadminbar"><ul><li><a href="/wp-admin">Howdy, kbadmin</a></li></ul></div>'
+            .'<main><h1>The site itself</h1></main></body>',
+            ['text', 'link'],
+            true,
+        )['html'];
+
+        $doc = new \DOMDocument;
+        libxml_use_internal_errors(true);
+        $doc->loadHTML($html);
+        libxml_clear_errors();
+        $bar = (new \DOMXPath($doc))->query('//*[@id="wpadminbar"]//*[@data-edit or @data-edit-href or @data-style]');
+
+        $this->assertSame(0, $bar->length, 'the host\'s toolbar was offered for editing');
+        $this->assertNotNull($this->keyOfText($html, 'The site itself'), 'the site itself must still be editable');
+    }
+
+    public function test_styling_stops_at_the_furniture_too(): void
+    {
+        // Content and styling are two passes and the styling one walks the
+        // document flat, so refusing the chrome element alone left everything
+        // under it styleable. On a real page that was ninety-four pieces of
+        // the WordPress toolbar.
+        $html = (new MarkupScanner)->apply(
+            '<body><div id="wpadminbar"><ul><li><span>Howdy</span></li></ul></div></body>',
+            ['text'],
+            true,
+        )['html'];
+
+        $this->assertSame(0, substr_count($html, 'data-style='), 'the toolbar was left styleable');
+    }
+
+    public function test_a_host_can_mark_its_own_furniture_without_us_knowing_its_name(): void
+    {
+        $html = (new MarkupScanner)->apply(
+            '<body><div data-no-edit><p>Somebody else\'s bar</p></div><p>Ours</p></body>',
+            ['text'],
+            true,
+        )['html'];
+
+        $this->assertNull($this->keyOfText($html, "Somebody else's bar"));
+        $this->assertNotNull($this->keyOfText($html, 'Ours'));
+    }
+
     public function test_a_link_the_template_left_blank_is_the_one_that_most_needs_filling(): void
     {
         // A bought template ships its social row as <a href=""> with the
