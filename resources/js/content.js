@@ -500,6 +500,14 @@ const start = async () => {
                 window.liveEditStyleProps = payload.styleProps;
             }
 
+            // How many changes are waiting, so the toolbar can offer to put
+            // them live. A server-rendered page is told this in its layout; a
+            // static page has no layout, so the Publish button simply never
+            // appeared and the drafts had nowhere to go.
+            if (typeof payload.pending === 'number' && payload.styleProps) {
+                window.liveEditPublishing = { ...(window.liveEditPublishing ?? {}), pending: payload.pending };
+            }
+
             applied = applyContent(document, payload.settings ?? {});
             applyStyles(document, payload.styles ?? {});
         }

@@ -30,7 +30,20 @@ class IssueEditSession
         [, $plain] = $site->issueToken(
             TokenType::Session,
             $label !== null && $label !== '' ? mb_substr($label, 0, 100) : 'Edit session',
-            [Ability::Read, Ability::Write],
+            // Publish too, and deliberately.
+            //
+            // Holding edits back is only a safety net if the person who made
+            // them can release them. On a site this application does not
+            // render there is no other credential in the building: the button
+            // is not there, and the ability was not either, so a static-site
+            // client could edit for ever and never go live. That is the
+            // flagship case.
+            //
+            // It is not the same as handing a browser the secret. A session is
+            // short-lived, origin-bound, minted only for somebody who proved
+            // they may edit this site, and cannot mint another — which is what
+            // Ability::Mint exists to prevent.
+            [Ability::Read, Ability::Write, Ability::Publish],
             $expiresAt,
         );
 

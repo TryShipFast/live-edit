@@ -1937,8 +1937,24 @@ const bootLiveEdit = () => {
          * declaring how many changes are waiting; without that the buttons stay
          * hidden and the editor behaves as it always did.
          */
-        const publishing = window.liveEditPublishing;
-        if (publishing) {
+        /*
+         * A server-rendered page declares this in its layout, before anything
+         * here runs. A static page learns it from the content it fetches,
+         * which has not arrived yet — so reading it once at boot left the
+         * Publish button permanently disabled on exactly the sites that have
+         * no other way to put work live.
+         */
+        const whenPublishingKnown = (use) => {
+            if (window.liveEditPublishing) {
+                use(window.liveEditPublishing);
+
+                return;
+            }
+
+            pageSettled().then(() => window.liveEditPublishing && use(window.liveEditPublishing));
+        };
+
+        whenPublishingKnown((publishing) => {
             let pending = publishing.pending ?? 0;
             const showPending = () => {
                 ui.publishButton.hidden = false;
@@ -1981,7 +1997,7 @@ const bootLiveEdit = () => {
                     window.prompt('Copy this preview link:', publishing.previewUrl);
                 }
             });
-        }
+        });
 
         ui.undoButton.addEventListener('click', async () => {
             const res = await request('/live-edit/undo', { method: 'POST' });

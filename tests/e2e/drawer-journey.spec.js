@@ -343,6 +343,108 @@ test('the client is told when a save does not reach the page', async ({ page, re
         .toBeVisible({ timeout: 15000 });
 });
 
+
+/* -------------------------- making it live, and lists ------------------------- */
+
+test('a client can put their own work live, and a visitor sees it', async ({ page, browser, request }) => {
+    // The whole point of holding edits back. If the person who made the
+    // change cannot release it, the draft is a trap rather than a safety net —
+    // and on a site this application does not render there was no button and
+    // no ability behind it, so a client could edit for ever and never go live.
+    await asEditor(page, request);
+
+    const key = await page.evaluate(() => {
+        for (const el of document.querySelectorAll('[data-edit^="setting:"]')) {
+            if ((el.textContent ?? '').trim().length > 8) return el.getAttribute('data-edit');
+        }
+
+        return null;
+    });
+    expect(key).not.toBeNull();
+
+    const words = `Live for everyone ${Date.now()}`;
+    await openDrawer(page, `[data-edit="${key}"]`);
+    await panel(page).locator('textarea').first().fill(words);
+    await save(page);
+
+    // Whether there is a step between saving and being live is the site's
+    // choice; that a client can get there without one is not.
+    const waiting = await page.evaluate(() => window.liveEditPublishing?.pending ?? 0);
+    const publish = page.getByRole('button', { name: /^Publish/ });
+
+    if (waiting > 0) {
+        await expect(publish, 'work is waiting and there is no way to release it').toBeVisible();
+        await expect(publish).toBeEnabled();
+        // Putting work live asks first, as it should.
+        page.once('dialog', (d) => d.accept());
+        await publish.click();
+        await settled(page);
+    }
+
+    // A visitor, who reads the published files and holds no key at all.
+    const visitor = await (await browser.newContext()).newPage();
+    await visitor.goto('/');
+    await settled(visitor);
+
+    expect(await shown(visitor, `[data-edit="${key}"]`)).toContain(words);
+});
+
+test('an item added to a list is on the page, and can be taken off again', async ({ page, request }) => {
+    await asEditor(page, request);
+
+    // A list a client can actually reach. The controls live in the panel of an
+    // item, so something inside one has to open on a click — and a link does
+    // not: in editing mode a link still navigates, deliberately, so that the
+    // whole site can be browsed, and it is edited from a handle instead.
+    const list = await page.evaluate(() => {
+        const opens = (el) => el && el.tagName !== 'A';
+
+        for (const candidate of document.querySelectorAll('[data-edit-list]')) {
+            const items = [...candidate.children].filter((child) => child.dataset.editItem);
+            const openable = items.some((item) => (
+                (item.matches('[data-edit]') && opens(item))
+                || opens(item.querySelector('[data-edit], [data-edit-icon], [data-edit-img]'))
+            ));
+
+            if (items.length > 0 && openable) return candidate.getAttribute('data-edit-list');
+        }
+
+        return null;
+    });
+    test.skip(!list, 'no list on this page has an item a client can open');
+
+    const items = `[data-edit-list="${list}"] > [data-edit-item]`;
+    const count = () => page.locator(items).count();
+    const before = await count();
+
+    const openItem = async (which) => {
+        const item = page.locator(which).first();
+        const inner = item.locator(':is([data-edit], [data-edit-icon], [data-edit-img]):not(a)').first();
+        const target = await inner.count() ? inner : item;
+        await target.scrollIntoViewIfNeeded();
+        await target.click({ force: true });
+        await expect(page.getByRole('button', { name: 'Save changes' })).toBeVisible();
+    };
+
+    await openItem(items);
+    await panel(page).getByRole('button', { name: /Add another|Add item/ }).click();
+    await settled(page);
+    await page.reload();
+    await settled(page);
+
+    expect(await count(), 'the new item is not on the page').toBe(before + 1);
+
+    // And off again, so the suite leaves the site as it found it.
+    await openItem(`${items}:last-child`);
+    page.once('dialog', (d) => d.accept());
+    await panel(page).getByRole('button', { name: /Delete this item/ }).click();
+    await settled(page);
+    await page.reload();
+    await settled(page);
+
+    expect(await count(), 'the item could not be taken off again').toBe(before);
+});
+
 /* ------------------------------ and the visitor ----------------------------- */
 
 test('a visitor is shown the published site and none of the editing', async ({ page, browser, request }) => {

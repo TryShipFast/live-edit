@@ -6,7 +6,8 @@
   "scripts": {
     "test": "vitest run",
     "test:e2e": "playwright test",
-    "test:journey": "playwright test tests/e2e/drawer-journey.spec.js"
+    "test:journey": "playwright test tests/e2e/drawer-journey.spec.js tests/e2e/content-is-yours.spec.js",
+    "test:journey:blade": "playwright test tests/e2e/blade-journey.spec.js"
   },
   "devDependencies": {
     "@babel/parser": "^7.29.9",
