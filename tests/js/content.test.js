@@ -456,21 +456,50 @@ describe('putting a list in the order somebody chose', () => {
 })
 
 describe('what editing mode does to the page it is a guest on', () => {
-    it('never hides the thing being edited', async () => {
-        // These markers had a rule of their own — opacity 0, back to 1 on
-        // hover — written for an affordance laid over a picture and aimed at
-        // the picture instead. Turning editing on made every image on the page
-        // vanish until the pointer crossed it, which is exactly the opposite
-        // of what somebody choosing a replacement needs.
+    // The marker means two things. A hand-written host lays a panel over a
+    // picture and marks the panel; a scanned page has no panel, so the marker
+    // lands on the <img>. One rule served both, and whichever way it was
+    // written, one of the two broke.
+    const hidingSelectorsIn = (css) => css
+        .replace(/\/\*[\s\S]*?\*\//g, '')
+        .split('}')
+        .filter((block) => /opacity:\s*0\s*[;}]?/.test(block))
+        .flatMap((block) => block.split('{')[0].split(',').map((s) => s.trim()))
+        .filter(Boolean);
+
+    const hides = (css, html) => {
+        document.body.className = 'editing';
+        document.body.innerHTML = html;
+        const target = document.body.firstElementChild;
+
+        return hidingSelectorsIn(css).some((selector) => {
+            try {
+                return target.matches(selector.replace(/^body\.editing\s+/, ''));
+            } catch {
+                return false;
+            }
+        });
+    };
+
+    it('never hides a picture that is the picture', async () => {
         const { PAGE_CSS } = await import('../../resources/js/chrome.js');
 
-        const hidden = PAGE_CSS
-            // Comments explain the history; they are not rules.
-            .replace(/\/\*[\s\S]*?\*\//g, '')
-            .split('}')
-            .filter((block) => /opacity:\s*0\s*[;}]?/.test(block))
-            .map((block) => block.split('{')[0].trim());
+        expect(hides(PAGE_CSS, '<img data-edit-img="setting:auto:p" src="/a.jpg">')).toBe(false);
+    });
 
-        expect(hidden).toEqual([]);
+    it('still hides a panel laid over a picture until it is wanted', async () => {
+        // The host keeps it hidden and the editor reveals it on hover. Showing
+        // it always would leave "Replace image" sitting on the picture.
+        const { PAGE_CSS } = await import('../../resources/js/chrome.js');
+
+        expect(hides(PAGE_CSS, '<div data-edit-img="gallery:1">Replace image</div>')).toBe(true);
+    });
+
+    it('never hides a section because of its background', async () => {
+        // The element carrying a background IS the section. Hiding it would
+        // take the section's contents with it.
+        const { PAGE_CSS } = await import('../../resources/js/chrome.js');
+
+        expect(hides(PAGE_CSS, '<section data-edit-bg="setting:auto:b">Words</section>')).toBe(false);
     });
 });

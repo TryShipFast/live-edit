@@ -338,22 +338,30 @@ select.le-input {
 export const PAGE_CSS = `
 body.editing [data-edit],
 body.editing [data-edit-href]:not([data-edit]),
-/* A picture is marked the same way the words are.
- *
- * These two had their own rule — opacity 0, back to 1 on hover — which was
- * written for an affordance laid over a picture and aimed at the picture
- * instead. The result: turn editing on and every image on the page vanishes
- * until the pointer happens to cross it. The one person who must be able to
- * see a picture is the one deciding whether to replace it. Hover is drawn by
- * the overlay's indicator, which also names the element, so nothing here
- * needs to hide anything. */
-body.editing [data-edit-img],
+/* The picture itself is marked the same way the words are. */
+body.editing img[data-edit-img],
 body.editing [data-edit-bg] {
   outline: 1px dashed rgba(17, 24, 39, .35);
   outline-offset: 3px;
   border-radius: 3px;
   cursor: pointer;
 }
+/* The marker means two different things, and one rule used to serve both.
+ *
+ * A host that writes its own templates lays a panel OVER a picture and marks
+ * the panel — it says "Replace image" and is hidden until wanted. A scanned
+ * page has no such panel, so the marker lands on the <img> itself. Hiding
+ * both made every picture on a scanned page vanish until the pointer crossed
+ * it, and the one person who must see a picture is the one deciding whether
+ * to replace it. Revealing both left the panel covering the picture the whole
+ * time. The tag says which is which. */
+body.editing :not(img)[data-edit-img] {
+  display: flex;
+  opacity: 0;
+  transition: opacity .15s ease;
+}
+body.editing :not(img)[data-edit-img]:hover,
+body.editing :not(img)[data-edit-img]:focus-visible { opacity: 1; }
 `;
 
 const el = (tag, className, text) => {
