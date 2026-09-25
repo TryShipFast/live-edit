@@ -1116,7 +1116,30 @@ class MarkupScanner
                 continue;
             }
 
-            if ($tag === 'a' && $child->getAttribute('href') !== '') {
+            // An empty href is not "no link" — it is the one link that most
+            // needs an answer.
+            //
+            // A bought template ships its social row as <a href=""> with the
+            // brand's icon inside, waiting for the buyer's own address. Those
+            // were the only anchors skipped here, so the very first thing a new
+            // customer sits down to do — put their Facebook page in — was the
+            // one thing the editor would not let them do. All they could reach
+            // was the screen-reader label inside, which is invisible.
+            //
+            // Found on a real Elementor template: four social links, four
+            // empty hrefs, none of them editable.
+            //
+            // The value is not the test. An href="" is the template declaring
+            // a destination it does not know yet, and Elementor drops the
+            // attribute altogether — the four social anchors on the page that
+            // exposed this carried target="_blank" and nothing else.
+            //
+            // target and rel are the tell: they mean nothing except on
+            // something meant to navigate, so an anchor wearing one is a link
+            // whatever its href says. A bare <a> with none of the three is
+            // usually a control a script drives — a tab, an accordion — and
+            // offering a web address for one of those invites breaking it.
+            if ($tag === 'a' && $this->isDestination($child)) {
                 $this->addLink($child);
                 if (! $this->isTextLeaf($child)) {
                     $this->walk($child);
@@ -1422,6 +1445,20 @@ class MarkupScanner
             'suggested' => 'data-edit-attr="placeholder:setting:'.$this->lastKey.'"',
             'node' => $element,
         ];
+    }
+
+    /**
+     * Whether this anchor is meant to take somebody somewhere.
+     *
+     * An href of any value says so. So does target or rel, which mean nothing
+     * on anything else — and that is the only signal a page builder leaves
+     * when the buyer has not filled the address in yet.
+     */
+    protected function isDestination(DOMElement $element): bool
+    {
+        return $element->hasAttribute('href')
+            || $element->hasAttribute('target')
+            || $element->hasAttribute('rel');
     }
 
     protected function addLink(DOMElement $element): void

@@ -728,6 +728,38 @@ class MarkupScannerTest extends TestCase
         $this->assertMatchesRegularExpression('/<code[^>]*>wp-config\.php<\/code>/', $html, 'the marked-up word lost its tag');
     }
 
+    public function test_a_link_the_template_left_blank_is_the_one_that_most_needs_filling(): void
+    {
+        // A bought template ships its social row as <a href=""> with the
+        // brand's icon inside, waiting for the buyer's own address. Putting
+        // their Facebook page in is the first thing a new customer sits down
+        // to do, and it was the one thing the editor would not let them do:
+        // an empty href was read as "not a link". All they could reach was the
+        // screen-reader label, which is invisible.
+        // Both spellings a builder uses for "no address yet": an empty href,
+        // and — the one actually found on the page — no href at all, with
+        // target="_blank" the only thing left saying it is a link.
+        foreach ([
+            '<a href="" class="elementor-social-icon"><span class="elementor-screen-only">Facebook</span></a>',
+            '<a target="_blank" class="elementor-social-icon"><span class="elementor-screen-only">Facebook</span></a>',
+        ] as $anchor) {
+            $html = (new MarkupScanner)->apply("<div>{$anchor}</div>", ['text', 'link'], true)['html'];
+
+            $this->assertStringContainsString('data-edit-href="auto:', $html, "a blank social link was left uneditable: {$anchor}");
+        }
+    }
+
+    public function test_an_anchor_that_is_really_a_control_is_not_offered_a_web_address(): void
+    {
+        // No href attribute at all is a tab or an accordion that a script
+        // drives. Offering a destination for one is an invitation to break it,
+        // so the attribute's presence is the test, not its value.
+        $html = (new MarkupScanner)->apply('<div><a class="tab-toggle">Details</a></div>', ['text', 'link'], true)['html'];
+
+        $this->assertStringNotContainsString('data-edit-href', $html);
+        $this->assertNotNull($this->keyOfText($html, 'Details'), 'its words should still be editable');
+    }
+
     public function test_a_background_the_browser_resolved_is_offered_like_any_other(): void
     {
         // A page builder writes its backgrounds into a generated stylesheet,
