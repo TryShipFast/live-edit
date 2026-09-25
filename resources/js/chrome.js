@@ -337,22 +337,23 @@ select.le-input {
  */
 export const PAGE_CSS = `
 body.editing [data-edit],
-body.editing [data-edit-href]:not([data-edit]) {
+body.editing [data-edit-href]:not([data-edit]),
+/* A picture is marked the same way the words are.
+ *
+ * These two had their own rule — opacity 0, back to 1 on hover — which was
+ * written for an affordance laid over a picture and aimed at the picture
+ * instead. The result: turn editing on and every image on the page vanishes
+ * until the pointer happens to cross it. The one person who must be able to
+ * see a picture is the one deciding whether to replace it. Hover is drawn by
+ * the overlay's indicator, which also names the element, so nothing here
+ * needs to hide anything. */
+body.editing [data-edit-img],
+body.editing [data-edit-bg] {
   outline: 1px dashed rgba(17, 24, 39, .35);
   outline-offset: 3px;
   border-radius: 3px;
   cursor: pointer;
 }
-/* Hover is drawn by the overlay's indicator, which also names the element. */
-body.editing [data-edit-img],
-body.editing [data-edit-bg] {
-  display: flex;
-  opacity: 0;
-  transition: opacity .15s ease;
-}
-body.editing [data-edit-img]:hover,
-body.editing [data-edit-bg]:hover,
-body.editing [data-edit-img]:focus-visible { opacity: 1; }
 `;
 
 const el = (tag, className, text) => {

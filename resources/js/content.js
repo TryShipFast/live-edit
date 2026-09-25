@@ -198,6 +198,26 @@ export const applyContent = (root, settings) => {
             applyValue(element, settings[key]);
             applied++;
         }
+
+        // The description is stored beside the picture. A page rendered by a
+        // server puts it in the markup; a static page has only this, so
+        // without it the alt text the drawer collects is written down, kept,
+        // and never reaches a screen reader or a search engine — which is the
+        // whole reason for asking somebody to write one.
+        for (const [suffix, attribute] of [['Alt', 'alt'], ['Title', 'title']]) {
+            if (Object.hasOwn(settings, key + suffix)) {
+                const value = settings[key + suffix];
+                // An empty description is a decorative image, which is a
+                // meaningful answer: alt="" says "skip me". An empty title is
+                // not — it is a tooltip nobody wanted.
+                if (value === '' && attribute === 'title') {
+                    element.removeAttribute('title');
+                } else {
+                    element.setAttribute(attribute, value);
+                }
+                applied++;
+            }
+        }
     }
 
     // An icon is a set of class names, not words. The server swaps them the

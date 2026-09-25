@@ -77,6 +77,23 @@ describe('what a visitor sees, applied by the server and by the browser', () => 
         expect(b).toBe('/new.jpg');
     });
 
+    it('agrees on how a picture is described', () => {
+        // The browser applies the description on a live page; the server
+        // applies it when a customer exports their files. One rule written
+        // twice is how an exported page loses the alt text the live one has.
+        const { server: s, browser: b } = both(
+            '<img data-edit-img="setting:auto:p" src="/old.jpg" alt="Old" title="Old">',
+            { 'auto:p': '/new.jpg', 'auto:pAlt': 'A beach at dawn', 'auto:pTitle': '' }, {},
+            (doc) => {
+                const img = doc.querySelector('img');
+                return `${img.getAttribute('alt')}|${img.hasAttribute('title')}`;
+            },
+        );
+
+        expect(b).toBe(s);
+        expect(b).toBe('A beach at dawn|false');
+    });
+
     it('agrees on where a link goes', () => {
         const { server: s, browser: b } = both(
             '<a data-edit="setting:auto:t" data-edit-href="auto:h" href="/old">Book</a>',

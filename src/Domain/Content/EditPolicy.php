@@ -28,6 +28,39 @@ class EditPolicy
      */
     public function permitsKey(string $key): bool
     {
+        if ($this->declaredOrScanned($key)) {
+            return true;
+        }
+
+        // A picture's description is written beside the picture, under its own
+        // name with a suffix. Nobody declares those names — the scanner gives
+        // a picture a key like auto:1a2b3c and its description is
+        // auto:1a2b3cAlt, which matches no pattern and no allowlist. Refusing
+        // them meant a save that changed the picture and then failed on the
+        // alt text: the change had happened and the person was told it had
+        // not. It is allowed exactly when the thing it describes is.
+        foreach (self::COMPANIONS as $suffix) {
+            if (str_ends_with($key, $suffix)) {
+                $describes = substr($key, 0, -strlen($suffix));
+
+                if ($describes !== '' && $this->declaredOrScanned($describes)) {
+                    return true;
+                }
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * The attributes that belong to a picture rather than standing on their
+     * own. Deliberately short: every suffix here is a key an API caller may
+     * write without it having been declared anywhere.
+     */
+    private const COMPANIONS = ['Alt', 'Title'];
+
+    private function declaredOrScanned(string $key): bool
+    {
         if (in_array($key, config('live-edit.settings', []), true)) {
             return true;
         }

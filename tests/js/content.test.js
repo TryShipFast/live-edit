@@ -244,6 +244,31 @@ describe('the markers that are not data-edit', () => {
         expect(document.querySelector('img').getAttribute('src')).toBe('/new.png');
     });
 
+    it('describes a picture for the people who cannot see it', () => {
+        // The drawer asks for alt text and the API stores it. Nothing applied
+        // it, so on a static site the description was written down, kept, and
+        // never reached a screen reader or a search engine.
+        document.body.innerHTML = '<img data-edit-img="setting:auto:pic" src="/old.png" alt="Old">';
+
+        applyContent(document, { 'auto:pic': '/new.png', 'auto:picAlt': 'A beach at dawn', 'auto:picTitle': 'Dawn' });
+
+        const img = document.querySelector('img');
+        expect(img.getAttribute('alt')).toBe('A beach at dawn');
+        expect(img.getAttribute('title')).toBe('Dawn');
+    });
+
+    it('lets a picture be marked decorative but does not leave an empty tooltip', () => {
+        // alt="" is a real answer: it tells a screen reader to skip the
+        // image. An empty title is not — it is a tooltip nobody asked for.
+        document.body.innerHTML = '<img data-edit-img="setting:auto:pic" src="/a.png" alt="Old" title="Old">';
+
+        applyContent(document, { 'auto:picAlt': '', 'auto:picTitle': '' });
+
+        const img = document.querySelector('img');
+        expect(img.getAttribute('alt')).toBe('');
+        expect(img.hasAttribute('title')).toBe(false);
+    });
+
     it('leaves a picture alone when nothing was published for it', () => {
         document.body.innerHTML = '<img data-edit-img="setting:auto:pic" src="/old.png" alt="">';
 
@@ -429,3 +454,23 @@ describe('putting a list in the order somebody chose', () => {
         expect(order(document)).toEqual(['Second, moved first', 'First, moved second']);
     });
 })
+
+describe('what editing mode does to the page it is a guest on', () => {
+    it('never hides the thing being edited', async () => {
+        // These markers had a rule of their own — opacity 0, back to 1 on
+        // hover — written for an affordance laid over a picture and aimed at
+        // the picture instead. Turning editing on made every image on the page
+        // vanish until the pointer crossed it, which is exactly the opposite
+        // of what somebody choosing a replacement needs.
+        const { PAGE_CSS } = await import('../../resources/js/chrome.js');
+
+        const hidden = PAGE_CSS
+            // Comments explain the history; they are not rules.
+            .replace(/\/\*[\s\S]*?\*\//g, '')
+            .split('}')
+            .filter((block) => /opacity:\s*0\s*[;}]?/.test(block))
+            .map((block) => block.split('{')[0].trim());
+
+        expect(hidden).toEqual([]);
+    });
+});

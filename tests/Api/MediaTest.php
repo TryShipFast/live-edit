@@ -5,6 +5,7 @@ namespace ShipFast\LiveEdit\Tests\Api;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
 use ShipFast\LiveEdit\Domain\Content\ImageStore;
+use ShipFast\LiveEdit\Domain\Content\SiteStore;
 use ShipFast\LiveEdit\Domain\Site\Ability;
 use ShipFast\LiveEdit\Domain\Site\Site;
 use ShipFast\LiveEdit\Domain\Site\TokenType;
@@ -42,6 +43,7 @@ class MediaTest extends TestCase
         $app['config']->set('live-edit.disk', 's3');
         $app['config']->set('live-edit.directory', 'live-edit');
         $app['config']->set('live-edit.max_upload_kb', 8192);
+        $app['config']->set('live-edit.settings', ['heroImage', 'heroImageAlt', 'heroImageTitle']);
     }
 
     protected function setUp(): void
@@ -72,7 +74,13 @@ class MediaTest extends TestCase
 
     protected function as(string $token): array
     {
-        return ['Authorization' => 'Bearer '.$token, 'Origin' => 'https://client.test'];
+        // What the editor itself sends. Without it a rejected field is a
+        // redirect rather than the error the browser would actually see.
+        return [
+            'Authorization' => 'Bearer '.$token,
+            'Origin' => 'https://client.test',
+            'Accept' => 'application/json',
+        ];
     }
 
     public function test_an_image_is_stored_on_the_bucket_and_answered_with_a_url(): void
@@ -239,5 +247,202 @@ class MediaTest extends TestCase
 
         Storage::disk('s3')->assertExists($path);
         $this->assertStringStartsWith('live-edit/', $path);
+    }
+
+    /* ------------ changing the picture a page actually points at ------------ */
+
+    /**
+     * Storing the bytes was never the job. This endpoint took an upload, put
+     * it in the bucket, handed back an address and left it there — nobody
+     * wrote the address down, so the page went on showing the old picture. A
+     * customer sees a save that did nothing.
+     */
+    public function test_an_uploaded_picture_becomes_the_one_the_page_shows(): void
+    {
+        $response = $this->post($this->url(), [
+            'target' => 'setting:heroImage',
+            'file' => UploadedFile::fake()->image('new.jpg', 800, 600),
+        ], $this->as($this->session))->assertOk();
+
+        $this->assertSame($response->json('url'), $this->settings()['heroImage'] ?? null);
+    }
+
+    public function test_a_pasted_url_becomes_the_picture(): void
+    {
+        // The drawer offers "or paste an image URL" and this endpoint used to
+        // reject it outright: the only field it read was the file, so pasting
+        // a URL answered "the file field is required".
+        $this->post($this->url(), [
+            'target' => 'setting:heroImage',
+            'url' => 'https://images.example.com/beach.jpg',
+        ], $this->as($this->session))->assertOk();
+
+        $this->assertSame('https://images.example.com/beach.jpg', $this->settings()['heroImage'] ?? null);
+    }
+
+    public function test_a_picture_can_be_described_and_removed(): void
+    {
+        $this->post($this->url(), [
+            'target' => 'setting:heroImage',
+            'url' => 'https://images.example.com/beach.jpg',
+            'alt' => 'A beach at dawn',
+            'imgTitle' => 'Dawn',
+        ], $this->as($this->session))->assertOk();
+
+        $settings = $this->settings();
+        $this->assertSame('A beach at dawn', $settings['heroImageAlt'] ?? null);
+        $this->assertSame('Dawn', $settings['heroImageTitle'] ?? null);
+
+        $this->post($this->url(), [
+            'target' => 'setting:heroImage',
+            'remove' => '1',
+        ], $this->as($this->session))->assertOk();
+
+        $this->assertSame('', $this->settings()['heroImage'] ?? null);
+    }
+
+    public function test_the_alt_text_can_be_changed_on_its_own(): void
+    {
+        // Correcting a description is a real edit, and the picture field being
+        // empty while doing it is not a mistake.
+        $this->post($this->url(), [
+            'target' => 'setting:heroImage',
+            'url' => 'https://images.example.com/beach.jpg',
+        ], $this->as($this->session))->assertOk();
+
+        $this->post($this->url(), [
+            'target' => 'setting:heroImage',
+            'alt' => 'Corrected description',
+        ], $this->as($this->session))->assertOk();
+
+        $settings = $this->settings();
+        $this->assertSame('Corrected description', $settings['heroImageAlt'] ?? null);
+        // And the picture it describes is still there.
+        $this->assertSame('https://images.example.com/beach.jpg', $settings['heroImage'] ?? null);
+    }
+
+    public function test_a_description_is_saved_for_a_picture_nobody_declared(): void
+    {
+        // The scanner names a picture auto:<hash>; its description is that
+        // name with a suffix, which matches no allowlist and no pattern.
+        // Refusing it failed the save *after* the picture had been replaced,
+        // so the change had happened and the person was told it had not.
+        config()->set('live-edit.auto_keys', true);
+
+        $this->post($this->url(), [
+            'target' => 'setting:auto:1a2b3c4d5e6f',
+            'url' => 'https://images.example.com/beach.jpg',
+            'alt' => 'A beach at dawn',
+        ], $this->as($this->session))->assertOk();
+
+        $settings = $this->settings();
+        $this->assertSame('https://images.example.com/beach.jpg', $settings['auto:1a2b3c4d5e6f'] ?? null);
+        $this->assertSame('A beach at dawn', $settings['auto:1a2b3c4d5e6fAlt'] ?? null);
+    }
+
+    public function test_a_companion_key_is_only_allowed_beside_a_real_one(): void
+    {
+        // Not a general escape from the allowlist: the suffix is permitted
+        // because the thing it describes is, and for nothing else.
+        config()->set('live-edit.auto_keys', false);
+
+        $this->post($this->url(), [
+            'target' => 'setting:whateverAlt',
+            'url' => 'https://images.example.com/beach.jpg',
+        ], $this->as($this->session))->assertStatus(422);
+    }
+
+    public function test_a_refused_save_leaves_nothing_behind(): void
+    {
+        // One picture edit is several settings. Written one at a time, a
+        // refusal partway through replaced the picture and kept the old
+        // description, while reporting that nothing had been saved.
+        config()->set('live-edit.auto_keys', true);
+
+        // Room for exactly one write, so the picture is stored and the
+        // description that follows it is refused — a failure that can only
+        // happen partway through, which is the case this is about.
+        $this->site->forceFill(['limits' => ['writes' => 1]])->save();
+
+        $this->post($this->url(), [
+            'target' => 'setting:auto:1a2b3c4d5e6f',
+            'url' => 'https://images.example.com/beach.jpg',
+            'alt' => 'A beach at dawn',
+        ], $this->as($this->session))->assertStatus(402);
+
+        $settings = $this->settings();
+        $this->assertArrayNotHasKey('auto:1a2b3c4d5e6f', $settings, 'the picture changed on a save that failed');
+        $this->assertArrayNotHasKey('auto:1a2b3c4d5e6fAlt', $settings);
+    }
+
+    public function test_a_save_with_nothing_in_it_says_so(): void
+    {
+        $this->post($this->url(), ['target' => 'setting:heroImage'], $this->as($this->session))
+            ->assertStatus(422)
+            ->assertJsonPath('error.type', 'invalid_request_error');
+    }
+
+    public function test_a_picture_may_not_be_a_script(): void
+    {
+        // This value becomes a src the browser will fetch.
+        foreach (['javascript:alert(1)', 'data:text/html;base64,PHNjcmlwdD4='] as $attempt) {
+            $this->post($this->url(), ['target' => 'setting:heroImage', 'url' => $attempt], $this->as($this->session))
+                ->assertStatus(422);
+
+            $this->assertArrayNotHasKey('heroImage', $this->settings());
+        }
+    }
+
+    public function test_an_undeclared_setting_is_refused(): void
+    {
+        // The same allowlist a text edit goes through: an API that wrote any
+        // key it was handed would be a way around it.
+        $this->post($this->url(), [
+            'target' => 'setting:somethingElse',
+            'url' => 'https://images.example.com/beach.jpg',
+        ], $this->as($this->session))->assertStatus(422);
+    }
+
+    public function test_a_row_in_the_hosts_own_database_is_not_reachable(): void
+    {
+        // "post:12" is a record in the host application. A site on somebody
+        // else's server has none, and this API does not reach into one.
+        $this->post($this->url(), [
+            'target' => 'post:12',
+            'url' => 'https://images.example.com/beach.jpg',
+        ], $this->as($this->session))->assertStatus(422);
+    }
+
+    public function test_a_read_only_key_cannot_change_a_picture(): void
+    {
+        $this->post($this->url(), [
+            'target' => 'setting:heroImage',
+            'url' => 'https://images.example.com/beach.jpg',
+        ], $this->as($this->publishable))->assertStatus(403);
+
+        $this->assertArrayNotHasKey('heroImage', $this->settings());
+    }
+
+    public function test_an_upload_with_no_target_still_answers_with_an_address(): void
+    {
+        // A style field uploading a section background writes the address into
+        // the style itself, so it names no setting. That path must keep
+        // working exactly as it did.
+        $this->post($this->url(), ['file' => UploadedFile::fake()->image('bg.jpg')], $this->as($this->session))
+            ->assertOk()
+            ->assertJsonStructure(['url', 'path']);
+    }
+
+    /**
+     * What the person editing would see: their own unpublished work laid over
+     * what is live, which is the same thing the content endpoint hands them.
+     *
+     * @return array<string, string>
+     */
+    protected function settings(): array
+    {
+        $store = new SiteStore($this->site->fresh());
+
+        return array_merge($store->published(), $store->draftedSettings());
     }
 }

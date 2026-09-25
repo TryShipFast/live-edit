@@ -856,7 +856,13 @@ const bootLiveEdit = () => {
             }
             if (!response.ok) {
                 const data = await response.json().catch(() => ({}));
-                throw new Error(data.message ?? 'Could not save. Try again.');
+                // The two hosts word a refusal differently: the editor's own
+                // controller answers {message}, the content API answers
+                // {error: {message}}. Reading only the first threw away every
+                // reason the API ever gave and showed "Could not save. Try
+                // again." instead — which says nothing, and is the wrong
+                // advice when trying again cannot possibly work.
+                throw new Error(data.error?.message ?? data.message ?? 'Could not save. Try again.');
             }
             if (!isJsonResponse(response)) {
                 throw new Error('That did not save. Reload the page and try again.');

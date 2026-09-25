@@ -375,6 +375,25 @@ class MarkupScanner
             if (array_key_exists($key, $overrides) && strtolower($node->tagName) === 'img') {
                 $node->setAttribute('src', $overrides[$key]);
             }
+
+            // The description is stored beside the picture. The browser
+            // applies it the same way; two implementations of one rule is how
+            // an exported page ends up missing the alt text the live one has.
+            foreach (['Alt' => 'alt', 'Title' => 'title'] as $suffix => $attribute) {
+                if (! array_key_exists($key.$suffix, $overrides)) {
+                    continue;
+                }
+
+                $described = (string) $overrides[$key.$suffix];
+
+                // alt="" is a real answer — it tells a screen reader to skip
+                // the image. An empty title is a tooltip nobody wanted.
+                if ($described === '' && $attribute === 'title') {
+                    $node->removeAttribute('title');
+                } else {
+                    $node->setAttribute($attribute, $described);
+                }
+            }
         }
 
         foreach ($xpath->query('//*[@data-edit-href]') as $node) {
