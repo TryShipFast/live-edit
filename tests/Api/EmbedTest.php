@@ -279,10 +279,34 @@ class EmbedTest extends TestCase
         $response = $this->get('/live-edit/runtime.js')->assertOk();
 
         $this->assertStringContainsString('application/javascript', (string) $response->headers->get('Content-Type'));
+
+        // The stamped directory is what matters, not which file inside it:
+        // a current build is served as one minified bundle and a runtime
+        // somebody is midway through editing is served as modules.
         $this->assertStringContainsString(
-            'live-edit/assets/'.EmbedController::assetVersion().'/live-edit.js',
+            'live-edit/assets/'.EmbedController::assetVersion().'/',
             $response->getContent(),
         );
+        $this->assertMatchesRegularExpression('#/(bundle|live-edit)\.js#', $response->getContent());
+    }
+
+    public function test_a_bundle_older_than_its_sources_is_not_served(): void
+    {
+        /*
+         * The failure a build step invites: a bundle that exists, is served
+         * with total confidence, and is wrong in a way nothing on the page
+         * reveals. Touching any source must be enough to fall back to the
+         * modules, without anybody being told to rebuild.
+         */
+        $source = __DIR__.'/../../resources/js/chrome.js';
+        $was = filemtime($source);
+
+        try {
+            touch($source, time() + 60);
+            $this->assertStringContainsString('/live-edit.js', $this->get('/live-edit/runtime.js')->getContent());
+        } finally {
+            touch($source, $was);
+        }
     }
 
     public function test_the_runtime_address_is_never_kept_without_asking(): void

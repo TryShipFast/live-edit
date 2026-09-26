@@ -42,6 +42,9 @@ class EmbedController
         'support.js' => 'support.js',
         'svg.js' => 'svg.js',
         'verify.js' => 'verify.js',
+        // The built bundle, resolved to resources/dist rather than to a
+        // sibling of the modules.
+        'bundle.js' => 'bundle.js',
     ];
 
     /**
@@ -104,7 +107,37 @@ class EmbedController
 
     private static function path(string $name): string
     {
+        if ($name === 'bundle.js') {
+            return __DIR__.'/../../../../resources/dist/live-edit.js';
+        }
+
         return __DIR__.'/../../../../resources/js/'.$name;
+    }
+
+    /**
+     * Whether the built bundle is newer than everything it was built from.
+     *
+     * Not "does it exist". A bundle that exists and is out of date is worse
+     * than none: it is served with the same confidence and is wrong in a way
+     * nothing on the page reveals.
+     */
+    private static function bundleIsCurrent(): bool
+    {
+        $bundle = self::path('bundle.js');
+
+        if (! is_file($bundle)) {
+            return false;
+        }
+
+        $built = filemtime($bundle);
+
+        foreach (glob(__DIR__.'/../../../../resources/js/*.js') ?: [] as $source) {
+            if (filemtime($source) > $built) {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     /**
@@ -184,7 +217,22 @@ class EmbedController
     public function runtime(): Response
     {
         $version = self::assetVersion();
-        $target = url('live-edit/assets/'.$version.'/live-edit.js');
+
+        /*
+         * The bundle when it is current, the modules when it is not.
+         *
+         * Shipped as source, the editor is nine files and three hundred
+         * kilobytes, and a browser fetches each import in turn. Bundled and
+         * minified it is one file and a third of the size.
+         *
+         * Which one is served is decided by comparing timestamps rather than
+         * by a flag, because the failure a flag invites is the one that costs
+         * hours: a bundle built before the last edit, served confidently,
+         * while the source on disk says something else. Anybody editing the
+         * runtime gets the modules until they rebuild, and gets them without
+         * being told to do anything.
+         */
+        $target = url('live-edit/assets/'.$version.'/'.(self::bundleIsCurrent() ? 'bundle.js' : 'live-edit.js'));
 
         // The version IS the bytes of the runtime, so it is exactly the right
         // entity tag: a browser holding the current build is told so without

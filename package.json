@@ -4,6 +4,7 @@
   "type": "module",
   "description": "Runtime for the shipfast/live-edit in-place editor.",
   "scripts": {
+    "build": "esbuild resources/js/live-edit.js --bundle --minify --format=esm --target=es2020 --outfile=resources/dist/live-edit.js",
     "test": "vitest run",
     "test:e2e": "playwright test",
     "test:journey": "playwright test tests/e2e/drawer-journey.spec.js tests/e2e/content-is-yours.spec.js",
