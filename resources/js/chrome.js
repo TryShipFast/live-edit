@@ -34,10 +34,14 @@ const CHROME_CSS = `
   --le-accent-soft: rgba(11, 12, 15, .08);
   /* Cobalt is the accent and the handoff is strict about it: one primary
      action per view. It marks selection and focus, not every button. */
-  --le-cobalt: #3148F5;
-  --le-cobalt-hover: #2438D6;
+  /* The brand blue, and it is spent in exactly one place: Publish. Anything
+     else on the bar that wants attention gets white on the dark ground, so
+     the blue keeps meaning "this is the button that puts it live". */
+  --le-blue: #3148F5;
+  --le-blue-hover: #2438D6;
+  --le-on-dark: #FFFFFF;
+  --le-on-dark-hover: #E6E7EA;
   --le-danger: #C0392B;
-  --le-live: #3148F5;
   --le-shadow: 0 30px 80px -20px rgba(11, 12, 15, .3);
   font-family: 'Schibsted Grotesk', ui-sans-serif, -apple-system, "Segoe UI", Roboto, sans-serif;
   font-size: 14px; line-height: 1.5; color: var(--le-body);
@@ -108,12 +112,12 @@ button, input, select, textarea { font: inherit; color: inherit; margin: 0; }
    A count is the difference between "publish" as a habit and as a decision. */
 .le-publish {
   cursor: pointer; border: 0; border-radius: 999px; padding: 8px 16px;
-  background: #3148F5; color: #fff; font-size: 13px; font-weight: 500;
+  background: var(--le-blue); color: #fff; font-size: 13px; font-weight: 500;
   display: inline-flex; align-items: center; gap: 8px;
   transition: background .15s ease, opacity .15s ease;
 }
-.le-publish:hover { background: #2438D6; }
-.le-publish[disabled] { opacity: .45; cursor: default; background: #3148F5; }
+.le-publish:hover { background: var(--le-blue-hover); }
+.le-publish[disabled] { opacity: .45; cursor: default; background: var(--le-blue); }
 .le-publish-count {
   min-width: 20px; height: 20px; padding: 0 6px; border-radius: 999px;
   background: rgba(255,255,255,.22); font-size: 12px; line-height: 20px; text-align: center;
@@ -138,7 +142,7 @@ button, input, select, textarea { font: inherit; color: inherit; margin: 0; }
 }
 .le-status { display: flex; align-items: center; gap: 8px; font-size: 12px; color: #9A9DA5; padding: 0 6px 0 2px; }
 .le-dot { width: 7px; height: 7px; border-radius: 999px; background: #64748b; flex: none; box-shadow: 0 0 0 3px rgba(100,116,139,.18); transition: background .2s ease, box-shadow .2s ease; }
-.le-toolbar.is-editing .le-dot { background: var(--le-cobalt); box-shadow: 0 0 0 3px rgba(49,72,245,.25); }
+.le-toolbar.is-editing .le-dot { background: var(--le-on-dark); box-shadow: 0 0 0 3px rgba(255,255,255,.18); }
 .le-btn {
   cursor: pointer; border: 0; border-radius: 999px; padding: 9px 18px;
   font-size: 13px; font-weight: 600; background: var(--le-accent); color: #fff;
@@ -186,7 +190,7 @@ button, input, select, textarea { font: inherit; color: inherit; margin: 0; }
 }
 .le-tab:hover { color: #45484F; }
 .le-tab.is-on { color: #0B0C0F; border-bottom-color: #0B0C0F; }
-:host :is(input, textarea, select):focus { border-color: var(--le-cobalt); outline: 1px solid var(--le-cobalt); }
+:host :is(input, textarea, select):focus { border-color: var(--le-accent); outline: 1px solid var(--le-accent); }
 .le-tab-count {
   display: inline-block; margin-left: 5px; min-width: 16px; padding: 0 4px;
   border-radius: 999px; background: #EEEFF1; color: #45484F;
@@ -222,11 +226,11 @@ button, input, select, textarea { font: inherit; color: inherit; margin: 0; }
 .le-change-when { font-size: 12px; color: #9A9DA5; margin: 2px 0 0; }
 .le-version { display: flex; gap: 12px; align-items: flex-start; padding-bottom: 14px; }
 .le-version-dot { width: 8px; height: 8px; margin-top: 6px; border-radius: 999px; background: #DADCE0; flex: none; }
-.le-version-dot.is-latest { background: #3148F5; }
+.le-version-dot.is-latest { background: var(--le-ink); }
 
 /* What the panel is editing, under the tabs rather than beside them. */
 .le-subject { padding: 18px 20px 0; }
-.le-subject .le-eyebrow { color: #3148F5; letter-spacing: .04em; }
+.le-subject .le-eyebrow { letter-spacing: .04em; }
 .le-eyebrow { font-size: 10px; font-weight: 700; letter-spacing: .16em; text-transform: uppercase; color: var(--le-muted); margin-bottom: 6px; }
 .le-title { font-size: 19px; font-weight: 700; color: var(--le-ink); letter-spacing: -.01em; }
 .le-trail { display: none; flex-wrap: wrap; align-items: center; gap: 4px; font-size: 11px; color: var(--le-muted); margin-bottom: 6px; }
@@ -326,8 +330,11 @@ button, input, select, textarea { font: inherit; color: inherit; margin: 0; }
 .le-icon-choice.is-current { border-color: var(--le-accent); box-shadow: inset 0 0 0 1px var(--le-accent); }
 /* The glyph is drawn with the page's icon font, set inline per element. */
 .le-icon-choice { line-height: 1; }
+/* The publish button inside the panel. Same blue as the one on the bar,
+   because it does the same thing; it was left carrying dark green text from
+   when the accent was green, which on blue is close to unreadable. */
 .le-btn-publish {
-  border: none; background: var(--le-live); color: #05300f; font-weight: 650;
+  border: none; background: var(--le-blue); color: #fff; font-weight: 600;
   border-radius: 999px; padding: 8px 16px; cursor: pointer; font-size: 13px;
   transition: filter .15s ease;
 }
