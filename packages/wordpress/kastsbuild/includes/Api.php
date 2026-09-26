@@ -101,6 +101,40 @@ class Api
     }
 
     /**
+     * Everybody whose photograph is on the published site.
+     *
+     * Asked with the publishable key, because this is what the credits page
+     * shows the public, and cached: it changes only when somebody publishes a
+     * new picture, and a credits page is read far more often than it changes.
+     *
+     * An empty list on failure. A credits page that cannot reach us should
+     * say nothing rather than break the site it lives on.
+     *
+     * @return array<int, array<string, string|null>>
+     */
+    public static function attributions(): array
+    {
+        $cached = get_transient('kastsbuild_attributions');
+
+        if (is_array($cached)) {
+            return $cached;
+        }
+
+        $key = Settings::get('publishable_key');
+
+        if (! is_string($key) || $key === '') {
+            return [];
+        }
+
+        $found = self::get('/attributions', $key)['attributions'] ?? [];
+        $found = is_array($found) ? $found : [];
+
+        set_transient('kastsbuild_attributions', $found, 5 * MINUTE_IN_SECONDS);
+
+        return $found;
+    }
+
+    /**
      * The page this theme just rendered, handed back ready to be edited.
      *
      * Marked up and carrying the client's words, in one answer. This plugin

@@ -42,6 +42,16 @@ Route::prefix(config('live-edit.api.prefix', 'api/live-edit/v1').'/{site}')
             // Where the published files are, so a CDN or a build can fetch
             // them without going through this application again.
             Route::get('/versions', [ContentController::class, 'versions'])->name('live-edit.api.versions');
+            /*
+             * Everybody whose photograph is on the published site.
+             *
+             * A read key, because this is what the site shows the public on
+             * its credits page, and the key that renders the page is the one
+             * printed in it. Deliberately not called "credits" — that name is
+             * already taken by what the site has left to spend, and one of
+             * the two is about money.
+             */
+            Route::get('/attributions', [ContentController::class, 'attributions'])->name('live-edit.api.attributions');
             // A page asking which of its own elements are editable. Costs a
             // full parse, so it is counted and throttled on its own.
             Route::post('/tag', [ContentController::class, 'tag'])->name('live-edit.api.tag');

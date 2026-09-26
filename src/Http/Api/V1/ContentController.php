@@ -11,6 +11,7 @@ use ShipFast\LiveEdit\Application\Api\AssistWithText;
 use ShipFast\LiveEdit\Application\Api\ExportMarkup;
 use ShipFast\LiveEdit\Application\Api\FindPhotos;
 use ShipFast\LiveEdit\Application\Api\ImagineAPicture;
+use ShipFast\LiveEdit\Application\Api\ListAttributions;
 use ShipFast\LiveEdit\Application\Api\ListChanges;
 use ShipFast\LiveEdit\Application\Api\PrepareMarkup;
 use ShipFast\LiveEdit\Application\Api\PublishSite;
@@ -178,6 +179,19 @@ class ContentController
      * A consumer that is not this application — a CDN, a build, another
      * framework — needs addresses rather than a database.
      */
+    /**
+     * Everybody whose photograph is on the published site.
+     *
+     * What a credits page is rendered from. Cached for a while because it
+     * changes only when somebody publishes a new picture, and a credits page
+     * is read far more often than it changes.
+     */
+    public function attributions(Request $request, ListAttributions $list): JsonResponse
+    {
+        return response()->json($list(ApiContext::site($request)))
+            ->withHeaders(['Cache-Control' => 'public, max-age=300']);
+    }
+
     public function versions(Request $request, ReadPublishedContent $read): JsonResponse
     {
         $site = ApiContext::site($request);

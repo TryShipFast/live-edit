@@ -19,6 +19,7 @@
  * already manages. That is theirs.
  */
 use KastsBuild\Builder;
+use KastsBuild\Credits;
 use KastsBuild\Frontend;
 use KastsBuild\Publishing;
 use KastsBuild\Settings;
@@ -27,6 +28,7 @@ if (! defined('ABSPATH')) {
     exit;
 }
 
+define('KASTSBUILD_FILE', __FILE__);
 define('KASTSBUILD_PATH', plugin_dir_path(__FILE__));
 define('KASTSBUILD_URL', plugin_dir_url(__FILE__));
 
@@ -54,12 +56,14 @@ require KASTSBUILD_PATH.'includes/Session.php';
 require KASTSBUILD_PATH.'includes/Frontend.php';
 require KASTSBUILD_PATH.'includes/Publishing.php';
 require KASTSBUILD_PATH.'includes/Builder.php';
+require KASTSBUILD_PATH.'includes/Credits.php';
 
 add_action('plugins_loaded', function () {
     Settings::boot();
     Frontend::boot();
     Publishing::boot();
     Builder::boot();
+    Credits::boot();
 });
 
 register_deactivation_hook(__FILE__, function () {
