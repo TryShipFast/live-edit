@@ -197,6 +197,24 @@ called now travels with each page and carries content across a rename.
 existed have nothing to carry from. Their first re-tag after a scanner change
 can orphan content. Everything saved since is covered, and a test holds it.
 
+## A background photograph is not on the credits page — decided, not overlooked
+
+A picture chosen for an `<img>` stores who took it and appears on
+`/photo-credits`. A picture chosen as a section *background* does not: a
+background is stored through the style path, which holds a value and has no
+room beside it for a photographer, a link and a licence the way a picture's
+setting does.
+
+Left as it is on purpose, and the reason it is safe to leave is narrow. It only
+matters for Unsplash and for Creative Commons licences other than CC0, because
+those are the only sources that ask to be credited at all; an uploaded file is
+the client's own and a generated one has no photographer. Whoever chooses a
+background is told who took it at the moment they choose it, so nobody is
+credited wrongly — the credit is simply not published anywhere.
+
+Closing it means giving a style the same companions a setting has, which is a
+change to how styles are stored rather than an addition to this feature.
+
 ## Not yet exercised
 
 - The React adapter has not been re-run since the shared code changed.
