@@ -125,6 +125,17 @@ class PicturesTest extends TestCase
         Http::assertNothingSent();
     }
 
+    public function test_a_refused_key_is_not_reported_as_a_bad_connection(): void
+    {
+        // Different problems, different answers. "Try again in a moment"
+        // about a key that will never work sends somebody back to press the
+        // same button for the rest of the afternoon.
+        $this->withUnsplash();
+        Http::fake(['*' => Http::response(['errors' => ['OAuth error: The access token is invalid']], 401)]);
+
+        $this->assertSame('not_allowed', app(FindPhotos::class)->search('clinic')['reason']);
+    }
+
     public function test_a_search_with_no_provider_says_so_rather_than_returning_nothing(): void
     {
         // Empty results and "not switched on" look identical to a client and

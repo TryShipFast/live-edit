@@ -1846,11 +1846,36 @@ const bootLiveEdit = () => {
                 onFile: (file) => chosen({ file }),
             }));
 
-            const note = document.createElement('p');
-            note.className = 'le-hint';
-            note.style.marginTop = '14px';
-            note.textContent = 'You can also drag a picture straight onto the image on the page.';
-            panel.append(note);
+            // The other way somebody already has a picture: it is on the
+            // internet and they have the address. This used to be a box in
+            // the panel; it belongs with the rest of the ways in here.
+            const link = el('div', 'le-row-tight');
+            const address = document.createElement('input');
+            address.type = 'url';
+            address.className = 'le-search';
+            address.placeholder = 'Or paste a link to a picture';
+
+            const use = el('button', 'le-btn-outline', 'Use it');
+            use.type = 'button';
+
+            const take = () => {
+                const value = address.value.trim();
+                if (value) chosen({ url: value.startsWith('http') ? value : `https://${value}` });
+            };
+
+            use.addEventListener('click', take);
+            address.addEventListener('keydown', (event) => {
+                if (event.key !== 'Enter') return;
+                event.preventDefault();
+                take();
+            });
+
+            link.append(address, use);
+            panel.append(link);
+
+            const hint = el('p', 'le-hint', 'You can also drag a picture straight onto the image on the page.');
+            hint.style.marginTop = '14px';
+            panel.append(hint);
         };
 
         const drawPhotos = async (panel, element, chosen) => {
@@ -1960,6 +1985,10 @@ const bootLiveEdit = () => {
 
         const photoExcuse = (reason, query) => ({
             not_configured: 'Free photographs are not switched on for this site yet.',
+            // Not "try again": this one never works until somebody changes a
+            // setting, and sending them back to the same button for the rest
+            // of the afternoon is worse than saying so.
+            not_allowed: 'The photo library would not accept this site’s key. It needs setting up again.',
             unreachable: 'Could not reach the photo library just now. Try again in a moment.',
             nothing_to_search_for: 'Type what the picture should show.',
         }[reason] ?? `Nothing found for "${query}". Try fewer words.`);
@@ -2787,7 +2816,7 @@ const bootLiveEdit = () => {
 
             const note = document.createElement('div');
             note.className = 'le-hint';
-            note.textContent = 'Uploads are stored on the server and replace the current image.';
+            note.textContent = 'Nothing changes on your site until you publish.';
 
             const textInput = (name, label, value, hint) => {
                 const w = document.createElement('label');
@@ -2819,8 +2848,7 @@ const bootLiveEdit = () => {
              * hand what is chosen back to the fields below, so it saves the
              * same way a pasted address does.
              */
-            const ways = el('div', 'le-chips');
-            ways.style.marginTop = '12px';
+            const ways = el('div', 'le-ways');
 
             const takeChosen = ({ url, file, credit, alt }) => {
                 if (file) {
@@ -2856,16 +2884,21 @@ const bootLiveEdit = () => {
                 ui.saveButton.click();
             };
 
-            [
-                ['Free photos', 'Free photos'],
-                ['Upload a file', 'Upload'],
-                ['Make one · 5 credits', 'Generate with AI'],
-            ].forEach(([label, tab]) => {
-                const button = el('button', 'le-chip', label);
-                button.type = 'button';
-                button.addEventListener('click', () => openImagePicker(element, takeChosen, tab));
-                ways.append(button);
-            });
+            // One button, and the choosing happens in the one place it is
+            // being done. Three buttons here made the panel ask which method
+            // before it asked what picture, which is the wrong question
+            // first: somebody knows they want a different picture long before
+            // they know where it is coming from.
+            const replace = el('button', 'le-btn le-wide', isBackground ? 'Replace background' : 'Replace image');
+            replace.type = 'button';
+            replace.addEventListener('click', () => openImagePicker(element, takeChosen, 'Free photos'));
+            ways.append(replace);
+
+            // The file box and the address box are the plumbing the save
+            // reads; the picker fills them. Kept in the panel and out of
+            // sight, so there is one save path rather than two.
+            fileWrap.hidden = true;
+            urlWrap.hidden = true;
 
             drawerFields.append(preview, ways, fileWrap, urlWrap, note);
 
@@ -3383,6 +3416,97 @@ const bootLiveEdit = () => {
 
             ui.previewButton.addEventListener('click', enterPreview);
         });
+
+        /* \u2500\u2500 The site's other pages \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
+         *
+         * Read off the site's own navigation rather than configured, for the
+         * same reason everything else here is read off the page: the client
+         * bought a template and nobody is going to sit down and list its pages
+         * for us. Whatever the theme put in its menu IS the list of pages,
+         * and it is already in the document.
+         *
+         * Switching is a navigation, because this editor runs inside the real
+         * page rather than in a frame around it. Edit mode is remembered
+         * across that, and unpublished work lives on the server, so arriving
+         * at the next page looks exactly like staying on this one.
+         */
+        const sitePages = () => {
+            const menus = document.querySelectorAll('nav, [role="navigation"], header ul');
+            const seen = new Map();
+
+            // The admin's own furniture is a navigation too, and a very
+            // prominent one. Without this the switcher offered "Plugins",
+            // "Themes" and "Get Involved" as pages of the client's website.
+            const isHostChrome = (node) => node.closest(
+                '#wpadminbar, #adminmenu, #wp-toolbar, #live-edit-ui, [data-no-edit], [data-live-edit-chrome]'
+            ) !== null;
+
+            menus.forEach((menu) => {
+                if (isHostChrome(menu)) return;
+
+                menu.querySelectorAll('a[href]').forEach((link) => {
+                    if (isHostChrome(link)) return;
+
+                    let url;
+
+                    try {
+                        url = new URL(link.getAttribute('href'), window.location.href);
+                    } catch {
+                        return;
+                    }
+
+                    // Another website, a jump down this page, a mailto, a
+                    // file: none of them is a page of this site to edit.
+                    if (url.origin !== window.location.origin) return;
+                    if (/\.(pdf|zip|jpe?g|png|gif|svg|webp|mp4|mp3)$/i.test(url.pathname)) return;
+                    if (url.pathname === window.location.pathname && url.hash) return;
+
+                    const label = (link.textContent ?? '').replace(/\s+/g, ' ').trim();
+
+                    // A menu is full of links that are pictures, icons and
+                    // empty wrappers. A page needs a name to be offered as one.
+                    if (label === '' || label.length > 22) return;
+                    if (seen.has(url.pathname)) return;
+
+                    seen.set(url.pathname, { label, href: url.href });
+                });
+            });
+
+            return [...seen.values()].slice(0, 6);
+        };
+
+        const drawPages = () => {
+            const pages = sitePages();
+
+            // One page is not a choice, and a row with a single item in it
+            // just takes room from the controls that do something.
+            if (pages.length < 2) return;
+
+            const here = window.location.pathname.replace(/\/$/, '');
+
+            pages.forEach((page) => {
+                const button = el('button', 'le-page-btn', page.label);
+                button.type = 'button';
+                button.title = page.href;
+
+                if (new URL(page.href).pathname.replace(/\/$/, '') === here) {
+                    button.classList.add('is-on');
+                } else {
+                    button.addEventListener('click', () => {
+                        // Kept on, so the next page opens ready to edit
+                        // rather than as a visitor.
+                        sessionStorage.setItem('tb_editing', '1');
+                        window.location.href = page.href;
+                    });
+                }
+
+                ui.pageSwitcher.append(button);
+            });
+
+            ui.pageSwitcher.hidden = false;
+        };
+
+        drawPages();
 
         /* \u2500\u2500 Undo and redo \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
          *

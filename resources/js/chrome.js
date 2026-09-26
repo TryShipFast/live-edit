@@ -108,6 +108,22 @@ button, input, select, textarea { font: inherit; color: inherit; margin: 0; }
 }
 .le-bar-btn:hover { background: #2A2C31; }
 .le-bar-btn.is-on { background: #2A2C31; }
+/* The site's other pages, so editing one does not mean hunting for the next.
+   A segmented track rather than separate buttons, because these are one
+   choice with several answers and only one of them can be true. */
+.le-pages {
+  display: flex; align-items: center; gap: 2px; flex: none;
+  background: #1B1D22; border-radius: 999px; padding: 3px;
+}
+.le-page-btn {
+  cursor: pointer; border: 0; background: none; color: #fff;
+  border-radius: 999px; padding: 5px 12px; font-size: 12px; font-weight: 500;
+  white-space: nowrap; transition: background .15s ease;
+}
+.le-page-btn:hover { background: #2A2C31; }
+.le-page-btn.is-on { background: #fff; color: #0B0C0F; font-weight: 600; }
+.le-page-btn.is-on:hover { background: #fff; }
+
 /* Publish is the one accent on the view, and it carries how much is waiting.
    A count is the difference between "publish" as a habit and as a decision. */
 .le-publish {
@@ -511,6 +527,13 @@ select.le-input {
 }
 .le-modal-foot .le-modal-note { margin-right: auto; font-size: 12px; color: var(--le-muted); }
 
+/* One obvious action in the panel; the choosing happens in the dialog. */
+.le-ways { margin: 14px 0 4px; }
+.le-wide { width: 100%; justify-content: center; }
+.le-row-tight { display: flex; gap: 8px; margin-top: 16px; }
+.le-row-tight .le-search { flex: 1; min-width: 0; }
+.le-row-tight .le-btn-outline { flex: none; }
+
 /* ---- picking a photograph ---- */
 .le-search {
   width: 100%; border: 1px solid var(--le-line-strong, #DADCE0); border-radius: 999px;
@@ -714,6 +737,13 @@ export function createChrome() {
     redoButton.setAttribute('aria-label', 'Redo');
     redoButton.innerHTML = arrow(true);
 
+    // Filled in once the page has been read for its own navigation, and left
+    // out entirely on a site with only one page.
+    const pageSwitcher = el('div', 'le-pages');
+    pageSwitcher.hidden = true;
+    pageSwitcher.setAttribute('role', 'group');
+    pageSwitcher.setAttribute('aria-label', 'Pages');
+
     const changesButton = el('button', 'le-bar-btn le-when-roomy', 'Changes');
     changesButton.type = 'button';
     changesButton.title = 'Everything you have changed and not published';
@@ -741,6 +771,8 @@ export function createChrome() {
         toggleButton,
         undoButton,
         redoButton,
+        el("span", "le-sep"),
+        pageSwitcher,
         changesButton,
         previewButton,
         publishButton,
@@ -954,6 +986,7 @@ export function createChrome() {
         toggleButton,
         undoButton,
         redoButton,
+        pageSwitcher,
         statusText,
         dot,
         localeSelect,

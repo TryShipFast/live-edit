@@ -59,6 +59,14 @@ class FindPhotos
             return ['photos' => [], 'reason' => 'unreachable'];
         }
 
+        // A refused key and an unreachable service are different problems with
+        // different answers, and saying "try again in a moment" about a key
+        // that will never work sends somebody back to press the same button
+        // for the rest of the afternoon.
+        if ($response->status() === 401 || $response->status() === 403) {
+            return ['photos' => [], 'reason' => 'not_allowed'];
+        }
+
         if (! $response->successful()) {
             return ['photos' => [], 'reason' => 'unreachable'];
         }
