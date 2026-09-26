@@ -11,6 +11,7 @@ use ShipFast\LiveEdit\Console\Commands\PruneOrphanedUploads;
 use ShipFast\LiveEdit\Console\Commands\ScanForEditables;
 use ShipFast\LiveEdit\Console\Commands\Versions;
 use ShipFast\LiveEdit\Http\Api\Middleware\EnforceCors;
+use ShipFast\LiveEdit\Http\Middleware\TagsEditableMarkup;
 
 class LiveEditServiceProvider extends ServiceProvider
 {
@@ -43,6 +44,15 @@ class LiveEditServiceProvider extends ServiceProvider
             // overwrite these headers with ones no browser will accept.
             if ($this->app->bound(HttpKernel::class)) {
                 $this->app->make(HttpKernel::class)->prependMiddleware(EnforceCors::class);
+
+                /*
+                 * Pushed rather than prepended: it rewrites a finished
+                 * response, so it wants to run last on the way out, after
+                 * whatever else the host does to its own HTML.
+                 */
+                if (config('live-edit.auto_tag', false)) {
+                    $this->app->make(HttpKernel::class)->pushMiddleware(TagsEditableMarkup::class);
+                }
             }
         }
         $this->loadMigrationsFrom(__DIR__.'/../database/migrations');

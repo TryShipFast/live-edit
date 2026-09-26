@@ -245,6 +245,31 @@ return [
      * anybody's editor off. Defaults to the cloud host and site because a
      * site that talks to the service already named both.
      */
+    /*
+     * Who may edit, for a host that has no opinion of its own.
+     *
+     * Only a convenience: the gate is the host's to define and this is simply
+     * a list it can read, so a brochure site does not have to invent a role
+     * to answer a question about two people. A host with real roles should
+     * ignore this and define the gate from those.
+     */
+    'editors' => env('LIVE_EDIT_EDITORS', ''),
+
+    /*
+     * Find the editable parts of a page instead of being told them.
+     *
+     * Off by default, and deliberately: it rewrites every HTML response it is
+     * allowed to touch, and a package that quietly started reformatting a
+     * host's pages on upgrade would be indefensible. On, a Laravel site needs
+     * no data-edit attributes at all — the keys are derived from the content.
+     *
+     * The trade is real and worth knowing before choosing. A named key
+     * survives its wording changing; a derived one is a signature OF that
+     * wording, so a developer rewriting the sentence in the template orphans
+     * the client's edit. Name the handful that matter, let the rest be found.
+     */
+    'auto_tag' => env('LIVE_EDIT_AUTO_TAG', false),
+
     'licence' => [
         'host' => env('LIVE_EDIT_LICENCE_HOST', env('LIVE_EDIT_CLOUD_HOST')),
         'site' => env('LIVE_EDIT_LICENCE_SITE', env('LIVE_EDIT_CLOUD_SITE')),
