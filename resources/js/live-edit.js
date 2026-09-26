@@ -1071,6 +1071,55 @@ const bootLiveEdit = () => {
             return null;
         };
 
+        /**
+         * Tell the page builder what just changed, so its copy agrees.
+         *
+         * A builder does not render from the markup; it renders from its own
+         * store. So a page built with one has two answers to "what does this
+         * heading say" — ours, which wins on every page view, and the
+         * builder's, which wins the moment somebody opens the page in it and
+         * presses Update. The client's words are gone, weeks later, done by
+         * somebody who was not editing text at all.
+         *
+         * The store is reachable, so the honest fix is to keep the two in
+         * agreement rather than to warn about the disagreement. The element a
+         * client clicked sits inside a wrapper carrying the builder's own id
+         * for it, which is the same id the store uses.
+         *
+         * Best effort, deliberately. The save already happened and succeeded;
+         * this is reconciliation, and failing it must not turn a save that
+         * worked into an error message.
+         */
+        const tellTheBuilder = async (edit) => {
+            const url = window.liveEditApi?.builderUrl;
+
+            if (!url || edit?.kind !== 'setting' || typeof edit.savedValue !== 'string' || !edit.element) {
+                return;
+            }
+
+            const owner = edit.element.closest('.elementor-element[data-id]');
+
+            if (!owner) {
+                return;
+            }
+
+            try {
+                await fetch(url, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', ...(window.liveEditApi?.publishHeaders ?? {}) },
+                    body: JSON.stringify({
+                        page: window.location.href,
+                        element: owner.dataset.id,
+                        value: edit.savedValue,
+                    }),
+                });
+            } catch (error) {
+                // Their words are saved either way; this only decides whether
+                // the builder will overwrite them later.
+                console.warn('[live-edit] could not tell the page builder about this change:', error.message);
+            }
+        };
+
         const save = async () => {
             if (!current) return;
             const saveButton = ui.saveButton;
@@ -1156,6 +1205,7 @@ const bootLiveEdit = () => {
                         body: JSON.stringify({ key: current.styleKey, props: collectStyleProps() }),
                     });
                 }
+                await tellTheBuilder(current);
                 expectChange(expectationFor(current, drawerFields));
                 settle('Saved \u2713', current.key ?? null, current.savedValue ?? null);
             } catch (error) {
@@ -1986,7 +2036,8 @@ const bootLiveEdit = () => {
             if (!node?.closest) return null;
             const chip = node.closest('[data-style-edit]');
             if (chip) return { element: chip, kind: 'style' };
-            const image = node.closest('[data-edit-img], [data-edit-bg]');
+            // A picture you click ON, so it is the nearest thing and wins.
+            const image = node.closest('[data-edit-img]');
             if (image) return { element: image, kind: 'image' };
             const icon = node.closest('[data-edit-icon]');
             if (icon) return { element: icon, kind: 'icon' };
@@ -1996,6 +2047,20 @@ const bootLiveEdit = () => {
             if (text) return { element: text, kind: 'text' };
             const link = node.closest('[data-edit-href]:not([data-edit])');
             if (link) return { element: link, kind: 'link' };
+            /*
+             * A background you click INSIDE, so it must lose to anything
+             * nearer — the same rule as a styleable box below, and for the
+             * same reason, but it took a real page to notice.
+             *
+             * A hero section is a full-screen container with a picture behind
+             * it and the headline sitting on top. Checked before the text, it
+             * swallowed every click anywhere in it: somebody clicking the
+             * words they wanted to change got an image uploader instead, with
+             * nothing to say why. Which is close to the worst thing this
+             * product can do to somebody who has never used it before.
+             */
+            const background = node.closest('[data-edit-bg]');
+            if (background) return { element: background, kind: 'image' };
             // Any styleable box, checked last so content wins over its container.
             const box = node.closest('[data-style]:not([data-style-edit])');
             if (box) return { element: box, kind: 'style' };

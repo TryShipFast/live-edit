@@ -7,20 +7,40 @@ money are the ones nobody notices for weeks.
 Measured on a WordPress 7.1 install running Astra + Elementor with the
 Guitarist starter template, and on the WordPress theme unit test data.
 
-## The page builder is a second source of truth
+## The page builder is a second source of truth — solved for Elementor text
 
 **What happens.** Elementor, Beaver Builder, Divi and the rest regenerate their
 markup from their own store. An edit made here and an edit made there are two
 answers to the same question, and the builder's answer wins the next time
-anybody opens it and presses Update.
+anybody opens it and presses Update. The client's change disappears weeks
+later, done by somebody who was not editing text at all, and nothing errors.
 
-**What a client sees.** Their change disappears after somebody touches the page
-in the builder. Nothing errors.
+**Where we stand for Elementor.** It cannot be solved from inside the page, and
+it does not have to be: the store is post meta, and it is ordinary JSON. When a
+client changes a heading, a paragraph or a button on a page Elementor owns, the
+same words are written into `_elementor_data` for the widget they belong to.
+The two answers agree, so it stops mattering which one is asked.
 
-**Where we stand.** Not solved, and not solvable from inside the page. The
-report names the builder when it finds one so the risk is at least stated
-before anybody relies on it. For a site the client edits only through us, this
-never fires.
+Proven on the install by editing the hero through the drawer, then
+**deactivating our plugin entirely** — WordPress rendered the client's words
+from Elementor's own store, with no editor markup on the page at all. The edit
+survives an Update, and survives uninstalling us.
+
+Deliberately narrow, because this is somebody's page structure and the failure
+of getting it wrong is a page that will not open in the builder again:
+
+- three widget types (`heading`, `text-editor`, `button`), and anything else is
+  refused rather than guessed at — an icon box has two pieces of text and a
+  form has a dozen;
+- the field has to exist already and be a string; one is never created;
+- only `elType: widget` is written to, never a container;
+- best effort, after the save has already succeeded — reconciliation must never
+  turn a save that worked into an error.
+
+**What is still true.** Images, backgrounds, links and icons are not
+reconciled, only words. Beaver Builder, Divi and Bricks are not reconciled at
+all — each keeps its store in its own shape, and the shape is the work. On
+those, the original warning stands: an Update replaces what the client wrote.
 
 ## ~~A background only exists while it is on screen~~ — mostly fixed
 

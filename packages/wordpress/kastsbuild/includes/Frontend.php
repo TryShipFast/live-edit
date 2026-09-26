@@ -125,6 +125,20 @@ class Frontend
         return is_string($path) ? substr($path, 0, 200) : '/';
     }
 
+    /**
+     * Whether this page is one Elementor renders from its own store.
+     *
+     * Asked of the page rather than of the site: a site can be built with a
+     * builder and still have pages that are not, and offering to reconcile a
+     * store that does not exist would be a request per save for nothing.
+     */
+    private static function builtByElementor(): bool
+    {
+        $id = (int) get_queried_object_id();
+
+        return $id > 0 && get_post_meta($id, '_elementor_data', true) !== '';
+    }
+
     /** The attribute the editor looks for before it will start. */
     private static function markBodyForEditing(string $html): string
     {
@@ -184,6 +198,10 @@ class Frontend
                 // to.
                 'publishUrl' => rest_url('kastsbuild/v1/publish'),
                 'publishHeaders' => ['X-WP-Nonce' => wp_create_nonce('wp_rest')],
+                // Where to tell the page builder what changed, so its own copy
+                // of the words stops disagreeing with the client's. Only sent
+                // when there is a builder here to tell.
+                'builderUrl' => self::builtByElementor() ? rest_url('kastsbuild/v1/builder') : null,
             ]),
             wp_json_encode([
                 // Without this the editor has no Publish button at all, and

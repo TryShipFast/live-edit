@@ -18,6 +18,7 @@
  * It deliberately does not touch posts, pages or any other content WordPress
  * already manages. That is theirs.
  */
+use KastsBuild\Builder;
 use KastsBuild\Frontend;
 use KastsBuild\Publishing;
 use KastsBuild\Settings;
@@ -52,11 +53,13 @@ require KASTSBUILD_PATH.'includes/Api.php';
 require KASTSBUILD_PATH.'includes/Session.php';
 require KASTSBUILD_PATH.'includes/Frontend.php';
 require KASTSBUILD_PATH.'includes/Publishing.php';
+require KASTSBUILD_PATH.'includes/Builder.php';
 
 add_action('plugins_loaded', function () {
     Settings::boot();
     Frontend::boot();
     Publishing::boot();
+    Builder::boot();
 });
 
 register_deactivation_hook(__FILE__, function () {
