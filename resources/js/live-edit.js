@@ -3184,19 +3184,103 @@ const bootLiveEdit = () => {
             };
             showPending();
 
-            ui.publishButton.addEventListener('click', async () => {
-                if (!window.confirm(`Put ${pending} change${pending === 1 ? '' : 's'} live for everyone to see?`)) return;
-                ui.publishButton.disabled = true;
+            /*
+             * What is about to become public, before it does.
+             *
+             * This was a window.confirm reading "Put 3 changes live for
+             * everyone to see?", which asks somebody to agree to a number.
+             * Nobody can answer that: the one thing they need to know is
+             * WHICH three, and the only way to find out was to cancel, open
+             * Changes, read it, and come back. So the list is here.
+             *
+             * It also stops being a native dialog, which freezes the page it
+             * is drawn over \u2014 including this editor \u2014 until it is answered.
+             */
+            const reviewAndPublish = async () => {
+                const many = pending === 1 ? '' : 's';
+                const where = publishing.domain ?? window.location.host;
+
+                const sheet = ui.modal({
+                    title: `Publish ${pending} change${many}`,
+                    subtitle: `They go live on ${where} right away.`,
+                    size: 'is-narrow',
+                });
+
+                sheet.body.append(note('Loading\u2026'));
+
+                const keep = el('button', 'le-btn-outline', 'Keep editing');
+                keep.type = 'button';
+                keep.addEventListener('click', () => sheet.close());
+
+                const go = el('button', 'le-btn-publish', 'Publish now');
+                go.type = 'button';
+
+                sheet.foot.hidden = false;
+                sheet.foot.append(keep, go);
+                go.focus();
+
+                // The list is what makes this worth stopping for, but it is
+                // not what makes it safe: a service that cannot answer must
+                // not block somebody from publishing work they already know
+                // about.
                 try {
-                    const response = await request('/live-edit/publish', { method: 'POST' });
-                    const data = await response.json();
-                    pending = 0;
-                    showPending();
-                    reloadWithToast(`Published ${data.published} change${data.published === 1 ? '' : 's'} \u2713`);
+                    const response = await request('/live-edit/changes', { method: 'GET' });
+                    const payload = await response.json();
+                    const changes = payload?.changes ?? [];
+
+                    const list = el('div', 'le-review');
+
+                    changes.forEach((change) => {
+                        const row = el('div', 'le-review-row');
+                        row.append(
+                            // The same words the Changes tab uses, so the list
+                            // somebody checked before pressing Publish and the
+                            // list they publish are recognisably the same one.
+                            el('div', 'le-review-what', labelForChange(change)),
+                            el('div', 'le-review-to', trim(change.after) || '(empty)'),
+                        );
+                        list.append(row);
+                    });
+
+                    sheet.body.replaceChildren(changes.length > 0 ? list : note('Nothing is waiting.'));
                 } catch (error) {
-                    showPending();
-                    window.alert(error.message);
+                    sheet.body.replaceChildren(note(plainly(error, 'list what is waiting')));
                 }
+
+                go.addEventListener('click', async () => {
+                    go.disabled = true;
+                    keep.disabled = true;
+                    go.textContent = 'Publishing\u2026';
+                    // Half a publish is not a thing anybody should be able to
+                    // walk away from.
+                    sheet.allowDismiss(false);
+
+                    try {
+                        await request('/live-edit/publish', { method: 'POST' });
+                        pending = 0;
+                        showPending();
+                        sheet.close();
+                        // Where it went, not how many went. The count was on
+                        // the button they just pressed; the address is the
+                        // thing somebody wants confirmed.
+                        reloadWithToast(`Live on ${where} \u2713`);
+                    } catch (error) {
+                        sheet.allowDismiss(true);
+                        go.disabled = false;
+                        keep.disabled = false;
+                        go.textContent = 'Try again';
+                        sheet.body.replaceChildren(note(plainly(error, 'publish that')));
+                    }
+                });
+            };
+
+            ui.publishButton.addEventListener('click', () => {
+                if (pending === 0) return;
+
+                // Whatever is being typed right now counts as a change, and
+                // it is not saved until the box loses focus.
+                document.activeElement?.blur?.();
+                void reviewAndPublish();
             });
 
             ui.previewButton.addEventListener('click', async () => {
