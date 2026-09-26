@@ -559,6 +559,37 @@ select.le-input {
 .le-pick { position: relative; }
 .le-empty { padding: 28px 0; text-align: center; font-size: 13px; color: var(--le-muted); }
 
+/* ---- seeing it as a visitor would ----------------------------------
+   The editor's own furniture is the one thing a client cannot judge the page
+   without removing: outlines on everything, a bar across the bottom, a panel
+   down the side. This takes all of it away and leaves one way back. */
+.le-back {
+  position: fixed; bottom: 22px; left: 50%; transform: translateX(-50%);
+  z-index: 2147483004; display: flex; align-items: center; gap: 6px;
+  background: var(--le-ink); border-radius: 999px; padding: 6px;
+  box-shadow: 0 20px 50px -10px rgba(11,12,15,.45);
+}
+.le-back-btn {
+  cursor: pointer; border: 0; background: none; color: #fff;
+  border-radius: 999px; padding: 8px 16px; font-size: 13px; font-weight: 500;
+}
+.le-back-btn:hover { background: #2A2C31; }
+.le-back-btn.is-on { background: #fff; color: var(--le-ink); font-weight: 600; }
+
+/* A phone is a different width, and a width is what a stylesheet listens to.
+   Shrinking the page in place would keep the desktop layout and only make it
+   narrow, which shows nobody anything true, so the phone view is the real
+   page loaded at a real phone width. */
+.le-phone {
+  position: fixed; inset: 0; z-index: 2147483003; background: var(--le-canvas, #E9EAED);
+  display: flex; align-items: center; justify-content: center; padding: 28px 0 90px;
+}
+.le-phone iframe {
+  width: 390px; height: 100%; max-height: 844px; border: 0;
+  border-radius: 14px; background: #fff;
+  box-shadow: 0 30px 80px -30px rgba(11,12,15,.45);
+}
+
 /* ---- what is about to go live ---- */
 .le-review { display: flex; flex-direction: column; gap: 2px; }
 .le-review-row { padding: 11px 0; border-bottom: 1px solid var(--le-line-soft, #EEEFF1); }
@@ -683,7 +714,7 @@ export function createChrome() {
 
     const previewButton = el('button', 'le-bar-btn le-when-roomy', 'Preview');
     previewButton.type = 'button';
-    previewButton.title = 'Copy a link that shows the unpublished version';
+    previewButton.title = 'See the page the way a visitor will';
     previewButton.hidden = true;
 
     /* Publishing: the one accent on the view, carrying how much is waiting.

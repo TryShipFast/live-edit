@@ -3165,11 +3165,11 @@ const bootLiveEdit = () => {
             let pending = publishing.pending ?? 0;
             const showPending = () => {
                 ui.publishButton.hidden = false;
-                // A control that does nothing is worse than one that is not
-                // there: not every host can issue a preview link, and an
-                // editor who clicks it and gets silence learns to distrust the
-                // rest of the toolbar.
-                ui.previewButton.hidden = ! publishing.previewUrl;
+                // Always available now. It used to be hidden unless the host
+                // could issue a shareable link, but the thing it mostly does
+                // is take our own furniture off the page so somebody can look
+                // at their site, and every host can do that.
+                ui.previewButton.hidden = false;
                 // The word stays put and the number appears beside it. The
                 // label used to be rewritten to "Publish 3", which moved the
                 // button's width on every save and made the one control
@@ -3283,17 +3283,105 @@ const bootLiveEdit = () => {
                 void reviewAndPublish();
             });
 
-            ui.previewButton.addEventListener('click', async () => {
-                if (!publishing.previewUrl) return;
-                try {
-                    await navigator.clipboard.writeText(publishing.previewUrl);
-                    ui.toast('Preview link copied \u2713');
-                } catch {
-                    // Clipboard access is refused often enough that the link
-                    // has to be gettable without it.
-                    window.prompt('Copy this preview link:', publishing.previewUrl);
+            /*
+             * The page as a visitor gets it.
+             *
+             * Everything the editor adds is exactly what stops somebody
+             * judging their own site: a dashed outline round every sentence,
+             * a bar across the bottom, a panel down one side. Until now the
+             * only way to see the page without them was to leave edit mode,
+             * which also puts away the work in progress.
+             *
+             * The phone view is the real page loaded at a real phone width
+             * rather than this one squeezed narrow. A stylesheet listens to
+             * the width of the window, not the width of a box drawn inside
+             * it, so squeezing shows the desktop layout in a thin column:
+             * convincing, and wrong about the one thing being checked.
+             */
+            const enterPreview = () => {
+                const wasEditing = document.body.classList.contains('editing');
+
+                closeDrawer(true);
+                setEditing(false);
+                ui.toolbar.style.display = 'none';
+
+                const pill = document.createElement('div');
+                pill.className = 'le-back';
+
+                let phone = null;
+
+                const showPhone = (on) => {
+                    if (on && !phone) {
+                        phone = document.createElement('div');
+                        phone.className = 'le-phone';
+                        const frame = document.createElement('iframe');
+                        const url = new URL(window.location.href);
+                        // So the editor does not boot a second time inside
+                        // its own preview.
+                        url.searchParams.set('live-edit', 'off');
+                        frame.src = url.toString();
+                        frame.title = 'This page on a phone';
+                        phone.append(frame);
+                        ui.shadow.append(phone);
+                    } else if (!on && phone) {
+                        phone.remove();
+                        phone = null;
+                    }
+                };
+
+                const widths = [['Desktop', false], ['Phone', true]];
+                const buttons = widths.map(([label, wantsPhone]) => {
+                    const button = el('button', 'le-back-btn', label);
+                    button.type = 'button';
+                    button.addEventListener('click', () => {
+                        buttons.forEach((other) => other.classList.remove('is-on'));
+                        button.classList.add('is-on');
+                        showPhone(wantsPhone);
+                    });
+                    pill.append(button);
+
+                    return button;
+                });
+                buttons[0].classList.add('is-on');
+
+                if (publishing.previewUrl) {
+                    const share = el('button', 'le-back-btn', 'Copy a link to this');
+                    share.type = 'button';
+                    share.title = 'A link that shows this unpublished version to somebody else';
+                    share.addEventListener('click', async () => {
+                        try {
+                            await navigator.clipboard.writeText(publishing.previewUrl);
+                            ui.toast('Link copied \u2713');
+                        } catch {
+                            // Refused often enough that the link has to be
+                            // gettable without it.
+                            window.prompt('Copy this link:', publishing.previewUrl);
+                        }
+                    });
+                    pill.append(share);
                 }
-            });
+
+                const back = el('button', 'le-back-btn', 'Back to editing');
+                back.type = 'button';
+                back.addEventListener('click', () => {
+                    showPhone(false);
+                    pill.remove();
+                    document.removeEventListener('keydown', onKey, true);
+                    ui.toolbar.style.display = '';
+                    setEditing(wasEditing);
+                });
+
+                const onKey = (event) => {
+                    if (event.key === 'Escape') back.click();
+                };
+
+                document.addEventListener('keydown', onKey, true);
+                pill.append(back);
+                ui.shadow.append(pill);
+                back.focus();
+            };
+
+            ui.previewButton.addEventListener('click', enterPreview);
         });
 
         ui.undoButton.addEventListener('click', async () => {
@@ -3357,6 +3445,12 @@ const startLiveEdit = (() => {
 
     return () => {
         if (started) return;
+
+        // The phone preview loads this same page in a frame, and an editor
+        // booting inside its own preview draws a second toolbar over a page
+        // nobody can reach to press it.
+        if (new URLSearchParams(window.location.search).get('live-edit') === 'off') return;
+
         started = true;
         bootLiveEdit();
     };
