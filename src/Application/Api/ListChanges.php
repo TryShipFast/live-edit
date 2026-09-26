@@ -55,7 +55,7 @@ class ListChanges
                     // theme's own words, which only the page knows.
                     'before' => $draft->kind === 'setting' ? ($published[$draft->subject] ?? null) : null,
                     'after' => $draft->kind === 'setting'
-                        ? ($payload['value'] ?? '')
+                        ? $this->readably($payload['value'] ?? '', $published[$draft->subject] ?? null)
                         : $this->describeStyle($payload),
                     'at' => $draft->updated_at?->toIso8601String(),
                 ];
@@ -64,6 +64,66 @@ class ListChanges
             ->all();
 
         return ['changes' => $changes, 'count' => count($changes)];
+    }
+
+    /**
+     * A saved value, said the way a person would say it.
+     *
+     * A list of things is stored as one setting holding the ORDER OF ITS ITEM
+     * IDS, because that is what survives being published and reverted as a
+     * single change. Printed straight into the Changes tab it read
+     * ["nmuiimroh","i1","i2"] — and describing it as "3 items: nmuiimroh, i1,
+     * i2" is no better, because those are names the editor made up for its own
+     * use and nobody has ever seen them.
+     *
+     * What somebody wants to know about a list is what happened to it. So it
+     * is compared with what is published and reported as the difference.
+     */
+    protected function readably(mixed $value, mixed $before = null): string
+    {
+        $items = $this->asList($value);
+
+        if ($items === null) {
+            return (string) $value;
+        }
+
+        $had = $this->asList($before);
+        $now = count($items);
+
+        if ($had === null) {
+            return $now === 1 ? 'A list of 1 item' : "A list of {$now} items";
+        }
+
+        $was = count($had);
+
+        if ($now > $was) {
+            return $this->many($now - $was, 'item').' added, leaving '.$this->many($now, 'item');
+        }
+
+        if ($now < $was) {
+            return $this->many($was - $now, 'item').' removed, leaving '.$this->many($now, 'item');
+        }
+
+        return $items === $had ? 'The list is unchanged' : 'The order changed';
+    }
+
+    protected function many(int $count, string $noun): string
+    {
+        return $count.' '.($count === 1 ? $noun : $noun.'s');
+    }
+
+    /**
+     * @return array<int, mixed>|null
+     */
+    protected function asList(mixed $value): ?array
+    {
+        if (! is_string($value) || ! str_starts_with(trim($value), '[')) {
+            return null;
+        }
+
+        $items = json_decode($value, true);
+
+        return is_array($items) ? $items : null;
     }
 
     /**
