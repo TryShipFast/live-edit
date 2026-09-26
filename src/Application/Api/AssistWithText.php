@@ -31,7 +31,7 @@ class AssistWithText
     }
 
     /**
-     * @param  array{heading?: string, page?: string, role?: string, tone?: string}  $context
+     * @param  array{heading?: string, page?: string, role?: string, site?: string, about?: string}  $context
      * @return array{text: string|null, balance: int, reason?: string}
      */
     public function __invoke(Site $site, string $action, string $text, array $context = []): array
@@ -83,7 +83,18 @@ class AssistWithText
             ? 'Rewrite it shorter while keeping every fact in it. Fewer words, same meaning.'
             : 'Rewrite it more clearly and naturally, keeping every fact in it and keeping roughly the same length.';
 
+        /*
+         * What the model is told, and why each part is there.
+         *
+         * Without the last two it knows the sentence and the heading above it
+         * and nothing else, so it writes something that fits the paragraph and
+         * not the business: a clinic's "Book now" and a law firm's come back
+         * in the same voice. The site's own name and its own description of
+         * itself are already on the page and cost nothing to pass on.
+         */
         $about = collect([
+            isset($context['site']) ? "The website is for: {$context['site']}." : null,
+            isset($context['about']) ? "The site describes itself as: \"{$context['about']}\"." : null,
             isset($context['role']) ? "It is the {$context['role']} of the section." : null,
             isset($context['heading']) ? "The heading above it reads: \"{$context['heading']}\"." : null,
             isset($context['page']) ? "The page is: {$context['page']}." : null,
@@ -104,6 +115,18 @@ class AssistWithText
                                 'Keep the language it was written in.',
                                 'Never invent facts, prices, dates, names or claims that are not already there.',
                                 'Match the register of the original; if it is plain, stay plain.',
+                                // Without this the business is passed and
+                                // ignored. Asked to rewrite "Book now", the
+                                // model answered "Schedule your appointment"
+                                // for a clinic and, told it was a guitarist's
+                                // site, answered "Schedule your appointment"
+                                // again. The context was there; nothing said
+                                // it mattered.
+                                'The rewrite must suit the business described below.',
+                                'Never use a word that belongs to a different trade: an appointment,',
+                                'a booking, a consultation, a table, a fitting and a session are not',
+                                'interchangeable, and picking the wrong one tells the reader the site',
+                                'was not written by anybody who works there.',
                             ]),
                         ],
                         [

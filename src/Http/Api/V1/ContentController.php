@@ -276,6 +276,11 @@ class ContentController
             'heading' => ['nullable', 'string', 'max:300'],
             'page' => ['nullable', 'string', 'max:200'],
             'role' => ['nullable', 'string', 'max:60'],
+            // What the site IS, which is the context that was missing. Told
+            // only the sentence and the heading above it, a model writes
+            // something that fits the paragraph and not the business.
+            'site' => ['nullable', 'string', 'max:120'],
+            'about' => ['nullable', 'string', 'max:400'],
         ]);
 
         $result = $assist(
@@ -286,6 +291,8 @@ class ContentController
                 'heading' => $validated['heading'] ?? null,
                 'page' => $validated['page'] ?? null,
                 'role' => $validated['role'] ?? null,
+                'site' => $validated['site'] ?? null,
+                'about' => $validated['about'] ?? null,
             ]),
         );
 

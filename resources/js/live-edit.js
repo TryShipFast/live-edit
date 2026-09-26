@@ -644,6 +644,24 @@ const bootLiveEdit = () => {
             return wrap;
         };
 
+        /**
+         * The kind of control each style property needs.
+         *
+         * Kept beside the CSS this editor writes, because they are two halves
+         * of one fact: a property rendered as a colour has to be edited as a
+         * colour. The server sends the same map, and is still believed first.
+         */
+        const KINDS_OF_STYLE = {
+            background: 'color',
+            backgroundImage: 'url',
+            textColor: 'color',
+            fontSize: 'px',
+            paddingX: 'px',
+            paddingY: 'px',
+            radius: 'px',
+            hidden: 'toggle',
+        };
+
         const addStyleFields = (styleKey, propNames, element) => {
             current.styleKey = styleKey;
             const values = (window.liveEditStyles ?? {})[styleKey] ?? {};
@@ -653,7 +671,23 @@ const bootLiveEdit = () => {
             drawerFields.append(heading);
             let offered = 0;
             (element ? stylePropsFor(element, propNames) : propNames).forEach((name) => {
-                const type = (window.liveEditStyleProps ?? {})[name];
+                /*
+                 * What kind of control a property needs.
+                 *
+                 * This used to come only from the site's answer, which is
+                 * fetched as the editor starts. A panel is built once, so
+                 * clicking an element before that answer arrived — which is
+                 * to say, clicking the first thing you see — drew no controls
+                 * at all and said "nothing on this element can be restyled".
+                 * The panel never corrected itself, so a feature that was
+                 * merely late looked switched off.
+                 *
+                 * A colour is a colour on every site, so the kinds are known
+                 * here. The site's answer still wins where it has one, which
+                 * is what lets a host offer a property this list has never
+                 * heard of; it is no longer needed for the panel to work.
+                 */
+                const type = (window.liveEditStyleProps ?? {})[name] ?? KINDS_OF_STYLE[name];
                 if (!type) return;
                 drawerFields.append(styleField(name, type, values[name], element));
                 offered++;
@@ -741,6 +775,34 @@ const bootLiveEdit = () => {
 
         // Ancestor trail: jump from an element's editor to any tagged container
         // it sits in (card, section) without hunting for its chip.
+        /*
+         * Drawing the panel again when what it needed turns up late.
+         *
+         * Two things the panel depends on are fetched as the editor starts:
+         * what the site allows to be restyled, and how many credits are left.
+         * A panel is built once, from whatever had arrived by then. Click an
+         * element before those answers land — which is to say, click the first
+         * thing you see — and you get a panel with no style controls, reading
+         * "nothing on this element can be restyled", and no offer to rewrite
+         * the words. Wait a second and click the same element and both appear.
+         *
+         * Nothing errors, and the panel never corrects itself, so the feature
+         * looks absent rather than late. Redrawing when the answer arrives
+         * costs one rebuild of a panel nobody has typed into yet.
+         */
+        let lastOpened = null;
+
+        const redrawPanel = () => {
+            // Never over somebody's unsaved work: they would watch what they
+            // had typed disappear, which is a far worse fault than the one
+            // this fixes.
+            if (!lastOpened || !current || current.dirty) return;
+            if (!drawer.classList.contains('is-open') || drawerTab !== 'Edit') return;
+            if (!lastOpened.isConnected) return;
+
+            openNode(lastOpened);
+        };
+
         const labelForNode = (node) => {
             // A band the model understood ("Hero", "FAQ") beats a generic role.
             if (node.dataset.editRegion) return node.dataset.editRegion;
@@ -751,6 +813,10 @@ const bootLiveEdit = () => {
         };
 
         const openNode = (node) => {
+            // Remembered so the panel can be drawn again if what it needs
+            // arrives after it was built. See redrawPanel().
+            lastOpened = node;
+
             if (node.dataset.editImg !== undefined) editImage(node);
             else if (node.dataset.edit !== undefined) editText(node);
             else if (node.dataset.svgEdit !== undefined || node.dataset.editSvg !== undefined) editDrawing(node);
@@ -935,6 +1001,8 @@ const bootLiveEdit = () => {
             try {
                 const response = await request('/live-edit/credits', { method: 'GET' });
                 credits = await response.json();
+                // It may have arrived after a panel was already drawn without it.
+                redrawPanel();
             } catch (error) {
                 // Not knowing the balance is a reason to leave the buttons
                 // out, not a reason to interrupt somebody.
@@ -979,6 +1047,11 @@ const bootLiveEdit = () => {
                  * took the colour off.
                  */
                 if (payload?.styles) window.liveEditStyles = payload.styles;
+
+                // Same reason as the credits: a panel built before this
+                // landed says nothing on the element can be restyled, and
+                // would go on saying it.
+                redrawPanel();
             } catch (error) {
                 console.warn('[live-edit] could not read what this site allows to be styled:', error);
             }
@@ -1036,6 +1109,26 @@ const bootLiveEdit = () => {
             return div;
         };
 
+        /** The site's own name for itself. */
+        const whatThisSiteIs = () => {
+            const named = document.querySelector('meta[property="og:site_name"]')?.content
+                ?? document.querySelector('meta[name="application-name"]')?.content
+                // A title is usually "Page name - Site name", and the part
+                // after the separator is the one that names the business.
+                ?? (document.title ?? '').split(/\s+[|\u2013\u2014-]\s+/).pop();
+
+            return (named ?? '').replace(/\s+/g, ' ').trim().slice(0, 120);
+        };
+
+        /** How the site describes itself, where it says so. */
+        const howTheSiteDescribesItself = () => {
+            const said = document.querySelector('meta[name="description"]')?.content
+                ?? document.querySelector('meta[property="og:description"]')?.content
+                ?? '';
+
+            return said.replace(/\s+/g, ' ').trim().slice(0, 400);
+        };
+
         const runAssist = async (action, label, element, box, button, name) => {
             button.disabled = true;
             name.textContent = 'Thinking…';
@@ -1056,6 +1149,13 @@ const bootLiveEdit = () => {
                         heading: nearestHeading(element),
                         role: describeElement(element),
                         page: window.location.pathname,
+                        // What the site is, in the site's own words. Both are
+                        // already on the page: without them the model knows
+                        // the sentence and the heading above it and nothing
+                        // about the business, so a clinic and a law firm get
+                        // rewritten in the same voice.
+                        site: whatThisSiteIs(),
+                        about: howTheSiteDescribesItself(),
                     }),
                 });
                 result = await response.json();
