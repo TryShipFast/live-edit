@@ -9,6 +9,8 @@ use ShipFast\LiveEdit\Application\Api\ApplyEdit;
 use ShipFast\LiveEdit\Application\Api\ApplyStyle;
 use ShipFast\LiveEdit\Application\Api\AssistWithText;
 use ShipFast\LiveEdit\Application\Api\ExportMarkup;
+use ShipFast\LiveEdit\Application\Api\FindPhotos;
+use ShipFast\LiveEdit\Application\Api\ImagineAPicture;
 use ShipFast\LiveEdit\Application\Api\ListChanges;
 use ShipFast\LiveEdit\Application\Api\PrepareMarkup;
 use ShipFast\LiveEdit\Application\Api\PublishSite;
@@ -276,6 +278,51 @@ class ContentController
         return response()->json($result)->withHeaders(['Cache-Control' => 'no-store, private']);
     }
 
+    /**
+     * Free photographs for somebody who does not have one.
+     *
+     * Costs no credits: these are not ours and not generated, and charging for
+     * a search would make the cheapest good answer look like the expensive one.
+     */
+    public function photos(Request $request, FindPhotos $photos): JsonResponse
+    {
+        $validated = $request->validate([
+            'q' => ['required', 'string', 'max:120'],
+        ]);
+
+        return response()->json($photos->search($validated['q']))
+            ->withHeaders(['Cache-Control' => 'private, max-age=300']);
+    }
+
+    /**
+     * Saying which photograph was used, so its photographer is credited.
+     *
+     * Required by Unsplash's terms and the mechanism by which the people whose
+     * work this is get counted. Answers immediately either way: a client who
+     * has chosen a picture should not wait on our bookkeeping.
+     */
+    public function photoUsed(Request $request, FindPhotos $photos): JsonResponse
+    {
+        $validated = $request->validate([
+            'download_location' => ['required', 'string', 'max:500'],
+        ]);
+
+        $photos->reportUse($validated['download_location']);
+
+        return response()->json(['noted' => true])->withHeaders(['Cache-Control' => 'no-store']);
+    }
+
+    /** Making a picture when no photograph will do. Five credits. */
+    public function imagine(Request $request, ImagineAPicture $imagine): JsonResponse
+    {
+        $validated = $request->validate([
+            'prompt' => ['required', 'string', 'max:600'],
+        ]);
+
+        return response()->json($imagine(ApiContext::site($request), $validated['prompt']))
+            ->withHeaders(['Cache-Control' => 'no-store, private']);
+    }
+
     /** What this site has left to spend. */
     public function credits(Request $request, Credits $credits): JsonResponse
     {
@@ -283,6 +330,10 @@ class ContentController
             'balance' => $credits->balance(ApiContext::site($request)),
             'costs' => Credits::COSTS,
             'available' => app(AssistWithText::class)->available(),
+            // What the picker may offer. A tab that answers "not configured"
+            // is worse than a tab that is not there.
+            'photos' => app(FindPhotos::class)->available(),
+            'imagine' => app(ImagineAPicture::class)->available(),
         ])->withHeaders(['Cache-Control' => 'no-store, private']);
     }
 

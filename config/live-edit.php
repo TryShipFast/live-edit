@@ -135,6 +135,33 @@ return [
         'api_key' => env('OPENAI_API_KEY'),
         'batch' => 25,
         'timeout' => 30,
+
+        // Making a picture rather than writing a sentence. Its own endpoint
+        // and model, because they are a different thing on every provider and
+        // somebody may well want a cheap model for words and a good one for
+        // images.
+        'image_endpoint' => env('LIVE_EDIT_AI_IMAGE_ENDPOINT', 'https://api.openai.com/v1/images/generations'),
+        'image_model' => env('LIVE_EDIT_AI_IMAGE_MODEL', 'gpt-image-1'),
+        'image_timeout' => 90,
+    ],
+
+    /*
+     * Free photographs, from Unsplash.
+     *
+     * Proxied rather than called from the page: the key would otherwise be
+     * printed into every site we are installed on, where anybody could take it
+     * and spend somebody else's quota.
+     *
+     * Unsplash's terms require that using a photo is reported back to them, so
+     * the photographer is credited with the download. That is not optional and
+     * it is not a formality — it is how the people whose work this is get
+     * counted.
+     */
+    'photos' => [
+        'enabled' => env('LIVE_EDIT_PHOTOS', false),
+        'endpoint' => env('LIVE_EDIT_PHOTOS_ENDPOINT', 'https://api.unsplash.com'),
+        'access_key' => env('UNSPLASH_ACCESS_KEY'),
+        'timeout' => 15,
     ],
 
     // Rendered scan (live-edit:scan --url=): renders the page in headless

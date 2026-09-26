@@ -71,6 +71,15 @@ Route::prefix(config('live-edit.api.prefix', 'api/live-edit/v1').'/{site}')
             // rewrite. A write key: this costs money.
             Route::get('/credits', [ContentController::class, 'credits'])->name('live-edit.api.credits');
             Route::post('/assist', [ContentController::class, 'assist'])->name('live-edit.api.assist');
+
+            // Free photographs, and saying which one was used so its
+            // photographer is credited. Proxied because the key would
+            // otherwise be printed into every site we are installed on.
+            Route::get('/photos', [ContentController::class, 'photos'])->name('live-edit.api.photos');
+            Route::post('/photos/used', [ContentController::class, 'photoUsed'])->name('live-edit.api.photos.used');
+
+            // Making one, when no photograph will do.
+            Route::post('/imagine', [ContentController::class, 'imagine'])->name('live-edit.api.imagine');
         });
 
         // How a section looks. The same key and the same cost as a word: the
