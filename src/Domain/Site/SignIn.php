@@ -96,6 +96,7 @@ class SignIn
             $editor->name ?: $editor->email,
             $editor->abilities(),
             $expiresAt,
+            $editor->id,
         );
 
         return [

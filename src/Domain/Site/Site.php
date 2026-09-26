@@ -99,12 +99,15 @@ class Site extends Model
      * @param  array<int, Ability>|null  $abilities
      * @return array{0: ApiToken, 1: string}
      */
-    public function issueToken(TokenType $type, string $name, ?array $abilities = null, ?\DateTimeInterface $expiresAt = null): array
+    public function issueToken(TokenType $type, string $name, ?array $abilities = null, ?\DateTimeInterface $expiresAt = null, ?int $editorId = null): array
     {
         $value = TokenValue::generate($type);
 
         $token = $this->tokens()->create([
             'public_id' => $value->id,
+            // Only a session has a person behind it; the site's own keys
+            // belong to the site.
+            'editor_id' => $editorId,
             'type' => $type->value,
             'name' => $name,
             'secret_hash' => $value->hash(),

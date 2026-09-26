@@ -49,10 +49,24 @@ class SessionController
             'session' => [
                 'valid' => $usable,
                 'site' => $site->slug,
-                // The label the sign-in recorded — a name where we have one,
-                // the address otherwise. Enough for the site to say who is
-                // editing; not a directory lookup.
-                'editor' => $usable ? $token->name : null,
+                /*
+                 * The person, from their own row rather than from the token's
+                 * display name.
+                 *
+                 * So a site can greet whoever is editing — "Welcome Tope" —
+                 * and be addressing the right one. A label would make two
+                 * editors of the same name indistinguishable and turn a
+                 * rename into a different person.
+                 */
+                'editor' => $usable ? [
+                    'name' => $token->editor?->name ?: null,
+                    'email' => $token->editor?->email,
+                    // What to actually put on screen, decided here so every
+                    // adapter greets people the same way and none of them has
+                    // to fall back to an empty string.
+                    'greeting' => $token->editor?->name
+                        ?: (is_string($token->editor?->email) ? explode('@', $token->editor->email)[0] : $token->name),
+                ] : null,
                 'expires_at' => $token->expires_at?->toIso8601String(),
             ],
         ])->withHeaders(['Cache-Control' => 'no-store, private']);

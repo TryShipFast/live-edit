@@ -5,6 +5,7 @@ namespace ShipFast\LiveEdit\Tests\Api;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Testing\TestResponse;
+use ShipFast\LiveEdit\Domain\Site\Editor;
 use ShipFast\LiveEdit\Domain\Site\Provisioner;
 use ShipFast\LiveEdit\Domain\Site\Site;
 use ShipFast\LiveEdit\Domain\Site\SiteVerification;
@@ -366,5 +367,76 @@ class LicenceTest extends TestCase
         foreach (['acme.com', 'attacker-test.com', 'test.com', 'nottest.example'] as $real) {
             $this->assertFalse(SiteVerification::isLocal($real), $real);
         }
+    }
+
+    public function test_a_key_cannot_be_used_for_a_site_it_was_not_issued_to(): void
+    {
+        // The mapping is the whole licence. A key that worked against any
+        // site would make "this key belongs to acme.com" a note rather than
+        // a rule, and one leaked key would unlock every customer.
+        [, $key] = $this->licensedSite();
+
+        Site::query()->create([
+            'slug' => 'someone-else',
+            'name' => 'Someone else',
+            'allowed_origins' => ['https://acme.test'],
+            'domain' => 'acme.test',
+            'verification_code' => 'shipfast-verify-abc123',
+            'verified_at' => now(),
+        ]);
+
+        // Forbidden rather than unauthorised: the key is real and was
+        // recognised, it simply does not belong to this site.
+        $this->getJson('/api/live-edit/v1/someone-else/licence', [
+            'Authorization' => 'Bearer '.$key,
+            'Origin' => 'https://acme.test',
+        ])->assertForbidden();
+    }
+
+    public function test_an_expired_session_is_not_somebody_who_may_edit(): void
+    {
+        $site = Site::query()->create(['slug' => 'acme', 'name' => 'Acme', 'allowed_origins' => ['https://acme.test']]);
+        $editor = Editor::query()->create(['site_id' => $site->id, 'email' => 'tope@acme.test', 'name' => 'Tope']);
+
+        [, $live] = $site->issueToken(TokenType::Session, 'Tope', null, now()->addHour(), $editor->id);
+        [, $stale] = $site->issueToken(TokenType::Session, 'Tope', null, now()->subMinute(), $editor->id);
+
+        // A site that keeps its own content asks this before showing anybody
+        // an editor, so an expired session has to read as "not you".
+        $this->getJson('/api/live-edit/v1/acme/session', [
+            'Authorization' => 'Bearer '.$live, 'Origin' => 'https://acme.test',
+        ])->assertOk()->assertJsonPath('session.valid', true);
+
+        $this->getJson('/api/live-edit/v1/acme/session', [
+            'Authorization' => 'Bearer '.$stale, 'Origin' => 'https://acme.test',
+        ])->assertUnauthorized();
+    }
+
+    public function test_a_session_says_who_is_editing_so_a_site_can_greet_them(): void
+    {
+        $site = Site::query()->create(['slug' => 'acme', 'name' => 'Acme', 'allowed_origins' => ['https://acme.test']]);
+        $editor = Editor::query()->create(['site_id' => $site->id, 'email' => 'tope@acme.test', 'name' => 'Tope']);
+        [, $token] = $site->issueToken(TokenType::Session, 'Tope', null, now()->addHour(), $editor->id);
+
+        $this->getJson('/api/live-edit/v1/acme/session', [
+            'Authorization' => 'Bearer '.$token, 'Origin' => 'https://acme.test',
+        ])
+            ->assertOk()
+            ->assertJsonPath('session.editor.name', 'Tope')
+            ->assertJsonPath('session.editor.email', 'tope@acme.test')
+            ->assertJsonPath('session.editor.greeting', 'Tope');
+    }
+
+    public function test_somebody_with_no_name_recorded_is_still_greeted(): void
+    {
+        $site = Site::query()->create(['slug' => 'acme', 'name' => 'Acme', 'allowed_origins' => ['https://acme.test']]);
+        $editor = Editor::query()->create(['site_id' => $site->id, 'email' => 'tope@acme.test']);
+        [, $token] = $site->issueToken(TokenType::Session, 'tope@acme.test', null, now()->addHour(), $editor->id);
+
+        // "Welcome tope" beats "Welcome " and beats printing their whole
+        // address back at them.
+        $this->getJson('/api/live-edit/v1/acme/session', [
+            'Authorization' => 'Bearer '.$token, 'Origin' => 'https://acme.test',
+        ])->assertOk()->assertJsonPath('session.editor.greeting', 'tope');
     }
 }
