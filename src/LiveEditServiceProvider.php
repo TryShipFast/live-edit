@@ -13,6 +13,7 @@ use ShipFast\LiveEdit\Console\Commands\ScanForEditables;
 use ShipFast\LiveEdit\Console\Commands\Versions;
 use ShipFast\LiveEdit\Http\Api\Middleware\EnforceCors;
 use ShipFast\LiveEdit\Http\Middleware\TagsEditableMarkup;
+use ShipFast\LiveEdit\Support\EditorSession;
 use ShipFast\LiveEdit\Support\Licence;
 
 class LiveEditServiceProvider extends ServiceProvider
@@ -48,6 +49,19 @@ class LiveEditServiceProvider extends ServiceProvider
         }
 
         Gate::define('live-edit', function ($user = null) {
+            /*
+             * Somebody who signed in with us, first.
+             *
+             * This is the ordinary way in now: the editor's own sign-in,
+             * verified against the service, with no account on this website
+             * involved. Checked before the host's user because a site may
+             * have both — an administrator who also edits — and the editor
+             * session is the one that says anything about editing.
+             */
+            if (EditorSession::check()) {
+                return true;
+            }
+
             if ($user === null) {
                 return false;
             }

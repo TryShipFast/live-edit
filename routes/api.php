@@ -208,6 +208,17 @@ Route::middleware([EnforceCors::class])
         Route::middleware([ThrottleApi::class.':sign_in'])
             ->post('/sign-in', [SignInController::class, 'request'])
             ->name('live-edit.api.sign-in');
+
+        /*
+         * The same door, with a password instead of a link.
+         *
+         * Under the same throttle, which matters more here: a link is only
+         * ever sent to an address that already edits the site, while a
+         * password can be guessed at. The limit is the guard.
+         */
+        Route::middleware([ThrottleApi::class.':sign_in'])
+            ->post('/sign-in/password', [SignInController::class, 'password'])
+            ->name('live-edit.api.sign-in.password');
     });
 
 Route::get('/live-edit/sign-in/{token}', [SignInController::class, 'redeem'])

@@ -2,6 +2,7 @@
 
 use Illuminate\Support\Facades\Route;
 use ShipFast\LiveEdit\Http\Api\V1\EmbedController;
+use ShipFast\LiveEdit\Http\Controllers\EditorSessionController;
 use ShipFast\LiveEdit\Http\Controllers\LiveEditController;
 use ShipFast\LiveEdit\Http\Controllers\ThemeController;
 use ShipFast\LiveEdit\Http\Middleware\RequiresLicence;
@@ -76,6 +77,21 @@ Route::middleware(config('live-edit.view_middleware', ['web']))->group(function 
  * the address that names a build is safe to cache for a year because a new
  * build is a new address.
  */
+/*
+ * Signing in happens with us, not here.
+ *
+ * Outside the authenticated group on purpose: the whole point is that the
+ * person at the keyboard has no account on this website. They sign in on the
+ * service, the toolbar receives a token, and it hands it here to be checked.
+ */
+Route::middleware(config('live-edit.view_middleware', ['web']))->group(function () {
+    Route::post('/live-edit/session', [EditorSessionController::class, 'store'])
+        ->name('live-edit.session.store');
+
+    Route::delete('/live-edit/session', [EditorSessionController::class, 'destroy'])
+        ->name('live-edit.session.destroy');
+});
+
 Route::get('/live-edit/runtime.js', [EmbedController::class, 'runtime'])
     ->name('live-edit.runtime.script');
 

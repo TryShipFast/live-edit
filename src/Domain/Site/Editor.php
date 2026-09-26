@@ -12,7 +12,16 @@ class Editor extends Model
 {
     protected $table = 'live_edit_editors';
 
-    protected $fillable = ['site_id', 'email', 'name', 'may_publish'];
+    protected $fillable = ['site_id', 'email', 'name', 'may_publish', 'password'];
+
+    /**
+     * Never serialised, never logged, never returned by an endpoint.
+     *
+     * Hidden rather than merely "not selected anywhere": the day somebody
+     * returns an Editor from a controller is the day a hash goes over the
+     * wire, and that is not a mistake worth leaving available.
+     */
+    protected $hidden = ['password'];
 
     protected $casts = [
         'may_publish' => 'boolean',

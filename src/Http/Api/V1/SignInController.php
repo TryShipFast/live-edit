@@ -5,6 +5,7 @@ namespace ShipFast\LiveEdit\Http\Api\V1;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use ShipFast\LiveEdit\Domain\Site\PasswordSignIn;
 use ShipFast\LiveEdit\Domain\Site\SignIn;
 use ShipFast\LiveEdit\Domain\Site\Site;
 
@@ -61,5 +62,57 @@ class SignInController
         return redirect()->away(
             $result['return_to'].$separator.'kb_session='.urlencode($result['token'])
         )->withHeaders(['Cache-Control' => 'no-store, private']);
+    }
+
+    /**
+     * Sign in with an address and a password, and get a session back.
+     *
+     * The session is returned rather than redirected to, because the caller is
+     * the editor's own toolbar sitting on the customer's page: it has the
+     * answer already and can hand it to that site's server itself, without a
+     * round trip through an email client.
+     *
+     * One error for every kind of failure. "No such editor" and "wrong
+     * password" as separate answers turn this into a way to ask which of a
+     * customer's staff are real, which is exactly what the emailed-link flow
+     * next door refuses to do.
+     */
+    public function password(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'site' => ['required', 'string', 'max:63'],
+            'email' => ['required', 'email', 'max:200'],
+            'password' => ['required', 'string', 'max:200'],
+        ]);
+
+        $site = Site::query()->where('slug', $validated['site'])->first();
+
+        $result = $site !== null && $site->isActive()
+            ? PasswordSignIn::attempt($site, $validated['email'], $validated['password'])
+            : null;
+
+        if ($result === null) {
+            return response()->json([
+                'error' => [
+                    'type' => 'sign_in_failed',
+                    'message' => 'That address and password do not match an editor of this site.',
+                ],
+            ], 422)->withHeaders(['Cache-Control' => 'no-store, private']);
+        }
+
+        return response()->json([
+            'session' => [
+                'token' => $result['token'],
+                'expires_at' => $result['expires_at'],
+                'editor' => [
+                    'name' => $result['editor']->name ?: null,
+                    'email' => $result['editor']->email,
+                    // What to put on screen, decided here so every adapter
+                    // greets people the same way.
+                    'greeting' => $result['editor']->name
+                        ?: explode('@', $result['editor']->email)[0],
+                ],
+            ],
+        ])->withHeaders(['Cache-Control' => 'no-store, private']);
     }
 }

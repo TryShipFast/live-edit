@@ -91,13 +91,12 @@ final class Licence
             $response = Http::timeout(5)
                 ->withToken(self::key())
                 ->acceptJson()
-                ->get(self::host().'/'.trim((string) config('live-edit.api.prefix', 'api/live-edit/v1'), '/')
-                    .'/'.rawurlencode(self::site()).'/licence', [
-                        // What this installation believes it is. A server can
-                        // say anything, which the service knows — it is a
-                        // tripwire there, not a lock.
-                        'domain' => self::domain(),
-                    ]);
+                ->get(self::endpoint('licence'), [
+                    // What this installation believes it is. A server can
+                    // say anything, which the service knows — it is a
+                    // tripwire there, not a lock.
+                    'domain' => self::domain(),
+                ]);
 
             if ($response->successful()) {
                 $licence = (array) $response->json('licence', []);
@@ -188,9 +187,23 @@ final class Licence
         return trim((string) config('live-edit.licence.key'));
     }
 
-    private static function site(): string
+    public static function site(): string
     {
         return trim((string) config('live-edit.licence.site', config('live-edit.cloud.site')));
+    }
+
+    /**
+     * A service endpoint for this site, built in one place.
+     *
+     * The host, the prefix and the site slug were being glued together at
+     * each call site, which is three chances to disagree about a slash.
+     */
+    public static function endpoint(string $path): string
+    {
+        return self::host()
+            .'/'.trim((string) config('live-edit.api.prefix', 'api/live-edit/v1'), '/')
+            .'/'.rawurlencode(self::site())
+            .'/'.ltrim($path, '/');
     }
 
     private static function host(): string
