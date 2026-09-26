@@ -8,6 +8,7 @@ use ShipFast\LiveEdit\Http\Api\Middleware\EnforceCors;
 use ShipFast\LiveEdit\Http\Api\Middleware\ThrottleApi;
 use ShipFast\LiveEdit\Http\Api\V1\ContentController;
 use ShipFast\LiveEdit\Http\Api\V1\EmbedController;
+use ShipFast\LiveEdit\Http\Api\V1\LicenceController;
 use ShipFast\LiveEdit\Http\Api\V1\MediaController;
 use ShipFast\LiveEdit\Http\Api\V1\SessionController;
 use ShipFast\LiveEdit\Http\Api\V1\SignInController;
@@ -37,6 +38,14 @@ Route::prefix(config('live-edit.api.prefix', 'api/live-edit/v1').'/{site}')
             AuthenticateApiToken::class.':read',
             ThrottleApi::class.':read',
         ])->group(function () {
+            /*
+             * Is this licence good, and is it mine.
+             *
+             * A read key, because a self-hosting install (Laravel, WordPress)
+             * has one and needs nothing more to ask: the answer contains no
+             * content, only the terms the site is already entitled to know.
+             */
+            Route::get('/licence', [LicenceController::class, 'show'])->name('live-edit.api.licence');
             Route::get('/content', [ContentController::class, 'show'])->name('live-edit.api.content');
             Route::get('/content/version', [ContentController::class, 'version'])->name('live-edit.api.version');
             // Where the published files are, so a CDN or a build can fetch

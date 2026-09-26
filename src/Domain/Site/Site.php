@@ -29,7 +29,28 @@ class Site extends Model
         'bytes_stored' => 'integer',
         'suspended_at' => 'datetime',
         'last_active_at' => 'datetime',
+        'verified_at' => 'datetime',
     ];
+
+    /**
+     * Whether this site has proved it holds the domain it registered.
+     */
+    public function isVerified(): bool
+    {
+        return $this->verified_at !== null && trim((string) $this->domain) !== '';
+    }
+
+    /**
+     * Whether a hostname is the one this site's licence was bought for.
+     *
+     * An unverified site matches nothing. That is the whole point: a licence
+     * naming a domain nobody proved they hold should not let anybody in under
+     * that name, least of all the person who typed it.
+     */
+    public function ownsDomain(?string $host): bool
+    {
+        return $this->isVerified() && SiteVerification::covers((string) $this->domain, $host);
+    }
 
     public function tokens(): HasMany
     {
