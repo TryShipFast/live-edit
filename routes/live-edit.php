@@ -3,6 +3,7 @@
 use Illuminate\Support\Facades\Route;
 use ShipFast\LiveEdit\Http\Api\V1\EmbedController;
 use ShipFast\LiveEdit\Http\Controllers\LiveEditController;
+use ShipFast\LiveEdit\Http\Controllers\SignInController;
 use ShipFast\LiveEdit\Http\Controllers\ThemeController;
 use ShipFast\LiveEdit\Support\DraftStore;
 
@@ -77,3 +78,16 @@ Route::get('/live-edit/assets/{version}/{file}', fn (string $version, string $fi
     ->where('version', '[A-Za-z0-9._-]+')
     ->where('file', '[a-z-]+\\.js')
     ->name('live-edit.assets.versioned');
+
+/*
+ * Signing in to edit.
+ *
+ * Outside the authenticated group, necessarily: this is how somebody becomes
+ * authenticated. On the "web" middleware because it needs a session and a CSRF
+ * token, and on a site that may have no other login at all.
+ */
+Route::middleware('web')->group(function () {
+    Route::get('/live-edit/sign-in', [SignInController::class, 'show'])->name('live-edit.sign-in');
+    Route::post('/live-edit/sign-in', [SignInController::class, 'store'])->name('live-edit.sign-in.store');
+    Route::post('/live-edit/sign-out', [SignInController::class, 'destroy'])->name('live-edit.sign-out');
+});

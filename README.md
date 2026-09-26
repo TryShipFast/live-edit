@@ -45,6 +45,27 @@ the one composer installed are different versions of the same thing, with
 nothing to say so. `@liveEdit` loads the installed package, so updating it is
 `composer update`.
 
+### Signing in
+
+The package serves its own sign-in at **`/live-edit/sign-in`**. Link to it from
+wherever suits the site — a footer link is usual:
+
+```blade
+<a href="{{ route('live-edit.sign-in') }}">Sign in</a>
+```
+
+It authenticates against **your** users, with your guard and your password
+hashes. The package stores no credential, issues none, and has no user of its
+own to reset or recover. Its one requirement of a host is a users table and an
+auth provider, which a Laravel application has whether or not it has ever had
+a login screen.
+
+That matters because most sites this is installed on have no admin panel.
+Requiring one would make "install it and add a line" untrue for exactly the
+sites it is for.
+
+Signing out is `POST /live-edit/sign-out`.
+
 ### Who may edit
 
 The editor appears for whoever passes the `live-edit` gate. Define it:
