@@ -104,6 +104,23 @@ Define the `live-edit` gate (or your own `middleware`) to control who can edit.
 
 ## Tagging
 
+Two ways, and they mix. Name the handful of things that matter and let the rest
+be found.
+
+**Named keys** are what the examples below use. They are stable: the key says
+what the element is for, so the client's words survive a developer rewriting
+the sentence around them. Worth writing for anything important.
+
+**Derived keys** need no attributes at all. Set `LIVE_EDIT_AUTO_TAG=true` and
+the editable parts of a page are found as it is served — only for somebody the
+gate allows, so a visitor's page is never parsed or rewritten. The trade is
+that a derived key is a signature *of* the current wording: change that
+sentence in the template and the client's edit is orphaned. Use it to make a
+site editable without touching its templates, which is the only option for a
+site somebody bought rather than built.
+
+A page that already carries `data-edit` keeps its own keys untouched.
+
 ```blade
 <h1 data-edit="setting:heroTitle" data-edit-label="Hero heading">{{ $site->get('heroTitle') }}</h1>
 <div data-edit="record:faq:{{ $faq->id }}" data-edit-deletable
@@ -141,6 +158,29 @@ markup alone can't supply. Always review the output — it is a draft.
 
 Load the admin partial once in your layout (`@include('live-edit::admin')`)
 and the drawer/toolbar handle the rest.
+
+## If something is wrong
+
+**`@liveEdit` appears as text on the page.** Blade does not error on a
+directive it does not know — it prints it, so this ends up visible to
+visitors. It means the package is not registered. Usually the install skipped
+Laravel's discovery step, or the views were compiled before it ran:
+
+```bash
+php artisan package:discover
+php artisan view:clear
+```
+
+**The runtime loads but no toolbar appears.** The editor mounts off the body,
+not off the script tag. With `LIVE_EDIT_AUTO_TAG=true` that is done for you;
+without it, the host's layout has to carry `data-admin` (and `data-csrf`) on
+`<body>` for whoever may edit.
+
+**Edits save and then vanish on reload.** The save is working; nothing is
+putting the value back. With named keys the template renders it from your own
+model — check it actually does. With derived keys this is the middleware's
+job, so it means `LIVE_EDIT_AUTO_TAG` is off. If publishing is switched on,
+an unpublished change is deliberately only visible to an editor.
 
 ## Licence
 
