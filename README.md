@@ -120,3 +120,18 @@ markup alone can't supply. Always review the output — it is a draft.
 
 Load the admin partial once in your layout (`@include('live-edit::admin')`)
 and the drawer/toolbar handle the rest.
+
+## Licence
+
+Proprietary. Copyright (c) 2026 TryShipFast. See [LICENSE](LICENSE).
+
+The source is public so that customers and integrators can read it, audit it
+and build against it. Readable is not the same as free to take: a current
+subscription lets you run it on sites you own or operate, including sites you
+build for clients, and does not let you redistribute it, resell it, or offer it
+as a service of your own.
+
+If a subscription lapses, the editor stops. The websites do not. The content
+your clients wrote is in their own database and stays on their pages — losing
+the licence means losing the editor, not the site.
+

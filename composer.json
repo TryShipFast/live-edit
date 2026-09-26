@@ -2,7 +2,13 @@
     "name": "shipfast/live-edit",
     "description": "Config-driven, in-place live-edit CMS for Laravel sites: tag HTML elements, edit content, images, links, icons, styles, collections and nav in place.",
     "type": "library",
-    "license": "MIT",
+    "license": "proprietary",
+    "authors": [
+        {
+            "name": "TryShipFast",
+            "homepage": "https://tryshipfast.com"
+        }
+    ],
     "require": {
         "php": "^8.3",
         "illuminate/support": "^11.0 || ^12.0 || ^13.0"
