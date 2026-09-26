@@ -20,19 +20,26 @@ const CHROME_CSS = `
    hidden in script stayed on screen. The preview link showed on every site
    without publishing, doing nothing when pressed. */
 [hidden] { display: none !important; }
+/* The brand's palette, from the design handoff. The frame was brought over
+   and the inside of the panel was not, so the tabs sat on carbon and every
+   field under them was still blue-grey. One set of names, one look. */
 :host {
-  --le-ink: #0b1220;
-  --le-body: #334155;
-  --le-muted: #7c8899;
-  --le-line: #e8ecf1;
-  --le-field: #d6dde7;
-  --le-soft: #f6f8fb;
-  --le-accent: #111827;
-  --le-accent-soft: rgba(17, 24, 39, .10);
-  --le-danger: #e11d48;
-  --le-live: #22c55e;
-  --le-shadow: 0 24px 60px -12px rgba(11, 18, 32, .28), 0 8px 20px -8px rgba(11, 18, 32, .16);
-  font-family: ui-sans-serif, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+  --le-ink: #0B0C0F;
+  --le-body: #45484F;
+  --le-muted: #9A9DA5;
+  --le-line: #E6E7EA;
+  --le-field: #DADCE0;
+  --le-soft: #F4F5F7;
+  --le-accent: #0B0C0F;
+  --le-accent-soft: rgba(11, 12, 15, .08);
+  /* Cobalt is the accent and the handoff is strict about it: one primary
+     action per view. It marks selection and focus, not every button. */
+  --le-cobalt: #3148F5;
+  --le-cobalt-hover: #2438D6;
+  --le-danger: #C0392B;
+  --le-live: #3148F5;
+  --le-shadow: 0 30px 80px -20px rgba(11, 12, 15, .3);
+  font-family: 'Schibsted Grotesk', ui-sans-serif, -apple-system, "Segoe UI", Roboto, sans-serif;
   font-size: 14px; line-height: 1.5; color: var(--le-body);
   -webkit-font-smoothing: antialiased;
 }
@@ -49,7 +56,7 @@ const CHROME_CSS = `
  * them. Stated rather than reset, because the point is that the editor looks
  * the same on every site it is a guest on. */
 :host > * {
-  font-family: ui-sans-serif, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+  font-family: 'Schibsted Grotesk', ui-sans-serif, -apple-system, "Segoe UI", Roboto, sans-serif;
   font-size: 14px;
   font-weight: 400;
   font-style: normal;
@@ -131,7 +138,7 @@ button, input, select, textarea { font: inherit; color: inherit; margin: 0; }
 }
 .le-status { display: flex; align-items: center; gap: 8px; font-size: 12px; color: #9A9DA5; padding: 0 6px 0 2px; }
 .le-dot { width: 7px; height: 7px; border-radius: 999px; background: #64748b; flex: none; box-shadow: 0 0 0 3px rgba(100,116,139,.18); transition: background .2s ease, box-shadow .2s ease; }
-.le-toolbar.is-editing .le-dot { background: var(--le-live); box-shadow: 0 0 0 3px rgba(34,197,94,.22); }
+.le-toolbar.is-editing .le-dot { background: var(--le-cobalt); box-shadow: 0 0 0 3px rgba(49,72,245,.25); }
 .le-btn {
   cursor: pointer; border: 0; border-radius: 999px; padding: 9px 18px;
   font-size: 13px; font-weight: 600; background: var(--le-accent); color: #fff;
@@ -179,6 +186,7 @@ button, input, select, textarea { font: inherit; color: inherit; margin: 0; }
 }
 .le-tab:hover { color: #45484F; }
 .le-tab.is-on { color: #0B0C0F; border-bottom-color: #0B0C0F; }
+:host :is(input, textarea, select):focus { border-color: var(--le-cobalt); outline: 1px solid var(--le-cobalt); }
 .le-tab-count {
   display: inline-block; margin-left: 5px; min-width: 16px; padding: 0 4px;
   border-radius: 999px; background: #EEEFF1; color: #45484F;
