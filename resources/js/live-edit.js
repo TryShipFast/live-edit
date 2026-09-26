@@ -1966,10 +1966,11 @@ const bootLiveEdit = () => {
             const grid = document.createElement('div');
             grid.className = 'le-grid';
 
+            // Filled in from whichever library actually answered, rather than
+            // naming one of them and being wrong half the time.
             const credit = document.createElement('p');
             credit.className = 'le-hint';
             credit.style.marginTop = '16px';
-            credit.textContent = 'Free to use under the Unsplash licence. The photographer is credited automatically.';
 
             panel.append(search, chips, grid, credit);
 
@@ -1994,6 +1995,10 @@ const bootLiveEdit = () => {
                 }
 
                 const photos = payload?.photos ?? [];
+
+                credit.textContent = payload?.source === 'openverse'
+                    ? 'Free to use, including commercially. The photographer is credited automatically.'
+                    : 'Free to use under the Unsplash licence. The photographer is credited automatically.';
 
                 if (photos.length === 0) {
                     grid.replaceChildren(note(photoExcuse(payload?.reason, query)));
@@ -2164,9 +2169,21 @@ const bootLiveEdit = () => {
                     shot.alt = '';
 
                     pick.append(shot, el('span', 'le-tag', 'MADE'));
+                    /*
+                     * Where it came from, but no credit.
+                     *
+                     * Of the three ways to get a picture only one owes
+                     * anybody anything: a file the client uploaded is their
+                     * own, and a generated one has no photographer and no
+                     * licence. Putting "made by a computer" in the credit
+                     * field would print an attribution line on a page that
+                     * owes nobody an attribution. The source is still
+                     * recorded, because how a picture came to be there is
+                     * worth knowing later; it is simply not a credit.
+                     */
                     pick.addEventListener('click', () => chosen({
                         url,
-                        credit: 'Made by a computer, from a description',
+                        credit: '',
                         creditSource: 'Generated',
                     }));
                     grid.append(pick);

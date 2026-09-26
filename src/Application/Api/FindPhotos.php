@@ -148,9 +148,6 @@ class FindPhotos
                     : 'Unsplash',
                 'source' => 'Unsplash',
                 'sourceUrl' => $this->referred('https://unsplash.com'),
-                // Named so whoever is choosing knows what the picture asks of
-                // them before they choose it.
-                'requires' => 'credit',
                 // Handed back so the client can tell us which one was used,
                 // rather than us guessing from the URL later.
                 'downloadLocation' => $photo['links']['download_location'] ?? null,
@@ -200,10 +197,6 @@ class FindPhotos
                 // The licence itself, which is what a reader needs to follow
                 // to know what they in turn may do with it.
                 'sourceUrl' => $photo['license_url'] ?? ($photo['foreign_landing_url'] ?? null),
-                // Public domain asks for nothing. Everything else asks to be
-                // credited where the picture appears, and somebody choosing
-                // deserves to know which they are picking.
-                'requires' => strtoupper((string) ($photo['license'] ?? '')) === 'CC0' ? 'nothing' : 'credit',
                 // Openverse has no download endpoint to report to, and asks
                 // for attribution instead, which travels with the picture.
                 'downloadLocation' => null,
