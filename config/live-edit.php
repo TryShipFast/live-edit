@@ -275,32 +275,54 @@ return [
     /*
      * Who may edit, for a host that has no opinion of its own.
      *
-     * Only a convenience: the gate is the host's to define and this is simply
-     * a list it can read, so a brochure site does not have to invent a role
-     * to answer a question about two people. A host with real roles should
-     * ignore this and define the gate from those.
+     * Read by the gate this package defines when the host has not defined
+     * one, so naming an address here is all a brochure site needs to do — no
+     * service provider, no closure, no role invented to answer a question
+     * about two people.
+     *
+     * A host with real roles should define the `live-edit` gate itself; this
+     * is then ignored entirely.
+     *
+     * Empty means nobody, which is the only safe starting point: defaulting
+     * to any signed-in user would hand the editor to every customer of a site
+     * with public registration.
      */
     'editors' => env('LIVE_EDIT_EDITORS', ''),
 
     /*
      * Find the editable parts of a page instead of being told them.
      *
-     * Off by default, and deliberately: it rewrites every HTML response it is
-     * allowed to touch, and a package that quietly started reformatting a
-     * host's pages on upgrade would be indefensible. On, a Laravel site needs
-     * no data-edit attributes at all — the keys are derived from the content.
+     * On by default, which is safe because of what gates it. A response is
+     * only ever rewritten for somebody the `live-edit` gate allows, and that
+     * gate refuses everybody until editors are named — so an install that
+     * has not been told who may edit rewrites nothing for anybody, and a
+     * visitor's page is never touched on any install.
+     *
+     * It was off, on the reasoning that a package which quietly reformats a
+     * host's pages on upgrade would be indefensible. That reasoning was
+     * right about visitors and wrong about the default: the protection is
+     * the gate, and leaving this off as well only meant a correctly
+     * configured site still showed nothing, with no clue which of the two
+     * switches was missing.
      *
      * The trade is real and worth knowing before choosing. A named key
      * survives its wording changing; a derived one is a signature OF that
      * wording, so a developer rewriting the sentence in the template orphans
      * the client's edit. Name the handful that matter, let the rest be found.
      */
-    'auto_tag' => env('LIVE_EDIT_AUTO_TAG', false),
+    'auto_tag' => env('LIVE_EDIT_AUTO_TAG', true),
 
     'licence' => [
-        'host' => env('LIVE_EDIT_LICENCE_HOST', env('LIVE_EDIT_CLOUD_HOST')),
-        'site' => env('LIVE_EDIT_LICENCE_SITE', env('LIVE_EDIT_CLOUD_SITE')),
-        'key' => env('LIVE_EDIT_LICENCE_KEY'),
+        /*
+         * The two values a customer is given, spelled the short way.
+         *
+         * This is the whole configuration: register the site, paste these,
+         * done. The longer LIVE_EDIT_LICENCE_* and LIVE_EDIT_CLOUD_* names
+         * still work so nothing already deployed has to be edited.
+         */
+        'host' => env('LIVE_EDIT_HOST', env('LIVE_EDIT_LICENCE_HOST', env('LIVE_EDIT_CLOUD_HOST', 'https://live.shipfast.com'))),
+        'site' => env('LIVE_EDIT_SITE', env('LIVE_EDIT_LICENCE_SITE', env('LIVE_EDIT_CLOUD_SITE'))),
+        'key' => env('LIVE_EDIT_KEY', env('LIVE_EDIT_LICENCE_KEY')),
 
         // A day. Long enough that the service is asked once per site per day
         // rather than once per page view, short enough that a lapse takes

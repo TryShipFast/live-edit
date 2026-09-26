@@ -46,6 +46,16 @@ Route::prefix(config('live-edit.api.prefix', 'api/live-edit/v1').'/{site}')
              * content, only the terms the site is already entitled to know.
              */
             Route::get('/licence', [LicenceController::class, 'show'])->name('live-edit.api.licence');
+
+            /*
+             * Whether the caller's editor session is still good.
+             *
+             * In the read group because a session token carries read, and
+             * because asking changes nothing. It is how a site that keeps its
+             * own content finds out whether the person on the page may edit
+             * it, without that person needing an account on their own site.
+             */
+            Route::get('/session', [SessionController::class, 'show'])->name('live-edit.api.session.show');
             Route::get('/content', [ContentController::class, 'show'])->name('live-edit.api.content');
             Route::get('/content/version', [ContentController::class, 'version'])->name('live-edit.api.version');
             // Where the published files are, so a CDN or a build can fetch

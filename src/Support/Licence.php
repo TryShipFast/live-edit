@@ -107,6 +107,10 @@ final class Licence
                     'reason' => $licence['reason'] ?? null,
                     'expires_at' => $licence['expires_at'] ?? null,
                     'days_remaining' => $licence['days_remaining'] ?? null,
+                    'editors' => array_values(array_filter(array_map(
+                        fn ($email) => mb_strtolower(trim((string) $email)),
+                        (array) ($licence['editors'] ?? [])
+                    ))),
                 ];
 
                 if ($answer['valid']) {
@@ -122,7 +126,7 @@ final class Licence
             // A 401 or 403 is the service telling us plainly that this key is
             // not good. That is an answer, not an outage.
             if (in_array($response->status(), [401, 403], true)) {
-                return ['valid' => false, 'reason' => 'rejected', 'expires_at' => null, 'days_remaining' => null];
+                return ['valid' => false, 'reason' => 'rejected', 'expires_at' => null, 'days_remaining' => null, 'editors' => []];
             }
 
             return self::whenUnreachable('http_'.$response->status());
@@ -147,7 +151,30 @@ final class Licence
         // key goes unnoticed for a year.
         Log::warning('live-edit: could not check the licence, allowing editing.', ['why' => $why]);
 
-        return ['valid' => true, 'reason' => $why, 'expires_at' => null, 'days_remaining' => null];
+        return ['valid' => true, 'reason' => $why, 'expires_at' => null, 'days_remaining' => null, 'editors' => []];
+    }
+
+    /**
+     * The addresses registered against this site, for the default gate.
+     *
+     * Falls back to the local list, so a site can still name its own people
+     * without the service — and an install that has not registered at all is
+     * not left with nobody able to edit.
+     *
+     * @return array<int, string>
+     */
+    public static function editors(): array
+    {
+        $fromService = self::configured() ? (array) (self::status()['editors'] ?? []) : [];
+
+        if ($fromService !== []) {
+            return $fromService;
+        }
+
+        return array_values(array_filter(array_map(
+            fn (string $email) => mb_strtolower(trim($email)),
+            explode(',', (string) config('live-edit.editors', ''))
+        )));
     }
 
     /** Forget what we were told, so the next check really asks. */

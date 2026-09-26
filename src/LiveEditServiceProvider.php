@@ -4,6 +4,7 @@ namespace ShipFast\LiveEdit;
 
 use Illuminate\Contracts\Http\Kernel as HttpKernel;
 use Illuminate\Support\Facades\Blade;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\ServiceProvider;
 use ShipFast\LiveEdit\Console\Commands\ImportTheme;
 use ShipFast\LiveEdit\Console\Commands\ManageApiSite;
@@ -12,12 +13,54 @@ use ShipFast\LiveEdit\Console\Commands\ScanForEditables;
 use ShipFast\LiveEdit\Console\Commands\Versions;
 use ShipFast\LiveEdit\Http\Api\Middleware\EnforceCors;
 use ShipFast\LiveEdit\Http\Middleware\TagsEditableMarkup;
+use ShipFast\LiveEdit\Support\Licence;
 
 class LiveEditServiceProvider extends ServiceProvider
 {
     public function register(): void
     {
         $this->mergeConfigFrom(__DIR__.'/../config/live-edit.php', 'live-edit');
+    }
+
+    /**
+     * Answer "who may edit" so a host does not have to write code to say it.
+     *
+     * The gate is the host's to define and a host with real roles should
+     * define it — an application that knows about editors and administrators
+     * can say so far better than a list in an environment file.
+     *
+     * But requiring it made the smallest possible install a development task:
+     * composer require, add a line to a layout, and then open a service
+     * provider and write a closure before anything appears. For a brochure
+     * site with two people who will ever touch it, that closure only ever
+     * says "is it one of us".
+     *
+     * Only when the host has not defined it, so nothing here overrides an
+     * application that has an opinion. Closed unless addresses are named:
+     * defaulting to any signed-in user would hand the editor to every
+     * customer of a site with public registration, which is a security
+     * failure disguised as convenience.
+     */
+    private function defineEditorGateUnlessHostHasOne(): void
+    {
+        if (Gate::has('live-edit')) {
+            return;
+        }
+
+        Gate::define('live-edit', function ($user = null) {
+            if ($user === null) {
+                return false;
+            }
+
+            // From the licence where the site is registered, falling back to
+            // a local list. Registering the people in the same place as the
+            // site means somebody joining or leaving is not a deploy, and
+            // there are not two places to look when the wrong person can get
+            // in.
+            $named = Licence::editors();
+
+            return $named !== [] && in_array(mb_strtolower((string) ($user->email ?? '')), $named, true);
+        });
     }
 
     public function boot(): void
@@ -32,6 +75,8 @@ class LiveEditServiceProvider extends ServiceProvider
         Blade::directive('liveEdit', fn () => '<?php echo \\ShipFast\\LiveEdit\\Support\\CloudInstall::script(); ?>');
 
         $this->loadRoutesFrom(__DIR__.'/../routes/live-edit.php');
+
+        $this->defineEditorGateUnlessHostHasOne();
 
         // The API is off unless asked for: an install that does not need it
         // should not have it reachable.

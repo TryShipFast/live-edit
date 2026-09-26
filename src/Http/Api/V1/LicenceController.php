@@ -4,6 +4,7 @@ namespace ShipFast\LiveEdit\Http\Api\V1;
 
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use ShipFast\LiveEdit\Domain\Site\Editor;
 use ShipFast\LiveEdit\Domain\Site\Site;
 use ShipFast\LiveEdit\Domain\Site\SiteVerification;
 use ShipFast\LiveEdit\Http\Api\ApiContext;
@@ -76,6 +77,28 @@ class LicenceController
                 // gets it wrong.
                 'days_remaining' => $expiresAt !== null ? max(0, (int) now()->diffInDays($expiresAt, false)) : null,
                 'reason' => $this->reason($site, $lapsed, $matches),
+
+                /*
+                 * Who may edit this site, answered here rather than configured
+                 * on the site.
+                 *
+                 * The install is meant to be a site and a key. Asking a
+                 * customer to also keep a list of their own colleagues in an
+                 * environment file means a deploy every time somebody joins or
+                 * leaves, and two places to look when the wrong person can get
+                 * in. They are registered in the console, which is where the
+                 * site was registered, so that is where they are read from.
+                 *
+                 * Addresses only, and only for a caller already holding this
+                 * site's key. It is a list of who is allowed, not a directory:
+                 * no names, no anything else the row happens to carry.
+                 */
+                'editors' => Editor::query()
+                    ->where('site_id', $site->id)
+                    ->orderBy('email')
+                    ->pluck('email')
+                    ->map(fn (string $email) => mb_strtolower(trim($email)))
+                    ->all(),
             ],
         ])->withHeaders([
             // Never cached. A suspended site, a lapsed licence and a revoked
