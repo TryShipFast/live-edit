@@ -1,6 +1,7 @@
 <?php
 
 use App\Models\Setting;
+use ShipFast\LiveEdit\Models\LiveEditSetting;
 
 /*
  * ShipFast live-edit CMS — example configuration.
@@ -11,8 +12,20 @@ use App\Models\Setting;
  */
 return [
 
-    // The Eloquent model backing key/value settings (must have key + value).
-    'setting_model' => Setting::class,
+    /*
+     * The Eloquent model backing key/value settings (must have key + value).
+     *
+     * The host's own model where it has one, because a site that already
+     * stores settings should keep storing them in the same place — and
+     * tokreamsblue, the first install, does exactly that.
+     *
+     * Falling back to the package's own table rather than insisting on
+     * App\Models\Setting, which a fresh Laravel application does not have:
+     * insisting produced a site that tagged, opened the drawer, accepted
+     * typing and then had nowhere to put the words, with the failure showing
+     * up two steps later as "my edit vanished on reload".
+     */
+    'setting_model' => class_exists(Setting::class) ? Setting::class : LiveEditSetting::class,
 
     /*
      * The theme folder under resources/themes to serve, and the view holding
@@ -67,7 +80,21 @@ return [
     // "auto:<hash>" keys without a per-element allowlist entry — so a whole
     // theme tagged with `live-edit:scan --apply --auto` is editable with no
     // hand-authored config. Named keys still require the allowlist below.
-    'auto_keys' => env('LIVE_EDIT_AUTO_KEYS', false),
+    /*
+     * Defaults to whatever auto-tagging is set to, and that pairing matters.
+     *
+     * These are two switches over one idea — finding the editable parts of a
+     * page, and being willing to STORE what comes back from them — and having
+     * them independent produces a state with no honest use: a page derives a
+     * key for every paragraph, the drawer opens on any of them, and every
+     * save is refused with "Unknown setting". It looks like a broken product
+     * rather than a missing line of config.
+     *
+     * Set it explicitly to part ways: auto_keys on its own is for a theme
+     * tagged ahead of time by `live-edit:scan --apply --auto`, which needs
+     * the store without the per-request tagging.
+     */
+    'auto_keys' => env('LIVE_EDIT_AUTO_KEYS', env('LIVE_EDIT_AUTO_TAG', false)),
 
     // Middleware guarding the live-edit endpoints. Define the `live-edit`
     // Gate (or supply your own middleware) to control who may edit.

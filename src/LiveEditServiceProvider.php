@@ -44,16 +44,25 @@ class LiveEditServiceProvider extends ServiceProvider
             // overwrite these headers with ones no browser will accept.
             if ($this->app->bound(HttpKernel::class)) {
                 $this->app->make(HttpKernel::class)->prependMiddleware(EnforceCors::class);
-
-                /*
-                 * Pushed rather than prepended: it rewrites a finished
-                 * response, so it wants to run last on the way out, after
-                 * whatever else the host does to its own HTML.
-                 */
-                if (config('live-edit.auto_tag', false)) {
-                    $this->app->make(HttpKernel::class)->pushMiddleware(TagsEditableMarkup::class);
-                }
             }
+        }
+
+        /*
+         * Finding a page's editable parts has nothing to do with the API.
+         *
+         * This lived inside the block above, which meant it only ever
+         * registered on an install that had also switched the API on — and
+         * the site least likely to do that is exactly the one this is for: a
+         * Laravel app keeping its own content, which needs no API at all. It
+         * went unnoticed because the first host tested had the API enabled
+         * for unrelated reasons.
+         *
+         * Pushed rather than prepended: it rewrites a finished response, so
+         * it wants to run last on the way out, after whatever else the host
+         * does to its own HTML.
+         */
+        if (config('live-edit.auto_tag', false) && $this->app->bound(HttpKernel::class)) {
+            $this->app->make(HttpKernel::class)->pushMiddleware(TagsEditableMarkup::class);
         }
         $this->loadMigrationsFrom(__DIR__.'/../database/migrations');
         $this->loadViewsFrom(__DIR__.'/../resources/views', 'live-edit');
