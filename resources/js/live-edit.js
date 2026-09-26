@@ -891,11 +891,36 @@ const bootLiveEdit = () => {
             }
         };
 
-        // Read once as the editor starts, so the first panel that offers a
-        // rewrite already knows what it costs and what is left. Started here
-        // rather than at the top of this function because a const is not
-        // reachable before its own definition.
-        void loadCredits();
+        /*
+         * What this site will actually accept as styling.
+         *
+         * Every style control is drawn only for a property the site declares,
+         * because the server drops one it does not recognise: a control for an
+         * unsupported property saves, reports success and changes nothing,
+         * with no way for the client to tell why.
+         *
+         * The vocabulary reaches a page that FETCHES its content as part of
+         * the payload. A page baked by a server never fetches anything, so it
+         * had no vocabulary at all — and with none, every property was skipped
+         * and every panel said "nothing on this element can be restyled". The
+         * whole style panel was dead on WordPress, which is where the bought
+         * themes are.
+         *
+         * So it is asked for, with the editor's own key, which is the only
+         * key that is told.
+         */
+        const loadStyleVocabulary = async () => {
+            if (window.liveEditStyleProps) return;
+
+            try {
+                const response = await request('/live-edit/content', { method: 'GET' });
+                const payload = await response.json();
+
+                if (payload?.styleProps) window.liveEditStyleProps = payload.styleProps;
+            } catch (error) {
+                console.warn('[live-edit] could not read what this site allows to be styled:', error);
+            }
+        };
 
         const appendAssist = (element, box) => {
             // Only where a model is configured and only for words. A row of
@@ -1633,6 +1658,15 @@ const bootLiveEdit = () => {
                 window.alert(error.message);
             }
         };
+
+        // Started here, below request(), and not where they are defined.
+        // Both of these call it, and a const is not reachable before its own
+        // declaration — so from up there each threw into its own catch and
+        // logged a warning nobody reads. The style panel then said "nothing on
+        // this element can be restyled" on every WordPress site, and the AI
+        // row never appeared, both looking exactly like features that were off.
+        void loadCredits();
+        void loadStyleVocabulary();
 
         const appendLinkFields = (element) => {
             current.hrefKey = element.dataset.editHref;
