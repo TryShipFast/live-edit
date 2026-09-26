@@ -527,6 +527,13 @@ select.le-input {
 }
 .le-modal-foot .le-modal-note { margin-right: auto; font-size: 12px; color: var(--le-muted); }
 
+/* Who took the picture. Quiet, but present: on most of these the client is
+   obliged to name the photographer wherever the picture appears, and a credit
+   nobody can see is one nobody knows they have to honour. */
+.le-credit {
+  margin: 10px 0 0; font-size: 12px; color: var(--le-muted); line-height: 1.45;
+}
+
 /* One obvious action in the panel; the choosing happens in the dialog. */
 .le-ways { margin: 14px 0 4px; }
 .le-wide { width: 100%; justify-content: center; }

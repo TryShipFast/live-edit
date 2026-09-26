@@ -88,9 +88,16 @@ class TokenDomainTest extends TestCase
     public function test_a_tampered_secret_is_refused(): void
     {
         [, $plain] = $this->site()->issueToken(TokenType::Publishable, 'Web');
-        [$prefix, $id, $secret] = explode('_', $plain);
 
-        $tampered = $prefix.'_'.$id.'_'.strrev($secret);
+        // Split with a limit and change a character, rather than splitting
+        // blind and reversing. The secret is base64url and may contain
+        // underscores of its own, so an unlimited split hands back a fragment
+        // — and reversing a fragment that happens to be one character, or a
+        // palindrome, produces the ORIGINAL key. The test then asserts that a
+        // perfectly valid token is refused, and fails at random.
+        [$prefix, $id, $secret] = explode('_', $plain, 3);
+
+        $tampered = $prefix.'_'.$id.'_'.($secret[0] === 'a' ? 'b' : 'a').substr($secret, 1);
 
         $this->assertSame(Denial::Mismatched, $this->auth()->authenticate($tampered)->denial);
     }

@@ -77,7 +77,11 @@ class PicturesTest extends TestCase
 
         $this->assertCount(1, $found['photos']);
         $this->assertSame('Naksha Banwao', $found['photos'][0]['by']);
-        $this->assertSame('https://unsplash.test/@naksha', $found['photos'][0]['byUrl']);
+        // With the referral parameters Unsplash asks for on attribution
+        // links: it is how a photographer sees that somebody used their work,
+        // which is most of what they get out of this.
+        $this->assertStringStartsWith('https://unsplash.test/@naksha?', $found['photos'][0]['byUrl']);
+        $this->assertStringContainsString('utm_medium=referral', $found['photos'][0]['byUrl']);
     }
 
     public function test_it_asks_for_landscape_pictures(): void

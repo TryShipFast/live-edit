@@ -136,10 +136,21 @@ class FindPhotos
                 'full' => $photo['urls']['regular'] ?? ($photo['urls']['full'] ?? null),
                 'alt' => $photo['alt_description'] ?? null,
                 'by' => $photo['user']['name'] ?? null,
-                'byUrl' => $photo['user']['links']['html'] ?? null,
+                // Their guidelines ask for the referral parameters on both
+                // links. It is how a photographer sees that the traffic came
+                // from somebody using their picture, which is most of what
+                // they get out of this.
+                'byUrl' => isset($photo['user']['links']['html'])
+                    ? $this->referred($photo['user']['links']['html'])
+                    : null,
                 'credit' => isset($photo['user']['name'])
                     ? 'Photo by '.$photo['user']['name'].' on Unsplash'
                     : 'Unsplash',
+                'source' => 'Unsplash',
+                'sourceUrl' => $this->referred('https://unsplash.com'),
+                // Named so whoever is choosing knows what the picture asks of
+                // them before they choose it.
+                'requires' => 'credit',
                 // Handed back so the client can tell us which one was used,
                 // rather than us guessing from the URL later.
                 'downloadLocation' => $photo['links']['download_location'] ?? null,
@@ -185,6 +196,14 @@ class FindPhotos
                 'by' => $photo['creator'] ?? null,
                 'byUrl' => $photo['creator_url'] ?? ($photo['foreign_landing_url'] ?? null),
                 'credit' => $this->commonsCredit($photo),
+                'source' => ucfirst((string) ($photo['source'] ?? 'Openverse')),
+                // The licence itself, which is what a reader needs to follow
+                // to know what they in turn may do with it.
+                'sourceUrl' => $photo['license_url'] ?? ($photo['foreign_landing_url'] ?? null),
+                // Public domain asks for nothing. Everything else asks to be
+                // credited where the picture appears, and somebody choosing
+                // deserves to know which they are picking.
+                'requires' => strtoupper((string) ($photo['license'] ?? '')) === 'CC0' ? 'nothing' : 'credit',
                 // Openverse has no download endpoint to report to, and asks
                 // for attribution instead, which travels with the picture.
                 'downloadLocation' => null,
@@ -244,6 +263,23 @@ class FindPhotos
         } catch (\Throwable) {
             // Nothing to do about it and nothing to tell the client.
         }
+    }
+
+    /**
+     * A link back, marked as coming from us.
+     *
+     * Unsplash asks for these parameters on every link in an attribution. It
+     * is not tracking for its own sake: it is how a photographer can see that
+     * somebody used their work, which is the whole of what they are paid in.
+     */
+    protected function referred(string $url): string
+    {
+        $app = (string) (config('live-edit.photos.unsplash.app_name') ?? 'live-edit');
+
+        return $url.(str_contains($url, '?') ? '&' : '?').http_build_query([
+            'utm_source' => $app,
+            'utm_medium' => 'referral',
+        ]);
     }
 
     protected function unsplashKey(): string

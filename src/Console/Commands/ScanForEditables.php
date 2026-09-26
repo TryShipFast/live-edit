@@ -4,6 +4,7 @@ namespace ShipFast\LiveEdit\Console\Commands;
 
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Process;
+use ShipFast\LiveEdit\Domain\Content\Companions;
 use ShipFast\LiveEdit\Mapper\AiRefiner;
 use ShipFast\LiveEdit\Mapper\MarkupScanner;
 use ShipFast\LiveEdit\Models\ElementStyle;
@@ -350,9 +351,11 @@ class ScanForEditables extends Command
 
                 $moved += $settings::query()->where('key', $from)->update(['key' => $to]);
 
-                // Image settings carry siblings (Alt, Credit, Href) and each
-                // locale keeps its own copy, so those travel too.
-                foreach (['Alt', 'Credit', 'Href', 'Title'] as $suffix) {
+                // Image settings carry siblings — the description, the
+                // tooltip, who took it — and each locale keeps its own copy,
+                // so those travel too. One list, shared with every other place
+                // that has to know what a picture brings with it.
+                foreach (Companions::ALL as $suffix) {
                     $settings::query()->where('key', $from.$suffix)->update(['key' => $to.$suffix]);
                 }
                 $settings::query()->where('key', 'like', '%:'.$from)->get()->each(function ($row) use ($from, $to) {

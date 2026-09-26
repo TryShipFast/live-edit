@@ -7,6 +7,7 @@ use DOMElement;
 use DOMNode;
 use DOMXPath;
 use Illuminate\Support\Str;
+use ShipFast\LiveEdit\Domain\Content\Companions;
 use ShipFast\LiveEdit\Support\ContentSignature;
 use ShipFast\LiveEdit\Support\SvgSanitiser;
 
@@ -390,6 +391,33 @@ class MarkupScanner
                 } else {
                     $node->setAttribute($attribute, $described);
                 }
+            }
+
+            /*
+             * And who took it, written onto the picture itself.
+             *
+             * Under Unsplash's terms and every Creative Commons licence but
+             * CC0 the photographer has to be named where the work appears, so
+             * the page has to carry the credit rather than us knowing it in a
+             * database. On the element, because that is the only place that
+             * survives a theme rearranging its own markup, and because it is
+             * what lets the page show the credit next to the right picture
+             * without anybody wiring the two together.
+             */
+            foreach (Companions::CREDIT as $suffix) {
+                if (! array_key_exists($key.$suffix, $overrides)) {
+                    continue;
+                }
+
+                $attribute = 'data-edit-'.strtolower(preg_replace('/(?<!^)[A-Z]/', '-$0', $suffix));
+                $said = (string) $overrides[$key.$suffix];
+
+                // A picture replaced by one that needs no credit clears the
+                // last one. The previous photographer's name under somebody
+                // else's photograph is a false statement about who took it.
+                $said === ''
+                    ? $node->removeAttribute($attribute)
+                    : $node->setAttribute($attribute, $said);
             }
         }
 

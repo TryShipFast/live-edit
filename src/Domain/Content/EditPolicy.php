@@ -39,7 +39,7 @@ class EditPolicy
         // them meant a save that changed the picture and then failed on the
         // alt text: the change had happened and the person was told it had
         // not. It is allowed exactly when the thing it describes is.
-        foreach (self::COMPANIONS as $suffix) {
+        foreach (Companions::ALL as $suffix) {
             if (str_ends_with($key, $suffix)) {
                 $describes = substr($key, 0, -strlen($suffix));
 
@@ -57,8 +57,6 @@ class EditPolicy
      * own. Deliberately short: every suffix here is a key an API caller may
      * write without it having been declared anywhere.
      */
-    private const COMPANIONS = ['Alt', 'Title'];
-
     private function declaredOrScanned(string $key): bool
     {
         if (in_array($key, config('live-edit.settings', []), true)) {

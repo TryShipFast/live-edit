@@ -8,6 +8,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 use ShipFast\LiveEdit\Application\Api\ApplyEdit;
 use ShipFast\LiveEdit\Application\Api\StoreMedia;
+use ShipFast\LiveEdit\Domain\Content\Companions;
 use ShipFast\LiveEdit\Domain\Site\OverLimit;
 use ShipFast\LiveEdit\Http\Api\ApiContext;
 
@@ -45,6 +46,25 @@ class MediaController
             'remove' => ['nullable', 'boolean'],
             'alt' => ['nullable', 'string', 'max:300'],
             'imgTitle' => ['nullable', 'string', 'max:300'],
+            /*
+             * Who took the picture, kept with the picture.
+             *
+             * Not decoration and not optional: Unsplash's terms and every
+             * Creative Commons licence except CC0 require the photographer to
+             * be named wherever the work appears. Held in the tooltip it was
+             * visible on hover and nowhere else, which satisfies nobody, and
+             * a licence obligation that depends on a mouse is a debt the
+             * platform was quietly carrying on behalf of every client.
+             *
+             * Sibling settings, under the same names the alt text uses, so
+             * drafting, publishing, reverting and snapshots all work without
+             * a second mechanism to keep in step.
+             */
+            'credit' => ['nullable', 'string', 'max:300'],
+            'creditBy' => ['nullable', 'string', 'max:200'],
+            'creditUrl' => ['nullable', 'url:http,https', 'max:2000'],
+            'creditSource' => ['nullable', 'string', 'max:100'],
+            'creditSourceUrl' => ['nullable', 'url:http,https', 'max:2000'],
             // The box in the design this picture is replacing. A client rarely
             // has one the same shape, and dropped in untouched it stretches
             // the section it sits in.
@@ -97,9 +117,29 @@ class MediaController
 
                 // Written beside the picture under the names the page already
                 // reads them by, so a theme needs no arrangement with this.
-                foreach (['alt' => 'Alt', 'imgTitle' => 'Title'] as $field => $suffix) {
+                $beside = [
+                    'alt' => 'Alt',
+                    'imgTitle' => 'Title',
+                    'credit' => 'Credit',
+                    'creditBy' => 'CreditBy',
+                    'creditUrl' => 'CreditUrl',
+                    'creditSource' => 'CreditSource',
+                    'creditSourceUrl' => 'CreditSourceUrl',
+                ];
+
+                foreach ($beside as $field => $suffix) {
                     if ($request->has($field)) {
                         $apply($site, $token, $key.$suffix, (string) ($validated[$field] ?? ''));
+                    }
+                }
+
+                // A new picture without a credit clears the old one. The
+                // previous photographer's name sitting under somebody else's
+                // photograph is a worse failure than no name at all: it is a
+                // false statement about who took it.
+                if ($value !== null && ! $request->has('credit')) {
+                    foreach (Companions::CREDIT as $suffix) {
+                        $apply($site, $token, $key.$suffix, '');
                     }
                 }
             });

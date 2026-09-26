@@ -3,6 +3,7 @@
 namespace ShipFast\LiveEdit\Tests\Api;
 
 use ShipFast\LiveEdit\Domain\Content\CarryContentAcrossRetag;
+use ShipFast\LiveEdit\Domain\Content\Companions;
 use ShipFast\LiveEdit\Domain\Content\KeyMap;
 use ShipFast\LiveEdit\Domain\Content\SiteStore;
 use ShipFast\LiveEdit\Domain\Site\Site;
@@ -246,5 +247,48 @@ class WorkSurvivesARetagTest extends TestCase
             'Words for a gone element',
             SiteSetting::query()->where('site_id', $this->site->id)->where('key', $going)->value('value'),
         );
+    }
+
+    public function test_a_photographers_name_travels_with_the_photograph(): void
+    {
+        /*
+         * The failure this was written for.
+         *
+         * A picture's key is a signature of what it holds, so replacing the
+         * picture changes the key, and everything stored beside it has to move
+         * with it. The list of what moves was written out by hand in five
+         * places and had already drifted: the description and the tooltip
+         * travelled, four of the five credit fields did not. The
+         * photographer's name was left behind on a key nothing pointed at any
+         * more, so the picture arrived with no credit and the credit sat on a
+         * key belonging to a different picture. Neither half looked broken.
+         */
+        $html = '<body><div><img src="old.jpg" alt="A room"></div></body>';
+        $old = $this->pretendTheScannerUsedToSay($html);
+        $wasCalled = $this->oldKeyFor($old, 'old.jpg', 'data-edit-img');
+
+        foreach (Companions::ALL as $suffix) {
+            SiteSetting::query()->create([
+                'site_id' => $this->site->id,
+                'key' => $wasCalled.$suffix,
+                'value' => 'kept-'.$suffix,
+            ]);
+        }
+
+        $this->tag($html);
+
+        $nowCalled = $this->tag($html, 'index');
+        $held = $this->store()->published();
+
+        preg_match('/data-edit-img="setting:(auto:[a-f0-9]+)"/', $this->markup($html), $m);
+        $key = $m[1];
+
+        foreach (Companions::ALL as $suffix) {
+            $this->assertSame(
+                'kept-'.$suffix,
+                $held[$key.$suffix] ?? null,
+                "{$suffix} was left behind when the picture it belongs to moved",
+            );
+        }
     }
 }

@@ -79,7 +79,14 @@ class ProvisioningTest extends TestCase
 
         // Identities and states, never the key. A listing that leaked them
         // would make the whole "shown once" promise decoration.
-        $this->assertStringNotContainsString(explode('_', $secret)[2], $shown->getContent());
+        //
+        // Split with a limit, because the secret is base64url and may contain
+        // underscores of its own. Without one this asked whether some short
+        // fragment of the key appeared in the response, which is a different
+        // and much weaker question, and one that answers "yes" by coincidence
+        // often enough to fail a run at random.
+        $this->assertStringNotContainsString($secret, $shown->getContent());
+        $this->assertStringNotContainsString(explode('_', $secret, 3)[2], $shown->getContent());
         $this->assertCount(2, $shown->json('site.keys'));
         $this->assertArrayHasKey('id', $shown->json('site.keys.0'));
     }

@@ -9,6 +9,7 @@ use ShipFast\LiveEdit\Domain\Content\SiteStore;
 use ShipFast\LiveEdit\Domain\Site\Ability;
 use ShipFast\LiveEdit\Domain\Site\Site;
 use ShipFast\LiveEdit\Domain\Site\TokenType;
+use ShipFast\LiveEdit\Mapper\MarkupScanner;
 use ShipFast\LiveEdit\Tests\Fixtures\RemoteLikeDisk;
 use ShipFast\LiveEdit\Tests\TestCase;
 
@@ -444,5 +445,71 @@ class MediaTest extends TestCase
         $store = new SiteStore($this->site->fresh());
 
         return array_merge($store->published(), $store->draftedSettings());
+    }
+
+    public function test_the_photographer_is_kept_with_the_picture(): void
+    {
+        // Unsplash's terms and every Creative Commons licence but CC0 require
+        // the photographer to be named where the work appears. It used to
+        // live in the tooltip, visible on hover and nowhere else, which meets
+        // no licence anywhere and left the obligation with us.
+        $this->post($this->url(), [
+            'target' => 'setting:heroImage',
+            'url' => 'https://images.example.com/beach.jpg',
+            'credit' => 'Photo by Jefferson Santos on Unsplash',
+            'creditBy' => 'Jefferson Santos',
+            'creditUrl' => 'https://unsplash.com/@jefflssantos?utm_medium=referral',
+            'creditSource' => 'Unsplash',
+            'creditSourceUrl' => 'https://unsplash.com?utm_medium=referral',
+        ], $this->as($this->session))->assertOk();
+
+        $held = (new SiteStore($this->site->fresh()))->published();
+
+        $this->assertSame('Photo by Jefferson Santos on Unsplash', $held['heroImageCredit'] ?? null);
+        $this->assertSame('Jefferson Santos', $held['heroImageCreditBy'] ?? null);
+        $this->assertSame('Unsplash', $held['heroImageCreditSource'] ?? null);
+    }
+
+    public function test_a_new_picture_does_not_keep_the_last_photographers_name(): void
+    {
+        // The worst version of this: somebody else's name under a photograph
+        // they did not take. That is a false statement about authorship, and
+        // it would be one we made on the client's behalf.
+        $this->post($this->url(), [
+            'target' => 'setting:heroImage',
+            'url' => 'https://images.example.com/first.jpg',
+            'credit' => 'Photo by Jefferson Santos on Unsplash',
+            'creditBy' => 'Jefferson Santos',
+        ], $this->as($this->session))->assertOk();
+
+        $this->post($this->url(), [
+            'target' => 'setting:heroImage',
+            'url' => 'https://images.example.com/second.jpg',
+        ], $this->as($this->session))->assertOk();
+
+        $held = (new SiteStore($this->site->fresh()))->published();
+
+        $this->assertSame('', $held['heroImageCredit'] ?? '');
+        $this->assertSame('', $held['heroImageCreditBy'] ?? '');
+    }
+
+    public function test_the_credit_is_written_onto_the_picture_in_the_page(): void
+    {
+        // A page a server renders has to carry the credit itself; knowing it
+        // in a database names nobody.
+        $this->post($this->url(), [
+            'target' => 'setting:heroImage',
+            'url' => 'https://images.example.com/beach.jpg',
+            'credit' => 'Photo by Jefferson Santos on Unsplash',
+            'creditBy' => 'Jefferson Santos',
+        ], $this->as($this->session))->assertOk();
+
+        $marked = (new MarkupScanner)->applyOverrides(
+            '<img data-edit-img="setting:heroImage" src="old.jpg">',
+            (new SiteStore($this->site->fresh()))->published(),
+        );
+
+        $this->assertStringContainsString('data-edit-credit="Photo by Jefferson Santos on Unsplash"', $marked);
+        $this->assertStringContainsString('data-edit-credit-by="Jefferson Santos"', $marked);
     }
 }

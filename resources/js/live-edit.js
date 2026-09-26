@@ -577,7 +577,59 @@ const bootLiveEdit = () => {
                     },
                 });
 
-                wrap.append(input, upload, thumb, caption);
+                /*
+                 * A background is a picture, so it gets the same way of
+                 * finding one.
+                 *
+                 * This control had its own arrangement — paste a link, or
+                 * upload — which is the pair that covers somebody who already
+                 * has the picture and nobody who does not. That is the same
+                 * gap the image picker was built to close, and a client does
+                 * not think of a hero background as a different kind of thing
+                 * from a hero image.
+                 */
+                const ways = el('div', 'le-ways');
+                const replace = el('button', 'le-btn le-wide', 'Replace background');
+                replace.type = 'button';
+                replace.addEventListener('click', () => openImagePicker(element, async ({ url, file, credit }) => {
+                    let address = url;
+
+                    if (file) {
+                        showThumb(URL.createObjectURL(file));
+                        const body = new FormData();
+                        body.append('file', file);
+
+                        try {
+                            const response = await request('/live-edit/upload', { method: 'POST', body });
+                            address = (await response.json()).url;
+                        } catch (error) {
+                            ui.toast(plainly(error, 'save that'));
+
+                            return;
+                        }
+                    }
+
+                    if (!address) return;
+
+                    input.value = address;
+                    showThumb(address);
+                    describe(address, false);
+                    // Repaint the live preview with the stored address.
+                    input.dispatchEvent(new Event('input', { bubbles: true }));
+
+                    // A background has no element of its own to carry a
+                    // credit, and no theme renders one for it. Said out loud
+                    // here so nobody is under an obligation they cannot see.
+                    if (credit) ui.toast(credit, 4000);
+                }, 'Free photos', 'background'));
+                ways.append(replace);
+
+                // Kept, out of sight: the picker fills the address box and
+                // the save reads it, so there is still one path in.
+                input.hidden = true;
+                upload.hidden = true;
+
+                wrap.append(ways, input, upload, thumb, caption);
             } else {
                 const input = document.createElement('input');
                 input.type = 'number';
@@ -1626,6 +1678,28 @@ const bootLiveEdit = () => {
                     formData.append('fitWidth', String(Math.round(box.width)));
                     formData.append('fitHeight', String(Math.round(box.height)));
                 }
+                // Who took it, when the picture came from the picker. Sent
+                // with the picture rather than after it, so a failure cannot
+                // leave a photograph on the page with the last one's credit
+                // still attached to it.
+                // Only when it belongs to the picture being saved. Sending it
+                // otherwise would put one photographer's name under another
+                // photographer's work, which is worse than no credit at all:
+                // no credit is a gap, and the wrong credit is a lie we told
+                // on the client's behalf.
+                //
+                // And only in the request that carries the picture itself. A
+                // credit is not a thing on its own: sent without one it lands
+                // beside whatever picture that key already held, which is how
+                // a photographer's name ends up under a photograph they did
+                // not take. Tying the two together in one request means the
+                // name and the picture are always the same decision.
+                const carryingAPicture = file !== undefined || (url !== '' && url !== undefined);
+
+                if (current.credit && current.creditFor === current.target && carryingAPicture) {
+                    Object.entries(current.credit).forEach(([field, said]) => formData.append(field, said));
+                }
+
                 const attrInputs = [...drawerFields.querySelectorAll('[data-img-attr]')];
                     if (file) formData.append('file', file);
                     else if (url) formData.append('url', url.startsWith('http') ? url : `https://${url}`);
@@ -1797,10 +1871,13 @@ const bootLiveEdit = () => {
          * @param {(chosen: {url?: string, file?: File, credit?: string}) => void} apply
          * @param {string} startOn which tab to open on
          */
-        const openImagePicker = (element, apply, startOn = 'Free photos') => {
+        const openImagePicker = (element, apply, startOn = 'Free photos', calledIt = 'image') => {
             const sheet = ui.modal({
-                title: 'Replace image',
-                subtitle: element.dataset.editLabel ?? 'Image',
+                // Named as the client named it. Somebody who pressed "Replace
+                // background" and lands on a dialog headed "Replace image"
+                // has reason to wonder whether they pressed the right thing.
+                title: `Replace ${calledIt}`,
+                subtitle: element.dataset.editLabel ?? describeElement(element),
             });
 
             const panel = document.createElement('div');
@@ -1955,8 +2032,15 @@ const bootLiveEdit = () => {
 
                         chosen({
                             url: photo.full,
-                            credit: photo.by ? `Photo by ${photo.by} on Unsplash` : 'Unsplash',
                             alt: photo.alt ?? '',
+                            // Carried whole rather than rebuilt here, so the
+                            // sentence shown beside the picture is the one the
+                            // library said to use.
+                            credit: photo.credit ?? (photo.by ? `Photo by ${photo.by}` : ''),
+                            creditBy: photo.by ?? '',
+                            creditUrl: photo.byUrl ?? '',
+                            creditSource: photo.source ?? '',
+                            creditSourceUrl: photo.sourceUrl ?? '',
                         });
                     });
 
@@ -2080,7 +2164,11 @@ const bootLiveEdit = () => {
                     shot.alt = '';
 
                     pick.append(shot, el('span', 'le-tag', 'MADE'));
-                    pick.addEventListener('click', () => chosen({ url, credit: `Made from: ${prompt}` }));
+                    pick.addEventListener('click', () => chosen({
+                        url,
+                        credit: 'Made by a computer, from a description',
+                        creditSource: 'Generated',
+                    }));
                     grid.append(pick);
                 });
 
@@ -2850,7 +2938,7 @@ const bootLiveEdit = () => {
              */
             const ways = el('div', 'le-ways');
 
-            const takeChosen = ({ url, file, credit, alt }) => {
+            const takeChosen = ({ url, file, credit, alt, creditBy, creditUrl, creditSource, creditSourceUrl }) => {
                 if (file) {
                     const transfer = new DataTransfer();
                     transfer.items.add(file);
@@ -2867,19 +2955,28 @@ const bootLiveEdit = () => {
                 const altBox = drawerFields.querySelector('[data-img-attr="alt"]');
                 if (alt && altBox && altBox.value.trim() === '') altBox.value = alt;
 
-                /*
-                 * Who took it, kept where it survives.
-                 *
-                 * Unsplash's terms ask for the photographer to be named
-                 * wherever the picture is shown, and we have nowhere of our
-                 * own to put that yet. The title attribute is saved already
-                 * and shows on hover, so the credit travels with the picture
-                 * rather than being dropped on the floor between the picker
-                 * and the page. Only when the client has not written their
-                 * own — theirs is not ours to overwrite.
-                 */
-                const titleBox = drawerFields.querySelector('[data-img-attr="imgTitle"]');
-                if (credit && titleBox && titleBox.value.trim() === '') titleBox.value = credit;
+                // Who took it, carried into the fields the save sends. Not the
+                // tooltip: a licence obligation that only appears on hover is
+                // not met, and it was the platform carrying that gap on behalf
+                // of every client.
+                current.credit = {
+                    credit: credit ?? '',
+                    creditBy: creditBy ?? '',
+                    creditUrl: creditUrl ?? '',
+                    creditSource: creditSource ?? '',
+                    creditSourceUrl: creditSourceUrl ?? '',
+                };
+
+                // Which picture this credit is FOR, recorded beside it.
+                //
+                // The panel can move on between choosing a photograph and the
+                // save going out, and a credit that arrives attached to a
+                // different picture is a false statement about who took that
+                // one. Naming the subject here means the save can refuse
+                // rather than guess.
+                current.creditFor = current.target;
+
+                showCredit(current.credit);
 
                 ui.saveButton.click();
             };
@@ -2889,9 +2986,29 @@ const bootLiveEdit = () => {
             // before it asked what picture, which is the wrong question
             // first: somebody knows they want a different picture long before
             // they know where it is coming from.
+            /*
+             * Who took this picture.
+             *
+             * Shown rather than stored silently, because on most of these the
+             * client is under an obligation to name the photographer wherever
+             * the picture appears, and somebody who cannot see the credit
+             * cannot know they have one to honour.
+             */
+            const creditLine = el('p', 'le-credit');
+
+            const showCredit = (held) => {
+                const text = (held?.credit ?? '').trim();
+                creditLine.textContent = text;
+                creditLine.hidden = text === '';
+            };
+
+            showCredit({
+                credit: attributeOf(element, 'data-edit-credit', 'editCredit'),
+            });
+
             const replace = el('button', 'le-btn le-wide', isBackground ? 'Replace background' : 'Replace image');
             replace.type = 'button';
-            replace.addEventListener('click', () => openImagePicker(element, takeChosen, 'Free photos'));
+            replace.addEventListener('click', () => openImagePicker(element, takeChosen, 'Free photos', isBackground ? 'background' : 'image'));
             ways.append(replace);
 
             // The file box and the address box are the plumbing the save
@@ -2900,7 +3017,7 @@ const bootLiveEdit = () => {
             fileWrap.hidden = true;
             urlWrap.hidden = true;
 
-            drawerFields.append(preview, ways, fileWrap, urlWrap, note);
+            drawerFields.append(preview, creditLine, ways, fileWrap, urlWrap, note);
 
             if (current.target.startsWith('setting:') && !isBackground) {
                 drawerFields.append(

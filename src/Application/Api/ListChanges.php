@@ -2,6 +2,7 @@
 
 namespace ShipFast\LiveEdit\Application\Api;
 
+use ShipFast\LiveEdit\Domain\Content\Companions;
 use ShipFast\LiveEdit\Domain\Content\SiteStore;
 use ShipFast\LiveEdit\Domain\Site\Site;
 use ShipFast\LiveEdit\Models\Draft;
@@ -32,6 +33,17 @@ class ListChanges
             ->where('site_id', $site->id)
             ->orderByDesc('updated_at')
             ->get()
+            /*
+             * One picture edit is one change, not seven.
+             *
+             * Replacing a photograph writes the address, the description, the
+             * tooltip and four fields of credit, each its own setting so that
+             * a theme can read them by name. Listed separately they bury
+             * everything else somebody actually did, and "Text: Photo by
+             * Jefferson Santos on Unsplash" is not a change anybody made on
+             * purpose or would know how to revert.
+             */
+            ->reject(fn (Draft $draft) => $draft->kind === 'setting' && $this->belongsToAPicture($site, $draft->subject))
             ->map(function (Draft $draft) use ($published) {
                 $payload = (array) $draft->payload;
 
@@ -52,6 +64,42 @@ class ListChanges
             ->all();
 
         return ['changes' => $changes, 'count' => count($changes)];
+    }
+
+    /**
+     * Whether this key is one of a picture's companions rather than an edit
+     * of its own.
+     *
+     * The suffixes are the ones the media endpoint writes. Matched only when
+     * a key without the suffix also exists as a draft or a published setting,
+     * so a page whose own content key genuinely ends in "Title" is not
+     * quietly dropped from somebody's list of changes.
+     */
+    protected function belongsToAPicture(Site $site, string $subject): bool
+    {
+        foreach (Companions::ALL as $suffix) {
+            if (! str_ends_with($subject, $suffix)) {
+                continue;
+            }
+
+            $picture = substr($subject, 0, -strlen($suffix));
+
+            if ($picture === '') {
+                continue;
+            }
+
+            $isPicture = Draft::query()
+                ->where('site_id', $site->id)
+                ->where('kind', 'setting')
+                ->where('subject', $picture)
+                ->exists();
+
+            if ($isPicture) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /**

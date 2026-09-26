@@ -127,9 +127,12 @@ class CarryContentAcrossRetag
 
         $moved += SiteSetting::query()->where('site_id', $site)->where('key', $from)->update(['key' => $to]);
 
-        // A picture carries its description beside it, under its own name with
-        // a suffix, and each locale keeps its own copy of everything.
-        foreach (['Alt', 'Title', 'Credit', 'Href'] as $suffix) {
+        // A picture carries its description and its credit beside it, under
+        // its own name with a suffix, and each locale keeps its own copy of
+        // everything. Read from one list, because a suffix missing from this
+        // loop is work left behind on a key nothing points at any more: that
+        // is how a photographer's name came apart from the photograph.
+        foreach (Companions::ALL as $suffix) {
             SiteSetting::query()->where('site_id', $site)->where('key', $from.$suffix)->update(['key' => $to.$suffix]);
             Draft::query()->where('site_id', $site)->where('kind', 'setting')->where('subject', $from.$suffix)->update(['subject' => $to.$suffix]);
         }
