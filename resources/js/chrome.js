@@ -37,8 +37,8 @@ const CHROME_CSS = `
   /* The brand blue, and it is spent in exactly one place: Publish. Anything
      else on the bar that wants attention gets white on the dark ground, so
      the blue keeps meaning "this is the button that puts it live". */
-  --le-blue: #3148F5;
-  --le-blue-hover: #2438D6;
+  --le-blue: #1B6EF3;
+  --le-blue-hover: #145CD4;
   --le-on-dark: #FFFFFF;
   --le-on-dark-hover: #E6E7EA;
   --le-danger: #C0392B;
