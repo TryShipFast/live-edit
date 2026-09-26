@@ -158,9 +158,33 @@ return [
      * counted.
      */
     'photos' => [
-        'enabled' => env('LIVE_EDIT_PHOTOS', false),
+        'enabled' => env('LIVE_EDIT_PHOTOS', true),
+
+        /*
+         * Which library to search.
+         *
+         * "auto" is the useful answer and the default: Unsplash when somebody
+         * has supplied a key, Openverse when nobody has. Openverse needs no
+         * key at all, which matters more than it sounds — otherwise every
+         * customer has to register an application with a photo library before
+         * they can put a picture on their own website, and most of them will
+         * simply not have a picture instead.
+         */
+        'provider' => env('LIVE_EDIT_PHOTOS_PROVIDER', 'auto'),
+
+        'unsplash' => [
+            'endpoint' => env('LIVE_EDIT_PHOTOS_ENDPOINT', 'https://api.unsplash.com'),
+            'access_key' => env('UNSPLASH_ACCESS_KEY'),
+        ],
+
+        'openverse' => [
+            'endpoint' => env('LIVE_EDIT_OPENVERSE_ENDPOINT', 'https://api.openverse.org'),
+        ],
+
+        // Kept where they were so anything already reading them still works.
         'endpoint' => env('LIVE_EDIT_PHOTOS_ENDPOINT', 'https://api.unsplash.com'),
         'access_key' => env('UNSPLASH_ACCESS_KEY'),
+
         'timeout' => 15,
     ],
 

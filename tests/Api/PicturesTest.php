@@ -32,6 +32,9 @@ class PicturesTest extends TestCase
     {
         config()->set('live-edit.photos', [
             'enabled' => true,
+            'provider' => 'unsplash',
+            'unsplash' => ['endpoint' => 'https://api.unsplash.test', 'access_key' => 'test-key-not-real'],
+            'openverse' => ['endpoint' => 'https://api.openverse.test'],
             'endpoint' => 'https://api.unsplash.test',
             'access_key' => 'test-key-not-real',
             'timeout' => 5,
@@ -200,5 +203,104 @@ class PicturesTest extends TestCase
 
         $this->assertSame('not_enough_credits', $made['reason']);
         Http::assertNothingSent();
+    }
+
+    protected function withNoKeyAtAll(): void
+    {
+        config()->set('live-edit.photos', [
+            'enabled' => true,
+            'provider' => 'auto',
+            'unsplash' => ['endpoint' => 'https://api.unsplash.test', 'access_key' => null],
+            'openverse' => ['endpoint' => 'https://api.openverse.test'],
+            'timeout' => 5,
+        ]);
+    }
+
+    protected function openverseResult(): array
+    {
+        return ['results' => [[
+            'id' => 'ov-1',
+            'title' => 'a waiting room with morning light',
+            'url' => 'https://live.static.test/big.jpg',
+            'thumbnail' => 'https://live.static.test/thumb.jpg',
+            'creator' => 'chocolatedazzles',
+            'creator_url' => 'https://flickr.test/chocolatedazzles',
+            'license' => 'by',
+            'license_version' => '2.0',
+        ]]];
+    }
+
+    public function test_a_site_with_no_key_still_gets_photographs(): void
+    {
+        // Asking somebody to register an application with a photo library
+        // before they may put a picture on their own website is a way of them
+        // not having a picture. Most will simply leave the grey rectangle.
+        $this->withNoKeyAtAll();
+        Http::fake(['*' => Http::response($this->openverseResult(), 200)]);
+
+        $found = app(FindPhotos::class)->search('clinic waiting room');
+
+        $this->assertSame('openverse', $found['source']);
+        $this->assertCount(1, $found['photos']);
+        $this->assertTrue(app(FindPhotos::class)->available(), 'photographs were reported unavailable with no key');
+    }
+
+    public function test_a_commons_photo_carries_its_licence_as_well_as_its_photographer(): void
+    {
+        // Under Creative Commons the licence IS part of the credit, and it is
+        // the part that tells the next person what they may do with it.
+        $this->withNoKeyAtAll();
+        Http::fake(['*' => Http::response($this->openverseResult(), 200)]);
+
+        $credit = app(FindPhotos::class)->search('clinic')['photos'][0]['credit'];
+
+        $this->assertStringContainsString('chocolatedazzles', $credit);
+        $this->assertStringContainsString('CC BY 2.0', $credit);
+    }
+
+    public function test_it_only_asks_for_pictures_a_business_may_actually_use(): void
+    {
+        // A picture somebody cannot legally put on their website is worse
+        // than no picture, because they will not find out from us.
+        $this->withNoKeyAtAll();
+        Http::fake(['*' => Http::response($this->openverseResult(), 200)]);
+
+        app(FindPhotos::class)->search('clinic');
+
+        Http::assertSent(fn ($request) => str_contains((string) $request['license_type'], 'commercial'));
+    }
+
+    public function test_a_key_that_stops_working_is_not_the_clients_problem(): void
+    {
+        // They cannot fix it and they did not cause it, and the other library
+        // is right there and needs nothing.
+        config()->set('live-edit.photos', [
+            'enabled' => true,
+            'provider' => 'auto',
+            'unsplash' => ['endpoint' => 'https://api.unsplash.test', 'access_key' => 'revoked'],
+            'openverse' => ['endpoint' => 'https://api.openverse.test'],
+            'timeout' => 5,
+        ]);
+
+        Http::fake([
+            'api.unsplash.test/*' => Http::response(['errors' => ['OAuth error']], 401),
+            'api.openverse.test/*' => Http::response($this->openverseResult(), 200),
+        ]);
+
+        $found = app(FindPhotos::class)->search('clinic');
+
+        $this->assertSame('openverse', $found['source'], 'a refused key emptied the dialog instead of falling back');
+        $this->assertCount(1, $found['photos']);
+    }
+
+    public function test_a_key_is_preferred_when_there_is_one(): void
+    {
+        // Unsplash has the better photographs; Openverse is the floor, not
+        // the choice.
+        $this->withUnsplash();
+        config()->set('live-edit.photos.provider', 'auto');
+        Http::fake(['*' => Http::response($this->unsplashResult(), 200)]);
+
+        $this->assertSame('unsplash', app(FindPhotos::class)->search('clinic')['source']);
     }
 }
