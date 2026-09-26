@@ -7,6 +7,7 @@ use Illuminate\Http\Request;
 use Illuminate\Validation\ValidationException;
 use ShipFast\LiveEdit\Application\Api\ApplyEdit;
 use ShipFast\LiveEdit\Application\Api\ApplyStyle;
+use ShipFast\LiveEdit\Application\Api\AssistWithText;
 use ShipFast\LiveEdit\Application\Api\ExportMarkup;
 use ShipFast\LiveEdit\Application\Api\ListChanges;
 use ShipFast\LiveEdit\Application\Api\PrepareMarkup;
@@ -15,6 +16,7 @@ use ShipFast\LiveEdit\Application\Api\ReadPublishedContent;
 use ShipFast\LiveEdit\Application\Api\TagMarkup;
 use ShipFast\LiveEdit\Domain\Content\SiteSnapshot;
 use ShipFast\LiveEdit\Domain\Content\SiteStore;
+use ShipFast\LiveEdit\Domain\Credits\Credits;
 use ShipFast\LiveEdit\Domain\Site\Ability;
 use ShipFast\LiveEdit\Domain\Site\Meter;
 use ShipFast\LiveEdit\Domain\Site\OverLimit;
@@ -241,6 +243,47 @@ class ContentController
             // usefully keep it — and they do, against a hash of that markup.
             'Cache-Control' => 'private, max-age=600',
         ]);
+    }
+
+    /**
+     * Rewriting one piece of copy, and what it cost.
+     *
+     * The balance comes back with every answer, including the refusals, so the
+     * panel never has to ask separately and can never show a number that is
+     * one action out of date.
+     */
+    public function assist(Request $request, AssistWithText $assist): JsonResponse
+    {
+        $validated = $request->validate([
+            'action' => ['required', 'string', 'in:rewrite,shorten'],
+            'text' => ['required', 'string', 'max:5000'],
+            'heading' => ['nullable', 'string', 'max:300'],
+            'page' => ['nullable', 'string', 'max:200'],
+            'role' => ['nullable', 'string', 'max:60'],
+        ]);
+
+        $result = $assist(
+            ApiContext::site($request),
+            $validated['action'],
+            $validated['text'],
+            array_filter([
+                'heading' => $validated['heading'] ?? null,
+                'page' => $validated['page'] ?? null,
+                'role' => $validated['role'] ?? null,
+            ]),
+        );
+
+        return response()->json($result)->withHeaders(['Cache-Control' => 'no-store, private']);
+    }
+
+    /** What this site has left to spend. */
+    public function credits(Request $request, Credits $credits): JsonResponse
+    {
+        return response()->json([
+            'balance' => $credits->balance(ApiContext::site($request)),
+            'costs' => Credits::COSTS,
+            'available' => app(AssistWithText::class)->available(),
+        ])->withHeaders(['Cache-Control' => 'no-store, private']);
     }
 
     /**

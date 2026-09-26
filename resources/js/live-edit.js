@@ -866,6 +866,158 @@ const bootLiveEdit = () => {
             return `Could not ${what}. Nothing has been lost; try again in a moment.`;
         };
 
+        /* ── Rewriting a sentence ──────────────────────────────────────
+         *
+         * Deliberately not "write my website for me". The product's argument
+         * is that a human designed the page and the client owns the words;
+         * this helps with one of them, on request, and hands back something
+         * they can then edit like anything else.
+         *
+         * The balance is read once when the editor starts and kept up to date
+         * by the answers themselves, so the panel never shows a number that is
+         * one action out of date and never costs a second request to draw.
+         */
+        let credits = null;
+
+        const loadCredits = async () => {
+            try {
+                const response = await request('/live-edit/credits', { method: 'GET' });
+                credits = await response.json();
+            } catch (error) {
+                // Not knowing the balance is a reason to leave the buttons
+                // out, not a reason to interrupt somebody.
+                console.warn('[live-edit] could not read the credit balance:', error);
+                credits = null;
+            }
+        };
+
+        // Read once as the editor starts, so the first panel that offers a
+        // rewrite already knows what it costs and what is left. Started here
+        // rather than at the top of this function because a const is not
+        // reachable before its own definition.
+        void loadCredits();
+
+        const appendAssist = (element, box) => {
+            // Only where a model is configured and only for words. A row of
+            // buttons that answer "not available" is worse than no row.
+            if (!credits?.available || !box) return;
+
+            const heading = document.createElement('div');
+            heading.className = 'le-assist-head';
+            heading.append(sectionHeading('AI assist'), balanceLabel());
+            drawerFields.append(heading);
+
+            [['rewrite', 'Rewrite'], ['shorten', 'Shorten']].forEach(([action, label]) => {
+                const cost = credits.costs?.[action] ?? 1;
+                const button = document.createElement('button');
+                button.type = 'button';
+                button.className = 'le-assist';
+
+                const name = document.createElement('span');
+                name.textContent = label;
+
+                const price = document.createElement('span');
+                price.className = 'le-assist-cost';
+                price.textContent = `${cost} credit${cost === 1 ? '' : 's'}`;
+
+                button.append(name, price);
+
+                if ((credits.balance ?? 0) < cost) {
+                    button.disabled = true;
+                    price.classList.add('is-short');
+                    button.title = 'Not enough credits';
+                }
+
+                button.addEventListener('click', () => void runAssist(action, label, element, box, button, name));
+                drawerFields.append(button);
+            });
+        };
+
+        const balanceLabel = () => {
+            const span = document.createElement('span');
+            span.className = 'le-assist-balance';
+            span.textContent = `${credits?.balance ?? 0} credits left`;
+
+            return span;
+        };
+
+        const sectionHeading = (text) => {
+            const div = document.createElement('div');
+            div.className = 'le-section-heading';
+            div.textContent = text;
+
+            return div;
+        };
+
+        const runAssist = async (action, label, element, box, button, name) => {
+            button.disabled = true;
+            name.textContent = 'Thinking…';
+
+            let result;
+
+            try {
+                const response = await request('/live-edit/assist', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        action,
+                        text: box.value,
+                        // Context is what makes the answer fit. "Rewrite this"
+                        // on the words "Book now" produces marketing sludge;
+                        // told it is a button under a heading about same-day
+                        // appointments, it produces something that belongs.
+                        heading: nearestHeading(element),
+                        role: describeElement(element),
+                        page: window.location.pathname,
+                    }),
+                });
+                result = await response.json();
+            } catch (error) {
+                button.disabled = false;
+                name.textContent = label;
+                ui.toast(plainly(error, 'rewrite that'));
+
+                return;
+            }
+
+            if (typeof result?.balance === 'number' && credits) credits.balance = result.balance;
+
+            if (!result?.text) {
+                button.disabled = false;
+                name.textContent = label;
+                ui.toast(assistExcuse(result?.reason));
+
+                return;
+            }
+
+            // Into the box rather than onto the page: it is a suggestion until
+            // somebody presses Save, and they can edit it first like any other
+            // words they typed themselves.
+            box.value = result.text;
+            box.dispatchEvent(new Event('input', { bubbles: true }));
+            box.focus();
+
+            button.disabled = false;
+            name.textContent = label;
+            ui.toast(`Rewritten. ${result.balance} credits left.`);
+        };
+
+        /* The nearest heading above this element, which is most of what tells
+           a model what the page is about. */
+        const nearestHeading = (element) => {
+            const section = element.closest('section, article, header, div[data-style]') ?? document.body;
+            const heading = section.querySelector('h1, h2, h3') ?? document.querySelector('h1');
+
+            return (heading?.textContent ?? '').replace(/\s+/g, ' ').trim().slice(0, 200);
+        };
+
+        const assistExcuse = (reason) => ({
+            not_enough_credits: 'Not enough credits for that. You can buy more from your account.',
+            no_suggestion: 'No suggestion for this one. Your words are unchanged.',
+            not_configured: 'Rewriting is not switched on for this site yet.',
+            nothing_to_work_with: 'There are no words here to rewrite yet.',
+        }[reason] ?? 'Could not rewrite that just now. Your words are unchanged.');
+
         /* ── Changes ───────────────────────────────────────────────────
          *
          * Everything saved and not yet published, with what the page said
@@ -1548,6 +1700,10 @@ const bootLiveEdit = () => {
                 drawerFields.append(asIcon
                     ? fieldInput('icon', 'Icon', element.dataset.editValue ?? '', 1, false)
                     : fieldInput('value', 'Text', text, 6, richSetting));
+
+                // Offered under the words it would rewrite, and only for
+                // words: there is nothing to say about an icon.
+                if (!asIcon) appendAssist(element, drawerFields.querySelector('textarea'));
             } else {
                 const [type, id] = rest;
                 current = { kind: 'record', type, id: Number(id) };

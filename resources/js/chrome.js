@@ -185,6 +185,23 @@ button, input, select, textarea { font: inherit; color: inherit; margin: 0; }
   font-size: 11px; font-weight: 500; line-height: 16px; text-align: center;
 }
 .le-tab.is-on .le-tab-count { background: #0B0C0F; color: #fff; }
+/* ---- AI assist ---- */
+.le-assist-head { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
+.le-assist-balance { font-size: 12px; color: #9A9DA5; }
+.le-assist {
+  display: flex; align-items: center; justify-content: space-between; gap: 10px;
+  width: 100%; cursor: pointer; border: 0; border-radius: 10px;
+  padding: 11px 14px; background: #F4F5F7; color: #0B0C0F;
+  font-size: 14px; font-weight: 500; text-align: left;
+  transition: background .15s ease, opacity .15s ease;
+}
+.le-assist:hover { background: #EBECEF; }
+.le-assist:disabled { opacity: .5; cursor: default; background: #F4F5F7; }
+/* The price, next to the thing it buys. Somebody about to spend a credit
+   should not have to remember what it costs. */
+.le-assist-cost { font-size: 12px; color: #9A9DA5; font-weight: 400; }
+.le-assist-cost.is-short { color: #C0392B; }
+
 /* ---- the Changes and History lists ---- */
 .le-change { display: flex; flex-direction: column; gap: 4px; padding-bottom: 16px; border-bottom: 1px solid #EEEFF1; }
 .le-change:last-child { border-bottom: 0; padding-bottom: 0; }

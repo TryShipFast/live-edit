@@ -66,6 +66,11 @@ Route::prefix(config('live-edit.api.prefix', 'api/live-edit/v1').'/{site}')
             // every page of the site.
             Route::get('/changes', [ContentController::class, 'changes'])->name('live-edit.api.changes');
             Route::delete('/changes', [ContentController::class, 'revert'])->name('live-edit.api.changes.revert');
+
+            // What the site has left to spend, and spending some of it on a
+            // rewrite. A write key: this costs money.
+            Route::get('/credits', [ContentController::class, 'credits'])->name('live-edit.api.credits');
+            Route::post('/assist', [ContentController::class, 'assist'])->name('live-edit.api.assist');
         });
 
         // How a section looks. The same key and the same cost as a word: the
