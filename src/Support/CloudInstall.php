@@ -2,6 +2,8 @@
 
 namespace ShipFast\LiveEdit\Support;
 
+use Illuminate\Support\Facades\Gate;
+
 /**
  * The one line a Laravel application adds to become editable.
  *
@@ -48,6 +50,21 @@ class CloudInstall
          * updated. One directive, right either way.
          */
         if ($site === '' || $host === '') {
+            /*
+             * And only to somebody who may edit.
+             *
+             * A visitor was being sent the whole editor, which then found no
+             * editable page and did nothing. Three things wrong with that: it
+             * is a download nobody asked for, on a page whose speed is the
+             * client's business rather than ours; it tells anybody reading the
+             * source that this site is editable and where from; and it is the
+             * same gate the rest of the package already respects, so leaving
+             * this one open made the answer depend on which part you asked.
+             */
+            if (! Gate::allows('live-edit')) {
+                return '';
+            }
+
             return '<script src="'.e(url('live-edit/runtime.js')).'" type="module" defer></script>';
         }
 
