@@ -277,6 +277,45 @@ class ApiEndpointTest extends TestCase
         $this->assertStringContainsString('Authorization', $response->headers->get('Access-Control-Allow-Headers'));
     }
 
+    /**
+     * Every method the API answers is a method a browser is allowed to send.
+     *
+     * Naming only GET and POST here did not make DELETE safe, it made it
+     * unreachable: the browser asks first, is told the method is not on the
+     * list, and never sends the request. Reverting a change is a DELETE, so
+     * Revert failed on every site that is not this application, reporting
+     * "failed to fetch" — which reads as the network being down rather than
+     * as a button that was never wired up.
+     *
+     * Read off the routes rather than written out, so a method added later
+     * cannot be quietly unreachable for the same reason.
+     */
+    public function test_every_method_the_api_answers_is_one_a_browser_may_send(): void
+    {
+        $advertised = $this->call('OPTIONS', $this->url(), [], [], [], [
+            'HTTP_ORIGIN' => 'https://client.test',
+            'HTTP_ACCESS_CONTROL_REQUEST_METHOD' => 'DELETE',
+        ])->headers->get('Access-Control-Allow-Methods');
+
+        $prefix = config('live-edit.api.prefix');
+
+        $answered = collect(app('router')->getRoutes())
+            ->filter(fn ($route) => str_starts_with($route->uri(), $prefix))
+            ->flatMap(fn ($route) => $route->methods())
+            ->reject(fn (string $method) => in_array($method, ['HEAD', 'OPTIONS'], true))
+            ->unique();
+
+        $this->assertNotEmpty($answered);
+
+        foreach ($answered as $method) {
+            $this->assertStringContainsString(
+                $method,
+                (string) $advertised,
+                "the API answers {$method} but no browser on another origin is allowed to send it",
+            );
+        }
+    }
+
     public function test_a_host_with_wide_open_cors_still_cannot_be_used_by_another_origin(): void
     {
         // Laravel ships cors.paths = ['api/*'] and allowed_origins = ['*'],

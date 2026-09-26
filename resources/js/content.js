@@ -666,6 +666,12 @@ const start = async () => {
             applied = applyContent(document, payload.settings ?? {});
             applyStyles(document, payload.styles ?? {});
 
+            // Handed to the panel as well as to the page. The style controls
+            // read their current values from here; without it they opened
+            // reading "use default" on an element that plainly was not, and
+            // saving wrote that back.
+            window.liveEditStyles = payload.styles ?? {};
+
             // And keep them. A bought theme runs its own scripts after this
             // one, and several of them write text and swap pictures.
             defendContent(document);

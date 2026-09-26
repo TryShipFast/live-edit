@@ -5,6 +5,7 @@ namespace ShipFast\LiveEdit\Application\Api;
 use ShipFast\LiveEdit\Domain\Content\SiteStore;
 use ShipFast\LiveEdit\Domain\Site\Site;
 use ShipFast\LiveEdit\Mapper\MarkupScanner;
+use ShipFast\LiveEdit\Support\StyleCss;
 
 /**
  * A finished page for a host that cannot run the scanner itself.
@@ -61,11 +62,54 @@ class PrepareMarkup
             $content = array_merge($content, $store->draftedSettings());
         }
 
+        $html = $content === [] ? $marked : $scanner->applyOverrides($marked, $content);
+
         return [
-            'html' => $content === [] ? $marked : $scanner->applyOverrides($marked, $content),
+            'html' => $this->withStyling($html, $store, $editing),
             'applied' => count($content),
             'tagged' => ! $alreadyMarked,
             'version' => (int) ($store->version() ?? 0),
         ];
+    }
+
+    /**
+     * The client's styling, written into the page.
+     *
+     * Words were being baked in here and colours were not, so on a page a
+     * server renders — every bought WordPress theme — a client could change a
+     * background, watch it save, see it listed under Changes, publish it, and
+     * reload onto the theme's original colour. Nothing errored. The style was
+     * stored the whole time; no part of this pipeline ever painted it.
+     *
+     * A page the browser fetches its own content for never had the problem,
+     * because content.js applies styles as it hydrates. This is that same step
+     * for a host that cannot run it, and it reuses the renderer content.js is
+     * kept in step with rather than growing a second answer.
+     */
+    private function withStyling(string $html, SiteStore $store, bool $editing): string
+    {
+        // Passed in rather than left to the renderer to look up. Its fallback
+        // reads every style row on the service, which on a host serving more
+        // than one site is another client's colours.
+        $css = StyleCss::render(
+            $editing ? $store->draftedStyles() : [],
+            $store->publishedStyles(),
+        );
+
+        if (trim($css) === '') {
+            return $html;
+        }
+
+        $tag = '<style id="live-edit-styles">'.$css.'</style>';
+
+        // Last thing in the head, so it beats the theme's own stylesheet on
+        // equal specificity as well as by !important. A page with no head is
+        // a fragment rather than a document, and appending is the only honest
+        // thing left to do with it.
+        $position = stripos($html, '</head>');
+
+        return $position === false
+            ? $html.$tag
+            : substr($html, 0, $position).$tag.substr($html, $position);
     }
 }

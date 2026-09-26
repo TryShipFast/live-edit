@@ -7,6 +7,7 @@ use ShipFast\LiveEdit\Domain\Content\StylePolicy;
 use ShipFast\LiveEdit\Domain\Site\Ability;
 use ShipFast\LiveEdit\Domain\Site\Site;
 use ShipFast\LiveEdit\Domain\Site\TokenType;
+use ShipFast\LiveEdit\Models\Draft;
 use ShipFast\LiveEdit\Tests\TestCase;
 
 /**
@@ -207,5 +208,57 @@ class StyleTest extends TestCase
         ] as [$type, $value, $allowed]) {
             $this->assertSame($allowed, $policy->permits($type, $value), "{$type}: {$value}");
         }
+    }
+
+    /**
+     * Taking a colour back off.
+     *
+     * The Changes tab offers Revert beside a style exactly as it does beside a
+     * sentence, so the two have to mean the same thing. If the sentence comes
+     * back and the colour does not, the client is left with a change they were
+     * told they had undone and can no longer find in the list to undo again.
+     */
+    public function test_a_style_change_can_be_taken_back(): void
+    {
+        // Only a site that publishes deliberately has anything to revert: with
+        // drafts off a style is live the moment it is set, and the Changes tab
+        // has nothing to list.
+        config()->set('live-edit.publishing', true);
+
+        $this->postJson($this->url(), [
+            'key' => 'hero', 'props' => ['background' => '#123456'],
+        ], $this->as($this->session))->assertOk();
+
+        $this->assertArrayHasKey('hero', $this->styles(), 'the colour was never held in the first place');
+
+        $this->json('DELETE', '/api/live-edit/v1/client/changes', [
+            'key' => 'hero', 'kind' => 'style',
+        ], $this->as($this->session))->assertOk()->assertJson(['reverted' => true]);
+
+        $this->assertArrayNotHasKey('hero', $this->styles(), 'the colour survived being reverted');
+    }
+
+    public function test_reverting_a_style_leaves_the_words_on_the_same_element_alone(): void
+    {
+        // Both kinds hang off the page under their own key, and a revert names
+        // one of them. Deleting by name alone would take the sentence with the
+        // colour and look, to whoever pressed it, like the editor losing work.
+        config()->set('live-edit.publishing', true);
+
+        $this->postJson($this->url(), [
+            'key' => 'hero', 'props' => ['background' => '#123456'],
+        ], $this->as($this->session))->assertOk();
+
+        Draft::query()->create([
+            'site_id' => $this->site->id, 'kind' => 'setting', 'subject' => 'hero', 'payload' => ['value' => 'Half-typed'],
+        ]);
+
+        $this->json('DELETE', '/api/live-edit/v1/client/changes', [
+            'key' => 'hero', 'kind' => 'style',
+        ], $this->as($this->session))->assertOk();
+
+        $this->assertDatabaseHas((new Draft)->getTable(), [
+            'site_id' => $this->site->id, 'kind' => 'setting', 'subject' => 'hero',
+        ]);
     }
 }

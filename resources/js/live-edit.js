@@ -910,13 +910,23 @@ const bootLiveEdit = () => {
          * key that is told.
          */
         const loadStyleVocabulary = async () => {
-            if (window.liveEditStyleProps) return;
+            if (window.liveEditStyleProps && window.liveEditStyles) return;
 
             try {
                 const response = await request('/live-edit/content', { method: 'GET' });
                 const payload = await response.json();
 
                 if (payload?.styleProps) window.liveEditStyleProps = payload.styleProps;
+
+                /*
+                 * And what is already set, which is a different question the
+                 * panel also could not answer. It reads its current values
+                 * from here, so with nothing here every control opened reading
+                 * "use default" even on an element the client had coloured
+                 * themselves — and saving the panel then wrote that back and
+                 * took the colour off.
+                 */
+                if (payload?.styles) window.liveEditStyles = payload.styles;
             } catch (error) {
                 console.warn('[live-edit] could not read what this site allows to be styled:', error);
             }

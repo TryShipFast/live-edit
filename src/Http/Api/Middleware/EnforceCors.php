@@ -62,7 +62,14 @@ class EnforceCors
         $response->headers->set('Access-Control-Allow-Origin', $allowed);
 
         if ($preflight) {
-            $response->headers->set('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+            // DELETE and PATCH are here because the API answers them —
+            // reverting a change, removing an editor, revoking a key. Listing
+            // only GET and POST did not make those routes safe, it made them
+            // unreachable from any site that is not this one: the browser asks
+            // first, is told the method is not allowed, and never sends it.
+            // Revert then failed on every WordPress and static site with
+            // "failed to fetch", which reads as the network being down.
+            $response->headers->set('Access-Control-Allow-Methods', 'GET, POST, PATCH, DELETE, OPTIONS');
             $response->headers->set('Access-Control-Allow-Headers', 'Authorization, Content-Type, If-None-Match, Idempotency-Key');
             $response->headers->set('Access-Control-Max-Age', '600');
         }

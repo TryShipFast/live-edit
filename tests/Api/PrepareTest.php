@@ -2,6 +2,7 @@
 
 namespace ShipFast\LiveEdit\Tests\Api;
 
+use ShipFast\LiveEdit\Domain\Content\SiteStore;
 use ShipFast\LiveEdit\Domain\Site\Ability;
 use ShipFast\LiveEdit\Domain\Site\Site;
 use ShipFast\LiveEdit\Domain\Site\TokenType;
@@ -151,5 +152,71 @@ class PrepareTest extends TestCase
     {
         $this->postJson($this->url(), ['html' => str_repeat('a', 2_000_001)], $this->reader())
             ->assertStatus(422);
+    }
+
+    /**
+     * A colour the client chose is a colour on the page.
+     *
+     * This is the case nothing covered, and it was broken the whole time.
+     * Words were baked into the page here and styling was not, so on every
+     * bought WordPress theme somebody could change a background, watch it
+     * save, see it listed under Changes, publish it, reload, and be looking at
+     * the theme's original colour. Nothing errored anywhere.
+     */
+    public function test_a_style_the_client_saved_comes_back_on_the_page(): void
+    {
+        $html = '<html><head><title>x</title></head><body><div><h1>Theme headline</h1></div></body></html>';
+
+        $tagged = $this->postJson($this->url(), ['html' => $html], $this->reader())->json('html');
+        preg_match('/data-style="(s[a-f0-9]+)"/', $tagged, $m);
+        $this->assertNotEmpty($m, 'nothing on the page was marked as restylable');
+
+        (new SiteStore($this->site))
+            ->putStyle($m[1], ['background' => '#7b1e3a'], false);
+
+        $served = $this->postJson($this->url(), ['html' => $html], $this->reader())->json('html');
+
+        $this->assertStringContainsString('#7b1e3a', $served, 'the saved colour never reached the page');
+        $this->assertStringContainsString('[data-style="'.$m[1].'"]', $served);
+        // Before </head>, so it beats the theme's own stylesheet rather than
+        // losing to whatever loads after it.
+        $this->assertLessThan(
+            stripos($served, '</head>'),
+            stripos($served, 'live-edit-styles'),
+            'the styling was written after the head, where the theme can still win',
+        );
+    }
+
+    public function test_a_visitor_never_sees_a_colour_somebody_is_still_choosing(): void
+    {
+        // The same rule as words. A half-chosen colour is somebody mid-thought,
+        // and the site is open to the public while they think.
+        $html = '<html><head></head><body><div><h1>Theme headline</h1></div></body></html>';
+
+        $tagged = $this->postJson($this->url(), ['html' => $html], $this->reader())->json('html');
+        preg_match('/data-style="(s[a-f0-9]+)"/', $tagged, $m);
+
+        $store = new SiteStore($this->site);
+        $store->putStyle($m[1], ['background' => '#111111'], false);
+        $store->putStyle($m[1], ['background' => '#7b1e3a'], true);
+
+        $visitor = $this->postJson($this->url(), ['html' => $html], $this->reader())->json('html');
+        $this->assertStringContainsString('#111111', $visitor);
+        $this->assertStringNotContainsString('#7b1e3a', $visitor);
+
+        $editor = $this->postJson($this->url(), ['html' => $html], $this->editor())->json('html');
+        $this->assertStringContainsString('#7b1e3a', $editor, 'the editor could not see their own unpublished colour');
+    }
+
+    public function test_a_page_with_no_styling_is_left_exactly_as_it_was(): void
+    {
+        // An empty stylesheet tag on every page of every site would be our
+        // litter on somebody else's website.
+        $html = '<html><head></head><body><h1>Theme headline</h1></body></html>';
+
+        $this->assertStringNotContainsString(
+            'live-edit-styles',
+            $this->postJson($this->url(), ['html' => $html], $this->reader())->json('html'),
+        );
     }
 }
