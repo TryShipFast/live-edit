@@ -309,4 +309,62 @@ class LicenceTest extends TestCase
             $this->assertSame('acme.test', SiteVerification::normaliseDomain($spelling), $spelling);
         }
     }
+
+    public function test_a_local_development_site_may_be_verified_over_http(): void
+    {
+        // So the flow can be tried on shipfast.test before it is trusted in
+        // production, which is the worst possible place to first find out
+        // that it does not work.
+        Http::fake([
+            'https://dev.test/*' => Http::response('', 500),
+            'https://dev.test' => Http::response('', 500),
+            'http://dev.test/.well-known/*' => Http::response('shipfast-verify-abc123'),
+        ]);
+
+        $site = Site::query()->create([
+            'slug' => 'dev',
+            'name' => 'Dev',
+            'domain' => 'dev.test',
+            'verification_code' => 'shipfast-verify-abc123',
+        ]);
+
+        $this->assertTrue((new Provisioner)->verifyDomain($site)['verified']);
+    }
+
+    public function test_a_real_domain_is_never_asked_over_plain_http(): void
+    {
+        // The one that matters. A proof carried in clear is one the network
+        // can forge, so the http fallback must stay shut for anything that
+        // could be a real site — even when https is failing and http would
+        // happily answer.
+        Http::fake([
+            'https://acme.com/*' => Http::response('', 500),
+            'https://acme.com' => Http::response('', 500),
+            'http://acme.com/.well-known/*' => Http::response('shipfast-verify-abc123'),
+        ]);
+
+        $site = Site::query()->create([
+            'slug' => 'real',
+            'name' => 'Real',
+            'domain' => 'acme.com',
+            'verification_code' => 'shipfast-verify-abc123',
+        ]);
+
+        $this->assertFalse((new Provisioner)->verifyDomain($site)['verified']);
+
+        Http::assertNotSent(fn ($request) => str_starts_with($request->url(), 'http://'));
+    }
+
+    public function test_only_development_hostnames_count_as_local(): void
+    {
+        foreach (['shipfast.test', 'learnkasts.test', 'localhost', 'app.localhost'] as $local) {
+            $this->assertTrue(SiteVerification::isLocal($local), $local);
+        }
+
+        // "attacker-test.com" ends in neither, and must not be coaxed into
+        // the relaxed path by looking a bit like it does.
+        foreach (['acme.com', 'attacker-test.com', 'test.com', 'nottest.example'] as $real) {
+            $this->assertFalse(SiteVerification::isLocal($real), $real);
+        }
+    }
 }

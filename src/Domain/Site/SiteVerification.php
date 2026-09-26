@@ -2,6 +2,7 @@
 
 namespace ShipFast\LiveEdit\Domain\Site;
 
+use Illuminate\Http\Client\PendingRequest;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Str;
 
@@ -115,15 +116,76 @@ final class SiteVerification
             return ['verified' => false, 'method' => null, 'reason' => 'not_registered'];
         }
 
-        $base = 'https://'.$domain;
         $reason = null;
+
+        foreach (self::baseUrlsFor($domain) as $base) {
+            $result = self::lookFor($base, $code);
+
+            if ($result['verified']) {
+                return $result;
+            }
+
+            // "Not there" is an answer and ends it; "could not reach you" is
+            // not, so the next candidate base gets a turn. Without this a
+            // local site that only answers http would be reported as missing
+            // its code rather than as never having been asked.
+            if ($result['reason'] === 'not_found') {
+                return $result;
+            }
+
+            $reason = $result['reason'];
+        }
+
+        return ['verified' => false, 'method' => null, 'reason' => $reason ?? 'unreachable'];
+    }
+
+    /**
+     * Where to go looking, in order.
+     *
+     * https only, for everything that could be a real site. A plain-http
+     * proof is one a network can forge, and verification that can be forged
+     * by whoever carries the packets is not verification.
+     *
+     * The exception is a development hostname — .test, .localhost, localhost
+     * itself — which cannot be reached from the internet at all and is
+     * therefore not somebody else's site to impersonate. Those are worth
+     * supporting because the alternative is that the whole flow is untestable
+     * until it is in production, which is the one place nobody wants to find
+     * out that it does not work.
+     *
+     * @return array<int, string>
+     */
+    private static function baseUrlsFor(string $domain): array
+    {
+        return self::isLocal($domain)
+            ? ['https://'.$domain, 'http://'.$domain]
+            : ['https://'.$domain];
+    }
+
+    public static function isLocal(string $domain): bool
+    {
+        $domain = self::normaliseDomain($domain);
+
+        return $domain === 'localhost'
+            || $domain === '127.0.0.1'
+            || Str::endsWith($domain, ['.test', '.localhost']);
+    }
+
+    /**
+     * @return array{verified: bool, method: ?string, reason: ?string}
+     */
+    private static function lookFor(string $base, string $code): array
+    {
+        $reason = null;
+        // A development host is served with a certificate nothing trusts, so
+        // insisting on a valid one there means never being able to try the
+        // flow before it is live. Never relaxed for a real domain.
+        $insecure = str_starts_with($base, 'http://') || self::isLocal(parse_url($base, PHP_URL_HOST) ?: '');
 
         // The file first: it is one small response, while the home page of a
         // real site is often hundreds of kilobytes we would rather not fetch.
         try {
-            $file = Http::timeout(8)
-                ->withHeaders(['User-Agent' => 'ShipFast-Live-Edit-Verifier/1.0'])
-                ->get($base.self::WELL_KNOWN_PATH);
+            $file = self::client($insecure)->get($base.self::WELL_KNOWN_PATH);
 
             if ($file->successful() && str_contains($file->body(), $code)) {
                 return ['verified' => true, 'method' => 'file', 'reason' => null];
@@ -133,9 +195,7 @@ final class SiteVerification
         }
 
         try {
-            $page = Http::timeout(8)
-                ->withHeaders(['User-Agent' => 'ShipFast-Live-Edit-Verifier/1.0'])
-                ->get($base);
+            $page = self::client($insecure)->get($base);
 
             if ($page->successful() && self::pageCarries($page->body(), $code)) {
                 return ['verified' => true, 'method' => 'meta', 'reason' => null];
@@ -150,6 +210,14 @@ final class SiteVerification
         }
 
         return ['verified' => false, 'method' => null, 'reason' => $reason ?? 'not_found'];
+    }
+
+    private static function client(bool $insecure): PendingRequest
+    {
+        $client = Http::timeout(8)
+            ->withHeaders(['User-Agent' => 'ShipFast-Live-Edit-Verifier/1.0']);
+
+        return $insecure ? $client->withoutVerifying() : $client;
     }
 
     /**
