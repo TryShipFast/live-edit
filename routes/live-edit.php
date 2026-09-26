@@ -1,6 +1,7 @@
 <?php
 
 use Illuminate\Support\Facades\Route;
+use ShipFast\LiveEdit\Http\Api\V1\EmbedController;
 use ShipFast\LiveEdit\Http\Controllers\LiveEditController;
 use ShipFast\LiveEdit\Http\Controllers\ThemeController;
 use ShipFast\LiveEdit\Support\DraftStore;
@@ -56,3 +57,23 @@ Route::middleware(config('live-edit.view_middleware', ['web']))->group(function 
         return redirect('/');
     })->name('live-edit.preview.leave');
 });
+
+/*
+ * The editor's own files, for a site that installed this package.
+ *
+ * Outside the authenticated group above and outside the content API, because
+ * neither is the right gate. A browser fetching a script carries no session
+ * for it, and an application that only wants the editor should not have to
+ * switch on a content API it will never call to get one.
+ *
+ * Nothing here is content. It is the same JavaScript for every install, and
+ * the address that names a build is safe to cache for a year because a new
+ * build is a new address.
+ */
+Route::get('/live-edit/runtime.js', [EmbedController::class, 'runtime'])
+    ->name('live-edit.runtime.script');
+
+Route::get('/live-edit/assets/{version}/{file}', fn (string $version, string $file) => app(EmbedController::class)($file))
+    ->where('version', '[A-Za-z0-9._-]+')
+    ->where('file', '[a-z-]+\\.js')
+    ->name('live-edit.assets.versioned');

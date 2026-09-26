@@ -37,8 +37,18 @@ class CloudInstall
         $site = trim((string) config('live-edit.cloud.site'));
         $host = rtrim(trim((string) config('live-edit.cloud.host')), '/');
 
+        /*
+         * No cloud site configured means this application installed the
+         * package itself, so the editor is served from here.
+         *
+         * Without this, @liveEdit printed nothing on a self-hosted install and
+         * the only way to get an editor was to import the runtime through the
+         * site's own asset build — which compiles the engine into every site,
+         * so an engine fix then needs every site rebuilt rather than merely
+         * updated. One directive, right either way.
+         */
         if ($site === '' || $host === '') {
-            return '';
+            return '<script src="'.e(url('live-edit/runtime.js')).'" type="module" defer></script>';
         }
 
         // The per-site install rather than the runtime directly, which is also

@@ -212,11 +212,6 @@ Route::get('/live-edit/sign-in/{token}', [SignInController::class, 'redeem'])
  * is the one failure worse than a stale build. A directory in the path is
  * inherited for free.
  */
-Route::get('/live-edit/assets/{version}/{file}', fn (string $version, string $file) => app(EmbedController::class)($file))
-    ->where('version', '[A-Za-z0-9._-]+')
-    ->where('file', '[a-z-]+\.js')
-    ->name('live-edit.assets.versioned');
-
 Route::get('/live-edit/assets/{file}', EmbedController::class)
     ->where('file', '[a-z-]+\.js')
     ->name('live-edit.assets');
@@ -235,15 +230,11 @@ Route::get('/live-edit/embed.js', fn () => app(EmbedController::class)('embed.js
  * fixes behind before this existed.
  */
 /*
- * The editor, at an address that never changes.
- *
- * What a host should point a script tag at. It resolves the current build on
- * every request and revalidates, so an engine change is live on the next page
- * load rather than whenever somebody's cached answer expires. See
- * EmbedController::runtime() for why that is worth a request.
+ * runtime.js and the versioned asset directory are registered in
+ * routes/live-edit.php instead, which every install loads. A browser fetching
+ * a script has no session, and an application that only wants the editor
+ * should not have to switch on a content API to be served one.
  */
-Route::get('/live-edit/runtime.js', [EmbedController::class, 'runtime'])
-    ->name('live-edit.runtime.script');
 
 Route::get('/live-edit/runtime.json', fn () => response()->json([
     'version' => EmbedController::assetVersion(),

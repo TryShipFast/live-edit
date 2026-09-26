@@ -14,23 +14,57 @@ admin screens for content.
   (undo history), with migrations.
 - **`RichText`** — XSS-safe markdown-lite (`**bold**`, `*italic*`, `[text](url)`).
 - **`live-edit:prune-orphans`** — deletes uploaded images nothing references.
-- **JS module** (`resources/js/live-edit.js`) — the editor drawer, toolbar,
-  live preview, undo, toasts and every control.
+- **The editor itself** — drawer, toolbar, live preview as you type, undo and
+  redo, the image picker, publish review and preview mode. Served by the
+  package at `/live-edit/runtime.js` and loaded by `@liveEdit`; you never
+  import or build it.
 
 ## Install
 
+Two steps.
+
 ```bash
 composer require shipfast/live-edit
-php artisan vendor:publish --tag=live-edit-config   # config/live-edit.php
-php artisan vendor:publish --tag=live-edit-js        # resources/js/live-edit.js
 php artisan migrate
 ```
 
-Import the JS from your app entry (`resources/js/app.js`):
+Then one line in your layout's `<head>`:
 
-```js
-import './live-edit.js';
+```blade
+@liveEdit
 ```
+
+That is the whole integration. The directive serves the editor from this
+package, so there is nothing to import, nothing to publish, and nothing to add
+to your asset build.
+
+**Do not import the editor in `app.js`.** Bundling it compiles a copy of the
+engine into your site's assets, which means an engine fix reaches you only
+when you rebuild and redeploy — and until you do, the copy in your bundle and
+the one composer installed are different versions of the same thing, with
+nothing to say so. `@liveEdit` loads the installed package, so updating it is
+`composer update`.
+
+### Who may edit
+
+The editor appears for whoever passes the `live-edit` gate. Define it:
+
+```php
+// app/Providers/AppServiceProvider.php
+Gate::define('live-edit', fn (User $user): bool => $user->is_admin);
+```
+
+Nobody else is served the editor at all, so a visitor's page is the page they
+would have had without this package.
+
+### Optional
+
+```bash
+php artisan vendor:publish --tag=live-edit-config    # to change what is editable
+```
+
+The defaults work. Publish the config when you want to declare your own
+setting keys, models or locales.
 
 ## Configure
 
