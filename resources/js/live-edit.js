@@ -3384,11 +3384,146 @@ const bootLiveEdit = () => {
             ui.previewButton.addEventListener('click', enterPreview);
         });
 
-        ui.undoButton.addEventListener('click', async () => {
-            const res = await request('/live-edit/undo', { method: 'POST' });
-            const data = await res.json();
-            if (data.undone) reloadWithToast('Undone \u21a9');
-            else window.alert('Nothing to undo.');
+        /* \u2500\u2500 Undo and redo \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
+         *
+         * Undo takes back the most recent thing not yet published, which is
+         * the top of the list the Changes tab already shows. It stops at what
+         * is published: once something is public, taking it back is another
+         * change and another publish, and pretending otherwise would be a
+         * button that silently changes a live website.
+         *
+         * The undone value is kept so it can be put back, and kept in session
+         * storage rather than in a variable, because saving anything reloads
+         * this page \u2014 a stack held in memory would be empty by the time
+         * anybody reached for it. It is per site and per tab, and it goes when
+         * the tab does, which is the right lifetime for "what I just undid".
+         */
+        const REDO_KEY = `live-edit:redo:${api?.site ?? window.location.host}`;
+
+        const redoStack = () => {
+            try {
+                return JSON.parse(sessionStorage.getItem(REDO_KEY) ?? '[]');
+            } catch {
+                return [];
+            }
+        };
+
+        const setRedoStack = (stack) => {
+            try {
+                sessionStorage.setItem(REDO_KEY, JSON.stringify(stack.slice(-20)));
+            } catch {
+                // A browser refusing storage is not a reason to refuse an undo.
+            }
+        };
+
+        // Read rather than passed in, so this can be called from anywhere
+        // without threading the count through every caller.
+        const showUndoState = () => {
+            ui.undoButton.disabled = (window.liveEditPublishing?.pending ?? 0) === 0;
+            ui.redoButton.disabled = redoStack().length === 0;
+        };
+
+        whenPublishingKnown(showUndoState);
+        showUndoState();
+
+        const undoLast = async () => {
+            ui.undoButton.disabled = true;
+
+            let change;
+
+            try {
+                const response = await request('/live-edit/changes', { method: 'GET' });
+                change = ((await response.json())?.changes ?? [])[0];
+            } catch (error) {
+                ui.toast(plainly(error, 'undo that'));
+                showUndoState();
+
+                return;
+            }
+
+            if (!change) {
+                ui.toast('There is nothing left to undo. Everything is published.');
+                showUndoState();
+
+                return;
+            }
+
+            const label = labelForChange(change);
+
+            try {
+                await request('/live-edit/changes', {
+                    method: 'DELETE',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ key: change.key, kind: change.kind }),
+                });
+            } catch (error) {
+                ui.toast(plainly(error, 'undo that'));
+                showUndoState();
+
+                return;
+            }
+
+            setRedoStack([...redoStack(), { key: change.key, kind: change.kind, value: change.after, label }]);
+            reloadWithToast(`Undone: ${label}`);
+        };
+
+        const redoLast = async () => {
+            const stack = redoStack();
+            const step = stack.pop();
+
+            if (!step) {
+                ui.toast('There is nothing to put back.');
+
+                return;
+            }
+
+            ui.redoButton.disabled = true;
+
+            try {
+                if (step.kind === 'style') {
+                    // A style is stored as a set of properties, and the list
+                    // describes it in words rather than handing them back, so
+                    // this is the one thing that cannot be put back exactly.
+                    throw new Error('A styling change cannot be put back automatically yet.');
+                }
+
+                await request('/live-edit/setting', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ key: step.key, value: step.value, locale: window.liveEditLocale }),
+                });
+            } catch (error) {
+                ui.toast(plainly(error, 'put that back'));
+                ui.redoButton.disabled = false;
+
+                return;
+            }
+
+            setRedoStack(stack);
+            reloadWithToast(`Put back: ${step.label}`);
+        };
+
+        ui.undoButton.addEventListener('click', () => void undoLast());
+        ui.redoButton.addEventListener('click', () => void redoLast());
+
+        /*
+         * The shortcuts, and the one case they must keep out of.
+         *
+         * Inside a box somebody is typing in, the browser's own undo is the
+         * right one and is what they mean: taking back a word, not taking back
+         * the whole sentence they saved a minute ago.
+         */
+        document.addEventListener('keydown', (event) => {
+            if (!(event.metaKey || event.ctrlKey) || event.key.toLowerCase() !== 'z') return;
+
+            const focused = ui.shadow.activeElement ?? document.activeElement;
+            const inText = focused?.closest?.('input, textarea, [contenteditable="true"]');
+            if (inText) return;
+
+            event.preventDefault();
+
+            if (event.shiftKey) void redoLast();
+            else void undoLast();
         });
         ui.closeButton.addEventListener('click', () => closeDrawer());
         ui.cancelButton.addEventListener('click', () => closeDrawer());

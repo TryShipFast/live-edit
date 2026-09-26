@@ -704,9 +704,15 @@ export function createChrome() {
 
     const undoButton = el('button', 'le-round');
     undoButton.type = 'button';
-    undoButton.title = 'Undo the last change';
+    undoButton.title = 'Undo the last change you have not published';
     undoButton.setAttribute('aria-label', 'Undo');
     undoButton.innerHTML = arrow(false);
+
+    const redoButton = el('button', 'le-round');
+    redoButton.type = 'button';
+    redoButton.title = 'Put back what you just undid';
+    redoButton.setAttribute('aria-label', 'Redo');
+    redoButton.innerHTML = arrow(true);
 
     const changesButton = el('button', 'le-bar-btn le-when-roomy', 'Changes');
     changesButton.type = 'button';
@@ -734,6 +740,7 @@ export function createChrome() {
         el('span', 'le-sep'),
         toggleButton,
         undoButton,
+        redoButton,
         changesButton,
         previewButton,
         publishButton,
@@ -946,6 +953,7 @@ export function createChrome() {
         toolbar,
         toggleButton,
         undoButton,
+        redoButton,
         statusText,
         dot,
         localeSelect,
