@@ -164,6 +164,58 @@ class EmbedController
         ]);
     }
 
+    /**
+     * One address that always means "the editor, as it is now".
+     *
+     * A host that renders its own pages needs to name a script, and the script
+     * it wants is whichever build is current. Asking which one — fetching a
+     * manifest, then remembering the answer — turns every deploy into a wait:
+     * the WordPress plugin held that answer for an hour, so a fix took up to
+     * an hour to reach a site, and the same edit looked unchanged in the
+     * browser long after it was live. Worse, the asking happened while a
+     * visitor's page was being built, so a slow answer slowed the site down.
+     *
+     * So nothing is asked and nothing is remembered. This address never
+     * changes and its contents do: two lines that import the current build.
+     * It revalidates on every page view, which costs a 304 and a few bytes,
+     * while the build it points at is stamped and kept for a year. Fresh
+     * where freshness matters, cached where it is expensive.
+     */
+    public function runtime(): Response
+    {
+        $version = self::assetVersion();
+        $target = url('live-edit/assets/'.$version.'/live-edit.js');
+
+        // The version IS the bytes of the runtime, so it is exactly the right
+        // entity tag: a browser holding the current build is told so without
+        // anything being sent.
+        $etag = '"'.$version.'"';
+
+        if (trim((string) request()->header('If-None-Match'), 'W/') === $etag) {
+            return response('', 304)->withHeaders($this->runtimeHeaders($etag));
+        }
+
+        return response(
+            "// live-edit {$version}\nimport ".json_encode($target, JSON_UNESCAPED_SLASHES).";\n",
+            200,
+        )->withHeaders($this->runtimeHeaders($etag));
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    private function runtimeHeaders(string $etag): array
+    {
+        return [
+            'Content-Type' => 'application/javascript; charset=utf-8',
+            // no-cache is "ask me every time", not "do not store". The answer
+            // is almost always 304, so this is cheap and always current.
+            'Cache-Control' => 'no-cache, must-revalidate',
+            'ETag' => $etag,
+            'Access-Control-Allow-Origin' => '*',
+        ];
+    }
+
     public function __invoke(string $file): Response
     {
         $name = self::FILES[$file] ?? null;

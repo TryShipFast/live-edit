@@ -224,6 +224,17 @@ Route::get('/live-edit/embed.js', fn () => app(EmbedController::class)('embed.js
  * and a copy is what goes stale: the plugin's was eight kilobytes and several
  * fixes behind before this existed.
  */
+/*
+ * The editor, at an address that never changes.
+ *
+ * What a host should point a script tag at. It resolves the current build on
+ * every request and revalidates, so an engine change is live on the next page
+ * load rather than whenever somebody's cached answer expires. See
+ * EmbedController::runtime() for why that is worth a request.
+ */
+Route::get('/live-edit/runtime.js', [EmbedController::class, 'runtime'])
+    ->name('live-edit.runtime.script');
+
 Route::get('/live-edit/runtime.json', fn () => response()->json([
     'version' => EmbedController::assetVersion(),
     'assets' => url('live-edit/assets/'.EmbedController::assetVersion()),

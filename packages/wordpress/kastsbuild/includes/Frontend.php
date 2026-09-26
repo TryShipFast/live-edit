@@ -216,27 +216,22 @@ class Frontend
     }
 
     /**
-     * Where the current editor lives, asked of the service and remembered for
-     * an hour.
+     * Where the editor lives. One address, never asked about.
      *
-     * The address carries the version, so the browser may keep the files for
-     * a year and still get a fix the moment one ships — that is the whole
-     * point of asking rather than guessing. An hour is short enough that a
-     * release reaches editors the same morning and long enough that this is
-     * not a request per page view.
+     * This used to fetch a manifest to learn which build was current and keep
+     * the answer for an hour. Both halves were wrong. The hour meant a fix
+     * took up to an hour to reach a site, and — worse for anybody working on
+     * it — the same edit looked unchanged in the browser long after it had
+     * shipped, which sends you looking for a bug that is not there. And the
+     * asking happened while a visitor's page was being assembled, so the site
+     * waited on our service to render a page that did not need it.
      *
-     * Returns null when the service cannot be reached, and the editor simply
-     * does not appear. There is nothing useful it could do anyway: the content
-     * it edits lives there too.
+     * The service now resolves the current build itself, at an address that
+     * never changes, and revalidates cheaply. Nothing to ask, nothing to
+     * remember, nothing to go stale.
      */
     private static function runtimeUrl(): ?string
     {
-        $cached = get_transient('kastsbuild_runtime_url');
-
-        if (is_string($cached) && $cached !== '') {
-            return $cached;
-        }
-
         $base = rtrim((string) Settings::get('api_base'), '/');
 
         if ($base === '') {
@@ -245,25 +240,7 @@ class Frontend
 
         // The runtime is served from the host, beside the API rather than
         // inside it.
-        $host = preg_replace('#/api/live-edit/v\d+$#', '', $base);
-
-        $response = wp_remote_get($host.'/live-edit/runtime.json', ['timeout' => 5]);
-
-        if (is_wp_error($response) || wp_remote_retrieve_response_code($response) !== 200) {
-            return null;
-        }
-
-        $body = json_decode((string) wp_remote_retrieve_body($response), true);
-        $assets = is_array($body) ? ($body['assets'] ?? null) : null;
-
-        if (! is_string($assets) || $assets === '') {
-            return null;
-        }
-
-        $url = $assets.'/live-edit.js';
-        set_transient('kastsbuild_runtime_url', $url, HOUR_IN_SECONDS);
-
-        return $url;
+        return preg_replace('#/api/live-edit/v\\d+$#', '', $base).'/live-edit/runtime.js';
     }
 
     /**

@@ -264,4 +264,58 @@ class EmbedTest extends TestCase
             $this->get('/live-edit/assets/session.js?v='.$matches[1])->headers->get('Cache-Control')
         );
     }
+
+    /**
+     * A change to the editor reaches a site on the next page view.
+     *
+     * A host that renders its own pages has to name a script. It used to ask
+     * which build was current and remember the answer for an hour, so a fix
+     * took up to an hour to arrive and the same edit looked unchanged in the
+     * browser long after it had shipped. This address never changes, resolves
+     * the current build on every request, and revalidates.
+     */
+    public function test_the_runtime_address_always_points_at_the_current_build(): void
+    {
+        $response = $this->get('/live-edit/runtime.js')->assertOk();
+
+        $this->assertStringContainsString('application/javascript', (string) $response->headers->get('Content-Type'));
+        $this->assertStringContainsString(
+            'live-edit/assets/'.EmbedController::assetVersion().'/live-edit.js',
+            $response->getContent(),
+        );
+    }
+
+    public function test_the_runtime_address_is_never_kept_without_asking(): void
+    {
+        // The whole point. Anything that lets a browser or a plugin hold this
+        // answer brings back the hour-long wait it replaced.
+        $cacheControl = (string) $this->get('/live-edit/runtime.js')->headers->get('Cache-Control');
+
+        $this->assertStringContainsString('no-cache', $cacheControl);
+        $this->assertStringNotContainsString('immutable', $cacheControl);
+        $this->assertStringNotContainsString('max-age=3', $cacheControl, 'this is cached for a period again');
+    }
+
+    public function test_a_browser_already_holding_the_current_build_is_sent_nothing(): void
+    {
+        // Revalidating on every page view is only affordable because the
+        // answer is almost always "you have it".
+        $etag = $this->get('/live-edit/runtime.js')->headers->get('ETag');
+
+        $this->withHeaders(['If-None-Match' => $etag])
+            ->get('/live-edit/runtime.js')
+            ->assertStatus(304);
+    }
+
+    public function test_the_wordpress_plugin_asks_nothing_and_remembers_nothing(): void
+    {
+        // The plugin is where the hour lived. Both halves have to stay gone:
+        // the manifest fetch blocked a visitor's page on our service, and the
+        // transient is what made a shipped fix invisible.
+        $plugin = file_get_contents(__DIR__.'/../../packages/wordpress/kastsbuild/includes/Frontend.php');
+
+        $this->assertStringNotContainsString('runtime.json', $plugin, 'the plugin asks which build is current again');
+        $this->assertStringNotContainsString('kastsbuild_runtime_url', $plugin, 'the plugin remembers the answer again');
+        $this->assertStringContainsString('/live-edit/runtime.js', $plugin);
+    }
 }
