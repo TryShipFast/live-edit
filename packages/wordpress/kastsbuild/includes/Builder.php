@@ -69,26 +69,74 @@ class Builder
             return new \WP_Error('kastsbuild_no_page', 'That address does not belong to a page here.', ['status' => 404]);
         }
 
-        $stored = get_post_meta($postId, '_elementor_data', true);
-        $tree = is_string($stored) ? json_decode($stored, true) : $stored;
+        /*
+         * The page, and the draft of the page if somebody has one open.
+         *
+         * Elementor keeps an autosave beside the published data, and the
+         * editor loads the autosave in preference when one exists. Writing
+         * only to the published copy therefore fixes nothing in the case that
+         * matters most: a designer with the page open presses Update, the
+         * draft they are looking at wins, and the client's words are gone —
+         * which is the exact failure this whole endpoint exists to prevent.
+         *
+         * Found by opening the editor after a sync and seeing the old heading
+         * still there.
+         */
+        $targets = [$postId];
+        $autosave = wp_get_post_autosave($postId);
 
-        if (! is_array($tree)) {
+        if ($autosave) {
+            $targets[] = $autosave->ID;
+        }
+
+        $syncedAny = false;
+        $missing = 0;
+
+        foreach ($targets as $target) {
+            $stored = get_post_meta($target, '_elementor_data', true);
+            $tree = is_string($stored) ? json_decode($stored, true) : $stored;
+
+            if (! is_array($tree)) {
+                $missing++;
+
+                continue;
+            }
+
+            $changed = false;
+            $tree = self::replaceIn($tree, $elementId, $value, $changed);
+
+            if (! $changed) {
+                continue;
+            }
+
+            /*
+             * update_metadata rather than update_post_meta, and the
+             * difference is the whole reason the draft was not being fixed.
+             *
+             * update_post_meta begins by asking whether the id is a revision
+             * and, if it is, quietly writes to the PARENT instead. So every
+             * attempt to correct the autosave was landing on the published
+             * page again: it returned true, the published copy was already
+             * right, and the draft that would overwrite it sat there
+             * untouched. Nothing about the call said so.
+             *
+             * wp_slash because the meta layer unslashes, and this JSON is full
+             * of quotes and backslashes that would be eaten one layer at a
+             * time until the page no longer opens.
+             */
+            update_metadata('post', $target, '_elementor_data', wp_slash(wp_json_encode($tree)));
+            $syncedAny = true;
+        }
+
+        if ($missing === count($targets)) {
             // Not a page the builder owns. Nothing to reconcile, and saying so
             // is better than pretending we did something.
             return new \WP_REST_Response(['synced' => false, 'reason' => 'not_built_here'], 200);
         }
 
-        $changed = false;
-        $tree = self::replaceIn($tree, $elementId, $value, $changed);
-
-        if (! $changed) {
+        if (! $syncedAny) {
             return new \WP_REST_Response(['synced' => false, 'reason' => 'not_found_or_unsupported'], 200);
         }
-
-        // wp_slash because update_post_meta unslashes, and this JSON is full of
-        // quotes and backslashes that would be eaten one layer at a time until
-        // the page no longer opens.
-        update_post_meta($postId, '_elementor_data', wp_slash(wp_json_encode($tree)));
 
         // The builder keeps a generated stylesheet per page keyed on a version
         // it bumps itself. Left alone, a page whose text we changed can be
