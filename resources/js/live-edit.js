@@ -201,7 +201,7 @@ const bootLiveEdit = () => {
                 bridge.refresh();
             }
         };
-        const { drawer, drawerTitle, drawerTrail, drawerFields, drawerDelete, toggleButton, statusText, linkHandle, bgHandle } = ui;
+        const { drawer, drawerTabs, drawerSubject, drawerTitle, drawerTrail, drawerFields, drawerDelete, toggleButton, statusText, linkHandle, bgHandle } = ui;
 
         let current = null;
 
@@ -572,7 +572,7 @@ const bootLiveEdit = () => {
                             // Repaint the live preview with the stored URL.
                             input.dispatchEvent(new Event('input', { bubbles: true }));
                         } catch (error) {
-                            window.alert(error.message);
+                            window.alert(plainly(error, 'save that'));
                         }
                     },
                 });
@@ -787,6 +787,269 @@ const bootLiveEdit = () => {
             });
         };
 
+        /*
+         * Which tab the panel is showing.
+         *
+         * Edit is the element in front of somebody. Changes and History are
+         * where they go when they are unsure — "did that save", "what have I
+         * changed", "what went out last week" — and the whole reason they are
+         * tabs rather than another screen is that those questions arrive
+         * mid-edit, about the thing being edited.
+         */
+        let drawerTab = 'Edit';
+
+        const showTab = (name) => {
+            drawerTab = name;
+
+            Object.entries(drawerTabs).forEach(([label, tab]) => {
+                tab.classList.toggle('is-on', label === name);
+                tab.setAttribute('aria-selected', label === name ? 'true' : 'false');
+            });
+
+            // The subject line names what is selected, which only the Edit tab
+            // is about. Left showing, it labels a list of every change on the
+            // site with the name of one element.
+            drawerSubject.classList.toggle('le-hidden', name !== 'Edit');
+
+            // And so does the footer. "Save changes" under a list of changes
+            // offers to save a list, which is not a thing; each row there has
+            // already been saved, which is why it is in the list.
+            ui.drawerFoot.classList.toggle('le-hidden', name !== 'Edit');
+
+            if (name === 'Changes') void renderChanges();
+            if (name === 'History') void renderHistory();
+        };
+
+        Object.entries(drawerTabs).forEach(([name, tab]) => {
+            tab.addEventListener('click', () => {
+                // Moving away from a half-typed edit would lose it silently.
+                if (name !== 'Edit' && current?.dirty && !window.confirm('Discard unsaved changes?')) return;
+
+                showTab(name);
+
+                if (!drawer.classList.contains('is-open')) openDrawer();
+            });
+        });
+
+        /*
+         * What to say when something goes wrong.
+         *
+         * The person using this bought a website; they did not buy an
+         * understanding of what an API is, and "Editing that is not available
+         * over the content API yet (/live-edit/versions)" is a sentence
+         * written for whoever wrote the code. Shown to a client it reads as
+         * the product being broken in a way they have no move against.
+         *
+         * So: one plain sentence about what did not happen and what is still
+         * true, with the technical one kept in the console for whoever is
+         * actually debugging.
+         */
+        const plainly = (error, what) => {
+            console.warn(`[live-edit] ${what}:`, error);
+
+            const message = String(error?.message ?? '');
+
+            // Only the ones somebody can act on are told apart. Everything
+            // else gets the same honest sentence rather than a guess.
+            if (/failed to fetch|networkerror|load failed/i.test(message)) {
+                return 'No connection just now. Nothing has been lost; try again in a moment.';
+            }
+
+            if (/\b401\b|\b403\b|unauthor|forbidden/i.test(message)) {
+                return 'Your editing session has expired. Reload the page to carry on.';
+            }
+
+            if (/\b429\b|too many/i.test(message)) {
+                return 'That was a lot at once. Give it a few seconds and try again.';
+            }
+
+            return `Could not ${what}. Nothing has been lost; try again in a moment.`;
+        };
+
+        /* ── Changes ───────────────────────────────────────────────────
+         *
+         * Everything saved and not yet published, with what the page said
+         * before and what it will say after. The count alone was the least
+         * useful half of the answer: "3 unpublished changes" invites exactly
+         * one question, and nothing here could answer it.
+         */
+        const renderChanges = async () => {
+            drawerFields.replaceChildren(note('Loading…'));
+
+            let payload;
+
+            try {
+                const response = await request('/live-edit/changes', { method: 'GET' });
+                payload = await response.json();
+            } catch (error) {
+                drawerFields.replaceChildren(note(plainly(error, 'show your changes')));
+
+                return;
+            }
+
+            const changes = payload?.changes ?? [];
+
+            if (changes.length === 0) {
+                drawerFields.replaceChildren(note('No unpublished changes.'));
+
+                return;
+            }
+
+            drawerFields.replaceChildren();
+
+            changes.forEach((change) => {
+                const row = document.createElement('div');
+                row.className = 'le-change';
+
+                const head = document.createElement('div');
+                head.className = 'le-row le-change-head';
+                const label = document.createElement('span');
+                label.className = 'le-change-label';
+                label.textContent = labelForChange(change);
+
+                const revert = document.createElement('button');
+                revert.type = 'button';
+                revert.className = 'le-chip-btn';
+                revert.textContent = 'Revert';
+                revert.addEventListener('click', () => void revertChange(change, revert));
+
+                head.append(label, revert);
+                row.append(head);
+
+                // The old words struck through, the new ones under them. A
+                // change you cannot read is a change you cannot check.
+                if (change.before) {
+                    const before = document.createElement('p');
+                    before.className = 'le-change-before';
+                    before.textContent = trim(change.before);
+                    row.append(before);
+                }
+
+                const after = document.createElement('p');
+                after.className = 'le-change-after';
+                after.textContent = trim(change.after) || '(empty)';
+                row.append(after);
+
+                drawerFields.append(row);
+            });
+        };
+
+        const trim = (value) => {
+            const text = String(value ?? '').replace(/\s+/g, ' ').trim();
+
+            return text.length > 70 ? `${text.slice(0, 70)}…` : text;
+        };
+
+        /* What to call a change in the list.
+           The element's own words where the page still has them, because that
+           is what somebody remembers changing — not auto:9de57a6dba8b. */
+        const labelForChange = (change) => {
+            const onPage = document.querySelector(
+                `[data-edit="setting:${CSS.escape(change.key)}"], [data-edit-img="setting:${CSS.escape(change.key)}"], [data-style="${CSS.escape(change.key)}"]`
+            );
+
+            if (onPage) return describeElement(onPage);
+
+            return change.kind === 'style' ? 'Styling' : 'Text';
+        };
+
+        const revertChange = async (change, button) => {
+            button.disabled = true;
+            button.textContent = 'Reverting…';
+
+            try {
+                await request('/live-edit/changes', {
+                    method: 'DELETE',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ key: change.key, kind: change.kind }),
+                });
+            } catch (error) {
+                button.disabled = false;
+                button.textContent = 'Revert';
+                ui.toast(plainly(error, 'put that back'));
+
+                return;
+            }
+
+            // Reloading rather than putting the old words back by hand: the
+            // page is rendered from the drafts, and guessing what it should
+            // now say is how the panel and the page come to disagree.
+            reloadWithToast('Reverted \u2713');
+        };
+
+        /* ── History ───────────────────────────────────────────────────
+         * What has been published, newest first. */
+        const renderHistory = async () => {
+            drawerFields.replaceChildren(note('Loading…'));
+
+            let payload;
+
+            try {
+                const response = await request('/live-edit/versions', { method: 'GET' });
+                payload = await response.json();
+            } catch (error) {
+                drawerFields.replaceChildren(note(plainly(error, 'show what has been published')));
+
+                return;
+            }
+
+            const versions = payload?.versions ?? [];
+
+            if (versions.length === 0) {
+                drawerFields.replaceChildren(note('Nothing published yet. Your first publish will appear here.'));
+
+                return;
+            }
+
+            drawerFields.replaceChildren();
+
+            versions.forEach((version, index) => {
+                const row = document.createElement('div');
+                row.className = 'le-version';
+
+                const dot = document.createElement('span');
+                dot.className = index === 0 ? 'le-version-dot is-latest' : 'le-version-dot';
+
+                const text = document.createElement('div');
+                const what = document.createElement('p');
+                what.className = 'le-change-after';
+                what.textContent = version.restored_from
+                    ? `Restored version ${version.restored_from}`
+                    : `Published ${version.changes ?? 0} change${version.changes === 1 ? '' : 's'}`;
+
+                const when = document.createElement('p');
+                when.className = 'le-change-when';
+                when.textContent = ago(version.published_at);
+
+                text.append(what, when);
+                row.append(dot, text);
+                drawerFields.append(row);
+            });
+        };
+
+        const note = (message) => {
+            const paragraph = document.createElement('p');
+            paragraph.className = 'le-hint';
+            paragraph.textContent = message;
+
+            return paragraph;
+        };
+
+        /* Times a person would say out loud. "3 days ago" is what somebody
+           asks about; an ISO timestamp is what a log wants. */
+        const ago = (iso) => {
+            if (!iso) return '';
+
+            const seconds = Math.round((Date.now() - new Date(iso).getTime()) / 1000);
+
+            if (seconds < 90) return 'Just now';
+            if (seconds < 3600) return `${Math.round(seconds / 60)} minutes ago`;
+            if (seconds < 86400) return `${Math.round(seconds / 3600)} hours ago`;
+            if (seconds < 86400 * 8) return `${Math.round(seconds / 86400)} days ago`;
+
+            return new Date(iso).toLocaleDateString();
+        };
+
         const openDrawer = () => {
             // The floating handles point at the page, and the panel is now the
             // subject. On a phone the panel is full width, so a handle left
@@ -794,13 +1057,18 @@ const bootLiveEdit = () => {
             hideHandle();
             hideBgHandle();
             drawer.classList.add('is-open');
-            drawerFields.querySelector('textarea, input:not([type=checkbox]), select')?.focus();
+            ui.toolbar.classList.add('is-compact');
+
+            if (drawerTab === 'Edit') {
+                drawerFields.querySelector('textarea, input:not([type=checkbox]), select')?.focus();
+            }
         };
         const closeDrawer = (force = false) => {
             if (!force && current?.dirty && !window.confirm('Discard unsaved changes?')) return;
             current?.restore?.();
             clearStylePreview();
             drawer.classList.remove('is-open');
+            ui.toolbar.classList.remove('is-compact');
             current = null;
         };
 
@@ -1489,6 +1757,7 @@ const bootLiveEdit = () => {
             appendContents(element);
             appendListControls(element);
             setTrail(element.dataset.styleEdit ? (element.closest('[data-style]') ?? element.parentElement) : element);
+            showTab('Edit');
             openDrawer();
         };
 
@@ -2213,6 +2482,15 @@ const bootLiveEdit = () => {
 
         toggleButton?.addEventListener('click', () => setEditing(!document.body.classList.contains('editing')));
 
+        ui.changesButton?.addEventListener('click', () => {
+            // Somebody asking what they have changed is asking about editing,
+            // so turn it on rather than showing them an empty answer.
+            if (!document.body.classList.contains('editing')) setEditing(true);
+
+            showTab('Changes');
+            openDrawer();
+        });
+
         /*
          * Publishing, where the site holds edits back. The host says so by
          * declaring how many changes are waiting; without that the buttons stay
@@ -2244,7 +2522,13 @@ const bootLiveEdit = () => {
                 // editor who clicks it and gets silence learns to distrust the
                 // rest of the toolbar.
                 ui.previewButton.hidden = ! publishing.previewUrl;
-                ui.publishButton.textContent = pending > 0 ? `Publish ${pending}` : 'Published';
+                // The word stays put and the number appears beside it. The
+                // label used to be rewritten to "Publish 3", which moved the
+                // button's width on every save and made the one control
+                // somebody aims at a moving target.
+                ui.publishLabel.textContent = pending > 0 ? 'Publish' : 'Published';
+                ui.publishCount.textContent = String(pending);
+                ui.publishCount.hidden = pending === 0;
                 ui.publishButton.disabled = pending === 0;
                 ui.publishButton.title = pending > 0
                     ? `Put ${pending} change${pending === 1 ? '' : 's'} live`

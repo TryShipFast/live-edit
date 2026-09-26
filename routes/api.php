@@ -57,7 +57,16 @@ Route::prefix(config('live-edit.api.prefix', 'api/live-edit/v1').'/{site}')
             ThrottleApi::class.':write',
             AuthenticateApiToken::class.':write',
             ThrottleApi::class.':write',
-        ])->post('/content', [ContentController::class, 'update'])->name('live-edit.api.content.update');
+        ])->group(function () {
+            Route::post('/content', [ContentController::class, 'update'])->name('live-edit.api.content.update');
+
+            // What somebody has changed and not yet published, and putting one
+            // of them back. A write key rather than a read one: this is one
+            // person's unfinished work, and the publishable key is printed in
+            // every page of the site.
+            Route::get('/changes', [ContentController::class, 'changes'])->name('live-edit.api.changes');
+            Route::delete('/changes', [ContentController::class, 'revert'])->name('live-edit.api.changes.revert');
+        });
 
         // How a section looks. The same key and the same cost as a word: the
         // reading half of this was always here, so only the write was missing

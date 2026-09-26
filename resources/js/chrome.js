@@ -62,17 +62,58 @@ const CHROME_CSS = `
 button, input, select, textarea { font: inherit; color: inherit; margin: 0; }
 @media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
 
-/* ---- toolbar ---- */
+/* ---- the floating bar ---- */
+/* One dark pill, bottom-centre. Solid rather than translucent: over a
+   photograph a blurred bar takes on whatever is behind it, so the same control
+   looked different on every page and washed out entirely on a pale hero. */
 .le-toolbar {
-  position: fixed; bottom: 22px; left: 50%; transform: translateX(-50%);
-  z-index: 2147483000; display: flex; align-items: center; gap: 8px;
+  position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%);
+  z-index: 2147483000; display: flex; align-items: center; gap: 6px;
   max-width: calc(100vw - 24px); overflow-x: auto; white-space: nowrap;
-  padding: 7px 8px 7px 16px; border-radius: 999px;
-  background: rgba(11, 18, 32, .92); backdrop-filter: blur(12px);
-  border: 1px solid rgba(255,255,255,.08);
-  color: #fff; font-size: 13px; box-shadow: var(--le-shadow);
+  padding: 6px; border-radius: 999px;
+  background: #0B0C0F;
+  color: #fff; font-size: 13px;
+  box-shadow: 0 20px 50px -10px rgba(11,12,15,.45);
   scrollbar-width: none;
 }
+.le-mark {
+  width: 34px; height: 34px; flex: none; border-radius: 999px; background: #fff;
+  display: inline-flex; align-items: center; justify-content: center;
+}
+.le-sep { width: 1px; height: 20px; flex: none; background: #2A2C31; }
+/* A round button for the one-glyph controls: undo, redo. */
+.le-round {
+  width: 34px; height: 34px; flex: none; cursor: pointer; border: 0;
+  border-radius: 999px; background: none; color: #fff;
+  display: inline-flex; align-items: center; justify-content: center;
+  transition: background .15s ease, opacity .15s ease;
+}
+.le-round:hover { background: #2A2C31; }
+.le-round:disabled { opacity: .3; cursor: default; background: none; }
+.le-bar-btn {
+  cursor: pointer; border: 0; border-radius: 999px; padding: 8px 14px;
+  background: none; color: #fff; font-size: 13px; font-weight: 500;
+  transition: background .15s ease;
+}
+.le-bar-btn:hover { background: #2A2C31; }
+.le-bar-btn.is-on { background: #2A2C31; }
+/* Publish is the one accent on the view, and it carries how much is waiting.
+   A count is the difference between "publish" as a habit and as a decision. */
+.le-publish {
+  cursor: pointer; border: 0; border-radius: 999px; padding: 8px 16px;
+  background: #3148F5; color: #fff; font-size: 13px; font-weight: 500;
+  display: inline-flex; align-items: center; gap: 8px;
+  transition: background .15s ease, opacity .15s ease;
+}
+.le-publish:hover { background: #2438D6; }
+.le-publish[disabled] { opacity: .45; cursor: default; background: #3148F5; }
+.le-publish-count {
+  min-width: 20px; height: 20px; padding: 0 6px; border-radius: 999px;
+  background: rgba(255,255,255,.22); font-size: 12px; line-height: 20px; text-align: center;
+}
+/* With the panel open the bar has far less room, and four of its controls are
+   reachable inside the panel anyway. */
+.le-toolbar.is-compact .le-when-roomy { display: none; }
 .le-toolbar::-webkit-scrollbar { display: none; }
 /* On a narrow screen the bar clipped its own controls behind a scrollbar it
    hides, so a phone showed the status sentence and no buttons at all. The
@@ -88,7 +129,7 @@ button, input, select, textarea { font: inherit; color: inherit; margin: 0; }
   .le-status { padding-right: 0; }
   .le-status span { display: none; }
 }
-.le-status { display: flex; align-items: center; gap: 8px; font-weight: 600; color: #e6ebf3; padding-right: 4px; }
+.le-status { display: flex; align-items: center; gap: 8px; font-size: 12px; color: #9A9DA5; padding: 0 6px 0 2px; }
 .le-dot { width: 7px; height: 7px; border-radius: 999px; background: #64748b; flex: none; box-shadow: 0 0 0 3px rgba(100,116,139,.18); transition: background .2s ease, box-shadow .2s ease; }
 .le-toolbar.is-editing .le-dot { background: var(--le-live); box-shadow: 0 0 0 3px rgba(34,197,94,.22); }
 .le-btn {
@@ -113,18 +154,54 @@ button, input, select, textarea { font: inherit; color: inherit; margin: 0; }
 }
 
 /* ---- drawer ---- */
+/* A floating card rather than a panel welded to the edge.
+   The handoff is specific about this and it is not decoration: an
+   edge-attached drawer reads as part of the browser, and the thing it is
+   attached to is somebody else's website. Held off every edge by 12px, the
+   page underneath stays visibly theirs and the editor stays visibly ours. */
 .le-drawer {
-  position: fixed; inset-block: 0; right: 0; z-index: 2147483000;
-  width: min(430px, 100vw); display: none; flex-direction: column;
-  background: #fff; border-left: 1px solid var(--le-line);
-  border-radius: 20px 0 0 20px; box-shadow: var(--le-shadow); overflow: hidden;
+  position: fixed; top: 12px; right: 12px; bottom: 12px; z-index: 2147483000;
+  width: min(340px, calc(100vw - 24px)); display: none; flex-direction: column;
+  background: #fff; border: 1px solid var(--le-line);
+  border-radius: 16px; box-shadow: 0 30px 80px -20px rgba(11,12,15,.3); overflow: hidden;
 }
-.le-drawer.is-open { display: flex; animation: le-slide .28s cubic-bezier(.22,.7,.28,1); }
-@keyframes le-slide { from { transform: translateX(24px); opacity: 0; } to { transform: none; opacity: 1; } }
+.le-drawer.is-open { display: flex; animation: le-slide .28s cubic-bezier(.2,.7,.2,1); }
+@keyframes le-slide { from { transform: translateX(16px); opacity: 0; } to { transform: none; opacity: 1; } }
 .le-drawer-head {
-  display: flex; align-items: flex-start; justify-content: space-between; gap: 12px;
-  padding: 20px 24px 16px; border-bottom: 1px solid var(--le-line); background: #fff;
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  padding: 0 12px 0 20px; border-bottom: 1px solid var(--le-line); background: #fff;
 }
+.le-tabs { display: flex; align-items: center; gap: 18px; }
+.le-tab {
+  cursor: pointer; border: 0; background: none; padding: 16px 0 14px;
+  font-size: 13px; font-weight: 500; color: #9A9DA5;
+  border-bottom: 2px solid transparent; transition: color .15s ease;
+}
+.le-tab:hover { color: #45484F; }
+.le-tab.is-on { color: #0B0C0F; border-bottom-color: #0B0C0F; }
+.le-tab-count {
+  display: inline-block; margin-left: 5px; min-width: 16px; padding: 0 4px;
+  border-radius: 999px; background: #EEEFF1; color: #45484F;
+  font-size: 11px; font-weight: 500; line-height: 16px; text-align: center;
+}
+.le-tab.is-on .le-tab-count { background: #0B0C0F; color: #fff; }
+/* ---- the Changes and History lists ---- */
+.le-change { display: flex; flex-direction: column; gap: 4px; padding-bottom: 16px; border-bottom: 1px solid #EEEFF1; }
+.le-change:last-child { border-bottom: 0; padding-bottom: 0; }
+.le-change-head { justify-content: space-between; align-items: baseline; }
+.le-change-label { font-size: 13px; font-weight: 500; color: #0B0C0F; }
+/* Struck through, because it is what the page USED to say. Somebody checking
+   a change reads these two lines as a before and an after. */
+.le-change-before { font-size: 13px; color: #9A9DA5; text-decoration: line-through; margin: 0; }
+.le-change-after { font-size: 14px; font-weight: 500; color: #2A2C31; margin: 0; }
+.le-change-when { font-size: 12px; color: #9A9DA5; margin: 2px 0 0; }
+.le-version { display: flex; gap: 12px; align-items: flex-start; padding-bottom: 14px; }
+.le-version-dot { width: 8px; height: 8px; margin-top: 6px; border-radius: 999px; background: #DADCE0; flex: none; }
+.le-version-dot.is-latest { background: #3148F5; }
+
+/* What the panel is editing, under the tabs rather than beside them. */
+.le-subject { padding: 18px 20px 0; }
+.le-subject .le-eyebrow { color: #3148F5; letter-spacing: .04em; }
 .le-eyebrow { font-size: 10px; font-weight: 700; letter-spacing: .16em; text-transform: uppercase; color: var(--le-muted); margin-bottom: 6px; }
 .le-title { font-size: 19px; font-weight: 700; color: var(--le-ink); letter-spacing: -.01em; }
 .le-trail { display: none; flex-wrap: wrap; align-items: center; gap: 4px; font-size: 11px; color: var(--le-muted); margin-bottom: 6px; }
@@ -431,11 +508,20 @@ export function createChrome() {
 
     // ---- toolbar -----------------------------------------------------------
     const toolbar = el('div', 'le-toolbar');
-    const status = el('span', 'le-status');
+
+    /* The mark, so the bar is plainly ours and not something the theme grew.
+       A white disc on carbon: one shape, no colour, which is the whole idea
+       of this bar. */
+    const mark = el('span', 'le-mark');
+    mark.innerHTML = '<svg width="16" height="16" viewBox="0 0 32 32" aria-hidden="true">'
+        + '<rect x="3" y="3" width="20" height="20" rx="3" fill="none" stroke="#0B0C0F" stroke-width="2.5"/>'
+        + '<path d="M16 15 L16 30 L19.6 26.4 L22.2 31.2 L24.6 30 L22 25.3 L27 25.3 Z" fill="#3148F5" stroke="#fff" stroke-width="1.4" stroke-linejoin="round"/></svg>';
+
+    const status = el('span', 'le-status le-when-roomy');
     const dot = el('span', 'le-dot');
     const statusText = el('span', null, 'Viewing as visitor');
     status.append(dot, statusText);
-    toolbar.append(status);
+    toolbar.append(mark, status);
 
     let localeSelect = null;
     const locales = config.locales ?? {};
@@ -454,26 +540,52 @@ export function createChrome() {
         toolbar.append(localeSelect);
     }
 
-    const toggleButton = el('button', 'le-btn', 'Edit site');
+    const toggleButton = el('button', 'le-bar-btn', 'Edit site');
     toggleButton.type = 'button';
-    const undoButton = el('button', 'le-btn-ghost', 'Undo');
+
+    // One glyph each, so they read at a glance and take no width from the
+    // things that need words.
+    const arrow = (flip) => '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" aria-hidden="true"'
+        + (flip ? ' style="transform: scaleX(-1)"' : '')
+        + '><path d="M9 14 4 9l5-5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>'
+        + '<path d="M4 9h7a6 6 0 0 1 0 12H8" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>';
+
+    const undoButton = el('button', 'le-round');
     undoButton.type = 'button';
     undoButton.title = 'Undo the last change';
+    undoButton.setAttribute('aria-label', 'Undo');
+    undoButton.innerHTML = arrow(false);
 
-    // Publishing: shown only where the site holds edits back. The count is on
-    // the button because "Publish" alone does not say whether there is
-    // anything to publish.
-    const publishButton = el('button', 'le-btn-publish', 'Publish');
-    publishButton.type = 'button';
-    publishButton.title = 'Put your changes live';
-    publishButton.hidden = true;
+    const changesButton = el('button', 'le-bar-btn le-when-roomy', 'Changes');
+    changesButton.type = 'button';
+    changesButton.title = 'Everything you have changed and not published';
 
-    const previewButton = el('button', 'le-btn-ghost', 'Preview link');
+    const previewButton = el('button', 'le-bar-btn le-when-roomy', 'Preview');
     previewButton.type = 'button';
     previewButton.title = 'Copy a link that shows the unpublished version';
     previewButton.hidden = true;
 
-    toolbar.append(toggleButton, undoButton, publishButton, previewButton);
+    /* Publishing: the one accent on the view, carrying how much is waiting.
+       "Publish" alone does not say whether there is anything to publish, and
+       a button that does nothing when pressed is how somebody stops trusting
+       the rest of them. */
+    const publishButton = el('button', 'le-publish');
+    publishButton.type = 'button';
+    publishButton.title = 'Put your changes live';
+    publishButton.hidden = true;
+    const publishLabel = el('span', null, 'Publish');
+    const publishCount = el('span', 'le-publish-count');
+    publishCount.hidden = true;
+    publishButton.append(publishLabel, publishCount);
+
+    toolbar.append(
+        el('span', 'le-sep'),
+        toggleButton,
+        undoButton,
+        changesButton,
+        previewButton,
+        publishButton,
+    );
 
     (config.links ?? []).forEach((link) => {
         const anchor = el('a', 'le-btn-ghost', link.label);
@@ -509,14 +621,36 @@ export function createChrome() {
     drawer.setAttribute('aria-label', 'Edit content');
 
     const head = el('div', 'le-drawer-head');
-    const headText = el('div');
-    const drawerTrail = el('div', 'le-trail');
-    const drawerTitle = el('div', 'le-title', 'Text');
-    headText.append(el('div', 'le-eyebrow', 'Editing'), drawerTrail, drawerTitle);
+
+    /* Edit · Changes · History.
+       Changes and History are where somebody goes when they are unsure —
+       "did that save", "what have I changed", "what went out last week" — so
+       they are one click from the thing being edited rather than somewhere
+       else entirely. */
+    const tabs = el('div', 'le-tabs');
+    tabs.setAttribute('role', 'tablist');
+
+    const drawerTabs = {};
+    ['Edit', 'Changes', 'History'].forEach((name) => {
+        const tab = el('button', 'le-tab', name);
+        tab.type = 'button';
+        tab.dataset.tab = name;
+        tab.setAttribute('role', 'tab');
+        if (name === 'Edit') tab.classList.add('is-on');
+        drawerTabs[name] = tab;
+        tabs.append(tab);
+    });
+
     const closeButton = el('button', 'le-close', '×');
     closeButton.type = 'button';
     closeButton.setAttribute('aria-label', 'Close');
-    head.append(headText, closeButton);
+    head.append(tabs, closeButton);
+
+    // What is being edited, below the tabs.
+    const subject = el('div', 'le-subject');
+    const drawerTrail = el('div', 'le-trail');
+    const drawerTitle = el('div', 'le-title', 'Text');
+    subject.append(el('div', 'le-eyebrow', 'Selected'), drawerTrail, drawerTitle);
 
     const drawerFields = el('div', 'le-fields');
 
@@ -529,7 +663,7 @@ export function createChrome() {
     saveButton.type = 'button';
     foot.append(drawerDelete, cancelButton, saveButton);
 
-    drawer.append(head, drawerFields, foot);
+    drawer.append(head, subject, drawerFields, foot);
 
     // ---- floating link handle ---------------------------------------------
     const linkHandle = el('button', 'le-handle');
@@ -570,12 +704,18 @@ export function createChrome() {
         dot,
         localeSelect,
         drawer,
+        drawerFoot: foot,
+        drawerTabs,
+        drawerSubject: subject,
         drawerTitle,
         drawerTrail,
         drawerFields,
         drawerDelete,
         publishButton,
+        publishLabel,
+        publishCount,
         previewButton,
+        changesButton,
         closeButton,
         cancelButton,
         saveButton,

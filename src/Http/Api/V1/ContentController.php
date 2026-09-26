@@ -8,6 +8,7 @@ use Illuminate\Validation\ValidationException;
 use ShipFast\LiveEdit\Application\Api\ApplyEdit;
 use ShipFast\LiveEdit\Application\Api\ApplyStyle;
 use ShipFast\LiveEdit\Application\Api\ExportMarkup;
+use ShipFast\LiveEdit\Application\Api\ListChanges;
 use ShipFast\LiveEdit\Application\Api\PrepareMarkup;
 use ShipFast\LiveEdit\Application\Api\PublishSite;
 use ShipFast\LiveEdit\Application\Api\ReadPublishedContent;
@@ -18,6 +19,7 @@ use ShipFast\LiveEdit\Domain\Site\Ability;
 use ShipFast\LiveEdit\Domain\Site\Meter;
 use ShipFast\LiveEdit\Domain\Site\OverLimit;
 use ShipFast\LiveEdit\Http\Api\ApiContext;
+use ShipFast\LiveEdit\Models\Draft;
 use ShipFast\LiveEdit\Models\Version;
 
 /**
@@ -239,6 +241,47 @@ class ContentController
             // usefully keep it — and they do, against a hash of that markup.
             'Cache-Control' => 'private, max-age=600',
         ]);
+    }
+
+    /**
+     * What somebody has changed and not yet published.
+     *
+     * The editor could say how many there were and nothing else, which is the
+     * least useful half of the answer: "3 unpublished changes" invites exactly
+     * one question, and had no way to answer it.
+     */
+    public function changes(Request $request, ListChanges $changes): JsonResponse
+    {
+        return response()->json($changes(ApiContext::site($request)))
+            // One person's unfinished work. Nothing may hold it, anywhere.
+            ->withHeaders(['Cache-Control' => 'no-store, private']);
+    }
+
+    /**
+     * Put one change back.
+     *
+     * Deletes the draft rather than writing the old value over it, so what is
+     * left is the published page exactly as it was. Writing the old value back
+     * would leave a draft saying "make this the same as it already is", which
+     * publishes as a change and appears in the list as one.
+     */
+    public function revert(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'key' => ['required', 'string', 'max:200'],
+            'kind' => ['nullable', 'string', 'in:setting,style'],
+        ]);
+
+        $site = ApiContext::site($request);
+
+        $removed = Draft::query()
+            ->where('site_id', $site->id)
+            ->where('subject', $validated['key'])
+            ->when($validated['kind'] ?? null, fn ($query, $kind) => $query->where('kind', $kind))
+            ->delete();
+
+        return response()->json(['reverted' => $removed > 0])
+            ->withHeaders(['Cache-Control' => 'no-store, private']);
     }
 
     /**

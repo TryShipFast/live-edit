@@ -207,6 +207,8 @@ export const apiRequestFor = (url, options = {}, api) => {
         '/live-edit/publish': `${base}/${api?.site}/publish`,
         '/live-edit/image': `${base}/${api?.site}/media`,
         '/live-edit/upload': `${base}/${api?.site}/media`,
+        '/live-edit/changes': `${base}/${api?.site}/changes`,
+        '/live-edit/versions': `${base}/${api?.site}/versions`,
     };
 
     // Publishing decides what the public sees, so the content API asks for a
