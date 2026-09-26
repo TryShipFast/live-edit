@@ -201,6 +201,14 @@ export const declaredStyleProps = (attribute, configured) => {
  */
 export const apiRequestFor = (url, options = {}, api) => {
     const base = String(api?.base ?? '').replace(/\/$/, '');
+
+    // A search carries its terms in the address, so the name of the route and
+    // the address asked for are not the same string. Looked up by path and
+    // handed back with the query still attached: matching the whole thing
+    // meant every search missed the map and was reported as an endpoint the
+    // API does not have.
+    const [path, query] = String(url).split('?');
+
     const routes = {
         '/live-edit/setting': `${base}/${api?.site}/content`,
         '/live-edit/style': `${base}/${api?.site}/styles`,
@@ -212,6 +220,9 @@ export const apiRequestFor = (url, options = {}, api) => {
         '/live-edit/content': `${base}/${api?.site}/content`,
         '/live-edit/credits': `${base}/${api?.site}/credits`,
         '/live-edit/assist': `${base}/${api?.site}/assist`,
+        '/live-edit/photos': `${base}/${api?.site}/photos`,
+        '/live-edit/photos/used': `${base}/${api?.site}/photos/used`,
+        '/live-edit/imagine': `${base}/${api?.site}/imagine`,
     };
 
     // Publishing decides what the public sees, so the content API asks for a
@@ -231,18 +242,18 @@ export const apiRequestFor = (url, options = {}, api) => {
         };
     }
 
-    const target = routes[url];
+    const target = routes[path];
 
     if (!base || !api?.site || !api?.token) {
         throw new Error('The content API is not configured on this page.');
     }
 
     if (!target) {
-        throw new Error(`Editing that is not available over the content API yet (${url}).`);
+        throw new Error(`Editing that is not available over the content API yet (${path}).`);
     }
 
     return {
-        url: target,
+        url: query ? `${target}?${query}` : target,
         init: {
             ...options,
             headers: {

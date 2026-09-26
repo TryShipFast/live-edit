@@ -73,3 +73,26 @@ describe('publishing through a host that has its own idea of who may publish', (
         expect(init.headers.Authorization).toBe('Bearer kbe_x');
     });
 });
+
+describe('a search, which carries its terms in the address', () => {
+    const api = { base: 'https://cms.test/api/live-edit/v1', site: 'acme', token: 'k' };
+
+    it('finds the route by its path and keeps the query', () => {
+        // Matching the whole string meant every search missed the map and was
+        // reported as an endpoint the API does not have — which is how the
+        // photo picker came to say "could not look for photographs" on a
+        // perfectly working service.
+        const { url } = apiRequestFor('/live-edit/photos?q=clinic%20waiting', {}, api);
+
+        expect(url).toBe('https://cms.test/api/live-edit/v1/acme/photos?q=clinic%20waiting');
+    });
+
+    it('maps the endpoints the picker needs', () => {
+        expect(apiRequestFor('/live-edit/imagine', {}, api).url).toBe('https://cms.test/api/live-edit/v1/acme/imagine');
+        expect(apiRequestFor('/live-edit/photos/used', {}, api).url).toBe('https://cms.test/api/live-edit/v1/acme/photos/used');
+    });
+
+    it('still refuses an endpoint that does not exist', () => {
+        expect(() => apiRequestFor('/live-edit/nonsense?q=1', {}, api)).toThrow(/not available/);
+    });
+});

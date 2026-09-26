@@ -476,6 +476,95 @@ select.le-input {
   padding: 10px 20px; font-size: 13px; font-weight: 600;
   box-shadow: var(--le-shadow); transition: opacity .5s ease;
 }
+
+/* ---- modals ----------------------------------------------------------
+   Choosing a picture, and publishing, are the two moments in this product
+   worth taking over the whole screen: one needs room to compare options, the
+   other needs somebody to read a list before it goes out to the public. */
+.le-scrim {
+  position: fixed; inset: 0; z-index: 2147483003;
+  background: rgba(11, 12, 15, .45); backdrop-filter: blur(6px);
+  display: flex; align-items: center; justify-content: center; padding: 20px;
+}
+.le-modal {
+  display: flex; flex-direction: column; width: 100%; max-width: 760px;
+  max-height: min(640px, 86vh); background: #fff; color: var(--le-body);
+  border-radius: 16px; box-shadow: var(--le-shadow); overflow: hidden;
+}
+.le-modal.is-narrow { max-width: 480px; }
+.le-modal.is-medium { max-width: 500px; }
+.le-modal-head { display: flex; align-items: flex-start; gap: 12px; padding: 22px 24px 0; }
+.le-modal-heading { flex: 1; min-width: 0; }
+.le-modal-title { font-size: 19px; font-weight: 700; color: var(--le-ink); letter-spacing: -.01em; }
+.le-modal-sub { font-size: 13px; color: var(--le-muted); margin-top: 3px; }
+.le-modal-tabs { display: flex; gap: 22px; padding: 16px 24px 0; border-bottom: 1px solid var(--le-line); }
+.le-modal-tab {
+  cursor: pointer; border: 0; background: none; padding: 0 0 10px;
+  font-size: 13px; font-weight: 600; color: var(--le-muted);
+  border-bottom: 2px solid transparent; margin-bottom: -1px;
+}
+.le-modal-tab.is-on { color: var(--le-ink); border-bottom-color: var(--le-ink); }
+.le-modal-body { flex: 1; min-height: 0; overflow-y: auto; padding: 22px 24px; }
+.le-modal-foot {
+  display: flex; align-items: center; gap: 10px; justify-content: flex-end;
+  padding: 16px 24px; border-top: 1px solid var(--le-line); background: #fff;
+}
+.le-modal-foot .le-modal-note { margin-right: auto; font-size: 12px; color: var(--le-muted); }
+
+/* ---- picking a photograph ---- */
+.le-search {
+  width: 100%; border: 1px solid var(--le-line-strong, #DADCE0); border-radius: 999px;
+  padding: 10px 16px; font: inherit; font-size: 14px; color: var(--le-ink); background: #fff;
+}
+.le-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 12px; }
+.le-chip {
+  cursor: pointer; border: 1px solid var(--le-line); background: var(--le-soft);
+  border-radius: 999px; padding: 5px 11px; font-size: 12px; color: var(--le-body);
+}
+.le-chip:hover { border-color: var(--le-accent); color: var(--le-accent); }
+.le-chip.is-on { background: var(--le-accent); border-color: var(--le-accent); color: #fff; }
+.le-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-top: 18px; }
+.le-grid.is-square { grid-template-columns: repeat(2, 1fr); }
+.le-pick { cursor: pointer; border: 0; padding: 0; background: none; text-align: left; }
+.le-pick-shot {
+  width: 100%; aspect-ratio: 4 / 3; object-fit: cover; display: block;
+  border-radius: 10px; border: 1px solid var(--le-line); background: var(--le-soft);
+}
+.le-grid.is-square .le-pick-shot { aspect-ratio: 1 / 1; }
+.le-pick:hover .le-pick-shot { border-color: var(--le-accent); box-shadow: 0 0 0 3px var(--le-accent-soft); }
+.le-pick-by { display: block; font-size: 11px; color: var(--le-muted); margin-top: 6px; }
+.le-shimmer {
+  width: 100%; aspect-ratio: 4 / 3; border-radius: 10px;
+  background: linear-gradient(100deg, #EEEFF1 30%, #F7F8F9 50%, #EEEFF1 70%);
+  background-size: 200% 100%; animation: le-slide 1.2s linear infinite;
+}
+.le-grid.is-square .le-shimmer { aspect-ratio: 1 / 1; }
+@keyframes le-slide { to { background-position: -200% 0; } }
+@media (prefers-reduced-motion: reduce) { .le-shimmer { animation: none; } }
+
+/* The prompt the page writes for itself. Somebody who cannot describe the
+   picture they want can press one button and get a usable one. */
+.le-suggest { background: var(--le-soft); border-radius: 12px; padding: 14px 16px; }
+.le-suggest-text { font-size: 13px; color: var(--le-body); font-style: italic; }
+.le-textarea {
+  width: 100%; min-height: 84px; margin-top: 14px; resize: vertical;
+  border: 1px solid var(--le-line-strong, #DADCE0); border-radius: 12px;
+  padding: 11px 13px; font: inherit; font-size: 14px; color: var(--le-ink); background: #fff;
+}
+.le-tag {
+  position: absolute; top: 8px; left: 8px; border-radius: 999px;
+  background: rgba(11,12,15,.7); color: #fff; font-size: 10px; font-weight: 700;
+  letter-spacing: .08em; padding: 3px 7px;
+}
+.le-pick { position: relative; }
+.le-empty { padding: 28px 0; text-align: center; font-size: 13px; color: var(--le-muted); }
+
+/* ---- what is about to go live ---- */
+.le-review { display: flex; flex-direction: column; gap: 2px; }
+.le-review-row { padding: 11px 0; border-bottom: 1px solid var(--le-line-soft, #EEEFF1); }
+.le-review-row:last-child { border-bottom: 0; }
+.le-review-what { font-size: 12px; color: var(--le-muted); }
+.le-review-to { font-size: 14px; font-weight: 500; color: var(--le-ink); margin-top: 2px; }
 `;
 
 /**
@@ -726,6 +815,100 @@ export function createChrome() {
         setTimeout(() => node.remove(), hold + 600);
     };
 
+    /**
+     * A dialog over the page.
+     *
+     * One of these rather than three hand-built ones, because the things that
+     * are easy to forget are the same every time and all of them are the
+     * difference between a dialog and a trap: Escape closes it, clicking the
+     * darkened page behind closes it, focus moves into it so a keyboard can
+     * reach the buttons, and it goes away cleanly.
+     *
+     * `dismissable: false` is for a dialog with work in flight — a translation
+     * running, a publish in progress. Closing those halfway is how somebody
+     * ends up paying for something they never received.
+     */
+    const modal = ({ title, subtitle, size = '', dismissable = true } = {}) => {
+        const scrim = el('div', 'le-scrim');
+        const card = el('div', `le-modal ${size}`.trim());
+        card.setAttribute('role', 'dialog');
+        card.setAttribute('aria-modal', 'true');
+
+        const heading = el('div', 'le-modal-heading');
+        const titleEl = el('div', 'le-modal-title', title ?? '');
+        const subEl = el('div', 'le-modal-sub', subtitle ?? '');
+        subEl.hidden = !subtitle;
+        heading.append(titleEl, subEl);
+        card.setAttribute('aria-label', title ?? 'Dialog');
+
+        const close = el('button', 'le-close', '×');
+        close.type = 'button';
+        close.setAttribute('aria-label', 'Close');
+
+        const head = el('div', 'le-modal-head');
+        head.append(heading, close);
+
+        const tabs = el('div', 'le-modal-tabs');
+        tabs.hidden = true;
+        const body = el('div', 'le-modal-body');
+        const foot = el('div', 'le-modal-foot');
+        foot.hidden = true;
+
+        card.append(head, tabs, body, foot);
+        scrim.append(card);
+
+        // Where the keyboard was before this opened, so it can be put back.
+        // Otherwise closing a dialog drops focus onto the document and the
+        // next Tab starts again from the top of somebody else's website.
+        const previous = document.activeElement;
+        let shut = false;
+
+        const dismiss = () => {
+            if (shut) return;
+            shut = true;
+            document.removeEventListener('keydown', onKey, true);
+            scrim.remove();
+            previous?.focus?.();
+            state.dismissable = true;
+        };
+
+        const onKey = (event) => {
+            if (event.key === 'Escape' && state.dismissable) {
+                event.stopPropagation();
+                dismiss();
+            }
+        };
+
+        const state = { dismissable };
+
+        close.addEventListener('click', dismiss);
+        scrim.addEventListener('mousedown', (event) => {
+            if (event.target === scrim && state.dismissable) dismiss();
+        });
+        document.addEventListener('keydown', onKey, true);
+
+        shadow.append(scrim);
+        close.focus();
+
+        return {
+            card,
+            body,
+            foot,
+            tabs,
+            close: dismiss,
+            title: (text) => (titleEl.textContent = text),
+            subtitle: (text) => {
+                subEl.textContent = text ?? '';
+                subEl.hidden = !text;
+            },
+            // Turned off while something is in flight, back on when it lands.
+            allowDismiss: (allowed) => {
+                state.dismissable = allowed;
+                close.hidden = !allowed;
+            },
+        };
+    };
+
     return {
         root,
         shadow,
@@ -756,5 +939,6 @@ export function createChrome() {
         hoverBox,
         hoverLabel,
         toast,
+        modal,
     };
 }

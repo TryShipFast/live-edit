@@ -1678,6 +1678,395 @@ const bootLiveEdit = () => {
         void loadCredits();
         void loadStyleVocabulary();
 
+        /* ── Finding a picture ─────────────────────────────────────────
+         *
+         * The commonest thing a client cannot do is produce a good photograph.
+         * They have the words; they do not have a photographer. So the three
+         * ways of getting one are in the order they should be tried: the file
+         * they already have, then a real photograph somebody took and gave
+         * away, then — last, and the only one that costs money — inventing one.
+         *
+         * Every result leaves by the same door as a hand-typed URL: it fills
+         * the drawer's own fields and presses its own Save. That keeps one
+         * save path, so the picture is fitted to the space the theme designed,
+         * the description is kept, and the page builder is told, exactly as
+         * before. A second save path is how two of those quietly stop
+         * happening for pictures chosen this way.
+         */
+        const el = (tag, className, text) => {
+            const node = document.createElement(tag);
+            if (className) node.className = className;
+            if (text !== undefined && text !== null) node.textContent = text;
+
+            return node;
+        };
+
+        /**
+         * The small line above a heading, which is usually the useful one.
+         *
+         * A hero heading is very often a name — of the person, of the company,
+         * of the restaurant — and a name is the worst thing to search a photo
+         * library for. The kicker above it is where the category lives:
+         * "Guitarist & Musician", "Architecture & Interiors", "Family care".
+         * That is what somebody wants a picture of.
+         */
+        const categoryNear = (element) => {
+            // Up until a container that actually holds a heading. The nearest
+            // one to an image is often a wrapper the theme put around the
+            // picture alone, which contains no words at all — start there and
+            // this returns nothing on exactly the pages it is meant for.
+            let section = element.closest('section, article, header, div[data-style]');
+
+            while (section && !section.querySelector('h1, h2, h3')) {
+                section = section.parentElement?.closest('section, article, header, div[data-style]') ?? null;
+            }
+
+            const heading = section?.querySelector('h1, h2, h3');
+
+            if (!section || !heading) return '';
+
+            const before = [...section.querySelectorAll('p, span, div, h4, h5, h6')]
+                .filter((node) => node.children.length === 0)
+                .filter((node) => heading.compareDocumentPosition(node) & Node.DOCUMENT_POSITION_PRECEDING)
+                .map((node) => (node.textContent ?? '').replace(/\s+/g, ' ').trim())
+                // Long enough to mean something, short enough to be a label
+                // rather than a paragraph.
+                .find((text) => text.length > 3 && text.length < 42);
+
+            return before ?? '';
+        };
+
+        // Words that describe nothing on their own, plus whatever the site
+        // calls itself — searching a photo library for the client's own name
+        // returns strangers who happen to share it.
+        const SAYS_NOTHING = /^(the|and|with|for|your|our|from|that|this|they|them|will|have|more|about|into|just|than|then|when|what|where|very|been|here|there)$/;
+
+        const usefulWords = (text) => {
+            const ours = new Set(
+                (document.title ?? '').toLowerCase().split(/[^a-z0-9]+/i).filter(Boolean)
+            );
+
+            return (text ?? '')
+                .toLowerCase()
+                .split(/[^a-z0-9]+/i)
+                .filter((word) => word.length > 3 && !SAYS_NOTHING.test(word) && !ours.has(word));
+        };
+
+        const describeSpot = (element) => {
+            // Category first, heading second: the heading may be a name.
+            const words = usefulWords(categoryNear(element)).slice(0, 3);
+
+            if (words.length > 0) return words.join(' ');
+
+            const fromHeading = usefulWords(nearestHeading(element)).slice(0, 3);
+
+            return fromHeading.length > 0 ? fromHeading.join(' ') : 'workplace';
+        };
+
+        const photoSuggestions = (element) => {
+            const from = describeSpot(element);
+            const label = (element.dataset.editLabel ?? '').toLowerCase().trim();
+            const wide = /hero|banner|header|cover/.test(label);
+
+            return [...new Set([
+                from,
+                wide ? `${from} wide` : `${from} close up`,
+                // Always one that is certain to return something, so a search
+                // that finds nothing is never a dead end.
+                'workplace',
+            ].filter(Boolean))].slice(0, 4);
+        };
+
+        /**
+         * A description of the picture, written from the page.
+         *
+         * Somebody who cannot describe what they want can press one button and
+         * get something usable. The subject is the kicker where there is one,
+         * because a heading is so often a name, and a picture of a name is not
+         * a thing anybody can take.
+         */
+        const imagePrompt = (element) => {
+            const subject = categoryNear(element) || nearestHeading(element) || 'This page';
+
+            return `${subject.replace(/[.\s]+$/, '')}. Photographic, natural daylight, calm and`
+                + ' editorial, soft neutral tones to match the rest of the site. No text.';
+        };
+
+        /**
+         * @param {HTMLElement} element the image being replaced
+         * @param {(chosen: {url?: string, file?: File, credit?: string}) => void} apply
+         * @param {string} startOn which tab to open on
+         */
+        const openImagePicker = (element, apply, startOn = 'Free photos') => {
+            const sheet = ui.modal({
+                title: 'Replace image',
+                subtitle: element.dataset.editLabel ?? 'Image',
+            });
+
+            const panel = document.createElement('div');
+            sheet.body.append(panel);
+            sheet.tabs.hidden = false;
+
+            const chosen = (what) => {
+                sheet.close();
+                apply(what);
+            };
+
+            const tabs = {
+                Upload: () => drawUpload(panel, chosen),
+                'Free photos': () => void drawPhotos(panel, element, chosen),
+                'Generate with AI': () => drawImagine(panel, element, chosen),
+            };
+
+            const buttons = Object.keys(tabs).map((name) => {
+                const button = document.createElement('button');
+                button.type = 'button';
+                button.className = 'le-modal-tab';
+                button.textContent = name;
+                button.addEventListener('click', () => show(name));
+                sheet.tabs.append(button);
+
+                return [name, button];
+            });
+
+            const show = (name) => {
+                buttons.forEach(([label, button]) => button.classList.toggle('is-on', label === name));
+                panel.replaceChildren();
+                tabs[name]();
+            };
+
+            show(tabs[startOn] ? startOn : 'Free photos');
+
+            return sheet;
+        };
+
+        const drawUpload = (panel, chosen) => {
+            panel.append(uploadWidget({
+                hint: 'PNG, JPG or WEBP, or drag one here',
+                onFile: (file) => chosen({ file }),
+            }));
+
+            const note = document.createElement('p');
+            note.className = 'le-hint';
+            note.style.marginTop = '14px';
+            note.textContent = 'You can also drag a picture straight onto the image on the page.';
+            panel.append(note);
+        };
+
+        const drawPhotos = async (panel, element, chosen) => {
+            const search = document.createElement('input');
+            search.type = 'search';
+            search.className = 'le-search';
+            search.placeholder = 'Search free photographs';
+
+            const chips = document.createElement('div');
+            chips.className = 'le-chips';
+            const grid = document.createElement('div');
+            grid.className = 'le-grid';
+
+            const credit = document.createElement('p');
+            credit.className = 'le-hint';
+            credit.style.marginTop = '16px';
+            credit.textContent = 'Free to use under the Unsplash licence. The photographer is credited automatically.';
+
+            panel.append(search, chips, grid, credit);
+
+            const shimmer = () => {
+                grid.replaceChildren();
+                for (let i = 0; i < 6; i += 1) grid.append(el('div', 'le-shimmer'));
+            };
+
+            const look = async (query) => {
+                search.value = query;
+                shimmer();
+
+                let payload;
+
+                try {
+                    const response = await request(`/live-edit/photos?q=${encodeURIComponent(query)}`, { method: 'GET' });
+                    payload = await response.json();
+                } catch (error) {
+                    grid.replaceChildren(note(plainly(error, 'look for photographs')));
+
+                    return;
+                }
+
+                const photos = payload?.photos ?? [];
+
+                if (photos.length === 0) {
+                    grid.replaceChildren(note(photoExcuse(payload?.reason, query)));
+
+                    return;
+                }
+
+                grid.replaceChildren();
+
+                photos.forEach((photo) => {
+                    const pick = document.createElement('button');
+                    pick.type = 'button';
+                    pick.className = 'le-pick';
+
+                    const shot = document.createElement('img');
+                    shot.className = 'le-pick-shot';
+                    shot.src = photo.thumb ?? photo.full;
+                    shot.alt = photo.alt ?? '';
+                    shot.loading = 'lazy';
+
+                    const by = el('span', 'le-pick-by', photo.by ? `Photo by ${photo.by}` : '');
+
+                    pick.append(shot, by);
+                    pick.addEventListener('click', () => {
+                        // Unsplash asks to be told when a photograph is
+                        // actually used — it is how the photographer is
+                        // credited with it. Best effort, and never something
+                        // the client waits on.
+                        if (photo.downloadLocation) {
+                            void request('/live-edit/photos/used', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({ download_location: photo.downloadLocation }),
+                            }).catch(() => {});
+                        }
+
+                        chosen({
+                            url: photo.full,
+                            credit: photo.by ? `Photo by ${photo.by} on Unsplash` : 'Unsplash',
+                            alt: photo.alt ?? '',
+                        });
+                    });
+
+                    grid.append(pick);
+                });
+            };
+
+            photoSuggestions(element).forEach((suggestion, index) => {
+                const chip = document.createElement('button');
+                chip.type = 'button';
+                chip.className = 'le-chip';
+                chip.textContent = suggestion;
+                chip.addEventListener('click', () => void look(suggestion));
+                chips.append(chip);
+                if (index === 0) chip.classList.add('is-on');
+            });
+
+            search.addEventListener('keydown', (event) => {
+                if (event.key !== 'Enter') return;
+                event.preventDefault();
+                if (search.value.trim()) void look(search.value.trim());
+            });
+
+            await look(photoSuggestions(element)[0]);
+        };
+
+        const photoExcuse = (reason, query) => ({
+            not_configured: 'Free photographs are not switched on for this site yet.',
+            unreachable: 'Could not reach the photo library just now. Try again in a moment.',
+            nothing_to_search_for: 'Type what the picture should show.',
+        }[reason] ?? `Nothing found for "${query}". Try fewer words.`);
+
+        const drawImagine = (panel, element, chosen) => {
+            const suggestion = imagePrompt(element);
+
+            const card = el('div', 'le-suggest');
+            card.append(
+                el('div', 'le-eyebrow', 'Suggested for this spot'),
+                el('div', 'le-suggest-text', suggestion),
+            );
+
+            const use = document.createElement('button');
+            use.type = 'button';
+            use.className = 'le-chip';
+            use.style.marginTop = '10px';
+            use.textContent = 'Use this description';
+            card.append(use);
+
+            const box = document.createElement('textarea');
+            box.className = 'le-textarea';
+            box.placeholder = 'Describe the picture you want';
+            use.addEventListener('click', () => {
+                box.value = suggestion;
+                box.focus();
+            });
+
+            const go = document.createElement('button');
+            go.type = 'button';
+            go.className = 'le-btn-publish';
+            go.style.marginTop = '14px';
+            go.textContent = 'Make a picture · 5 credits';
+
+            const grid = el('div', 'le-grid is-square');
+            grid.style.display = 'none';
+
+            panel.append(card, box, go, grid);
+
+            go.addEventListener('click', async () => {
+                const prompt = box.value.trim() || suggestion;
+
+                go.disabled = true;
+                go.textContent = 'Making…';
+                grid.style.display = '';
+                grid.replaceChildren();
+                // Four, because one is a verdict and four is a choice.
+                for (let i = 0; i < 4; i += 1) grid.append(el('div', 'le-shimmer'));
+
+                let payload;
+
+                try {
+                    const response = await request('/live-edit/imagine', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ prompt }),
+                    });
+                    payload = await response.json();
+                } catch (error) {
+                    grid.replaceChildren(note(plainly(error, 'make a picture')));
+                    go.disabled = false;
+                    go.textContent = 'Try again · 5 credits';
+
+                    return;
+                }
+
+                const images = payload?.images ?? [];
+
+                if (typeof payload?.balance === 'number') credits = { ...(credits ?? {}), balance: payload.balance };
+
+                if (images.length === 0) {
+                    grid.replaceChildren(note(imagineExcuse(payload?.reason)));
+                    go.disabled = false;
+                    go.textContent = 'Try again · 5 credits';
+
+                    return;
+                }
+
+                grid.replaceChildren();
+
+                images.forEach((url) => {
+                    const pick = document.createElement('button');
+                    pick.type = 'button';
+                    pick.className = 'le-pick';
+
+                    const shot = document.createElement('img');
+                    shot.className = 'le-pick-shot';
+                    shot.src = url;
+                    shot.alt = '';
+
+                    pick.append(shot, el('span', 'le-tag', 'MADE'));
+                    pick.addEventListener('click', () => chosen({ url, credit: `Made from: ${prompt}` }));
+                    grid.append(pick);
+                });
+
+                go.disabled = false;
+                go.textContent = 'Make four more · 5 credits';
+            });
+        };
+
+        const imagineExcuse = (reason) => ({
+            not_enough_credits: 'Not enough credits to make a picture. You can buy more from your account.',
+            not_configured: 'Making pictures is not switched on for this site yet.',
+            no_suggestion: 'Nothing usable came back, so you have not been charged. Try describing it differently.',
+            nothing_to_work_with: 'Describe the picture you want first.',
+        }[reason] ?? 'Could not make a picture just now. You have not been charged.');
+
         const appendLinkFields = (element) => {
             current.hrefKey = element.dataset.editHref;
             current.targetKey = element.dataset.editTarget;
@@ -2419,7 +2808,66 @@ const bootLiveEdit = () => {
                 return w;
             };
 
-            drawerFields.append(preview, fileWrap, urlWrap, note);
+            /*
+             * The three ways to get a picture, in the order worth trying.
+             *
+             * The drawer could already take a file or a pasted address, which
+             * covers somebody who has the photograph and somebody who has the
+             * link. It covered nobody who has neither — which is most people,
+             * and the reason a half-finished site has a grey rectangle where
+             * the hero should be. These open the picker on the right tab and
+             * hand what is chosen back to the fields below, so it saves the
+             * same way a pasted address does.
+             */
+            const ways = el('div', 'le-chips');
+            ways.style.marginTop = '12px';
+
+            const takeChosen = ({ url, file, credit, alt }) => {
+                if (file) {
+                    const transfer = new DataTransfer();
+                    transfer.items.add(file);
+                    fileWrap.querySelector('input[type=file]').files = transfer.files;
+                    showPreview(URL.createObjectURL(file));
+                } else if (url) {
+                    urlInput.value = url;
+                    showPreview(url);
+                }
+
+                // A description somebody else already wrote beats an empty
+                // field, and the alt box is saved whether or not it was
+                // touched.
+                const altBox = drawerFields.querySelector('[data-img-attr="alt"]');
+                if (alt && altBox && altBox.value.trim() === '') altBox.value = alt;
+
+                /*
+                 * Who took it, kept where it survives.
+                 *
+                 * Unsplash's terms ask for the photographer to be named
+                 * wherever the picture is shown, and we have nowhere of our
+                 * own to put that yet. The title attribute is saved already
+                 * and shows on hover, so the credit travels with the picture
+                 * rather than being dropped on the floor between the picker
+                 * and the page. Only when the client has not written their
+                 * own — theirs is not ours to overwrite.
+                 */
+                const titleBox = drawerFields.querySelector('[data-img-attr="imgTitle"]');
+                if (credit && titleBox && titleBox.value.trim() === '') titleBox.value = credit;
+
+                ui.saveButton.click();
+            };
+
+            [
+                ['Free photos', 'Free photos'],
+                ['Upload a file', 'Upload'],
+                ['Make one · 5 credits', 'Generate with AI'],
+            ].forEach(([label, tab]) => {
+                const button = el('button', 'le-chip', label);
+                button.type = 'button';
+                button.addEventListener('click', () => openImagePicker(element, takeChosen, tab));
+                ways.append(button);
+            });
+
+            drawerFields.append(preview, ways, fileWrap, urlWrap, note);
 
             if (current.target.startsWith('setting:') && !isBackground) {
                 drawerFields.append(
