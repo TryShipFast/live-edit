@@ -4,9 +4,15 @@ use Illuminate\Support\Facades\Route;
 use ShipFast\LiveEdit\Http\Api\V1\EmbedController;
 use ShipFast\LiveEdit\Http\Controllers\LiveEditController;
 use ShipFast\LiveEdit\Http\Controllers\ThemeController;
+use ShipFast\LiveEdit\Http\Middleware\RequiresLicence;
 use ShipFast\LiveEdit\Support\DraftStore;
 
-Route::middleware(config('live-edit.middleware', ['web', 'auth', 'can:live-edit']))
+Route::middleware(array_merge(
+    (array) config('live-edit.middleware', ['web', 'auth', 'can:live-edit']),
+    // Appended rather than configured, so a host that has customised the
+    // middleware list cannot drop the licence check by not knowing about it.
+    [RequiresLicence::class],
+))
     ->prefix('live-edit')
     ->name('live-edit.')
     ->group(function () {

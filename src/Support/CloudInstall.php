@@ -65,6 +65,15 @@ class CloudInstall
                 return '';
             }
 
+            // And only while this installation is licensed to edit. The
+            // website is untouched either way — the content is in this
+            // application's own database and its pages render from it. What
+            // a lapsed licence costs is the editor, which is exactly what
+            // the licence sells.
+            if (! Licence::permits()) {
+                return '';
+            }
+
             return '<script src="'.e(url('live-edit/runtime.js')).'" type="module" defer></script>';
         }
 

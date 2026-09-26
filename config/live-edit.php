@@ -237,6 +237,25 @@ return [
         'site' => env('LIVE_EDIT_CLOUD_SITE'),
     ],
 
+    /*
+     * The licence this installation edits under.
+     *
+     * Only consulted when a key is set: an install that never configures one
+     * behaves exactly as it always did, so adding this release cannot switch
+     * anybody's editor off. Defaults to the cloud host and site because a
+     * site that talks to the service already named both.
+     */
+    'licence' => [
+        'host' => env('LIVE_EDIT_LICENCE_HOST', env('LIVE_EDIT_CLOUD_HOST')),
+        'site' => env('LIVE_EDIT_LICENCE_SITE', env('LIVE_EDIT_CLOUD_SITE')),
+        'key' => env('LIVE_EDIT_LICENCE_KEY'),
+
+        // A day. Long enough that the service is asked once per site per day
+        // rather than once per page view, short enough that a lapse takes
+        // effect the next day without anybody clearing a cache.
+        'ttl' => (int) env('LIVE_EDIT_LICENCE_TTL', 86400),
+    ],
+
     'api' => [
         'enabled' => env('LIVE_EDIT_API', false),
 
