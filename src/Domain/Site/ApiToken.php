@@ -2,6 +2,8 @@
 
 namespace ShipFast\LiveEdit\Domain\Site;
 
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\MassPrunable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
@@ -12,6 +14,8 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  */
 class ApiToken extends Model
 {
+    use MassPrunable;
+
     protected $table = 'live_edit_api_tokens';
 
     protected $guarded = [];
@@ -115,5 +119,25 @@ class ApiToken extends Model
         }
 
         $this->forceFill(['last_used_at' => now()])->saveQuietly();
+    }
+
+    /**
+     * Spent sign-in sessions, which otherwise accumulate for ever.
+     *
+     * One is minted every time somebody signs in to edit, and it is dead half
+     * an hour later. A site a few people use daily had forty of them against
+     * two real keys, burying the keys in its own console page.
+     *
+     * Only sessions, and only ones that expired a week ago. A publishable or
+     * secret key that has lapsed is not rubbish, it is a licence somebody may
+     * still want to renew, and the week is so a question about who signed in
+     * recently can still be answered.
+     */
+    public function prunable(): Builder
+    {
+        return static::query()
+            ->where('type', TokenType::Session->value)
+            ->whereNotNull('expires_at')
+            ->where('expires_at', '<', now()->subWeek());
     }
 }
