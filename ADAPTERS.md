@@ -20,18 +20,33 @@ Detect → edit → save → reload → navigate → publish → confirm as a vi
 
 | | Laravel | WordPress | Plain HTML | React | Next.js |
 | --- | --- | --- | --- | --- | --- |
-| Detect | ✓ 278 | ✓ | ✓ | ? | ✓ 142 |
-| Edit | ✓ | ✓ | ✓ | ? | ✓ |
-| Save | ✓ | ✓ | ✓ | ? | ✓ |
-| Reload | ✓ | ✓ | ✓ | ? | ✓ |
-| Navigate | ✓ | ✓ | ✓ | ? | ✓ |
-| Re-render | — | — | — | ? | ✓ |
-| Publish | ✓ | ✓ | ✓ | ? | ✓ |
-| Visitor sees it | ✓ | ✓ | ✓ | ? | ✓ |
+| Detect | ✓ 278 | ✓ | ✓ | ✓ 62 | ✓ 142 |
+| Edit | ✓ | ✓ | ✓ | ✓ | ✓ |
+| Save | ✓ | ✓ | ✓ | ✓ | ✓ |
+| Reload | ✓ | ✓ | ✓ | ✓ | ✓ |
+| Navigate | ✓ | ✓ | ✓ | ✓ | ✓ |
+| Re-render | — | — | — | ✓ | ✓ |
+| Publish | ✓ | ✓ | ✓ | ✓ | ✓ |
+| Visitor sees it | ✓ | ✓ | ✓ | ✓ | ✓ |
 
-React has its own column because nothing has been run against a plain React
-app — Vite or Create React App. Everything in the Next.js column was measured
-on App Router, and the two differ in exactly the way that matters here.
+React now has a measured column of its own. A Vite app, React 19 in
+StrictMode, react-router, and the same video template the plain-HTML column
+was measured on, rebuilt as components: 208 elements rendered, 62 tagged
+across four routes, 23 on the home page. Edited through the drawer, saved,
+survived a client navigation away and back, survived a full reload, published,
+and seen by a visitor holding nothing. Nothing in the served HTML carries a
+marker: every one of them appears after mount, which is the structural
+difference from the App Router column and the reason it was worth running
+separately.
+
+Two things were found by running it. The codemod was writing the raw source
+text as the fallback, so the template's `&gt;` paging arrow rendered as four
+literal characters on the page: fixed, with the fallback now folded and
+decoded the way JSX itself would have done it, and the key still hashed from
+the raw text so nobody's saved edits move. And a blank page that looked
+damning turned out to be the test app's own `useEffect(() => window.scrollTo(0, 0))`,
+whose return value React took for a cleanup function. Worth recording because
+the first guess was our provider and it was not.
 
 ## Who owns the content
 

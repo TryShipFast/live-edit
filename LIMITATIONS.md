@@ -156,6 +156,34 @@ in the terms, at the point of sale.
 
 ---
 
+### Anything inside a .map() is not editable, which on a real page is most of it
+**Adapter:** React, Next.js. **Recorded:** 2026-09-27. **Severity:** high for
+React, because it decides how much of a page a customer can actually change.
+
+The codemod tags a JSX element whose only child is a plain string. That rule
+is deliberate and right: a sentence built from an expression is data from the
+host's own database, and tagging it would attach a key to something that
+changes on every render. But it means a list rendered from an array is
+untouched, and on the template measured here the catalogue cards, the
+categories, the paging, the quick links and the testimonials are all arrays.
+
+Counted on that app: 62 elements tagged, and most of the words a visitor
+actually reads are not among them. The README's claim of around 80% of
+text-bearing elements does not hold on a page like this, and site navigation
+is untouched as well because router links are components rather than DOM.
+
+Laravel and WordPress do not have this problem: their lists are tagged in the
+rendered HTML, where a repeated item is just more markup, and list editing is
+measured working on two adapters.
+
+**To close it:** the list support that already exists for the other adapters
+needs a React equivalent, keyed on the data rather than on the element, so a
+customer can edit the items and not only the headings above them. That is a
+piece of work rather than a patch, and it is the honest reason the React
+column should not be sold as finished just because its critical path is green.
+
+---
+
 ### Corrected: the misdiagnosis that started the React work
 **Adapter:** React, Next.js. **Recorded:** 2026-09-27.
 

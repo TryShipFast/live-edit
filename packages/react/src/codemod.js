@@ -65,7 +65,92 @@ const trimmedSpan = (node, source) => {
     const leading = raw.length - raw.trimStart().length;
     const trailing = raw.length - raw.trimEnd().length;
 
-    return { start: node.start + leading, end: node.end - trailing, text: raw.trim() };
+    return {
+        start: node.start + leading,
+        end: node.end - trailing,
+        text: raw.trim(),
+        rendered: asJsxRenders(raw),
+    };
+};
+
+/**
+ * The entities JSX understands, decoded.
+ *
+ * Only the ones that turn up in real templates. The full HTML set is over two
+ * thousand names and carrying a table of them to catch &hellip; is not worth
+ * the weight; anything missed is left exactly as written, which is what the
+ * old behaviour was for everything.
+ */
+const ENTITIES = {
+    amp: '&', lt: '<', gt: '>', quot: '"', apos: "'", nbsp: ' ',
+    hellip: '…', mdash: '—', ndash: '–', copy: '©',
+    reg: '®', trade: '™', laquo: '«', raquo: '»',
+    lsquo: '‘', rsquo: '’', ldquo: '“', rdquo: '”',
+    times: '×', middot: '·', bull: '•', deg: '°',
+};
+
+/**
+ * What JSX would have put on the page, as opposed to what the file says.
+ *
+ * The two differ in ways that are invisible until somebody looks at the page.
+ * A codemod moves the words out of JSX and into a JavaScript string argument,
+ * where none of JSX's own rules apply any more:
+ *
+ * Entities stop being entities. A paging arrow written &gt; is a > on the page
+ * and the four characters &gt; once it is inside a string. Measured on a real
+ * template: the arrow in its pagination rendered as literal &gt; the moment
+ * the codemod touched it, and nothing in the run said so.
+ *
+ * Newlines stop collapsing. JSX folds a wrapped paragraph and its indentation
+ * into single spaces; a string keeps every one of them, so the fallback stops
+ * matching the words the page used to show and the file's indentation ends up
+ * in the customer's content.
+ *
+ * Follows Babel's own rule for JSX text, so the result is what the compiler
+ * would have produced.
+ */
+const asJsxRenders = (raw) => {
+    const lines = raw.split(/\r\n|\n|\r/);
+    let lastWithWords = 0;
+
+    lines.forEach((line, at) => {
+        if (/[^ \t]/.test(line)) {
+            lastWithWords = at;
+        }
+    });
+
+    let out = '';
+
+    lines.forEach((line, at) => {
+        let trimmed = line.replace(/\t/g, ' ');
+
+        if (at !== 0) {
+            trimmed = trimmed.replace(/^ +/, '');
+        }
+
+        if (at !== lines.length - 1) {
+            trimmed = trimmed.replace(/ +$/, '');
+        }
+
+        if (trimmed !== '') {
+            out += at === lastWithWords ? trimmed : trimmed + ' ';
+        }
+    });
+
+    return out.replace(
+        /&(#x?[0-9a-fA-F]+|[a-zA-Z]+);/g,
+        (whole, body) => {
+            if (body[0] === '#') {
+                const code = body[1] === 'x' || body[1] === 'X'
+                    ? Number.parseInt(body.slice(2), 16)
+                    : Number.parseInt(body.slice(1), 10);
+
+                return Number.isFinite(code) && code > 0 ? String.fromCodePoint(code) : whole;
+            }
+
+            return ENTITIES[body] ?? whole;
+        }
+    );
 };
 
 const walk = (node, visit) => {
@@ -161,6 +246,11 @@ export const transform = (source, { relativePath = 'unknown', force = null } = {
             return;
         }
 
+        // Keyed on the raw source text, not on what it renders as. The words
+        // are only an ingredient of the key, and changing that ingredient
+        // would move the keys of every element holding an entity or a wrapped
+        // line, which orphans the edits already saved against them. Key
+        // stability has cost this project a day once already.
         const key = keyFor(relativePath, index++, span.text);
 
         edits.push({
@@ -173,11 +263,11 @@ export const transform = (source, { relativePath = 'unknown', force = null } = {
             edits.push({
                 start: span.start,
                 end: span.end,
-                text: `{useContent(${JSON.stringify(key)}, ${JSON.stringify(span.text)})}`,
+                text: `{useContent(${JSON.stringify(key)}, ${JSON.stringify(span.rendered)})}`,
             });
         }
 
-        changes.push({ key, tag, text: span.text });
+        changes.push({ key, tag, text: span.rendered });
     });
 
     if (changes.length === 0) {
