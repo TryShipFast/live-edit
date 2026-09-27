@@ -62,12 +62,19 @@ and it changes the answer to "what happens to my words if we fall out".
 | Nested / mixed content | ✓ | ✓ | ✓ | ? | ✓ |
 | Images | ? | ? | ? | ? | ? |
 | Background images | ? | ? | ? | ? | ? |
-| Lists and repeated items | ? | ? | ? | ? | ? |
+| Lists and repeated items | ? | ? | ✓ | ? | ✓ |
 | Tables | ? | ? | ? | ? | ? |
 | Forms | ? | ? | ? | ? | ? |
 | SVG and icons | ? | ? | ? | ? | ? |
 | Rich text (bold, italic) | ? | ? | ? | ? | ? |
 | Alt text and SEO fields | ? | ? | ? | ? | ? |
+
+Lists were measured on two adapters. A nine-card grid on the static site and a
+three-plan pricing table in Next.js: editing one item leaves the others
+untouched, "+ Add another" inserts a complete new item with its own id next to
+the one you were on, "Delete this item" removes only that one, and all three
+survive a reload. On Next.js that includes surviving React's own render. Both
+still need running on Laravel and WordPress before those cells move.
 
 Nested / mixed content was measured on five shapes — a decoration before the
 words, an icon before them, a badge after them, an inline phrase between them,

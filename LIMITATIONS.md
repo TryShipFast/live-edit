@@ -69,6 +69,22 @@ serve a tarball from the control plane the way the WordPress plugin's zip is
 already served, and print whichever is true in the install card. Until one of
 them is done, the Next.js and React instructions should not claim otherwise.
 
+### A new list item arrives carrying the first item's words
+**Adapter:** all. **Found:** 2026-09-27. **Severity:** low.
+
+"+ Add another" on the second card of a nine-card grid inserted a new card
+holding the **first** card's title and paragraph, not the words of the card it
+was added from and not an empty one. The new item is correct in every other
+way — its own id, the right position, a complete copy of the design — so this
+is about which words it starts with.
+
+Defensible as "the first item is the template", but somebody adding a card
+beside the one they are working on will expect either that card's shape or a
+blank one, and will now have two cards saying the same thing until they notice.
+
+**To close it:** copy the item the person was on, or start the new one empty
+with the design intact. Worth a decision rather than a guess.
+
 ### A sentence changed in two places at once loses its arrangement
 **Adapter:** all. **Found:** 2026-09-27. **Severity:** low.
 
