@@ -46,6 +46,24 @@ lands somebody in a dashboard when they asked to edit a website.
 the way the static adapter and the WordPress plugin already do with
 `?kb-enter=1`, and return them to that page rather than to the host's default.
 
+### The React package is not published anywhere a customer can install from
+**Adapter:** React, Next.js. **Found:** 2026-09-27.
+
+The console tells a customer to run `npm install @shipfast/live-edit-react`.
+That package does not exist on npm — the registry returns 404 — and the repo
+it lives in is private, so `npm install` from git is not open to them either.
+The instruction cannot be followed by anybody outside this machine.
+
+It packs cleanly (11 files, 12.1 kB) and declares its dependencies, so there
+is nothing wrong with the package itself. It has simply never been sent
+anywhere, and publishing is a decision with a name, a scope and an owner
+attached to it rather than something to do quietly.
+
+**To close it:** either publish to npm under an owned `@shipfast` scope, or
+serve a tarball from the control plane the way the WordPress plugin's zip is
+already served, and print whichever is true in the install card. Until one of
+them is done, the Next.js and React instructions should not claim otherwise.
+
 ### A client-rendered tree reverts DOM-level edits
 **Adapter:** React, Next.js. **Found:** 2026-09-27.
 
