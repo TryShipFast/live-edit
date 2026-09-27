@@ -33,6 +33,15 @@ class Content
     /** Set once the words held by the service have been brought down. */
     private const MIGRATED_OPTION = 'kastsbuild_content_migrated';
 
+    /**
+     * The settings that belong to a picture rather than standing on their own.
+     *
+     * Written beside it under the names a theme already reads them by, which
+     * means they are ordinary rows here and have to be recognised as a group
+     * when a picture is reverted or listed as a change.
+     */
+    private const COMPANIONS = ['Alt', 'Title', 'Credit', 'CreditBy', 'CreditUrl', 'CreditSource', 'CreditSourceUrl'];
+
     public static function contentTable(): string
     {
         global $wpdb;
@@ -199,6 +208,47 @@ class Content
         return count($drafts);
     }
 
+    /**
+     * Put one held change back, leaving every other one alone.
+     *
+     * The editor's Revert button sends the key it is reverting to the same
+     * route that discards everything, distinguished only by whether a key came
+     * with it. Answering both with "discard everything" meant somebody who had
+     * corrected three sentences and changed their mind about one lost all
+     * three - silently, and reported to them as having reverted one.
+     *
+     * The draft is deleted rather than overwritten with the published value.
+     * Writing the old value back would leave a draft saying "make this what it
+     * already is", which publishes as a change and lists as one.
+     *
+     * @return int how many rows that turned out to be
+     */
+    public static function revert(string $key, string $locale = ''): int
+    {
+        global $wpdb;
+
+        self::ensureTables();
+
+        // A picture is one change made of several settings - the address, the
+        // description, the tooltip, four fields of credit - so reverting it has
+        // to take them together. Left behind, they would publish later as
+        // changes nobody remembers making: a photographer's name under a
+        // photograph that went back to being somebody else's.
+        $keys = [$key];
+
+        foreach (self::COMPANIONS as $suffix) {
+            $keys[] = $key.$suffix;
+        }
+
+        $marks = implode(', ', array_fill(0, count($keys), '%s'));
+
+        return (int) $wpdb->query($wpdb->prepare(
+            'DELETE FROM '.self::contentTable()." WHERE status = 'draft' AND locale = %s AND content_key IN ({$marks})",
+            $locale,
+            ...$keys
+        ));
+    }
+
     /** Throw away every held change, leaving the published page alone. */
     public static function discard(): int
     {
@@ -212,6 +262,62 @@ class Content
         self::forget();
 
         return $count;
+    }
+
+    /**
+     * Everything held back, in the shape the editor's Changes tab reads.
+     *
+     * The same shape the service answers with, because the panel showing it is
+     * the same panel on every adapter and should not have to know which kind
+     * of site it is looking at.
+     *
+     * @return array{changes: array<int, array<string, mixed>>, count: int}
+     */
+    public static function changes(): array
+    {
+        $drafts = self::drafted();
+        $published = self::published();
+        $changes = [];
+
+        foreach ($drafts as $key => $value) {
+            // One picture edit is one change, not seven. Listed separately the
+            // credit fields bury everything else somebody actually did, and
+            // "Photo by Caio Silva on Unsplash" is not a change anybody made
+            // on purpose or would know how to revert.
+            if (self::belongsToAPicture($key, $drafts)) {
+                continue;
+            }
+
+            $changes[] = [
+                'key' => $key,
+                'kind' => 'setting',
+                // Null where the element has never been changed: what it says
+                // now is the theme's own words, which only the page knows.
+                'before' => $published[$key] ?? null,
+                'after' => $value,
+            ];
+        }
+
+        return ['changes' => $changes, 'count' => count($changes)];
+    }
+
+    /**
+     * Whether this key is a picture's companion rather than a change of its
+     * own, judged by whether the picture it would belong to is also changing.
+     *
+     * Without that second half, a client who edits only the alt text of a
+     * picture sees nothing at all in the list - the one row describing what
+     * they did, hidden as a companion of a change that is not happening.
+     */
+    private static function belongsToAPicture(string $key, array $drafts): bool
+    {
+        foreach (self::COMPANIONS as $suffix) {
+            if (str_ends_with($key, $suffix) && isset($drafts[substr($key, 0, -strlen($suffix))])) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /** Keep what is published now, so it can be returned to. */

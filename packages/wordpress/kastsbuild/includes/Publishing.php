@@ -133,26 +133,38 @@ class Publishing
         return new \WP_REST_Response(['saved' => true, 'pending' => Content::pending()]);
     }
 
-    /** What is waiting to be published. */
+    /**
+     * What is waiting to be published.
+     *
+     * Shaped the way the editor reads it - `before` and `after`, not `was` and
+     * `value`. It was answering in names of its own, so the Changes tab could
+     * name the element somebody had changed and could not show a word of what
+     * they had changed it to. A list you cannot read is no safer than no list.
+     */
     public static function changes(): \WP_REST_Response
     {
-        $drafts = Content::drafted();
-        $published = Content::published();
-
-        return new \WP_REST_Response(['changes' => array_map(
-            fn ($key, $value) => [
-                'key' => $key,
-                'value' => $value,
-                'was' => $published[$key] ?? null,
-            ],
-            array_keys($drafts),
-            $drafts
-        )]);
+        return new \WP_REST_Response(Content::changes());
     }
 
-    /** Throw the held changes away, leaving the published page alone. */
-    public static function discard(): \WP_REST_Response
+    /**
+     * Put a change back, or throw them all away.
+     *
+     * One route doing two jobs, told apart by whether a key came with the
+     * request - which is the editor's own arrangement, and worth matching
+     * exactly rather than reinterpreting: reading a revert as "discard
+     * everything" is how somebody loses work they did not ask to lose.
+     */
+    public static function discard(\WP_REST_Request $request): \WP_REST_Response
     {
+        $key = trim((string) $request->get_param('key'));
+
+        if ($key !== '') {
+            return new \WP_REST_Response([
+                'reverted' => Content::revert($key, (string) ($request->get_param('locale') ?? '')) > 0,
+                'pending' => Content::pending(),
+            ]);
+        }
+
         return new \WP_REST_Response(['discarded' => Content::discard()]);
     }
 
