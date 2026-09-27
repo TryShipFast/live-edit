@@ -46,6 +46,29 @@ lands somebody in a dashboard when they asked to edit a website.
 the way the static adapter and the WordPress plugin already do with
 `?kb-enter=1`, and return them to that page rather than to the host's default.
 
+### WordPress does not own its content, though the architecture says it does
+**Adapter:** WordPress. **Found:** 2026-09-27.
+
+The stated architecture is that Laravel and WordPress both keep their own data
+and ask the service only whether the licence is good. Laravel does: after an
+edit, the application's own settings table held the row and the control plane
+held none.
+
+WordPress does not. Counted after editing and publishing: 12 content rows in
+the control plane, and nothing in `wp_options`, `wp_posts` or `wp_postmeta`
+except transients — the licence answer, the editor session, and cached pages.
+The plugin has no code path that writes content into WordPress at all.
+
+It works, and it may even be the right design. But it is not what the
+architecture claims, and the difference is the answer to the question a
+customer will eventually ask: what happens to my words if we fall out. On
+Laravel the words are already theirs. On WordPress they are not.
+
+**To close it:** either write edits into WordPress as the architecture
+describes, or change the architecture to say what is true and make the
+consequence explicit in the console — that a WordPress site's content lives
+with us, exactly as a plain HTML site's does.
+
 ### The React package is not published anywhere a customer can install from
 **Adapter:** React, Next.js. **Found:** 2026-09-27.
 
