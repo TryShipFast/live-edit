@@ -194,4 +194,52 @@ class EditorSignsInWithUsTest extends TestCase
         $this->get('/live-edit/enter?to=https://somewhere-else.test/steal')
             ->assertRedirect('/#');
     }
+
+    public function test_a_site_can_insist_on_its_own_accounts(): void
+    {
+        // Laravel and WordPress already know who their people are. A site
+        // that says so should not also accept a control-plane session, or
+        // there are two doors where its owner thinks there is one.
+        config()->set('live-edit.sign_in', 'host');
+        $this->serviceSays($this->aGoodSession());
+
+        EditorSession::start('kbe_good');
+
+        $this->assertTrue(EditorSession::check());
+        $this->assertFalse(Gate::allows('live-edit'), 'a service session got in where only host accounts are accepted');
+    }
+
+    public function test_a_site_with_no_accounts_can_insist_on_ours(): void
+    {
+        config()->set('live-edit.sign_in', 'service');
+        config()->set('live-edit.editors', 'tope@acme.test');
+        $this->serviceSays($this->aGoodSession());
+
+        // Signed in to the host, listed as an editor, and still refused:
+        // this site has said its own accounts are not the way in.
+        $user = new class
+        {
+            public string $email = 'tope@acme.test';
+        };
+
+        $this->assertFalse(Gate::forUser($user)->allows('live-edit'));
+
+        EditorSession::start('kbe_good');
+        $this->assertTrue(Gate::allows('live-edit'));
+    }
+
+    public function test_being_signed_in_is_not_by_itself_permission_to_edit(): void
+    {
+        config()->set('live-edit.sign_in', 'host');
+        config()->set('live-edit.editors', 'tope@acme.test');
+
+        // A site with customer accounts would otherwise hand the editor to
+        // every customer who ever registered.
+        $customer = new class
+        {
+            public string $email = 'somebody@example.com';
+        };
+
+        $this->assertFalse(Gate::forUser($customer)->allows('live-edit'));
+    }
 }

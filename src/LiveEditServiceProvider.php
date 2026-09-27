@@ -50,28 +50,33 @@ class LiveEditServiceProvider extends ServiceProvider
         }
 
         Gate::define('live-edit', function ($user = null) {
+            $accepts = (string) config('live-edit.sign_in', 'either');
+
             /*
-             * Somebody who signed in with us, first.
+             * Signed in with the control plane.
              *
-             * This is the ordinary way in now: the editor's own sign-in,
-             * verified against the service, with no account on this website
-             * involved. Checked before the host's user because a site may
-             * have both — an administrator who also edits — and the editor
-             * session is the one that says anything about editing.
+             * No account on this website is involved, which is the only
+             * workable answer for a site that has none to borrow.
              */
-            if (EditorSession::check()) {
+            if ($accepts !== 'host' && EditorSession::check()) {
                 return true;
             }
 
-            if ($user === null) {
+            if ($accepts === 'service' || $user === null) {
                 return false;
             }
 
-            // From the licence where the site is registered, falling back to
-            // a local list. Registering the people in the same place as the
-            // site means somebody joining or leaving is not a deploy, and
-            // there are not two places to look when the wrong person can get
-            // in.
+            /*
+             * Or signed in to the application itself, and listed as an editor
+             * of this site.
+             *
+             * Being signed in is not by itself permission to rewrite the
+             * marketing copy: a site with customer accounts would otherwise
+             * hand the editor to every customer. The list comes from the
+             * licence, where the site was registered, so somebody joining or
+             * leaving is not a deploy and there are not two places to look
+             * when the wrong person can get in.
+             */
             $named = Licence::editors();
 
             return $named !== [] && in_array(mb_strtolower((string) ($user->email ?? '')), $named, true);

@@ -290,6 +290,32 @@ return [
     'editors' => env('LIVE_EDIT_EDITORS', ''),
 
     /*
+     * Where the person editing proves who they are.
+     *
+     * Three integrations, and they do not want the same answer:
+     *
+     *   'host'    the application's own accounts. What Laravel and WordPress
+     *             already have, and the reason neither needs us to duplicate
+     *             a users table. An address still has to be listed as an
+     *             editor of the site, so being signed in is not by itself
+     *             permission to rewrite the marketing copy.
+     *
+     *   'service' the control plane. For a site with no accounts to borrow:
+     *             static HTML, React, anything generated. Also the honest
+     *             answer for a brochure site whose users table exists because
+     *             the framework made one and has nobody in it.
+     *
+     *   'either'  whichever the person arrives with, which is the default
+     *             because it is the only value that cannot lock somebody out
+     *             of a site that was working yesterday.
+     *
+     * Ignored entirely by a host that defines the `live-edit` gate itself.
+     * An application that knows about roles can say this far better than a
+     * string can.
+     */
+    'sign_in' => env('LIVE_EDIT_SIGN_IN', 'either'),
+
+    /*
      * Find the editable parts of a page instead of being told them.
      *
      * On by default, which is safe because of what gates it. A response is
