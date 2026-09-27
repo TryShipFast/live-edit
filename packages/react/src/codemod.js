@@ -197,7 +197,7 @@ export const transform = (source, { relativePath = 'unknown', force = null } = {
 /** Add useContent to an existing import from the package, or write a new one. */
 const importFor = (source, ast) => {
     const imports = ast.program.body.filter((node) => node.type === 'ImportDeclaration');
-    const existing = imports.find((node) => node.source.value === '@kastsbuild/react');
+    const existing = imports.find((node) => node.source.value === '@shipfast/live-edit-react');
 
     if (existing) {
         const already = existing.specifiers.some((s) => s.imported?.name === 'useContent');
@@ -211,7 +211,7 @@ const importFor = (source, ast) => {
         return { start: last.end, end: last.end, text: ', useContent' };
     }
 
-    const line = "import { useContent } from '@kastsbuild/react';\n";
+    const line = "import { useContent } from '@shipfast/live-edit-react';\n";
 
     if (imports.length > 0) {
         const last = imports[imports.length - 1];

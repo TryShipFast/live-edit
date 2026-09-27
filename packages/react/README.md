@@ -1,4 +1,4 @@
-# @kastsbuild/react
+# @shipfast/live-edit-react
 
 In-place editing of **static** content in React and Next.js apps — the words and
 assets that live in the template, not data from your API or database. Dynamic
@@ -17,7 +17,7 @@ it survives re-renders, survives routing, and needs no fight with the reconciler
 ## Use
 
 ```jsx
-import { LiveEditProvider, useContent } from '@kastsbuild/react';
+import { LiveEditProvider, useContent } from '@shipfast/live-edit-react';
 
 export default function Layout({ children, content, sessionKey }) {
   return (
@@ -78,8 +78,8 @@ paragraph without being told.
 You do not hand-edit components. The codemod walks the project and does it:
 
 ```bash
-npx kb-codemod .          # shows what it would do, changes nothing
-npx kb-codemod . --write  # applies it
+npx live-edit-codemod .          # shows what it would do, changes nothing
+npx live-edit-codemod . --write  # applies it
 ```
 
 It reads `.js`, `.jsx`, `.mjs`, `.ts` and `.tsx` — JSX lives in `.js` as often
@@ -115,7 +115,7 @@ components — the directive is added along with the hook, since a hook without
 it is not a working component — and then every edit appears in place.
 
 ```bash
-npx kb-codemod components --write --client
+npx live-edit-codemod components --write --client
 ```
 
 ## The editor itself

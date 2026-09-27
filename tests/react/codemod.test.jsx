@@ -11,7 +11,7 @@ describe('codemod', () => {
         expect(code).toContain('data-edit="setting:auto:');
         expect(code).toContain('{useContent("auto:');
         expect(code).toContain('"Northfield Studio"');
-        expect(code).toContain("import { useContent } from '@kastsbuild/react';");
+        expect(code).toContain("import { useContent } from '@shipfast/live-edit-react';");
     });
 
     it('leaves anything with an expression alone', () => {
@@ -61,7 +61,7 @@ describe('codemod', () => {
         expect(changes).toHaveLength(1);
         expect(code).toContain('data-edit="setting:auto:');
         expect(code).not.toContain('useContent');
-        expect(code).not.toContain('@kastsbuild/react');
+        expect(code).not.toContain('@shipfast/live-edit-react');
     });
 
     it('makes a server file a client component when asked to make it live', () => {
@@ -113,11 +113,11 @@ describe('codemod', () => {
     });
 
     it('adds to an existing import from the package', () => {
-        const source = `'use client';\nimport { LiveEditProvider } from '@kastsbuild/react';\nexport default function C() {\n    return <h1>Words</h1>;\n}\n`;
+        const source = `'use client';\nimport { LiveEditProvider } from '@shipfast/live-edit-react';\nexport default function C() {\n    return <h1>Words</h1>;\n}\n`;
         const { code } = transform(source, { relativePath: 'a.jsx' });
 
         expect(code).toContain('{ LiveEditProvider, useContent }');
-        expect(code.match(/@kastsbuild\/react/g)).toHaveLength(1);
+        expect(code.match(/@shipfast\/live-edit-react/g)).toHaveLength(1);
     });
 
     it('preserves the surrounding formatting', () => {
