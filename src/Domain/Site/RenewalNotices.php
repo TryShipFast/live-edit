@@ -83,7 +83,7 @@ final class RenewalNotices
             return false;
         }
 
-        $editors = Editor::query()->where('site_id', $site->id)->get();
+        $editors = $site->editors()->get();
 
         if ($editors->isEmpty()) {
             // Nobody to tell. Recorded anyway, so adding an editor tomorrow

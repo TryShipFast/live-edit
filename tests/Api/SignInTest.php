@@ -66,10 +66,11 @@ class SignInTest extends TestCase
         ]);
 
         $this->editor = Editor::query()->create([
-            'site_id' => $this->site->id,
             'email' => 'amaka@acme.test',
             'name' => 'Amaka',
         ]);
+
+        $this->site->editors()->attach($this->editor->id, ['may_publish' => true]);
     }
 
     private function ask(array $overrides = []): TestResponse
@@ -135,7 +136,9 @@ class SignInTest extends TestCase
 
     public function test_an_editor_without_that_permission_may_not_publish(): void
     {
-        $this->editor->forceFill(['may_publish' => false])->save();
+        // On the grant now, not on the person: the same editor may publish
+        // on one site and not on another.
+        $this->site->editors()->updateExistingPivot($this->editor->id, ['may_publish' => false]);
 
         $this->ask()->assertOk();
         $location = $this->get('/live-edit/sign-in/'.$this->linkFor($this->editor))->headers->get('Location');
@@ -266,7 +269,12 @@ class SignInTest extends TestCase
         $this->deleteJson('/api/live-edit/v1/sites/acme/editors/'.$this->editor->id,
             [], ['Authorization' => 'Bearer '.self::ADMIN])->assertOk();
 
-        $this->assertSame(1, Editor::query()->where('site_id', $this->site->id)->count());
+        $this->assertSame(1, $this->site->editors()->count());
+
+        // Removed from THIS site, not deleted: they may edit others, and an
+        // agency taking somebody off one client's site must not destroy the
+        // account they use for the rest.
+        $this->assertNotNull(Editor::query()->find($this->editor->id));
     }
 
     public function test_a_session_slides_while_somebody_is_working(): void

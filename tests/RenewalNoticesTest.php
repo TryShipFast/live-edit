@@ -39,7 +39,8 @@ class RenewalNoticesTest extends TestCase
 
         $site->issueToken(TokenType::Publishable, 'Web', null, now()->addDays($days));
 
-        Editor::query()->create(['site_id' => $site->id, 'email' => 'tope@acme.test', 'name' => 'Tope']);
+        $editor = Editor::query()->create(['email' => 'tope@acme.test', 'name' => 'Tope']);
+        $site->editors()->attach($editor->id, ['may_publish' => true]);
 
         return $site;
     }
@@ -152,7 +153,7 @@ class RenewalNoticesTest extends TestCase
     public function test_a_site_with_nobody_to_tell_does_not_bank_up_warnings(): void
     {
         $site = $this->siteExpiringIn(29);
-        Editor::query()->where('site_id', $site->id)->delete();
+        $site->editors()->detach();
 
         RenewalNotices::send();
 

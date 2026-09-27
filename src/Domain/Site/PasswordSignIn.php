@@ -27,9 +27,22 @@ final class PasswordSignIn
     public static function attempt(Site $site, string $email, string $password): ?array
     {
         $editor = Editor::query()
-            ->where('site_id', $site->id)
             ->whereRaw('lower(email) = ?', [mb_strtolower(trim($email))])
             ->first();
+
+        /*
+         * Known here, but not on THIS site.
+         *
+         * One person now has one account across every site they work on, so
+         * being a real editor and being an editor of the site in front of you
+         * are two different questions. Answered together, deliberately: the
+         * refusal below cannot tell the two apart, so a person who edits one
+         * agency's sites learns nothing about which other agencies exist by
+         * trying their password against a stranger's domain.
+         */
+        if ($editor !== null && ! $editor->mayEdit($site)) {
+            $editor = null;
+        }
 
         /*
          * Hash something even when there is no such editor.
@@ -42,7 +55,17 @@ final class PasswordSignIn
          * answer.
          */
         if ($editor === null || ! is_string($editor->password) || $editor->password === '') {
-            Hash::check($password, '$2y$12$usesomethingthatwillneverbeamatchAAAAAAAAAAAAAAAAAAAAAAAAAAA');
+            /*
+             * Hashing, rather than checking against a hash written out here.
+             *
+             * The made-up one that used to sit in this line was 67 characters
+             * where bcrypt is 60, so the hasher rejected it as not being
+             * bcrypt at all and threw — turning the unknown-address case into
+             * a 500 instead of a refusal, which is both a worse answer and a
+             * louder signal than the early return this was written to avoid.
+             * Making a hash costs the same time and cannot be malformed.
+             */
+            Hash::make($password);
 
             return null;
         }
@@ -58,13 +81,14 @@ final class PasswordSignIn
         }
 
         $editor->forceFill(['last_seen_at' => now()])->save();
+        $editor->sawOn($site);
 
         $expiresAt = now()->addSeconds(max(60, (int) config('live-edit.api.session_ttl', 1800)));
 
         [, $plain] = $site->issueToken(
             TokenType::Session,
             $editor->name ?: $editor->email,
-            $editor->abilities(),
+            $editor->abilities($site),
             $expiresAt,
             $editor->id,
         );

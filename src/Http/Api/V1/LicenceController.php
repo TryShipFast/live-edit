@@ -4,7 +4,6 @@ namespace ShipFast\LiveEdit\Http\Api\V1;
 
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use ShipFast\LiveEdit\Domain\Site\Editor;
 use ShipFast\LiveEdit\Domain\Site\Site;
 use ShipFast\LiveEdit\Domain\Site\SiteVerification;
 use ShipFast\LiveEdit\Http\Api\ApiContext;
@@ -93,8 +92,7 @@ class LicenceController
                  * site's key. It is a list of who is allowed, not a directory:
                  * no names, no anything else the row happens to carry.
                  */
-                'editors' => Editor::query()
-                    ->where('site_id', $site->id)
+                'editors' => $site->editors()
                     ->orderBy('email')
                     ->pluck('email')
                     ->map(fn (string $email) => mb_strtolower(trim($email)))

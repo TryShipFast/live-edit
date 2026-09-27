@@ -4,6 +4,7 @@ namespace ShipFast\LiveEdit\Http\Api\V1;
 
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Carbon;
 use Illuminate\Validation\ValidationException;
 use ShipFast\LiveEdit\Domain\Site\ApiToken;
 use ShipFast\LiveEdit\Domain\Site\Editor;
@@ -85,15 +86,18 @@ class SiteController
     /** The people who may edit this site. */
     public function editors(Site $site): JsonResponse
     {
-        return response()->json(['editors' => Editor::query()
-            ->where('site_id', $site->id)
+        return response()->json(['editors' => $site->editors()
             ->get()
             ->map(fn (Editor $e) => [
                 'id' => $e->id,
                 'email' => $e->email,
                 'name' => $e->name,
-                'may_publish' => $e->may_publish,
-                'last_seen_at' => $e->last_seen_at?->toIso8601String(),
+                // Off the grant, not the person: the same editor may publish
+                // here and not on the site next door.
+                'may_publish' => (bool) $e->pivot->may_publish,
+                'last_seen_at' => $e->pivot->last_seen_at
+                    ? Carbon::parse($e->pivot->last_seen_at)->toIso8601String()
+                    : null,
             ])->all()]);
     }
 
@@ -105,27 +109,56 @@ class SiteController
             'may_publish' => ['nullable', 'boolean'],
         ]);
 
-        $editor = Editor::query()->updateOrCreate(
-            ['site_id' => $site->id, 'email' => mb_strtolower(trim($validated['email']))],
-            ['name' => $validated['name'] ?? null, 'may_publish' => $validated['may_publish'] ?? true],
+        /*
+         * The person first, then their place on this site.
+         *
+         * An address already known keeps the account it has, password and
+         * all: adding somebody to a second site must not quietly hand them a
+         * new identity, or an agency's editor would end up with one login per
+         * client and be back where they started.
+         */
+        $editor = Editor::query()->firstOrCreate(
+            ['email' => mb_strtolower(trim($validated['email']))],
+            ['name' => $validated['name'] ?? null],
         );
+
+        if (blank($editor->name) && filled($validated['name'] ?? null)) {
+            $editor->forceFill(['name' => $validated['name']])->save();
+        }
+
+        $mayPublish = (bool) ($validated['may_publish'] ?? true);
+        $site->editors()->syncWithoutDetaching([$editor->id => ['may_publish' => $mayPublish]]);
 
         return response()->json(['editor' => [
             'id' => $editor->id,
             'email' => $editor->email,
-            'may_publish' => $editor->may_publish,
+            'may_publish' => $mayPublish,
         ]], 201);
     }
 
     public function removeEditor(Site $site, int $editorId): JsonResponse
     {
-        $editor = Editor::query()->where('site_id', $site->id)->where('id', $editorId)->first();
+        $editor = $site->editors()->whereKey($editorId)->first();
 
         if ($editor === null) {
             return response()->json(['error' => ['type' => 'not_found', 'message' => 'No such editor on this site.']], 404);
         }
 
-        $editor->delete();
+        /*
+         * Taken off THIS site, not deleted.
+         *
+         * They may edit others, and removing somebody from one client's site
+         * must not delete the account they use for the rest. Their sessions
+         * here go, because a removal that leaves a live session is not a
+         * removal.
+         */
+        ApiToken::query()
+            ->where('site_id', $site->id)
+            ->where('editor_id', $editor->id)
+            ->whereNull('revoked_at')
+            ->update(['revoked_at' => now()]);
+
+        $site->editors()->detach($editor->id);
 
         return response()->json(['removed' => $editorId]);
     }

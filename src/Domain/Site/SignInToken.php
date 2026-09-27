@@ -12,7 +12,7 @@ class SignInToken extends Model
 {
     protected $table = 'live_edit_sign_in_tokens';
 
-    protected $fillable = ['editor_id', 'token_hash', 'return_to', 'expires_at'];
+    protected $fillable = ['editor_id', 'site_id', 'token_hash', 'return_to', 'expires_at'];
 
     protected $casts = [
         'expires_at' => 'datetime',
@@ -20,6 +20,12 @@ class SignInToken extends Model
     ];
 
     protected $hidden = ['token_hash'];
+
+    /** The site this link is for, named on the link rather than inferred. */
+    public function site(): BelongsTo
+    {
+        return $this->belongsTo(Site::class, 'site_id');
+    }
 
     public function editor(): BelongsTo
     {

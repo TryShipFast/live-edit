@@ -33,11 +33,14 @@ class SignIn
         }
 
         $editor = Editor::query()
-            ->where('site_id', $site->id)
             ->whereRaw('lower(email) = ?', [mb_strtolower(trim($email))])
             ->first();
 
-        if ($editor === null || ! $site->isActive()) {
+        // Known, but not here. A link must never be sent for a site the
+        // person has not been given: one account now spans every site they
+        // work on, so "is this a real editor" stopped being the same question
+        // as "may they edit this".
+        if ($editor === null || ! $editor->mayEdit($site) || ! $site->isActive()) {
             return;
         }
 
@@ -45,6 +48,7 @@ class SignIn
 
         SignInToken::query()->create([
             'editor_id' => $editor->id,
+            'site_id' => $site->id,
             'token_hash' => hash('sha256', $plain),
             'return_to' => $returnTo,
             'expires_at' => now()->addMinutes((int) config('live-edit.api.sign_in_ttl', 15)),
@@ -69,7 +73,7 @@ class SignIn
     public static function redeem(string $plain): ?array
     {
         $record = SignInToken::query()
-            ->with('editor.site')
+            ->with(['editor', 'site'])
             ->where('token_hash', hash('sha256', $plain))
             ->first();
 
@@ -78,9 +82,13 @@ class SignIn
         }
 
         $editor = $record->editor;
-        $site = $editor?->site;
+        $site = $record->site;
 
-        if ($editor === null || $site === null || ! $site->isActive()) {
+        // Still granted, still active. A link is minted for a person and a
+        // site, and either can be taken away between the sending and the
+        // clicking: somebody removed from a site should not be let back in by
+        // an email from before they were removed.
+        if ($editor === null || $site === null || ! $site->isActive() || ! $editor->mayEdit($site)) {
             return null;
         }
 
@@ -88,13 +96,14 @@ class SignIn
         // somebody else, or replayed from a mailbox later, is spent.
         $record->forceFill(['used_at' => now()])->save();
         $editor->forceFill(['last_seen_at' => now()])->save();
+        $editor->sawOn($site);
 
         $expiresAt = now()->addSeconds(max(60, (int) config('live-edit.api.session_ttl', 1800)));
 
         [, $plainToken] = $site->issueToken(
             TokenType::Session,
             $editor->name ?: $editor->email,
-            $editor->abilities(),
+            $editor->abilities($site),
             $expiresAt,
             $editor->id,
         );

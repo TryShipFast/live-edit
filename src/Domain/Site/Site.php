@@ -3,6 +3,7 @@
 namespace ShipFast\LiveEdit\Domain\Site;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use ShipFast\LiveEdit\Domain\Content\SiteSnapshot;
 use ShipFast\LiveEdit\Domain\Content\SiteStore;
@@ -50,6 +51,21 @@ class Site extends Model
     public function ownsDomain(?string $host): bool
     {
         return $this->isVerified() && SiteVerification::covers((string) $this->domain, $host);
+    }
+
+    /**
+     * The people allowed to edit this site.
+     *
+     * Many to many in both directions and that is the point: one person edits
+     * several sites (an agency), and one site is edited by several people
+     * (the agency and the client whose site it is, who wants to change their
+     * own phone number without asking anybody).
+     */
+    public function editors(): BelongsToMany
+    {
+        return $this->belongsToMany(Editor::class, 'live_edit_editor_site', 'site_id', 'editor_id')
+            ->withPivot(['may_publish', 'last_seen_at'])
+            ->withTimestamps();
     }
 
     public function tokens(): HasMany
