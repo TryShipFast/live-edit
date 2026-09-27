@@ -6,6 +6,7 @@ use Closure;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
 use ShipFast\LiveEdit\Mapper\MarkupScanner;
+use ShipFast\LiveEdit\Support\CloudInstall;
 use ShipFast\LiveEdit\Support\DraftStore;
 use ShipFast\LiveEdit\Support\Licence;
 use Symfony\Component\HttpFoundation\BinaryFileResponse;
@@ -73,6 +74,7 @@ class TagsEditableMarkup
         // the body, so it is done here.
         if ($forAnEditor) {
             $html = $this->markBodyAsEditable($html);
+            $html = $this->carriesTheRuntime($html);
         }
 
         /*
@@ -154,6 +156,51 @@ class TagsEditableMarkup
      * when the editor appears, and quietly overriding it would turn the
      * editor on for pages its author had kept it off.
      */
+    /**
+     * Make sure the page an editor is looking at can actually load the editor.
+     *
+     * @liveEdit prints the runtime, and a developer pastes it into a layout.
+     * Real applications have several: this one tags its marketing pages
+     * through one layout and its course pages through another, and only the
+     * first had the directive. The result was the worst kind of half-working
+     * — the server recognised the editor, marked the body, tagged 278
+     * elements, and the browser received no editor at all. Nothing on screen
+     * said why, and the obvious conclusion from the outside is that the
+     * product is broken.
+     *
+     * So the middleware that decided this page is editable also gives it what
+     * it needs to be edited. The directive still works and still wins: a
+     * layout that has it is left alone, which is how somebody controls where
+     * the tag sits.
+     */
+    private function carriesTheRuntime(string $html): string
+    {
+        $script = CloudInstall::script();
+
+        if (trim($script) === '' || ! preg_match('/<\/body\s*>/i', $html, $match)) {
+            return $html;
+        }
+
+        /*
+         * Already there, by directive or by hand.
+         *
+         * Compared against the tag this install would print rather than
+         * against a name: it is /s/{site}.js for a cloud install and
+         * live-edit/runtime.js for a self-hosted one, and a guard that knew
+         * only one of them would double the runtime on the other. Two
+         * runtimes on one page is two editors arguing over the same elements,
+         * which is worse than none.
+         */
+        if (preg_match('#(?:/s/[^"\']+\.js|live-edit/runtime\.js)#', $html)) {
+            return $html;
+        }
+
+        $closing = $match[0];
+        $at = strrpos($html, $closing);
+
+        return $at === false ? $html : substr_replace($html, $script."\n".$closing, $at, strlen($closing));
+    }
+
     private function markBodyAsEditable(string $html): string
     {
         if (! preg_match('/<body\b[^>]*>/i', $html, $match)) {
