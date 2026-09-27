@@ -80,9 +80,13 @@ class PrepareTest extends TestCase
     {
         // The whole point in one case: the host sends what its theme rendered
         // and gets back a page it can serve, with no engine of its own.
+        //
+        // Asked with an editing key, because the marks are for the editor.
+        // A visitor is served the words without them, which the test below
+        // is about.
         $tagged = $this->postJson($this->url(), [
             'html' => '<body><div><h1>Theme headline</h1></div></body>',
-        ], $this->reader())->assertOk()->json('html');
+        ], $this->editor())->assertOk()->json('html');
 
         $this->assertStringContainsString('data-edit="setting:auto:', $tagged, 'the page came back unmarked');
 
@@ -97,13 +101,51 @@ class PrepareTest extends TestCase
         $this->assertSame(1, $again->json('applied'));
     }
 
+    public function test_a_visitor_is_served_the_words_without_the_scaffolding(): void
+    {
+        $tagged = $this->postJson($this->url(), [
+            'html' => '<body><div><h1>Theme headline</h1></div></body>',
+        ], $this->editor())->json('html');
+
+        preg_match('/data-edit="setting:(auto:[a-f0-9]+)"/', $tagged, $m);
+        SiteSetting::query()->create(['site_id' => $this->site->id, 'key' => $m[1], 'value' => 'Their headline']);
+
+        $visitor = $this->postJson($this->url(), [
+            'html' => '<body><div><h1>Theme headline</h1></div></body>',
+        ], $this->reader())->assertOk()->json('html');
+
+        // The words, because those are the client's and belong on the page.
+        $this->assertStringContainsString('Their headline', $visitor);
+
+        /*
+         * Not the marks. They exist so the words can be matched to the places
+         * they belong; once that is done they are of no use to a reader, and
+         * leaving them in announces that the site is editable and hands over
+         * the key for every sentence on it.
+         */
+        $this->assertStringNotContainsString('data-edit', $visitor);
+    }
+
+    public function test_a_page_its_own_developer_annotated_keeps_their_markup(): void
+    {
+        // Those attributes are part of somebody's template rather than ours
+        // to derive, so they are not ours to strip either.
+        $visitor = $this->postJson($this->url(), [
+            'html' => '<body><h1 data-edit="setting:heroTitle">Theme headline</h1></body>',
+        ], $this->reader())->assertOk()->json('html');
+
+        $this->assertStringContainsString('data-edit="setting:heroTitle"', $visitor);
+    }
+
     public function test_a_visitor_never_sees_somebody_elses_unfinished_sentence(): void
     {
         // The failure this guards is specific and bad: one person is halfway
         // through typing and everybody visiting the site reads it.
+        // The editing key, because the marks it needs are only on that
+        // answer now: a visitor's page comes back without them.
         $tagged = $this->postJson($this->url(), [
             'html' => '<body><div><h1>Theme headline</h1></div></body>',
-        ], $this->reader())->json('html');
+        ], $this->editor())->json('html');
 
         preg_match('/data-edit="setting:(auto:[a-f0-9]+)"/', $tagged, $m);
         SiteSetting::query()->create(['site_id' => $this->site->id, 'key' => $m[1], 'value' => 'Published words']);

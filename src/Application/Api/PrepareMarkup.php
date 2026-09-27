@@ -64,6 +64,23 @@ class PrepareMarkup
 
         $html = $content === [] ? $marked : $scanner->applyOverrides($marked, $content);
 
+        /*
+         * A visitor gets the words, not the scaffolding.
+         *
+         * The attributes exist so the client's words can be matched to the
+         * places they belong. Once that is done they have no further use to
+         * somebody reading the page, and leaving them in tells anybody who
+         * views the source that this site is editable and hands them the key
+         * for every sentence on it.
+         *
+         * Only where this page derived them. A page that arrived already
+         * marked was annotated by its own developer, and those attributes are
+         * part of their markup rather than ours to remove.
+         */
+        if (! $editing && ! $alreadyMarked) {
+            $html = preg_replace('/\s+data-edit(?:-[a-z-]+)?="[^"]*"/i', '', $html) ?? $html;
+        }
+
         return [
             'html' => $this->withStyling($html, $store, $editing),
             'applied' => count($content),
