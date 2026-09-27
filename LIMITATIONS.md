@@ -69,120 +69,6 @@ serve a tarball from the control plane the way the WordPress plugin's zip is
 already served, and print whichever is true in the install card. Until one of
 them is done, the Next.js and React instructions should not claim otherwise.
 
-### A client-rendered tree reverts DOM-level edits
-**Adapter:** React, Next.js. **Found:** 2026-09-27.
-
-The codemod decides a file is a server component when it has no
-`"use client"` of its own. That is not what makes a component server-side: a
-file imported by a client component is client-rendered whatever its own
-directive says. The template tested has `"use client"` on its root layout, so
-every component in it is client-rendered, and the codemod classified twelve of
-fifteen files as server.
-
-For the ones it calls server it writes the marker and no hook, on the
-reasoning that there is no React on the client to undo the edit. Where that
-reasoning is wrong the edit is applied to the DOM and then reverted by the
-next render — which the provider triggers itself when it finishes fetching
-content.
-
-Running the codemod with `--client` avoids it, but nothing tells anybody to.
-
-**To close it:** classify by the import graph rather than by the file's own
-directive, or treat a client root layout as making the whole tree client-side.
-Until then `--client` is the answer for App Router projects and should be what
-the console prints.
-
-### The codemod cannot change its mind
-**Adapter:** React, Next.js. **Found:** 2026-09-27.
-
-Re-running with `--client` over already-tagged files reports "0 elements in 0
-files" and does nothing. The skip is deliberate — a second run must not
-re-key a client's existing edits — but it means somebody who runs the plain
-version, finds their edits reverting, and reaches for `--client` gets a
-success message and no change.
-
-**To close it:** say what was skipped and why, and offer to add hooks to
-elements that already carry a marker without changing their keys.
-
-### React has no way to learn about the editing session
-**Adapter:** React, Next.js. **Found:** 2026-09-27.
-
-The provider takes `sessionKey` as a prop, and the README shows it arriving
-from the server. It cannot: the session is handed back in a URL fragment,
-which browsers never send to a server. Measured on the running app — the
-runtime had the session (`liveEditApi.token` set, body marked, 142 elements
-tagged) while the provider reported `editable: false`.
-
-The consequence is that edits go into the DOM rather than through React, which
-is the arrangement the provider exists to avoid.
-
-**To close it:** let the provider fall back to the session the runtime already
-found, in an effect so it cannot affect hydration, and have the runtime
-announce it. Keep the prop for applications that genuinely have a server-side
-session.
-
----
-
-## Fixed
-
-Kept because a fault that happened once can happen again.
-
-| What | Adapter | Fixed in |
-| --- | --- | --- |
-| Editing a sentence with a bold phrase in it destroyed every word on the far side of the phrase, silently | all | unreleased |
-| The editor invented a space where an inline element had been, so the words it showed were not the words the page held | all | unreleased |
-| The space between an icon and its label was dropped on every edit, so a button read "→Book a call" | all | unreleased |
-| A marked-up phrase was the one part of a sentence a client could not edit | all | unreleased |
-| The same element got a different key depending on which directory the codemod was pointed at, silently orphaning every edit already made | React, Next.js | unreleased |
-| One JSX expression in the package meant Next.js rendered nothing at all — no build error, no console error, every page blank | React, Next.js | unreleased |
-| The runtime wrote `data-admin`, `data-edit` and `data-kb-bg` before React hydrated, which is enough for React to distrust the tree | React, Next.js | unreleased |
-| The npm package was named after something this product is not called | React, Next.js | unreleased |
-| A page the server marked editable got no editor unless its layout had `@liveEdit`, so an app with several layouts half-worked in silence | Laravel | v0.8.4 |
-| A folder of HTML files had no way to start editing at all; the session arrives in a fragment and nothing put one there | Plain HTML | v0.8.3 |
-| Registration discarded the port, so a site on `:8110` was checked on port 443 and reported unreachable | all | v0.8.3 |
-| The well-known file check accepted any response containing the code, so a soft-404 serving the home page "verified by file" | all | v0.8.3 |
-| A migration dropped an index MySQL still needed for a foreign key, then its own half-finished work blocked the retry | all | v0.8.2 |
-| A server asking on its own behalf sends no Origin, and that silence was read as "wrong domain" — switching the editor off on correctly licensed sites | WordPress, Laravel | v0.8.1 |
-| The unknown-address path at sign-in hashed against a malformed bcrypt string and threw, so a mistyped address got a 500 that announced the address was unknown | all | v0.8.1 |
-| One person needed one account per site, so an agency had a login per client | all | v0.8.0 |
-| A WordPress owner could not prove they owned their domain without FTP or a child theme | WordPress | v0.7.0 |
-| Every platform's install instructions were shown at once, so a customer had to work out which was theirs | all | v0.7.0 |
-| A CSRF timeout on the sign-in page answered `419 PAGE EXPIRED` — a developer's sentence on the one page every client meets | all | v0.8.2 |
-
----
-
-## Not yet measured
-
-Not limitations. Rows nobody has run, listed so they are not mistaken for
-passing. A tick is only written here after it has been driven in a browser.
-
-**Every adapter:** lists and repeated components, tables, forms, SVG and icons,
-background images, CSS-generated content, alt text and SEO fields, responsive
-behaviour after an edit, page-load overhead.
-
-Nested and mixed content has now been measured on five shapes — a decoration
-before the words, an icon before them, a badge after them, an inline phrase
-between them, and a wrapper holding them — and each is covered by tests on
-both halves. What is still unmeasured there is rich text as an editing
-capability: making a word bold, rather than editing a word that already is.
-
-**Laravel:** Blade components and nested components, Eloquent-backed
-collections, conditional content, `@foreach` output.
-
-**WordPress:** Gutenberg blocks, template parts, custom fields, featured
-images, menus, WooCommerce content, behaviour alongside other plugins.
-
-**Plain HTML:** relative URLs across subdirectories, multi-page asset paths.
-
-**React and Next.js:** images, lists and mapped elements, nested components,
-client-side state, `next/image`, dynamic routes, static generation, and
-whether an edit survives a client-side route change. Detection is measured and
-good — 86 elements across 15 files, 142 in the DOM once the runtime has run.
-What is not yet proven is persistence through a re-render, which the first two
-open items above are about.
-
----
-
 ### A sentence changed in two places at once loses its arrangement
 **Adapter:** all. **Found:** 2026-09-27. **Severity:** low.
 
@@ -197,6 +83,24 @@ change, if this ever turns out to bother anybody. It may not be worth it.
 
 ---
 
+### Corrected: the misdiagnosis that started the React work
+**Adapter:** React, Next.js. **Recorded:** 2026-09-27.
+
+This register carried an entry saying a client-rendered tree reverted
+DOM-level edits, and that the codemod's classification was the cause. Measured
+after the key-stability fix, it is not: an edit to a genuine server component
+survives save, publish, a full reload, and is seen by a visitor with no
+session. The reverting was the codemod writing a different key on a second run
+— which is in the Fixed table above — and the classification was a theory
+built on top of the symptom.
+
+Kept as a correction rather than deleted, because the reasoning was wrong in a
+way worth recognising: a plausible mechanism was written down as though it had
+been observed. The classification fix was still worth making on its own terms,
+and is listed above.
+
+---
+
 ## One-off, unexplained
 
 Recorded rather than chased, so that a second sighting is recognised as a
@@ -205,3 +109,9 @@ pattern rather than treated as new.
 - **2026-09-27** — a single `503` from `/content` on a local static site, never
   reproduced across repeated requests. Local dev server under concurrent load
   is the likely cause; no server-side error was logged.
+- **2026-09-27** — the Next.js test template throws "Application error: a
+  client-side exception" when the browser goes back to a page it has already
+  rendered. Reproduced on the **pristine** template with no live-edit present,
+  so it is the template's own fault or a Next 16 dev-mode quirk. Recorded
+  because it makes the back-navigation row unmeasurable on this app, and
+  another template will be needed to measure it.

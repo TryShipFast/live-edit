@@ -33,6 +33,42 @@ export function LiveEditProvider({
     const pending = useRef(new Map());
     const timers = useRef(new Map());
 
+    /*
+     * The session the runtime found, when the application has not got one.
+     *
+     * `sessionKey` is a prop, and the README showed it arriving from the
+     * server. It cannot: somebody signing in is handed their session in a URL
+     * fragment, and a browser never sends a fragment to a server. So on a
+     * Next.js or React app there was no way for the provider to learn that
+     * anybody was editing — measured on a running app, the runtime held the
+     * session and marked the page while the provider still reported itself
+     * read-only, which meant every edit went into the DOM instead of through
+     * React, the one thing this provider exists to prevent.
+     *
+     * Read in an effect, never during render: touching window while rendering
+     * would make the server's output and the browser's first paint disagree,
+     * and React discards a tree it did not write.
+     */
+    const [found, setFound] = useState(null);
+
+    useEffect(() => {
+        if (sessionKey) {
+            return undefined;
+        }
+
+        const look = () => setFound(window.liveEditApi?.token ?? null);
+
+        look();
+
+        // The runtime may still be fetching when this mounts. It says so when
+        // it has one, rather than being polled for it.
+        window.addEventListener('live-edit:session', look);
+
+        return () => window.removeEventListener('live-edit:session', look);
+    }, [sessionKey]);
+
+    const session = sessionKey ?? found;
+
     // Which keys a hook is actually reading. An element inside a server
     // component has a marker but no hook, so setting state for it would change
     // nothing — and the editor needs to be told that, or it reports success
@@ -42,11 +78,11 @@ export function LiveEditProvider({
     // Whoever can write is the one holding a session key. A page with only a
     // publishable key can read and nothing else, which is what makes that key
     // safe to ship in the page at all.
-    const editable = Boolean(sessionKey);
+    const editable = Boolean(session);
 
     const client = useMemo(
-        () => createClient({ apiBase, site, key: sessionKey ?? publishableKey }),
-        [apiBase, site, sessionKey, publishableKey]
+        () => createClient({ apiBase, site, key: session ?? publishableKey }),
+        [apiBase, site, session, publishableKey]
     );
 
     const register = useCallback((key) => {

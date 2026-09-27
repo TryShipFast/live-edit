@@ -137,6 +137,13 @@
 
         if (token) {
             window.liveEditApi.token = token;
+
+            // Said out loud, because a React provider cannot be handed this:
+            // the session arrives in a URL fragment and a fragment never
+            // reaches the server that renders the props. Announced rather
+            // than polled for, and after the assignment so anybody listening
+            // finds it already there.
+            window.dispatchEvent(new CustomEvent('live-edit:session'));
         }
 
         // A page nobody prepared has to be told what is editable before

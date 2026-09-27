@@ -24,10 +24,10 @@ Detect → edit → save → reload → navigate → publish → confirm as a vi
 | Edit | ✓ | ✓ | ✓ | ? | ✓ |
 | Save | ✓ | ✓ | ✓ | ? | ✓ |
 | Reload | ✓ | ✓ | ✓ | ? | ✓ |
-| Navigate | ✓ | ✓ | ✓ | ? | ? |
-| Re-render | — | — | — | ? | ✗ |
+| Navigate | ✓ | ✓ | ✓ | ? | ✓ |
+| Re-render | — | — | — | ? | ✓ |
 | Publish | ✓ | ✓ | ✓ | ? | ✓ |
-| Visitor sees it | ✓ | ✓ | ✓ | ? | ? |
+| Visitor sees it | ✓ | ✓ | ✓ | ? | ✓ |
 
 React has its own column because nothing has been run against a plain React
 app — Vite or Create React App. Everything in the Next.js column was measured
@@ -92,28 +92,30 @@ been run against a plain React app at all.
 
 | Plain HTML | | | Next.js | |
 | --- | --- | --- | --- | --- |
-| Multiple pages | ✓ | | Server components | ✗ |
+| Multiple pages | ✓ | | Server components | ✓ |
 | Static assets | ✓ | | Client components | ? |
 | Relative URLs | ? | | SSR | ✓ |
 | CSS-generated content | ? | | Static generation | ? |
 | Responsive after an edit | ? | | `next/image` | ? |
 | | | | Dynamic routes | ? |
 | | | | Hydration | ✓ |
-| | | | Client navigation | ? |
+| | | | Client navigation | ✓ forward |
 
-Server components are ✗ on Next.js for a specific reason worth stating: the
-codemod classifies a file as server-rendered when it lacks its own
-`"use client"`, which is not what decides it. In the template tested, a client
-root layout made every component client-rendered, so twelve of fifteen files
-were classified wrongly and their edits were reverted by a later render.
-`--client` avoids it. See LIMITATIONS.md.
+Server components are ✓: an edit to one survives save, publish, a full reload,
+and is seen by a visitor holding no session. That was measured only after the
+codemod stopped writing a different key on a second run — the earlier reverting
+was the key moving, not the rendering.
+
+Client navigation is ticked forward only. Going **back** throws a client-side
+exception in this template, reproduced with no live-edit present at all, so
+that row needs a different app before it can be judged.
 
 ## Authentication and permissions
 
 | | Laravel | WordPress | Plain HTML | Next.js |
 | --- | --- | --- | --- | --- |
 | Sign in through the control plane | ✓ | ✓ | ✓ | ✓ |
-| Works with no host account at all | ? | ✓ | — | ? |
+| Works with no host account at all | ? | ✓ | — | ✓ |
 | Host's own login still honoured | ✓ | ✓ | — | — |
 | One login across several sites | ✓ | ✓ | ✓ | ✓ |
 | Publish permission per site | ✓ | ✓ | ✓ | ✓ |

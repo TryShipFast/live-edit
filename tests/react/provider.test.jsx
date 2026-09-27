@@ -362,4 +362,58 @@ describe('applying a value the editor already stored', () => {
 
         vi.useRealTimers();
     });
+
+    describe('finding the session the runtime already has', () => {
+        /*
+         * `sessionKey` is a prop and the README showed it arriving from the
+         * server. It cannot: a session is handed back in a URL fragment, and
+         * a browser never sends a fragment to a server. So on a real Next.js
+         * app the runtime held the session and marked the page while the
+         * provider still reported itself read-only — and every edit went into
+         * the DOM instead of through React, which is the one thing this
+         * provider exists to prevent.
+         */
+        afterEach(() => {
+            delete window.liveEditApi;
+        });
+
+        it('picks up a session the runtime found before it mounted', () => {
+            window.liveEditApi = { token: 'kbe_already_here' };
+
+            wrap(<Heading />);
+
+            expect(readBridge().editable).toBe(true);
+        });
+
+        it('picks one up that arrives after it mounted', () => {
+            wrap(<Heading />);
+
+            expect(readBridge().editable).toBe(false);
+
+            act(() => {
+                window.liveEditApi = { token: 'kbe_arrived_late' };
+                window.dispatchEvent(new CustomEvent('live-edit:session'));
+            });
+
+            expect(readBridge().editable).toBe(true);
+        });
+
+        it('stays read-only for a visitor, who has no session at all', () => {
+            // The publishable key reads and nothing else, which is what makes
+            // it safe to ship in the page.
+            wrap(<Heading />);
+
+            expect(readBridge().editable).toBe(false);
+        });
+
+        it('lets an application that does have a session key keep control', () => {
+            // A host that threads its own session through props should not
+            // have it second-guessed by whatever is on the window.
+            window.liveEditApi = { token: 'kbe_from_the_runtime' };
+
+            wrap(<Heading />, { sessionKey: 'kbe_from_the_app' });
+
+            expect(readBridge().editable).toBe(true);
+        });
+    });
 });

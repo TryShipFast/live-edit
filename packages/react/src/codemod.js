@@ -121,6 +121,7 @@ export const transform = (source, { relativePath = 'unknown', force = null } = {
 
     const edits = [];
     const changes = [];
+    let already = 0;
     let index = 0;
 
     walk(ast.program, (node) => {
@@ -130,7 +131,16 @@ export const transform = (source, { relativePath = 'unknown', force = null } = {
 
         const tag = tagNameOf(node.openingElement);
 
-        if (!isHostElement(tag) || hasAttribute(node.openingElement, 'data-edit')) {
+        if (!isHostElement(tag)) {
+            return;
+        }
+
+        // Counted, not just skipped. A second run leaving everything alone is
+        // the right thing to do and a confusing thing to be told nothing
+        // about; the caller is shown how many were already done.
+        if (hasAttribute(node.openingElement, 'data-edit')) {
+            already += 1;
+
             return;
         }
 
@@ -171,7 +181,7 @@ export const transform = (source, { relativePath = 'unknown', force = null } = {
     });
 
     if (changes.length === 0) {
-        return { code: source, changes, mode: isClient ? 'client' : 'server' };
+        return { code: source, changes, already, mode: isClient ? 'client' : 'server' };
     }
 
     if (isClient) {
@@ -191,7 +201,7 @@ export const transform = (source, { relativePath = 'unknown', force = null } = {
         .sort((a, b) => b.start - a.start)
         .reduce((carry, edit) => carry.slice(0, edit.start) + edit.text + carry.slice(edit.end), source);
 
-    return { code, changes, mode: isClient ? 'client' : 'server' };
+    return { code, changes, already, mode: isClient ? 'client' : 'server' };
 };
 
 /** Add useContent to an existing import from the package, or write a new one. */
