@@ -1,0 +1,80 @@
+ShipFast Live Edit — Software Licence
+Copyright (c) 2026 TryShipFast. All rights reserved.
+
+This software is proprietary. The source is published so that customers and
+integrators can read it, audit it and build against it. Being readable is not
+the same as being free to take: nothing below grants you ownership of it, and
+no permission is given beyond what is written here.
+
+
+1. WHAT YOU MAY DO
+
+If you hold a current subscription or written licence from TryShipFast, you
+may:
+
+  a. Install and run this software on websites you own or operate, or that you
+     operate on behalf of a client, for as long as that licence is current.
+
+  b. Copy it as far as running it requires — onto your servers, into your
+     deployment artefacts, into a backup.
+
+  c. Modify it for your own use, including to make it work with your own
+     application. You keep whatever you write; this licence does not claim it.
+
+  d. Read all of it. There is no obscured part and no part you are asked to
+     trust blindly.
+
+
+2. WHAT YOU MAY NOT DO
+
+You may not:
+
+  a. Redistribute this software, in whole or in part, to anyone who does not
+     hold their own licence. Deploying it as part of a website you build for a
+     client is permitted under 1(a); handing them the package to use elsewhere
+     is not.
+
+  b. Sublicense, sell, rent or lease it, or offer it as a hosted service of
+     your own.
+
+  c. Publish its source, including a modified version, anywhere it can be
+     obtained by people who are not licensed.
+
+  d. Remove or alter this notice, the copyright, or any attribution in the
+     source.
+
+
+3. WHEN A LICENCE ENDS
+
+If your subscription lapses, the permissions in section 1 end with it. You must
+stop installing and running the software.
+
+Websites you have already published are unaffected. The content your clients
+wrote is theirs, it is stored in their database, and it stays on their pages.
+Losing this licence means losing the editor, not the website.
+
+
+4. NO WARRANTY
+
+This software is provided "as is", without warranty of any kind, express or
+implied, including but not limited to the warranties of merchantability,
+fitness for a particular purpose and non-infringement.
+
+
+5. LIMITATION OF LIABILITY
+
+To the fullest extent permitted by law, TryShipFast is not liable for any
+claim, damages or other liability arising from this software or its use,
+whether in contract, tort or otherwise.
+
+
+6. THIRD-PARTY COMPONENTS
+
+This software depends on separately licensed open-source packages, listed in
+composer.json and package.json. Those keep their own licences, and nothing
+here changes them.
+
+
+7. GETTING A LICENCE
+
+TryShipFast — https://tryshipfast.com

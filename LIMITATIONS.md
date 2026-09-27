@@ -17,22 +17,37 @@ Toy pages agree with whatever the code already does.
 ## Open
 
 ### The React package is not published anywhere a customer can install from
-**Adapter:** React, Next.js. **Found:** 2026-09-27.
+**Adapter:** React, Next.js. **Found:** 2026-09-27. **Updated:** 2026-09-27.
 
 The console tells a customer to run `npm install @shipfast/live-edit-react`.
-That package does not exist on npm — the registry returns 404 — and the repo
-it lives in is private, so `npm install` from git is not open to them either.
-The instruction cannot be followed by anybody outside this machine.
+That package does not exist on npm: the registry still returns 404, and the
+repo it lives in is private, so `npm install` from git is not open to them
+either. The instruction cannot be followed by anybody outside this machine.
 
-It packs cleanly (11 files, 12.1 kB) and declares its dependencies, so there
-is nothing wrong with the package itself. It has simply never been sent
-anywhere, and publishing is a decision with a name, a scope and an owner
-attached to it rather than something to do quietly.
+The package itself is now ready to go, and was proved from a consumer's side
+rather than assumed. A packed tarball was installed into a throwaway project
+and, from there: `import { LiveEditProvider, useContent }` resolves, the
+provider server-renders both the fallback words and supplied content,
+`npx live-edit-codemod src --write` tags a component, `--client` writes the
+hook and an import of this package by name, and `--help` explains itself. It
+type-checks clean under `@types/react` 18 and 19. The tarball carries twelve
+files: `bin/`, `src/`, README and LICENCE, and nothing else.
 
-**To close it:** either publish to npm under an owned `@shipfast` scope, or
-serve a tarball from the control plane the way the WordPress plugin's zip is
-already served, and print whichever is true in the install card. Until one of
-them is done, the Next.js and React instructions should not claim otherwise.
+Three faults were found in the process, all of which would have met the first
+customer rather than us. `publishConfig.access` was unset, so the `@shipfast`
+scope would have published restricted and no customer could install it.
+`license`, `repository`, `homepage`, `engines` and `files` were all absent,
+and the LICENCE was not in the tarball at all. The type declarations named
+`JSX.Element`, a namespace `@types/react` 19 removed, so every TypeScript Next
+app, which is most of them, failed to compile with an error pointing inside
+`node_modules`. All three are fixed.
+
+**The single step that remains:** somebody with the npm account runs
+`npm publish` from `packages/react`. The exact sequence, including the org and
+2FA prerequisites and what to check afterwards, is in
+`packages/react/PUBLISHING.md`. Nobody owns the `@shipfast` scope on npm yet,
+so creating the org is part of that same sitting. Until it is done, the
+Next.js and React install cards should not claim otherwise.
 
 ### A new list item arrives carrying the first item's words
 **Adapter:** all. **Found:** 2026-09-27. **Severity:** low.
@@ -101,6 +116,43 @@ again - and this time it will publish.
 
 **To close it:** nothing to close. Carrying down work that could never have
 been released would restore a state the product never had.
+
+---
+
+### A lapsed licence takes a static site's published words off the page
+**Adapter:** plain HTML. **Recorded:** 2026-09-27. **Severity:** high, and it
+is a commercial decision rather than only a bug.
+
+Measured as a clean before and after on the video template, changing nothing
+but the key. With the key good, a visitor with no cookies reads the sentence
+the client published. With the site's publishable key revoked, the same
+visitor reads the template's original sentence instead. Every word that client
+ever published is gone from their live website, and their site does not say
+why.
+
+The site itself stays up: the template renders, all nine images load, there is
+no editor and no error visible to a reader. The mechanism is that a static
+page is tagged and filled in the browser, and both the tagging call and the
+content endpoint refuse an unauthenticated read, so the page falls back to
+whatever the HTML on disk says.
+
+Laravel and WordPress do not have this exposure. They keep their content in
+their own database and render it themselves, so a lapsed licence there costs
+them the editor and leaves their words alone. Plain HTML is the adapter where
+the service holds the content, which is the deliberate shape of the
+framework-agnostic product.
+
+**The decision, which is the owner's and not a developer's:** stopping the
+service when somebody stops paying is reasonable. Quietly reverting the text
+of somebody's live website to the template it was bought from is a different
+thing, and it happens without warning, to a site whose owner may not connect
+it to a lapsed subscription for days.
+
+**Options if the answer is that it should not happen:** publish a snapshot the
+page can read without a key, so published content survives a lapse while
+editing stops; or have the CLI bake published content into the HTML at publish
+time, so the files on disk are already correct; or leave it and say so plainly
+in the terms, at the point of sale.
 
 ---
 

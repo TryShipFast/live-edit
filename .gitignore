@@ -4,3 +4,6 @@ playwright-report/
 .phpunit.result.cache
 # Written by the suite when it publishes: artefacts of a run, not source.
 vendor/orchestra/testbench-core/laravel/storage/app/
+# What `npm pack` leaves behind when somebody inspects a tarball before
+# publishing. Build output of a version that may never be released.
+*.tgz

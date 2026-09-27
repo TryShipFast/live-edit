@@ -1,23 +1,56 @@
 {
   "name": "@shipfast/live-edit-react",
-  "version": "0.1.0",
+  "version": "0.10.0",
+  "description": "ShipFast Live Edit for React and Next.js: in-place editing of the static words and assets in your templates.",
+  "keywords": [
+    "live-edit",
+    "in-place-editing",
+    "cms",
+    "react",
+    "nextjs",
+    "codemod"
+  ],
+  "homepage": "https://tryshipfast.com",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/TryShipFast/live-edit.git",
+    "directory": "packages/react"
+  },
+  "bugs": {
+    "url": "https://tryshipfast.com/support"
+  },
+  "author": "TryShipFast (https://tryshipfast.com)",
+  "license": "SEE LICENSE IN LICENSE",
   "type": "module",
-  "description": "In-place editing for static content in React and Next.js apps.",
-  "main": "src/index.js",
+  "main": "./src/index.js",
+  "types": "./src/index.d.ts",
   "exports": {
     ".": {
       "types": "./src/index.d.ts",
       "default": "./src/index.js"
-    }
-  },
-  "peerDependencies": {
-    "react": ">=18"
+    },
+    "./package.json": "./package.json"
   },
   "bin": {
     "live-edit-codemod": "./bin/live-edit-codemod.mjs"
   },
+  "files": [
+    "bin",
+    "src",
+    "README.md",
+    "LICENSE"
+  ],
+  "sideEffects": false,
+  "engines": {
+    "node": ">=18"
+  },
+  "peerDependencies": {
+    "react": ">=18"
+  },
   "dependencies": {
     "@babel/parser": "^7.25.0"
   },
-  "types": "./src/index.d.ts"
+  "publishConfig": {
+    "access": "public"
+  }
 }

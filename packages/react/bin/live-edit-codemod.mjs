@@ -17,6 +17,37 @@ const EXTENSIONS = new Set(['.js', '.jsx', '.mjs', '.ts', '.tsx']);
 
 const args = process.argv.slice(2);
 const flag = (name) => args.includes(`--${name}`);
+
+/*
+ * The first thing anybody types at an unfamiliar command.
+ *
+ * Without this, --help was read as "no directory given", so the tool scanned
+ * the current directory instead and printed a full dry run. Somebody asking
+ * what the command does got a wall of their own components, and somebody
+ * asking from an empty folder got "0 elements in 0 files", which reads as a
+ * tool that is broken rather than one that was never told where to look.
+ */
+if (flag('help') || args.includes('-h')) {
+    console.log(`live-edit-codemod: make the static copy in a React or Next.js app editable.
+
+  live-edit-codemod [directory] [options]
+
+  directory        Where to look. Defaults to the current directory.
+
+  --write          Apply the changes. Without it, nothing is written.
+  --client         Treat the files it touches as client components: the
+                   useContent hook and 'use client' are added, and edits
+                   appear in place instead of on the next render.
+  --server         Marker only, no hook. For files that render on the server.
+  --help, -h       This.
+
+Keys are derived from each file's path relative to the nearest package.json,
+so running it twice, or over a subdirectory, leaves existing edits attached.
+
+Docs: https://tryshipfast.com`);
+    process.exit(0);
+}
+
 const root = path.resolve(args.find((a) => !a.startsWith('--')) ?? '.');
 const write = flag('write');
 const force = flag('client') ? true : flag('server') ? false : null;

@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react';
+import type { ReactElement, ReactNode } from 'react';
 
 /**
  * Types for the package.
@@ -34,7 +34,16 @@ export interface LiveEditProviderProps {
     children?: ReactNode;
 }
 
-export declare function LiveEditProvider(props: LiveEditProviderProps): JSX.Element;
+/*
+ * ReactElement, not JSX.Element.
+ *
+ * @types/react 19 removed the global JSX namespace, which is what a new Next
+ * app installs by default. Naming it here meant the package's own types
+ * failed to compile in the consumer's project: "Cannot find namespace 'JSX'",
+ * pointing at a file inside node_modules that they cannot edit. ReactElement
+ * is imported from react and means the same thing on both 18 and 19.
+ */
+export declare function LiveEditProvider(props: LiveEditProviderProps): ReactElement;
 
 /**
  * The value for a key, or the words already in the component.

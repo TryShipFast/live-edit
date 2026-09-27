@@ -4,6 +4,22 @@ In-place editing of **static** content in React and Next.js apps — the words a
 assets that live in the template, not data from your API or database. Dynamic
 content stays yours.
 
+Part of [ShipFast Live Edit](https://tryshipfast.com). The same editor serves
+Laravel, WordPress and plain HTML; this is the React and Next.js adapter.
+
+## Install
+
+```bash
+npm install @shipfast/live-edit-react
+```
+
+React 18 or 19, Node 18 or newer. The package is ESM with no build step, so
+what you read in `src/` is exactly what your bundler sees.
+
+You also need a site key, issued in your ShipFast console. The key licenses the
+site; the people who edit sign in at the console, so nobody needs an account on
+your application and you store no passwords for this.
+
 ## Why a package, when there is already an HTTP API
 
 In React the DOM is a projection of state, not the source of it. An edit written
@@ -140,3 +156,12 @@ reloaded — scroll position, open menus and whatever the visitor was doing stay
 as they were. An element inside a server component is not, so the page is
 fetched again instead. Pass `onRefresh={() => router.refresh()}` in Next and
 that happens without a full navigation.
+
+## Licence and support
+
+Proprietary. The source is published so you can read and audit what runs inside
+your application; running it requires a current ShipFast licence. Terms are in
+[LICENSE](./LICENSE).
+
+Questions, or something behaving differently to what is written here:
+[tryshipfast.com](https://tryshipfast.com).

@@ -182,10 +182,26 @@ that row needs a different app before it can be judged.
 | One login across several sites | ✓ | ✓ | ✓ | ✓ |
 | Publish permission per site | ✓ | ✓ | ✓ | ✓ |
 | Removing an editor ends their session | ✓ | ✓ | ✓ | ✓ |
+| A revoked key ends a session already open | ? | ? | ✓ | ? |
+| A revoked site key leaves the site standing | ? | ? | ✓ | ? |
 
 The WordPress row that reads ✓ for "no host account at all" was proven the
 hard way: every WordPress session was deleted server-side first, so the
 browser's cookie was worthless, and the person edited and published anyway.
+
+Revocation was measured on the static site, which is the adapter where the
+service owns everything and so has the most to say when a key stops working.
+With an editor open and mid-edit, the key was revoked server-side. The next
+save was refused, the editor told the person their session had ended and
+offered a new link, it forgot the stored session, and the page went back to
+how a visitor sees it. Nothing hung and nothing pretended to save.
+
+Revoking the site's own key leaves the website standing: the template renders,
+all nine images load, and there is no editor. What it does not leave standing
+is the client's published words, which is the entry now in LIMITATIONS.md.
+Those two rows are ticked for plain HTML only. Laravel and WordPress keep
+their own content and would behave differently by construction, which is worth
+measuring rather than reasoning about.
 
 ## What this says
 
