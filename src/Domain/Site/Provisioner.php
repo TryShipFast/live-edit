@@ -43,7 +43,7 @@ class Provisioner
             'slug' => $slug,
             'name' => $name !== null && trim($name) !== '' ? trim($name) : $slug,
             'allowed_origins' => $this->cleanOrigins($origins),
-            'domain' => SiteVerification::normaliseDomain((string) $domain) ?: null,
+            'domain' => SiteVerification::normaliseAddress((string) $domain) ?: null,
             // Minted at registration whether or not a domain was named, so the
             // customer has something to install before they come back to
             // verify. A code that only appears once verification is started

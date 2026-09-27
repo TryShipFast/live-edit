@@ -310,6 +310,40 @@ class LicenceTest extends TestCase
         $this->assertSame('not_found', $result['reason']);
     }
 
+    public function test_a_page_served_where_the_file_should_be_is_not_a_file(): void
+    {
+        /*
+         * Found on a real static site. A plain `php -S` answers an unknown
+         * path with the home page, so the well-known request came back with
+         * the whole document — which contained the code, because the meta tag
+         * was installed — and verification reported method "file" for a file
+         * that did not exist.
+         *
+         * Harmless there, because the code was on their own page. Not
+         * harmless in general: it is the same hole the home page check was
+         * hardened against, where anybody who can get a string onto a site
+         * can prove they own it.
+         */
+        Http::fake([
+            'acme.test/.well-known/*' => Http::response(
+                '<html><head><meta name="shipfast-site-verification" content="shipfast-verify-abc123"></head></html>'
+            ),
+            'acme.test' => Http::response('', 404),
+        ]);
+
+        $result = (new Provisioner)->verifyDomain($this->unverified());
+
+        $this->assertFalse($result['verified']);
+        $this->assertNull($result['method']);
+    }
+
+    public function test_a_file_may_end_with_a_newline_the_way_every_editor_writes_it(): void
+    {
+        Http::fake(['acme.test/.well-known/*' => Http::response("shipfast-verify-abc123\n")]);
+
+        $this->assertSame('file', (new Provisioner)->verifyDomain($this->unverified())['method']);
+    }
+
     public function test_a_meta_tag_with_somebody_elses_code_does_not_verify(): void
     {
         Http::fake([
@@ -385,6 +419,23 @@ class LicenceTest extends TestCase
 
             $this->assertSame($expected, Platform::clean($submitted), $submitted);
         }
+    }
+
+    public function test_registering_a_development_site_keeps_the_port_it_was_given(): void
+    {
+        // Registration used to store the name alone, so a site registered at
+        // 127.0.0.1:8110 was recorded as 127.0.0.1 and every check went to
+        // port 443 of a host that answers on 8110. Verification could never
+        // succeed, and the message said the site was unreachable rather than
+        // that we had thrown the address away ourselves.
+        $result = (new Provisioner)->create('ported', 'Ported', [], 'http://127.0.0.1:8110');
+
+        $this->assertSame('127.0.0.1:8110', $result['site']->domain);
+
+        // And the identity is still the name: a request arriving from
+        // 127.0.0.1 is this site, which is how a licence check sees it once
+        // the domain has been proved.
+        $this->assertTrue(SiteVerification::covers((string) $result['site']->domain, '127.0.0.1'));
     }
 
     public function test_a_site_served_on_a_port_is_asked_on_that_port(): void

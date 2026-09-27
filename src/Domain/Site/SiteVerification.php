@@ -61,6 +61,35 @@ final class SiteVerification
      * thinks of www.example.com as a different site from example.com, and a
      * licence that did would be wrong in the way that generates refunds.
      */
+    /**
+     * The domain as it should be STORED, which keeps a port.
+     *
+     * Identity and address are different things and this is the address. A
+     * licence is for a name, so matching compares names and ignores ports —
+     * a host header carries none. But going and looking for the proof means
+     * knocking on a door, and a development or staging site almost always
+     * sits on a port. Storing the name alone threw that away at registration
+     * and sent every check to port 443 of a host answering on 8110, which
+     * reads as a site that is down rather than an address we discarded
+     * ourselves.
+     */
+    public static function normaliseAddress(string $value): string
+    {
+        $host = self::normaliseDomain($value);
+
+        if ($host === '') {
+            return '';
+        }
+
+        if (! str_contains($value, '//')) {
+            $value = 'https://'.trim($value);
+        }
+
+        $port = parse_url($value, PHP_URL_PORT);
+
+        return $port ? $host.':'.$port : $host;
+    }
+
     public static function normaliseDomain(string $value): string
     {
         $value = trim($value);
@@ -212,7 +241,27 @@ final class SiteVerification
         try {
             $file = self::client($insecure)->get($base.self::WELL_KNOWN_PATH);
 
-            if ($file->successful() && str_contains($file->body(), $code)) {
+            /*
+             * The file has to BE the code, not merely contain it.
+             *
+             * The home page check already refuses a code that merely appears
+             * in the body, because any site with a comment thread or a search
+             * page that echoes its query would otherwise be verifiable by
+             * whoever can get a string onto it. The same reasoning applies
+             * here and was missing.
+             *
+             * It is not theoretical. A plain `php -S` answers an unknown path
+             * with the home page, so a site with the meta tag installed and
+             * no file at all verified as "file" — reporting a file that does
+             * not exist, which is a lie to anybody later trying to work out
+             * why verification broke.
+             *
+             * One line of it, trimmed, so a trailing newline from an editor
+             * is forgiven and a page of HTML is not.
+             */
+            $body = trim($file->body());
+
+            if ($file->successful() && strcasecmp($body, $code) === 0) {
                 return ['verified' => true, 'method' => 'file', 'reason' => null];
             }
         } catch (\Throwable $e) {

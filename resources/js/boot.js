@@ -63,6 +63,36 @@
     load('session.js').then(function (session) {
         var token = session.currentSession(window);
 
+        /*
+         * The way in, for a site that has nowhere else to put one.
+         *
+         * WordPress has a plugin that can answer a URL and Laravel has a
+         * route, so both could offer a door. A folder of HTML files has
+         * neither, and until this there was no way for its owner to start
+         * editing at all: the session arrives in a fragment, and nothing put
+         * a fragment there. The person was expected to hand-assemble a
+         * sign-in URL, which is not something to ask of somebody whose site
+         * is three files and an FTP client.
+         *
+         * So: add ?kb-enter=1 to any page and it sends them to sign in and
+         * brings them back to the page they were on. The same query the
+         * plugin answers, so there is one thing to remember across all of
+         * them.
+         */
+        if (!token && window.location.search.indexOf('kb-enter') !== -1) {
+            var here = new URL(window.location.href);
+            here.searchParams.delete('kb-enter');
+
+            var plane = config.api.replace(/\/api\/live-edit\/v\d+\/?$/, '');
+
+            window.location.replace(
+                plane + '/live-edit/sign-in?site=' + encodeURIComponent(config.site)
+                    + '&return_to=' + encodeURIComponent(here.href)
+            );
+
+            return;
+        }
+
         window.liveEditContent = session.contentConfigFor(config, token);
 
         if (token) {
