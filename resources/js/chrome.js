@@ -161,6 +161,9 @@ button, input, select, textarea { font: inherit; color: inherit; margin: 0; }
   .le-status span { display: none; }
 }
 .le-status { display: flex; align-items: center; gap: 8px; font-size: 12px; color: #9A9DA5; padding: 0 6px 0 2px; }
+/* No gap where no words are: an empty label still reserved its padding, which
+   left the greeting sitting oddly far from the mark. */
+.le-status:not(.is-saying) { gap: 0; padding-right: 0; }
 .le-dot { width: 7px; height: 7px; border-radius: 999px; background: #64748b; flex: none; box-shadow: 0 0 0 3px rgba(100,116,139,.18); transition: background .2s ease, box-shadow .2s ease; }
 .le-toolbar.is-editing .le-dot { background: var(--le-on-dark); box-shadow: 0 0 0 3px rgba(255,255,255,.18); }
 .le-btn {
@@ -703,9 +706,17 @@ export function createChrome() {
         + '<rect x="3" y="3" width="20" height="20" rx="3" fill="none" stroke="#0B0C0F" stroke-width="2.5"/>'
         + '<path d="M16 15 L16 30 L19.6 26.4 L22.2 31.2 L24.6 30 L22 25.3 L27 25.3 Z" fill="#3148F5" stroke="#fff" stroke-width="1.4" stroke-linejoin="round"/></svg>';
 
+    /* Empty until editing starts.
+
+       It used to read "Viewing as visitor", which said the same thing as the
+       button beside it: a bar offering "Edit site" is plainly not editing
+       anything. Two ways of saying one state, in the smallest piece of
+       furniture in the product. What replaces it is not silence for its own
+       sake — the text that appears while editing tells somebody what to click,
+       which is worth the room. */
     const status = el('span', 'le-status le-when-roomy');
     const dot = el('span', 'le-dot');
-    const statusText = el('span', null, 'Viewing as visitor');
+    const statusText = el('span', null, '');
     status.append(dot, statusText);
     toolbar.append(mark, status);
 

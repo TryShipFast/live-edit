@@ -1524,7 +1524,9 @@ const bootLiveEdit = () => {
                 else el.removeAttribute('tabindex');
             });
             sessionStorage.setItem('tb_editing', on ? '1' : '0');
-            statusText.textContent = on ? 'Editing mode: click any outlined text or image' : 'Viewing as visitor';
+            // Nothing to say when not editing — the button already says it.
+            statusText.textContent = on ? 'Click any outlined text or image' : '';
+            statusText.parentElement?.classList.toggle('is-saying', on);
             if (!on && typeof hideHandle === 'function') hideHandle();
             ui.toolbar.classList.toggle('is-editing', on);
             toggleButton.textContent = on ? 'Done editing' : 'Edit site';
