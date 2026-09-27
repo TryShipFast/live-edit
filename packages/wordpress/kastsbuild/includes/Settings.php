@@ -41,6 +41,9 @@ class Settings
         $clean = [
             'site' => sanitize_text_field($input['site'] ?? ''),
             'api_base' => esc_url_raw($input['api_base'] ?? ''),
+            'sign_in' => in_array($input['sign_in'] ?? '', ['wp', 'service', 'either'], true)
+                ? $input['sign_in']
+                : 'either',
             'publishable_key' => sanitize_text_field($input['publishable_key'] ?? ''),
             'capability' => sanitize_text_field($input['capability'] ?? 'edit_theme_options'),
         ];
@@ -66,6 +69,19 @@ class Settings
     public static function get(string $key, string $default = ''): string
     {
         return (string) (self::all()[$key] ?? $default);
+    }
+
+    /**
+     * Which doors are open: 'wp', 'service', or 'either'.
+     *
+     * Either by default, because it is the only value that cannot lock
+     * somebody out of a site that was working yesterday.
+     */
+    public static function signIn(): string
+    {
+        $value = self::get('sign_in', 'either');
+
+        return in_array($value, ['wp', 'service', 'either'], true) ? $value : 'either';
     }
 
     public static function capability(): string

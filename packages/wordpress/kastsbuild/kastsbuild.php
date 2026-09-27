@@ -21,6 +21,7 @@
 use KastsBuild\Builder;
 use KastsBuild\Credits;
 use KastsBuild\Frontend;
+use KastsBuild\PlaneSession;
 use KastsBuild\Publishing;
 use KastsBuild\Settings;
 
@@ -53,6 +54,7 @@ if (is_file(KASTSBUILD_PATH.'vendor/autoload.php')) {
 require KASTSBUILD_PATH.'includes/Settings.php';
 require KASTSBUILD_PATH.'includes/Api.php';
 require KASTSBUILD_PATH.'includes/Session.php';
+require KASTSBUILD_PATH.'includes/PlaneSession.php';
 require KASTSBUILD_PATH.'includes/Frontend.php';
 require KASTSBUILD_PATH.'includes/Publishing.php';
 require KASTSBUILD_PATH.'includes/Builder.php';
@@ -63,6 +65,10 @@ add_action('plugins_loaded', function () {
     Frontend::boot();
     Publishing::boot();
     Builder::boot();
+    // Signing in with the service, for a site whose editors have no
+    // WordPress account. Booted always: it does nothing until somebody
+    // arrives at the door, and the setting decides whether it opens.
+    PlaneSession::boot();
     Credits::boot();
 });
 

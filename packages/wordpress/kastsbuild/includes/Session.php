@@ -13,9 +13,24 @@ namespace KastsBuild;
  */
 class Session
 {
+    /**
+     * Whether whoever is looking may edit, by either route this site allows.
+     *
+     * WordPress first, because on most sites that is the answer and it costs
+     * nothing to ask. The service second, for somebody with no account here
+     * at all: an agency looking after thirty client sites does not want
+     * thirty WordPress logins, and a client who changes one sentence should
+     * not be handed the media library and everybody else's drafts to do it.
+     */
     public static function viewerMayEdit(): bool
     {
-        return is_user_logged_in() && current_user_can(Settings::capability());
+        $accepts = Settings::signIn();
+
+        if ($accepts !== 'service' && is_user_logged_in() && current_user_can(Settings::capability())) {
+            return true;
+        }
+
+        return $accepts !== 'wp' && PlaneSession::current() !== null;
     }
 
     /**
@@ -30,6 +45,19 @@ class Session
     {
         if (! self::viewerMayEdit()) {
             return null;
+        }
+
+        /*
+         * Somebody signed in with the service already holds a session key.
+         *
+         * Minting another from the secret key would work and would be wrong:
+         * it would give a person two live credentials, and the one the
+         * service knows about is the one it can revoke.
+         */
+        $fromService = PlaneSession::current();
+
+        if (is_array($fromService) && ($fromService['token'] ?? '') !== '') {
+            return $fromService['token'];
         }
 
         $user = wp_get_current_user();
