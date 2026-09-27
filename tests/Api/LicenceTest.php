@@ -6,6 +6,7 @@ use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Testing\TestResponse;
 use ShipFast\LiveEdit\Domain\Site\Editor;
+use ShipFast\LiveEdit\Domain\Site\Platform;
 use ShipFast\LiveEdit\Domain\Site\Provisioner;
 use ShipFast\LiveEdit\Domain\Site\Site;
 use ShipFast\LiveEdit\Domain\Site\SiteVerification;
@@ -330,6 +331,50 @@ class LicenceTest extends TestCase
         ]);
 
         $this->assertTrue((new Provisioner)->verifyDomain($site)['verified']);
+    }
+
+    public function test_a_site_remembers_what_it_is_built_with(): void
+    {
+        $result = (new Provisioner)->create('built', 'Built', [], 'built.com', 'nextjs');
+
+        $this->assertSame('nextjs', $result['site']->platform);
+    }
+
+    public function test_a_platform_nobody_offers_is_recorded_as_nothing_rather_than_guessed(): void
+    {
+        // Nothing is a real answer: the console then asks. A site quietly
+        // recorded as WordPress would be handed a plugin it cannot use.
+        foreach (['drupal', '', 'WORDPRESS'] as $submitted) {
+            $expected = $submitted === 'WORDPRESS' ? 'wordpress' : null;
+
+            $this->assertSame($expected, Platform::clean($submitted), $submitted);
+        }
+    }
+
+    public function test_a_site_served_on_a_port_is_asked_on_that_port(): void
+    {
+        // A development install almost always sits on one, and the identity
+        // the licence is for has no port in it, so the port was being dropped
+        // on the way out as well: every check knocked on 443 of a host that
+        // answers on 8088 and came back "we could not reach you".
+        Http::fake([
+            'http://dev.test:8088/.well-known/*' => Http::response('shipfast-verify-abc123'),
+            '*' => Http::response('', 500),
+        ]);
+
+        $site = Site::query()->create([
+            'slug' => 'ported',
+            'name' => 'Ported',
+            'domain' => 'dev.test:8088',
+            'verification_code' => 'shipfast-verify-abc123',
+        ]);
+
+        $this->assertTrue((new Provisioner)->verifyDomain($site)['verified']);
+
+        // And the port is still nowhere near the identity: a request arriving
+        // from dev.test is the same site, which is how the licence check sees
+        // it, since a host header carries no port.
+        $this->assertTrue(SiteVerification::covers('dev.test:8088', 'dev.test'));
     }
 
     public function test_a_real_domain_is_never_asked_over_plain_http(): void

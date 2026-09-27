@@ -25,7 +25,7 @@ class Provisioner
      *
      * @throws ValidationException
      */
-    public function create(string $slug, ?string $name = null, array $origins = [], ?string $domain = null): array
+    public function create(string $slug, ?string $name = null, array $origins = [], ?string $domain = null, ?string $platform = null): array
     {
         $slug = strtolower(trim($slug));
 
@@ -49,6 +49,7 @@ class Provisioner
             // verify. A code that only appears once verification is started
             // makes the flow two visits instead of one.
             'verification_code' => SiteVerification::newCode(),
+            'platform' => Platform::clean($platform),
         ]);
 
         // Both at once, because a site with only one of them cannot be used:

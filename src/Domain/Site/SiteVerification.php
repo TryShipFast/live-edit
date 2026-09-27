@@ -118,7 +118,7 @@ final class SiteVerification
 
         $reason = null;
 
-        foreach (self::baseUrlsFor($domain) as $base) {
+        foreach (self::baseUrlsFor($domain.self::portFrom((string) $site->domain)) as $base) {
             $result = self::lookFor($base, $code);
 
             if ($result['verified']) {
@@ -160,6 +160,31 @@ final class SiteVerification
         return self::isLocal($domain)
             ? ['https://'.$domain, 'http://'.$domain]
             : ['https://'.$domain];
+    }
+
+    /**
+     * The port to knock on, when the address named one.
+     *
+     * A domain's IDENTITY has no port in it: the licence is for a name, and
+     * the host header a page arrives with does not carry one, so matching has
+     * to compare names alone. Going and LOOKING is the other way round. A
+     * development install almost always sits on a port, and stripping it sent
+     * every check to port 443 of a host that answers on 8088, which reads as
+     * an unreachable site rather than as an address we discarded ourselves.
+     *
+     * Kept for real domains too. A site genuinely served on a port is
+     * unusual, but refusing to knock where somebody told us to is a strange
+     * way to answer that.
+     */
+    private static function portFrom(string $value): string
+    {
+        if (! str_contains($value, '//')) {
+            $value = 'https://'.$value;
+        }
+
+        $port = parse_url($value, PHP_URL_PORT);
+
+        return $port ? ':'.$port : '';
     }
 
     public static function isLocal(string $domain): bool

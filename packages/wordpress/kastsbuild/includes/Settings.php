@@ -44,6 +44,7 @@ class Settings
             'sign_in' => in_array($input['sign_in'] ?? '', ['wp', 'service', 'either'], true)
                 ? $input['sign_in']
                 : 'either',
+            'verification' => sanitize_text_field($input['verification'] ?? ''),
             'publishable_key' => sanitize_text_field($input['publishable_key'] ?? ''),
             'capability' => sanitize_text_field($input['capability'] ?? 'edit_theme_options'),
         ];
@@ -143,6 +144,16 @@ class Settings
                         <td><input name="kastsbuild_settings[secret_key]" id="kb-sec" type="password" class="regular-text"
                                    value="" placeholder="<?php echo $hasSecret ? 'Saved — leave blank to keep it' : 'kbs_…'; ?>">
                             <p class="description">Stays on this server. Never sent to a browser, and never shown again here.</p></td>
+                    </tr>
+                    <tr>
+                        <th scope="row"><label for="kb-verify">Verification code</label></th>
+                        <td><input name="kastsbuild_settings[verification]" id="kb-verify" type="text" class="regular-text"
+                                   value="<?php echo esc_attr($s['verification'] ?? ''); ?>" placeholder="shipfast-verify-…">
+                            <p class="description">
+                                From your dashboard, to prove you own this domain. Paste it here and this plugin puts
+                                it in your home page for you, then press Verify in the dashboard. Nothing to edit in
+                                your theme.
+                            </p></td>
                     </tr>
                     <tr>
                         <th scope="row"><label for="kb-signin">Where editors sign in</label></th>

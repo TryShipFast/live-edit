@@ -26,6 +26,9 @@ class Frontend
     {
         add_action('template_redirect', [self::class, 'start'], 1);
         add_action('wp_enqueue_scripts', [self::class, 'assets']);
+        // Early in the head, so it survives a theme that does something
+        // unusual further down.
+        add_action('wp_head', [self::class, 'verification'], 1);
     }
 
     public static function start(): void
@@ -35,6 +38,34 @@ class Frontend
         }
 
         ob_start([self::class, 'render']);
+    }
+
+    /**
+     * Put the ownership proof in the head, so nobody has to edit a theme.
+     *
+     * The service asks for this string on the site it is about to license,
+     * either as a meta tag or as a file. On WordPress a customer can do
+     * neither without FTP or a child theme, which turns a thirty second step
+     * into the reason an install stalls. The plugin is already in the page,
+     * so it can simply be the one to say it.
+     *
+     * Printed for everybody, including visitors: it proves control of the
+     * domain and gives nothing away. A code that only appeared for signed-in
+     * administrators would never be seen by us, which is the one reader it is
+     * written for.
+     */
+    public static function verification(): void
+    {
+        $code = trim((string) Settings::get('verification'));
+
+        if ($code === '') {
+            return;
+        }
+
+        printf(
+            '<meta name="shipfast-site-verification" content="%s">'."\n",
+            esc_attr($code)
+        );
     }
 
     /** Runs over the finished document, just before it is sent. */
