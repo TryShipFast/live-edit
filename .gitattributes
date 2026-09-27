@@ -1,12 +1,19 @@
 # Keep a published package to its source. A consumer installing this needs the
-# engine, not our test suite, our JavaScript toolchain, or the adapters they
-# did not ask for — and a WordPress plugin that vendors all of it is not a
-# plugin anyone will install.
+# engine, not our test suite or our JavaScript toolchain.
+#
+# The WordPress plugin stays IN. It looked like an adapter nobody asked for and
+# was excluded with the rest, but the control plane is itself a consumer of
+# this package and serves that plugin to customers from
+# vendor/shipfast/live-edit/packages/wordpress. Excluded, the directory is
+# absent on every real install and the download answers 404, which is the only
+# way a WordPress customer can get the plugin at all. It is 72K.
 /vendor           export-ignore
 /tests            export-ignore
 /tools            export-ignore
 /docs             export-ignore
-/packages         export-ignore
+# The React adapter is a consumer's own dependency, installed from npm when
+# they want it, so it has no business in a PHP package.
+/packages/react   export-ignore
 /node_modules     export-ignore
 /.github          export-ignore
 /phpunit.xml      export-ignore
