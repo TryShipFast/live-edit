@@ -110,10 +110,10 @@ class Settings
                 <?php settings_fields('kastsbuild'); ?>
                 <table class="form-table" role="presentation">
                     <tr>
-                        <th scope="row"><label for="kb-site">Site</label></th>
+                        <th scope="row"><label for="kb-site">Site ID</label></th>
                         <td><input name="kastsbuild_settings[site]" id="kb-site" type="text" class="regular-text"
                                    value="<?php echo esc_attr($s['site'] ?? ''); ?>">
-                            <p class="description">The site slug these keys belong to.</p></td>
+                            <p class="description">From your dashboard. The site these keys belong to.</p></td>
                     </tr>
                     <tr>
                         <th scope="row"><label for="kb-base">API address</label></th>
@@ -122,10 +122,10 @@ class Settings
                                    placeholder="https://cms.example.com/api/live-edit/v1"></td>
                     </tr>
                     <tr>
-                        <th scope="row"><label for="kb-pub">Publishable key</label></th>
+                        <th scope="row"><label for="kb-pub">App key</label></th>
                         <td><input name="kastsbuild_settings[publishable_key]" id="kb-pub" type="text" class="regular-text"
                                    value="<?php echo esc_attr($s['publishable_key'] ?? ''); ?>" placeholder="kbp_…">
-                            <p class="description">Read only. Safe in a page.</p></td>
+                            <p class="description">Public. It goes into every page this site serves, so it is not a secret and is safe there.</p></td>
                     </tr>
                     <tr>
                         <th scope="row"><label for="kb-sec">Secret key</label></th>
@@ -134,10 +134,26 @@ class Settings
                             <p class="description">Stays on this server. Never sent to a browser, and never shown again here.</p></td>
                     </tr>
                     <tr>
+                        <th scope="row"><label for="kb-signin">Where editors sign in</label></th>
+                        <td>
+                            <?php $signIn = self::signIn(); ?>
+                            <select name="kastsbuild_settings[sign_in]" id="kb-signin">
+                                <option value="either" <?php selected($signIn, 'either'); ?>>Either</option>
+                                <option value="wp" <?php selected($signIn, 'wp'); ?>>WordPress only</option>
+                                <option value="service" <?php selected($signIn, 'service'); ?>>Live Edit only</option>
+                            </select>
+                            <p class="description">
+                                WordPress accounts are the usual answer. Choose Live Edit for people who should be
+                                able to change words without an account here at all, which spares you handing out
+                                wp-admin to everybody who writes a sentence.
+                            </p>
+                        </td>
+                    </tr>
+                    <tr>
                         <th scope="row"><label for="kb-cap">Who may edit</label></th>
                         <td><input name="kastsbuild_settings[capability]" id="kb-cap" type="text" class="regular-text"
                                    value="<?php echo esc_attr($s['capability'] ?? 'edit_theme_options'); ?>">
-                            <p class="description">A WordPress capability. <code>edit_theme_options</code> means administrators.</p></td>
+                            <p class="description">A WordPress capability, used when they sign in with WordPress. <code>edit_theme_options</code> means administrators.</p></td>
                     </tr>
                 </table>
                 <?php submit_button(); ?>

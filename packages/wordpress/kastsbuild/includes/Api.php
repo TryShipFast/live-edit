@@ -177,6 +177,41 @@ class Api
         return self::request('POST', $path, $key, $body);
     }
 
+    /**
+     * Ask, and report what kind of answer came back.
+     *
+     * get() and post() flatten everything to an array, so a refusal and an
+     * outage are both an empty one. For most calls that is right: a page must
+     * render either way. The licence check is the exception, because the two
+     * mean opposite things. A refusal must switch the editor off; an outage
+     * at our end must never do that to a paying customer.
+     *
+     * @return array{status: ?int, data: array<string, mixed>}
+     */
+    public static function probe(string $path, string $key): array
+    {
+        if ($key === '' || Settings::get('site') === '') {
+            return ['status' => null, 'data' => []];
+        }
+
+        $response = wp_remote_request(self::base().$path, [
+            'method' => 'GET',
+            'timeout' => 5,
+            'headers' => ['Authorization' => 'Bearer '.$key, 'Accept' => 'application/json'],
+        ]);
+
+        if (is_wp_error($response)) {
+            return ['status' => null, 'data' => []];
+        }
+
+        $decoded = json_decode((string) wp_remote_retrieve_body($response), true);
+
+        return [
+            'status' => (int) wp_remote_retrieve_response_code($response),
+            'data' => is_array($decoded) ? $decoded : [],
+        ];
+    }
+
     /** @return array<string, mixed> */
     private static function request(string $method, string $path, string $key, array $body = []): array
     {

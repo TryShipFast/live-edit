@@ -24,6 +24,12 @@ class Session
      */
     public static function viewerMayEdit(): bool
     {
+        // Who they are is a separate question from whether this site is
+        // licensed at all, and the licence one is cheaper and decides more.
+        if (! Licence::permits()) {
+            return false;
+        }
+
         $accepts = Settings::signIn();
 
         if ($accepts !== 'service' && is_user_logged_in() && current_user_can(Settings::capability())) {

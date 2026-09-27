@@ -21,6 +21,7 @@
 use KastsBuild\Builder;
 use KastsBuild\Credits;
 use KastsBuild\Frontend;
+use KastsBuild\Licence;
 use KastsBuild\PlaneSession;
 use KastsBuild\Publishing;
 use KastsBuild\Settings;
@@ -53,6 +54,7 @@ if (is_file(KASTSBUILD_PATH.'vendor/autoload.php')) {
 
 require KASTSBUILD_PATH.'includes/Settings.php';
 require KASTSBUILD_PATH.'includes/Api.php';
+require KASTSBUILD_PATH.'includes/Licence.php';
 require KASTSBUILD_PATH.'includes/Session.php';
 require KASTSBUILD_PATH.'includes/PlaneSession.php';
 require KASTSBUILD_PATH.'includes/Frontend.php';
@@ -69,6 +71,29 @@ add_action('plugins_loaded', function () {
     // WordPress account. Booted always: it does nothing until somebody
     // arrives at the door, and the setting decides whether it opens.
     PlaneSession::boot();
+
+    /*
+     * Tell whoever runs this site when editing has stopped, and why.
+     *
+     * In the admin, because that is where somebody goes to find out why the
+     * toolbar has gone, and because the alternative is a client discovering
+     * it by trying to work and failing.
+     */
+    add_action('admin_notices', function () {
+        if (! current_user_can('manage_options') || Licence::permits()) {
+            return;
+        }
+
+        printf(
+            '<div class="notice notice-error"><p><strong>%s</strong> %s</p></div>',
+            esc_html__('Live editing is switched off.', 'kastsbuild'),
+            esc_html(Licence::message())
+        );
+    });
+
+    // So somebody who has just pasted a new key does not wait a day to find
+    // out whether it worked.
+    add_action('update_option_kastsbuild_settings', [Licence::class, 'forget']);
     Credits::boot();
 });
 

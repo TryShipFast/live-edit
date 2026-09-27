@@ -2,6 +2,8 @@
 
 namespace KastsBuild;
 
+use Elementor\Plugin;
+
 /**
  * Telling the page builder what the client changed.
  *
@@ -47,7 +49,10 @@ class Builder
     {
         register_rest_route('kastsbuild/v1', '/builder', [
             'methods' => 'POST',
-            'permission_callback' => fn () => current_user_can(Settings::capability()),
+            // Session::viewerMayEdit rather than the capability alone: it is
+            // the one place that knows about the licence and about somebody
+            // who signed in with the service rather than with WordPress.
+            'permission_callback' => fn () => Session::viewerMayEdit(),
             'callback' => [self::class, 'sync'],
         ]);
     }
@@ -142,7 +147,7 @@ class Builder
         // it bumps itself. Left alone, a page whose text we changed can be
         // served from a cache built before the change.
         if (class_exists('\Elementor\Plugin')) {
-            \Elementor\Plugin::$instance->files_manager->clear_cache();
+            Plugin::$instance->files_manager->clear_cache();
         }
 
         return new \WP_REST_Response(['synced' => true, 'page' => $postId, 'element' => $elementId], 200);
