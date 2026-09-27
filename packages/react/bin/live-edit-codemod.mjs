@@ -52,11 +52,46 @@ collect(root);
 
 let touched = 0;
 let tagged = 0;
+/**
+ * Where a file's path is measured from, which decides its key.
+ *
+ * The project root, never the directory being scanned. Keys are a hash of the
+ * path, so measuring from the scan directory meant `live-edit-codemod src`
+ * and `live-edit-codemod src/components` produced DIFFERENT keys for the same
+ * element in the same file — and a customer who ran one and later the other
+ * lost every edit they had made. The words stayed in the database under keys
+ * nothing on the page asked for any more, with nothing to say so.
+ *
+ * Found by running both on one template and comparing: c07eab32233c against
+ * f424fd0c6781 for the same heading.
+ */
+const projectRoot = (() => {
+    let at = fs.statSync(root).isDirectory() ? root : path.dirname(root);
+
+    for (let up = 0; up < 20; up += 1) {
+        if (fs.existsSync(path.join(at, 'package.json'))) {
+            return at;
+        }
+
+        const parent = path.dirname(at);
+
+        if (parent === at) {
+            break;
+        }
+
+        at = parent;
+    }
+
+    // No package.json anywhere above: the scan directory is all there is, and
+    // a stable-but-local key beats refusing to run.
+    return root;
+})();
+
 const skipped = [];
 const byMode = { client: 0, server: 0 };
 
 for (const file of files) {
-    const relative = path.relative(root, file);
+    const relative = path.relative(projectRoot, file);
     const source = fs.readFileSync(file, 'utf8');
 
     let result;
