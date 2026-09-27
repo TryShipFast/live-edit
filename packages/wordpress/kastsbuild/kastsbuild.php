@@ -3,7 +3,7 @@
 /**
  * Plugin Name: KastsBuild Live Edit
  * Description: Edit the words and pictures on this site in place, without a dashboard.
- * Version: 0.1.0
+ * Version: 0.10.0
  * Requires PHP: 8.1
  */
 
