@@ -60,14 +60,22 @@ and it changes the answer to "what happens to my words if we fall out".
 | Buttons and labels | ? | ? | ? | ? | ? |
 | Links (text and href) | ? | ? | ? | ? | ✓ |
 | Nested / mixed content | ✓ | ✓ | ✓ | ? | ✓ |
-| Images | ? | ? | ? | ? | ? |
+| Images | ? | ✓ detect | ? | ? | ? |
 | Background images | ? | ? | ? | ? | ? |
-| Lists and repeated items | ? | ? | ✓ | ? | ✓ |
+| Lists and repeated items | ? | ✓ detect | ✓ | ? | ✓ |
 | Tables | ? | ? | ? | ? | ? |
 | Forms | ? | ? | ? | ? | ? |
 | SVG and icons | ? | ? | ? | ? | ? |
 | Rich text (bold, italic) | ? | ? | ? | ? | ? |
-| Alt text and SEO fields | ? | ? | ? | ? | ? |
+| Alt text | ? | ✓ | ? | ? | ? |
+| SEO fields (title, description) | ? | ? | ? | ? | ? |
+
+WordPress was re-run on the current runtime and detects 107 elements, 37
+lists and 8 images on an Astra and Elementor site. Its image drawer offers
+replace, alt text, title attribute and remove; alt text was set through the
+editor and survived a reload, which is the first SEO-adjacent field measured
+anywhere. Its lists and image replacement are marked "detect" rather than ✓
+because detection was measured and the edit itself was not.
 
 Lists were measured on two adapters. A nine-card grid on the static site and a
 three-plan pricing table in Next.js: editing one item leaves the others
