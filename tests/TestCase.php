@@ -26,11 +26,35 @@ abstract class TestCase extends Orchestra
     {
         $app['config']->set('app.key', 'base64:'.base64_encode(random_bytes(32)));
         $app['config']->set('database.default', 'testbench');
-        $app['config']->set('database.connections.testbench', [
-            'driver' => 'sqlite',
-            'database' => ':memory:',
-            'prefix' => '',
-        ]);
+
+        /*
+         * SQLite in memory, unless a MySQL database is named.
+         *
+         * The two disagree about enough to matter — a migration that drops a
+         * column, in particular, meets completely different objections on
+         * each — and a suite that only ever runs on SQLite will say a
+         * migration is fine right up until it is run on a customer's MySQL.
+         * LIVE_EDIT_TEST_MYSQL=<database> points the whole suite at MySQL.
+         */
+        $mysql = env('LIVE_EDIT_TEST_MYSQL');
+
+        $app['config']->set('database.connections.testbench', $mysql
+            ? [
+                'driver' => 'mysql',
+                'host' => env('LIVE_EDIT_TEST_MYSQL_HOST', '127.0.0.1'),
+                'port' => env('LIVE_EDIT_TEST_MYSQL_PORT', '3306'),
+                'database' => $mysql,
+                'username' => env('LIVE_EDIT_TEST_MYSQL_USER', 'root'),
+                'password' => env('LIVE_EDIT_TEST_MYSQL_PASSWORD', ''),
+                'charset' => 'utf8mb4',
+                'collation' => 'utf8mb4_unicode_ci',
+                'prefix' => '',
+            ]
+            : [
+                'driver' => 'sqlite',
+                'database' => ':memory:',
+                'prefix' => '',
+            ]);
 
         // A deliberately different content shape than the tokreamsblue app:
         // a 'Widget' collection with body/icon/image fields. If the generic

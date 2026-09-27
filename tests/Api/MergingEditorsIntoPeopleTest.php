@@ -2,7 +2,9 @@
 
 namespace ShipFast\LiveEdit\Tests\Api;
 
+use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use ShipFast\LiveEdit\Tests\TestCase;
 
 /**
@@ -41,11 +43,19 @@ class MergingEditorsIntoPeopleTest extends TestCase
      */
     private function asItWasBefore(array $rows): void
     {
-        // The unique address is what the migration ADDS, so the old shape
-        // cannot be rebuilt while it is there.
-        DB::statement('drop index if exists live_edit_editors_email_unique');
-        DB::statement('alter table live_edit_editors add column site_id integer');
-        DB::statement('alter table live_edit_editors add column may_publish integer default 1');
+        // Through the schema builder, not raw SQL: the two databases spell
+        // this differently, and a helper that only speaks SQLite would make
+        // this whole file untestable on the one that broke.
+        try {
+            Schema::table('live_edit_editors', fn (Blueprint $table) => $table->dropUnique(['email']));
+        } catch (\Throwable) {
+            // Not there yet, which is the shape being rebuilt anyway.
+        }
+
+        Schema::table('live_edit_editors', function (Blueprint $table) {
+            $table->unsignedBigInteger('site_id')->nullable();
+            $table->boolean('may_publish')->default(true);
+        });
         DB::table('live_edit_editor_site')->delete();
 
         foreach ($rows as $row) {
@@ -59,6 +69,54 @@ class MergingEditorsIntoPeopleTest extends TestCase
         (function () {
             $this->moveTheExistingPeopleAcross();
         })->call($migration);
+    }
+
+    /** The migration object, so up() can be run the way a deploy runs it. */
+    private function migration(): object
+    {
+        return require __DIR__.'/../../database/migrations/2026_09_27_150000_one_person_may_edit_several_sites.php';
+    }
+
+    public function test_running_it_again_after_it_has_finished_does_nothing_rather_than_failing(): void
+    {
+        // A deploy that reruns migrations, or anybody retrying a pipeline,
+        // must not be punished for it.
+        $this->migration()->up();
+
+        $this->assertTrue(Schema::hasTable('live_edit_editor_site'));
+        $this->assertFalse(Schema::hasColumn('live_edit_editors', 'site_id'));
+    }
+
+    public function test_it_finishes_the_job_after_a_half_applied_run(): void
+    {
+        /*
+         * The state a real deploy was left in.
+         *
+         * MySQL does not roll back a CREATE TABLE, so a migration that failed
+         * partway through left the grants table behind while recording
+         * nothing. The retry — the first thing anybody does — then hit "table
+         * already exists" and the deploy was stuck with the database in
+         * neither shape, which is the worst of the three places to be.
+         */
+        [$first, $second] = $this->twoSites();
+
+        $this->asItWasBefore([
+            ['email' => 'tope@agency.test', 'name' => 'Tope', 'site_id' => $first, 'may_publish' => 1],
+            ['email' => 'tope@agency.test', 'name' => null, 'site_id' => $second, 'may_publish' => 0],
+        ]);
+
+        // asItWasBefore has put the old columns back and moved the people
+        // across, which is precisely where the failed deploy stopped: grants
+        // table present and full, old columns still there, no unique address.
+        $this->assertTrue(Schema::hasColumn('live_edit_editors', 'site_id'));
+        $this->assertGreaterThan(0, DB::table('live_edit_editor_site')->count());
+
+        $this->migration()->up();
+
+        $this->assertFalse(Schema::hasColumn('live_edit_editors', 'site_id'));
+        $this->assertFalse(Schema::hasColumn('live_edit_editors', 'may_publish'));
+        $this->assertSame(1, DB::table('live_edit_editors')->where('email', 'tope@agency.test')->count());
+        $this->assertSame(2, DB::table('live_edit_editor_site')->count());
     }
 
     public function test_one_address_on_three_sites_becomes_one_person_with_three_grants(): void

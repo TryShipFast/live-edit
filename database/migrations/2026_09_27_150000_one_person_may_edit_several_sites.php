@@ -33,7 +33,54 @@ use Illuminate\Support\Facades\Schema;
  */
 return new class extends Migration
 {
+    /*
+     * EVERY STEP BELOW ASKS BEFORE IT ACTS.
+     *
+     * MySQL does not roll back a CREATE TABLE. A migration that fails halfway
+     * therefore leaves the work it had already done in place while recording
+     * nothing, so the retry — which is the first thing anybody does — hits
+     * "table already exists" and the deploy is stuck with the database in
+     * neither shape. Asking first costs a handful of catalogue reads once and
+     * turns the retry into the fix.
+     */
     public function up(): void
+    {
+        if (! Schema::hasTable('live_edit_editor_site')) {
+            $this->createTheGrants();
+        }
+
+        if (! Schema::hasColumn('live_edit_sign_in_tokens', 'site_id')) {
+            /*
+             * A sign-in link has to name its own site now.
+             *
+             * It used to read the site off the editor, which worked only
+             * while an editor was a person-on-one-site. With one account
+             * spanning several, a link redeemed from a mailbox would land the
+             * person on whichever site came back first.
+             */
+            Schema::table('live_edit_sign_in_tokens', function (Blueprint $table) {
+                $table->foreignId('site_id')->nullable()->after('editor_id')
+                    ->constrained('live_edit_sites')->cascadeOnDelete();
+            });
+        }
+
+        // The presence of this column is what says the move has not happened.
+        if (Schema::hasColumn('live_edit_editors', 'site_id')) {
+            $this->moveTheExistingPeopleAcross();
+            $this->retireTheOldColumns();
+        }
+
+        if (! $this->hasIndex('live_edit_editors', 'live_edit_editors_email_unique')) {
+            // Added after the merge, never before: the merge is what makes it
+            // true, and a site with two rows for one address would fail here
+            // with nothing explaining why.
+            Schema::table('live_edit_editors', function (Blueprint $table) {
+                $table->unique('email');
+            });
+        }
+    }
+
+    private function createTheGrants(): void
     {
         Schema::create('live_edit_editor_site', function (Blueprint $table) {
             $table->id();
@@ -48,37 +95,69 @@ return new class extends Migration
 
             $table->unique(['editor_id', 'site_id']);
         });
+    }
 
-        /*
-         * A sign-in link has to name its own site now.
-         *
-         * It used to read the site off the editor, which worked only while an
-         * editor was a person-on-one-site. With one account spanning several,
-         * a link redeemed from a mailbox would otherwise land the person on
-         * whichever site happened to come back first.
-         */
-        Schema::table('live_edit_sign_in_tokens', function (Blueprint $table) {
-            $table->foreignId('site_id')->nullable()->after('editor_id')
-                ->constrained('live_edit_sites')->cascadeOnDelete();
-        });
+    /**
+     * Take away the columns that said an editor belonged to one site.
+     *
+     * Three separate statements, in this order, because the two databases
+     * this has to run on disagree about what is in the way.
+     *
+     * MySQL will not drop an index a foreign key is relying on, and site_id's
+     * foreign key was relying on the composite unique — so the constraint has
+     * to go first or the whole migration stops with errno 150, which is
+     * exactly what happened on the first deploy that was not SQLite.
+     *
+     * SQLite has no such objection but rebuilds the table to drop a column
+     * and refuses while an index still names the one going away, so the
+     * unique has to go before the column. Doing each in its own call is what
+     * satisfies both.
+     */
+    private function retireTheOldColumns(): void
+    {
+        $this->quietly(fn () => Schema::table('live_edit_editors', function (Blueprint $table) {
+            $table->dropForeign(['site_id']);
+        }));
 
-        $this->moveTheExistingPeopleAcross();
-
-        Schema::table('live_edit_editors', function (Blueprint $table) {
-            // The index and the constraint first, then the column. SQLite
-            // rebuilds the table to drop a column and refuses while anything
-            // still names the one going away.
+        $this->quietly(fn () => Schema::table('live_edit_editors', function (Blueprint $table) {
             $table->dropUnique(['site_id', 'email']);
-            $table->dropConstrainedForeignId('site_id');
-            $table->dropColumn('may_publish');
-        });
+        }));
 
-        // Added after the merge, never before: the merge is what makes it
-        // true, and a site with two rows for one address would fail here with
-        // nothing explaining why.
         Schema::table('live_edit_editors', function (Blueprint $table) {
-            $table->unique('email');
+            $table->dropColumn(['site_id', 'may_publish']);
         });
+    }
+
+    /**
+     * Run something that only has to succeed if it was there to begin with.
+     *
+     * Used for dropping a constraint and an index. Whether either exists
+     * depends on how old the database is and which driver made it, and a
+     * migration that dies because it could not remove something that was
+     * already absent has failed at doing nothing.
+     */
+    private function quietly(callable $step): void
+    {
+        try {
+            $step();
+        } catch (Throwable) {
+            // Already gone, which is the state this was trying to reach.
+        }
+    }
+
+    private function hasIndex(string $table, string $name): bool
+    {
+        try {
+            foreach (Schema::getIndexes($table) as $index) {
+                if (($index['name'] ?? '') === $name) {
+                    return true;
+                }
+            }
+        } catch (Throwable) {
+            return false;
+        }
+
+        return false;
     }
 
     /**
