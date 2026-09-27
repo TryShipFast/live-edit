@@ -55,6 +55,55 @@ class Publishing
             'callback' => [self::class, 'discard'],
             'permission_callback' => $mayEdit,
         ]);
+
+        register_rest_route('kastsbuild/v1', '/versions', [
+            'methods' => 'GET',
+            'callback' => [self::class, 'versions'],
+            'permission_callback' => $mayEdit,
+        ]);
+
+        /*
+         * Putting an earlier version back.
+         *
+         * Answered here because the snapshots are here. Restoring through the
+         * service would quietly rebuild the dependency that moving the words
+         * into this site removed, and would restore from a copy that stopped
+         * being updated the day this site took ownership.
+         */
+        register_rest_route('kastsbuild/v1', '/versions/(?P<id>\\d+)/restore', [
+            'methods' => 'POST',
+            'callback' => [self::class, 'restore'],
+            'permission_callback' => $mayEdit,
+        ]);
+    }
+
+    /** What this site has published, newest first. */
+    public static function versions(): \WP_REST_Response
+    {
+        return new \WP_REST_Response([
+            'current' => Content::versions(1)[0]['number'] ?? null,
+            'versions' => Content::versions(),
+        ]);
+    }
+
+    /** Put an earlier version back, keeping the current one to return to. */
+    public static function restore(\WP_REST_Request $request): \WP_REST_Response
+    {
+        $who = wp_get_current_user();
+        $restored = Content::restore(
+            (int) $request['id'],
+            (string) ($who->user_email ?: $who->display_name)
+        );
+
+        if ($restored === null) {
+            return new \WP_REST_Response(['message' => 'There is no version with that number on this site.'], 404);
+        }
+
+        delete_transient('kastsbuild_stamp');
+        self::forgetContentCaches();
+        Frontend::forgetCache();
+
+        return new \WP_REST_Response(['restored' => $restored]);
     }
 
     /**

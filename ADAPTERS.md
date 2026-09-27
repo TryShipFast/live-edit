@@ -40,7 +40,7 @@ Measured by counting rows, not by reading the design.
 | Adapter | Owns the content | Evidence |
 | --- | --- | --- |
 | Laravel | **the application** | 1 row in the app's own settings table, 0 in the control plane |
-| WordPress | **WordPress** | edits land in `wp_kastsbuild_content`; the plane's count stayed frozen at 12 across an edit and a publish |
+| WordPress | **WordPress** | edits land in `wp_kastsbuild_content`, snapshots in `wp_kastsbuild_versions`, restore is local; the plane's count stayed frozen at 12 throughout |
 | Plain HTML | the control plane | as intended, the site has no data layer of its own |
 | Next.js | the control plane | 1 published row in the plane |
 
@@ -55,6 +55,11 @@ count for that site did not move.
 The twelve rows it already held were copied down and left in place, frozen.
 Nothing writes to them again. A migration that goes wrong is survivable, at
 the cost of a second copy that will drift.
+
+History is local too, which is the part that would otherwise have quietly
+rebuilt the dependency. Measured: restoring version 1 put twelve values back,
+the page returned to what it had said before, the restore itself was kept as
+version 2 so it can be undone, and the plane never moved.
 
 ## Content types
 

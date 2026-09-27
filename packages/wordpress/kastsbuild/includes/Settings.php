@@ -185,7 +185,94 @@ class Settings
                 </table>
                 <?php submit_button(); ?>
             </form>
+
+            <?php self::history(); ?>
         </div>
         <?php
+    }
+
+    /**
+     * What this site has published, and a way back to any of it.
+     *
+     * Here rather than in the editor because the editor's History panel is
+     * read-only across every adapter, and snapshots nobody can restore are
+     * worse than no snapshots: they look like a safety net and are not one.
+     * wp-admin is also where somebody whose site has gone wrong will look,
+     * which is the moment this matters.
+     */
+    private static function history(): void
+    {
+        $versions = Content::versions(10);
+
+        if ($versions === []) {
+            return;
+        }
+
+        if (isset($_POST['kastsbuild_restore']) && check_admin_referer('kastsbuild_restore')) {
+            $who = wp_get_current_user();
+            $restored = Content::restore(
+                (int) $_POST['kastsbuild_restore'],
+                (string) ($who->user_email ?: $who->display_name)
+            );
+
+            printf(
+                '<div class="notice notice-%s"><p>%s</p></div>',
+                $restored === null ? 'error' : 'success',
+                $restored === null
+                    ? esc_html__('There is no version with that number on this site.', 'kastsbuild')
+                    : esc_html(sprintf(
+                        /* translators: %d: how many pieces of content were put back */
+                        __('Put back %d saved values. The version you were on was kept, so you can return to it.', 'kastsbuild'),
+                        $restored
+                    ))
+            );
+
+            $versions = Content::versions(10);
+        }
+
+        echo '<h2>'.esc_html__('What you have published', 'kastsbuild').'</h2>';
+        echo '<p>'.esc_html__('Every publish keeps a copy of the page as it was before it. These live in this site\'s own database.', 'kastsbuild').'</p>';
+        echo '<table class="widefat striped" style="max-width:52rem"><tbody>';
+
+        foreach ($versions as $version) {
+            printf(
+                '<tr><td>%s</td><td>%s</td><td>%s</td><td style="text-align:right">%s</td></tr>',
+                esc_html(sprintf(
+                    /* translators: %d: the version number */
+                    __('Version %d', 'kastsbuild'),
+                    $version['number']
+                )),
+                esc_html($version['restored_from']
+                    ? sprintf(
+                        /* translators: %d: the version that was put back */
+                        __('Restored version %d', 'kastsbuild'),
+                        $version['restored_from']
+                    )
+                    : sprintf(
+                        /* translators: %d: how many values it holds */
+                        _n('%d saved value', '%d saved values', (int) $version['changes'], 'kastsbuild'),
+                        $version['changes']
+                    )),
+                esc_html(mysql2date(get_option('date_format').' '.get_option('time_format'), $version['published_at'])),
+                self::restoreButton((int) $version['number'])
+            );
+        }
+
+        echo '</tbody></table>';
+    }
+
+    private static function restoreButton(int $number): string
+    {
+        ob_start();
+        echo '<form method="post" style="margin:0">';
+        wp_nonce_field('kastsbuild_restore');
+        printf(
+            '<button type="submit" name="kastsbuild_restore" value="%d" class="button">%s</button>',
+            $number,
+            esc_html__('Put this back', 'kastsbuild')
+        );
+        echo '</form>';
+
+        return (string) ob_get_clean();
     }
 }

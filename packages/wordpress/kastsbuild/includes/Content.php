@@ -232,6 +232,90 @@ class Content
     }
 
     /**
+     * The snapshots this site holds, newest first.
+     *
+     * Shaped the way the editor's History tab expects, because that panel is
+     * the same one every adapter shows and it should not have to know which
+     * kind of site it is looking at.
+     *
+     * @return array<int, array<string, mixed>>
+     */
+    public static function versions(int $limit = 50): array
+    {
+        global $wpdb;
+
+        self::ensureTables();
+
+        $rows = $wpdb->get_results($wpdb->prepare(
+            'SELECT id, created_at, author, note, payload FROM '.self::versionsTable().' ORDER BY id DESC LIMIT %d',
+            $limit
+        ));
+
+        return array_map(static function ($row) {
+            $payload = json_decode((string) $row->payload, true);
+
+            return [
+                'number' => (int) $row->id,
+                'changes' => is_array($payload) ? count($payload) : 0,
+                'restored_from' => $row->note !== '' && str_starts_with((string) $row->note, 'restored:')
+                    ? (int) substr((string) $row->note, 9)
+                    : null,
+                'published_at' => gmdate('c', strtotime((string) $row->created_at.' UTC')),
+                'author' => (string) $row->author,
+            ];
+        }, $rows);
+    }
+
+    /**
+     * Put an earlier snapshot back.
+     *
+     * The state being replaced is kept first, so a restore is itself
+     * undoable. Somebody reaching for history is usually already having a bad
+     * day, and "that was the wrong version" should not be the end of the
+     * road.
+     *
+     * Entirely local: content to snapshot to content. Routing this through
+     * the service would quietly rebuild the dependency that moving the words
+     * here removed.
+     */
+    public static function restore(int $id, string $author = ''): ?int
+    {
+        global $wpdb;
+
+        self::ensureTables();
+
+        $payload = $wpdb->get_var($wpdb->prepare(
+            'SELECT payload FROM '.self::versionsTable().' WHERE id = %d',
+            $id
+        ));
+
+        if ($payload === null) {
+            return null;
+        }
+
+        $words = json_decode((string) $payload, true);
+
+        if (! is_array($words)) {
+            return null;
+        }
+
+        self::snapshot($author, 'restored:'.$id);
+
+        // Everything published is replaced, not merged: a key the old version
+        // never had is a key that did not exist then, and leaving it behind
+        // would produce a page that never existed at any point in time.
+        $wpdb->delete(self::contentTable(), ['status' => 'published']);
+
+        foreach ($words as $key => $value) {
+            self::put((string) $key, $value === null ? null : (string) $value, false);
+        }
+
+        self::forget();
+
+        return count($words);
+    }
+
+    /**
      * Bring down whatever the service is still holding, once.
      *
      * A site that has been edited before this existed has its words there and

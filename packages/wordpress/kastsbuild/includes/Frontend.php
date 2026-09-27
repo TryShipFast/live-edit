@@ -245,6 +245,7 @@ class Frontend
                     '/live-edit/setting' => rest_url('kastsbuild/v1/setting'),
                     '/live-edit/changes' => rest_url('kastsbuild/v1/changes'),
                     '/live-edit/publish' => rest_url('kastsbuild/v1/publish'),
+                    '/live-edit/versions' => rest_url('kastsbuild/v1/versions'),
                 ],
                 'routeHeaders' => ['X-WP-Nonce' => wp_create_nonce('wp_rest')],
                 // Where to tell the page builder what changed, so its own copy
