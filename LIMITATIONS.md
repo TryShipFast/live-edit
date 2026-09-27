@@ -16,18 +16,6 @@ Toy pages agree with whatever the code already does.
 
 ## Open
 
-### The Laravel entry route returns to the application's own destination
-**Adapter:** Laravel. **Found:** 2026-09-27.
-
-`/live-edit/enter` sent the editor to `/admin` rather than to a page where
-editing happens, because the host application redirects an authenticated user
-there. Harmless — the editor works once you navigate to a public page — but it
-lands somebody in a dashboard when they asked to edit a website.
-
-**To close it:** carry the page they came from through the sign-in round trip,
-the way the static adapter and the WordPress plugin already do with
-`?kb-enter=1`, and return them to that page rather than to the host's default.
-
 ### WordPress does not own its content, though the architecture says it does
 **Adapter:** WordPress. **Found:** 2026-09-27.
 

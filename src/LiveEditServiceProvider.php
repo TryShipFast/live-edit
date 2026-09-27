@@ -13,6 +13,7 @@ use ShipFast\LiveEdit\Console\Commands\ScanForEditables;
 use ShipFast\LiveEdit\Console\Commands\SendRenewalNotices;
 use ShipFast\LiveEdit\Console\Commands\Versions;
 use ShipFast\LiveEdit\Http\Api\Middleware\EnforceCors;
+use ShipFast\LiveEdit\Http\Middleware\OpensTheEditorFromAnyPage;
 use ShipFast\LiveEdit\Http\Middleware\TagsEditableMarkup;
 use ShipFast\LiveEdit\Support\EditorSession;
 use ShipFast\LiveEdit\Support\Licence;
@@ -132,6 +133,19 @@ class LiveEditServiceProvider extends ServiceProvider
          */
         if (config('live-edit.auto_tag', false) && $this->app->bound(HttpKernel::class)) {
             $this->app->make(HttpKernel::class)->pushMiddleware(TagsEditableMarkup::class);
+        }
+
+        /*
+         * The door, which is not conditional on anything.
+         *
+         * Prepended, because it answers a request rather than rewriting a
+         * response, and it must not depend on auto_tag: a site that names its
+         * own editable elements still needs a way for its client to start
+         * editing, and losing the door along with the auto-tagger would be a
+         * strange thing to discover.
+         */
+        if ($this->app->bound(HttpKernel::class)) {
+            $this->app->make(HttpKernel::class)->prependMiddleware(OpensTheEditorFromAnyPage::class);
         }
         $this->loadMigrationsFrom(__DIR__.'/../database/migrations');
         $this->loadViewsFrom(__DIR__.'/../resources/views', 'live-edit');

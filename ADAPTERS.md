@@ -130,6 +130,7 @@ that row needs a different app before it can be judged.
 | | Laravel | WordPress | Plain HTML | Next.js |
 | --- | --- | --- | --- | --- |
 | Sign in through the control plane | ✓ | ✓ | ✓ | ✓ |
+| `?kb-enter=1` from any page | ✓ | ✓ | ✓ | ✓ |
 | Works with no host account at all | ? | ✓ | — | ✓ |
 | Host's own login still honoured | ✓ | ✓ | — | — |
 | One login across several sites | ✓ | ✓ | ✓ | ✓ |
