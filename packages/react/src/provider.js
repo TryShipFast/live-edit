@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { createElement, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { publishBridge } from './bridge.js';
 import { createClient } from './client.js';
 import { LiveEditContext } from './context.js';
@@ -147,5 +147,19 @@ export function LiveEditProvider({
         [content, set, apply, refresh, register, editable, locale, site]
     );
 
-    return <LiveEditContext.Provider value={value}>{children}</LiveEditContext.Provider>;
+    /*
+     * createElement rather than JSX, so this file is plain JavaScript.
+     *
+     * The package has no build step: what is written here is what a host
+     * bundles. One JSX expression was enough to make it unusable in Next.js,
+     * which does not compile anything inside node_modules and — this is the
+     * part that cost an afternoon — says nothing about it. No build error, no
+     * console error. The provider simply rendered nothing, so every page of
+     * the site went blank, and the only clue was that removing the provider
+     * brought the site back.
+     *
+     * A host can still opt into transpiling this package. Nobody should have
+     * to discover that they must.
+     */
+    return createElement(LiveEditContext.Provider, { value }, children);
 }

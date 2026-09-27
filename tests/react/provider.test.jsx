@@ -2,7 +2,7 @@ import { act, cleanup, render, screen } from '@testing-library/react';
 import { useState } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { readBridge } from '../../packages/react/src/bridge.js';
-import { LiveEditProvider } from '../../packages/react/src/provider.jsx';
+import { LiveEditProvider } from '../../packages/react/src/provider.js';
 import { useContent } from '../../packages/react/src/useContent.js';
 
 const Heading = () => <h1>{useContent('auto:abc', 'Original words')}</h1>;

@@ -58,6 +58,46 @@
         return import(base + file);
     };
 
+    /**
+     * Do nothing to this page until it has finished loading itself.
+     *
+     * The editor mounts off this attribute. Setting it the moment the script
+     * runs is right on a page the server rendered and finished with, and
+     * catastrophic on a hydrating one: React compares the markup it rendered
+     * on the server against the DOM it finds, sees an attribute that was not
+     * in the server's output, decides the tree cannot be trusted and bails
+     * out of hydrating ALL of it. The page goes blank. Not the editor — the
+     * customer's entire website, for the one person holding a session.
+     *
+     * Measured on a Next.js 16 app router template: one attribute, set a
+     * moment too early, emptied every page.
+     *
+     * So nothing this runtime writes lands before load, by which point React
+     * has hydrated and is watching the DOM rather than comparing it against
+     * the server's. A page with no React is unaffected: it has already fired
+     * load, and the work runs at once.
+     *
+     * One rule in one place, because it is not one attribute. data-admin
+     * marks the body; the tagger writes data-edit, data-style and data-kb-bg
+     * across the page. Every one of them is an attribute React did not
+     * render, and any single one is enough for it to give up on the tree.
+     */
+    var onceTheDomIsOurs = function (work) {
+        if (document.readyState === 'complete') {
+            return Promise.resolve(work());
+        }
+
+        return new Promise(function (resolve) {
+            window.addEventListener('load', function () {
+                // A frame after load, not during it: hydration can still be
+                // finishing in the same task, and waiting one costs nothing.
+                (window.requestAnimationFrame || setTimeout)(function () {
+                    resolve(work());
+                });
+            }, { once: true });
+        });
+    };
+
     // Whoever is here decides what the page should ask for: an editor sees
     // their own unpublished work, a visitor sees the published files.
     load('session.js').then(function (session) {
@@ -97,7 +137,6 @@
 
         if (token) {
             window.liveEditApi.token = token;
-            document.body.setAttribute('data-admin', '');
         }
 
         // A page nobody prepared has to be told what is editable before
@@ -111,6 +150,15 @@
         var editing = token || /[?&]edit(=1)?(&|$)/.test(window.location.search);
 
         var ready = load('autotag.js')
+            .then(function (m) {
+                return onceTheDomIsOurs(function () {
+                    if (token) {
+                        document.body.setAttribute('data-admin', '');
+                    }
+
+                    return m;
+                });
+            })
             .then(function (m) {
                 // Backgrounds are watched as well as read, because a builder
                 // loads a section's picture when it scrolls into view — but
