@@ -66,6 +66,25 @@ sites it is for.
 
 Signing out is `POST /live-edit/sign-out`.
 
+### The three values a site is given
+
+```env
+LIVE_EDIT_HOST=https://live.shipfast.com
+LIVE_EDIT_SITE_ID=acme
+LIVE_EDIT_APP_KEY=kbp_…
+```
+
+`APP_KEY` is public. It is printed into the source of every page it edits, so
+it is not a secret and its name should not suggest one. A site whose own
+server talks to the service, to let its people in or to publish, also sets
+`LIVE_EDIT_SECRET_KEY`; a Laravel or WordPress install that keeps its own
+content never calls that API and never needs one.
+
+These were `LIVE_EDIT_SITE` and `LIVE_EDIT_KEY`, and before that the
+`LIVE_EDIT_LICENCE_*` and `LIVE_EDIT_CLOUD_*` pairs. Every one of them is
+still read, so an upgrade changes nothing on a site already running. An
+installation still using a retired name says so in its log once a day.
+
 ### Three integrations, three answers
 
 Where the content lives, and where the person proves who they are, are two

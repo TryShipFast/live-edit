@@ -98,6 +98,10 @@ class LiveEditServiceProvider extends ServiceProvider
 
         $this->defineEditorGateUnlessHostHasOne();
 
+        // Said from here rather than from the config file, which has no
+        // logger and runs long before one exists.
+        Licence::warnAboutRetiredNames();
+
         // The API is off unless asked for: an install that does not need it
         // should not have it reachable.
         if (config('live-edit.api.enabled', false)) {

@@ -340,20 +340,59 @@ return [
 
     'licence' => [
         /*
-         * The two values a customer is given, spelled the short way.
+         * The three values a customer is given.
          *
-         * This is the whole configuration: register the site, paste these,
-         * done. The longer LIVE_EDIT_LICENCE_* and LIVE_EDIT_CLOUD_* names
-         * still work so nothing already deployed has to be edited.
+         *   SITE_ID     which site is asking
+         *   APP_KEY     public, printed into the page
+         *   SECRET_KEY  server side only, and only where one is needed
+         *
+         * The public one used to be called LIVE_EDIT_KEY, which reads like a
+         * secret and is not one: it is in the source of every page it edits.
+         * A name that implies otherwise is how a customer ends up treating
+         * the wrong one carelessly, or the right one as though it were
+         * dangerous.
+         *
+         * Every older spelling still works. The names below are read in order
+         * and the first that is set wins, so nothing already deployed has to
+         * be edited to take an upgrade. Whichever old name was used is
+         * recorded so the application can say so once, rather than a customer
+         * discovering it when support for it is finally removed.
          */
         'host' => env('LIVE_EDIT_HOST', env('LIVE_EDIT_LICENCE_HOST', env('LIVE_EDIT_CLOUD_HOST', 'https://live.shipfast.com'))),
-        'site' => env('LIVE_EDIT_SITE', env('LIVE_EDIT_LICENCE_SITE', env('LIVE_EDIT_CLOUD_SITE'))),
-        'key' => env('LIVE_EDIT_KEY', env('LIVE_EDIT_LICENCE_KEY')),
+        'site' => env('LIVE_EDIT_SITE_ID', env('LIVE_EDIT_SITE', env('LIVE_EDIT_LICENCE_SITE', env('LIVE_EDIT_CLOUD_SITE')))),
+        'key' => env('LIVE_EDIT_APP_KEY', env('LIVE_EDIT_KEY', env('LIVE_EDIT_LICENCE_KEY'))),
+
+        /*
+         * Only a site that talks to us from its own server needs this: to let
+         * its people in, or to publish. A Laravel or WordPress install that
+         * keeps its own content never calls the content API and never needs
+         * one, which is why it has no default and is not in the instructions.
+         */
+        'secret' => env('LIVE_EDIT_SECRET_KEY', env('LIVE_EDIT_LICENCE_SECRET')),
 
         // A day. Long enough that the service is asked once per site per day
         // rather than once per page view, short enough that a lapse takes
         // effect the next day without anybody clearing a cache.
         'ttl' => (int) env('LIVE_EDIT_LICENCE_TTL', 86400),
+
+        /*
+         * Which retired names this installation is still using.
+         *
+         * Worked out here rather than at boot because env() stops answering
+         * once a host caches its config, and a deprecation notice that goes
+         * quiet on exactly the installations that run cached config would
+         * warn only the people who did not need warning.
+         *
+         * @var array<int, string>
+         */
+        'deprecated_env' => array_values(array_filter([
+            env('LIVE_EDIT_SITE') !== null && env('LIVE_EDIT_SITE_ID') === null ? 'LIVE_EDIT_SITE' : null,
+            env('LIVE_EDIT_KEY') !== null && env('LIVE_EDIT_APP_KEY') === null ? 'LIVE_EDIT_KEY' : null,
+            env('LIVE_EDIT_LICENCE_SITE') !== null ? 'LIVE_EDIT_LICENCE_SITE' : null,
+            env('LIVE_EDIT_LICENCE_KEY') !== null ? 'LIVE_EDIT_LICENCE_KEY' : null,
+            env('LIVE_EDIT_CLOUD_SITE') !== null ? 'LIVE_EDIT_CLOUD_SITE' : null,
+            env('LIVE_EDIT_CLOUD_HOST') !== null ? 'LIVE_EDIT_CLOUD_HOST' : null,
+        ])),
     ],
 
     'api' => [

@@ -222,6 +222,39 @@ final class Licence
         ]);
     }
 
+    /**
+     * Say once that a retired name is still in use.
+     *
+     * Once a day, not once a request: this is a note for whoever runs the
+     * site, and a line in every request's log is not read, it is filtered.
+     *
+     * Nothing stops working. The old names are still honoured and will be for
+     * a good while; the point of saying anything is that the day they are
+     * removed should not be the day somebody finds out they were relying on
+     * them.
+     */
+    public static function warnAboutRetiredNames(): void
+    {
+        $retired = (array) config('live-edit.licence.deprecated_env', []);
+
+        if ($retired === []) {
+            return;
+        }
+
+        rescue(fn () => Cache::remember(
+            'live-edit.licence.v1.deprecation-said',
+            now()->addDay(),
+            function () use ($retired) {
+                Log::notice(
+                    'live-edit: these environment names have been renamed and will stop being read in a later release.',
+                    ['still_using' => $retired, 'use_instead' => ['LIVE_EDIT_SITE_ID', 'LIVE_EDIT_APP_KEY', 'LIVE_EDIT_SECRET_KEY']]
+                );
+
+                return true;
+            }
+        ), null, false);
+    }
+
     /** Forget what we were told, so the next check really asks. */
     public static function forget(): void
     {
