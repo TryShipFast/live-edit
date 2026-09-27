@@ -26,10 +26,11 @@ class PlaneSession
     private const COOKIE = 'kb_editor';
 
     /**
-     * How long a verified editor is remembered here.
+     * The longest a verified editor is remembered here.
      *
-     * Bounded by the service's own session anyway, which is shorter; this is
-     * the ceiling, not the answer.
+     * A ceiling, not the answer. The service says when its own session dies
+     * and that is always sooner; this only stops a browser holding a cookie
+     * for ever if that answer is ever missing.
      */
     private const HOURS = 12;
 
@@ -50,7 +51,29 @@ class PlaneSession
 
         $editor = get_transient('kastsbuild_editor_'.$id);
 
-        return is_array($editor) ? $editor : null;
+        if (! is_array($editor)) {
+            return null;
+        }
+
+        /*
+         * A session that has outlived the token it stands for is not a
+         * session.
+         *
+         * Without this the two clocks disagree: the service's session lasts
+         * two hours and this cookie lasted twelve, so for ten of them the
+         * site believed somebody was signed in, showed them the editor, and
+         * handed their browser a dead token. Every save then failed with a
+         * refusal none of it explained.
+         */
+        $expires = (int) ($editor['expires'] ?? 0);
+
+        if ($expires > 0 && $expires <= time()) {
+            delete_transient('kastsbuild_editor_'.$id);
+
+            return null;
+        }
+
+        return $editor;
     }
 
     public static function routes(): void
@@ -102,16 +125,24 @@ class PlaneSession
         $editor = (array) ($session['editor'] ?? []);
         $id = wp_generate_password(32, false, false);
 
+        // The service's own expiry, so this side never outlives it. Capped,
+        // in case a future service answer omits one.
+        $ceiling = time() + self::HOURS * HOUR_IN_SECONDS;
+        $expires = strtotime((string) ($session['expires_at'] ?? '')) ?: $ceiling;
+        $expires = min($expires, $ceiling);
+
         set_transient('kastsbuild_editor_'.$id, [
             'name' => $editor['name'] ?? null,
             'email' => $editor['email'] ?? null,
             'greeting' => (string) ($editor['greeting'] ?? 'there'),
-            // Kept so the token this stands for outlives nothing.
+            // Kept so a write uses the credential the service can revoke,
+            // rather than a second one minted from the secret key.
             'token' => $token,
-        ], self::HOURS * HOUR_IN_SECONDS);
+            'expires' => $expires,
+        ], max(60, $expires - time()));
 
         setcookie(self::COOKIE, $id, [
-            'expires' => time() + self::HOURS * HOUR_IN_SECONDS,
+            'expires' => $expires,
             'path' => '/',
             'secure' => is_ssl(),
             // The editor's own script sets nothing and reads nothing here, so
