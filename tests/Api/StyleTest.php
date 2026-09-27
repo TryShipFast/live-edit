@@ -92,7 +92,12 @@ class StyleTest extends TestCase
             'props' => ['background' => '#0A1F44', 'paddingY' => '80'],
         ], $this->as($this->session))->assertOk();
 
-        $this->assertSame(['background' => '#0A1F44', 'paddingY' => '80'], $this->styles()['hero'] ?? null);
+        // assertEquals, not assertSame: a MySQL JSON column normalises the
+        // order of its keys and SQLite keeps them as written, so an identical
+        // comparison here fails on one database and passes on the other while
+        // the stored styling is the same either way. Nothing reads these by
+        // position.
+        $this->assertEquals(['background' => '#0A1F44', 'paddingY' => '80'], $this->styles()['hero'] ?? null);
     }
 
     public function test_the_style_reaches_the_content_everyone_reads(): void
