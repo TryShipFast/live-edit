@@ -97,7 +97,11 @@ class Frontend
         // wp-admin. A scanner fix would reach a WordPress site weeks after
         // every other kind of site already had it — if the customer ever
         // updated at all.
-        $prepared = Api::prepare($html, self::pagePath(), $editing);
+        // The words go with the page. They are the customer's, they live in
+        // their own database, and the service applies them without keeping a
+        // copy — which is what makes "your content stays in your WordPress"
+        // true rather than a description of an intention.
+        $prepared = Api::prepare($html, self::pagePath(), $editing, Content::forViewer($editing));
 
         if ($prepared === null) {
             /*
@@ -229,6 +233,20 @@ class Frontend
                 // to.
                 'publishUrl' => rest_url('kastsbuild/v1/publish'),
                 'publishHeaders' => ['X-WP-Nonce' => wp_create_nonce('wp_rest')],
+                /*
+                 * The routes this site keeps for itself.
+                 *
+                 * Everything to do with the customer's words is answered here
+                 * and stored here. What is left for the service is what is
+                 * genuinely a service: the licence, signing in, the AI, stock
+                 * photos.
+                 */
+                'routes' => [
+                    '/live-edit/setting' => rest_url('kastsbuild/v1/setting'),
+                    '/live-edit/changes' => rest_url('kastsbuild/v1/changes'),
+                    '/live-edit/publish' => rest_url('kastsbuild/v1/publish'),
+                ],
+                'routeHeaders' => ['X-WP-Nonce' => wp_create_nonce('wp_rest')],
                 // Where to tell the page builder what changed, so its own copy
                 // of the words stops disagreeing with the client's. Only sent
                 // when there is a builder here to tell.
@@ -238,7 +256,7 @@ class Frontend
                 // Without this the editor has no Publish button at all, and
                 // someone could save drafts indefinitely with no way to
                 // release them — which is what happened before this existed.
-                'pending' => Api::pending(),
+                'pending' => Content::pending(),
                 // WordPress has no signed preview link to offer, and a control
                 // that does nothing is worse than one that is absent.
                 'previewUrl' => null,

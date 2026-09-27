@@ -233,18 +233,32 @@ export const apiRequestFor = (url, options = {}, api) => {
         '/live-edit/imagine': `${base}/${api?.site}/imagine`,
     };
 
-    // Publishing decides what the public sees, so the content API asks for a
-    // secret key — which a browser must never hold. A host that has its own
-    // idea of who may publish (WordPress knows, from its own users) points
-    // this at one of its own routes instead, and does the publishing from its
-    // server where the secret already lives.
-    if (url === '/live-edit/publish' && api?.publishUrl) {
+    /*
+     * A route the host has claimed for itself.
+     *
+     * Publishing was the first: it decides what the public sees, so the
+     * content API asks for a secret key, which a browser must never hold. A
+     * host with its own idea of who may publish — WordPress knows, from its
+     * own users — points it at one of its own routes and publishes from its
+     * server, where the secret already lives.
+     *
+     * The same door is how a host takes ownership of its content. WordPress
+     * keeps its customers' words in their own database, so it claims the
+     * routes that read and write them, and the content API never sees them.
+     * Anything it does not claim still goes to the service: the licence, the
+     * sign-in, the AI, the stock photos. Those are services, not the
+     * customer's content.
+     *
+     * Same origin, so the host's own session says who this is.
+     */
+    const claimed = api?.routes?.[path] ?? (path === '/live-edit/publish' ? api?.publishUrl : null);
+
+    if (claimed) {
         return {
-            url: api.publishUrl,
+            url: query ? `${claimed}?${query}` : claimed,
             init: {
                 ...options,
-                headers: { ...(options.headers ?? {}), ...(api.publishHeaders ?? {}), Accept: 'application/json' },
-                // Same origin, so the host's own session says who this is.
+                headers: { ...(options.headers ?? {}), ...(api.routeHeaders ?? api.publishHeaders ?? {}), Accept: 'application/json' },
                 credentials: 'same-origin',
             },
         };

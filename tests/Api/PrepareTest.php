@@ -76,6 +76,50 @@ class PrepareTest extends TestCase
         return ['Authorization' => 'Bearer '.$plain, 'Origin' => 'https://client.test'];
     }
 
+    public function test_a_host_that_keeps_its_own_words_sends_them_and_we_store_none(): void
+    {
+        /*
+         * The WordPress arrangement. A client's words live in their own
+         * WordPress tables, and this service applies them to a page without
+         * ever holding a copy — which is what makes "your content stays in
+         * your database" true rather than aspirational.
+         *
+         * Before this, the plugin posted the page and we looked the words up
+         * in our own store, so every WordPress site's content lived here
+         * whatever the architecture claimed.
+         */
+        $html = '<html><body><h1 data-edit="setting:hero">Template words</h1></body></html>';
+
+        $response = $this->postJson($this->url(), [
+            'html' => $html,
+            'content' => ['hero' => 'Words from the customer\'s own database'],
+        ], $this->reader());
+
+        $response->assertOk();
+        $this->assertStringContainsString('Words from the customer\'s own database', $response->json('html'));
+
+        // Nothing kept. The count is the promise.
+        $this->assertSame(0, \DB::table('live_edit_site_settings')->where('site_id', $this->site->id)->count());
+    }
+
+    public function test_a_host_that_sends_no_words_yet_is_not_given_somebody_elses(): void
+    {
+        // An empty list is a real answer: a site nobody has written on. It
+        // must not be read as "look them up for me", or a WordPress site that
+        // had migrated would start showing whatever we still held.
+        $store = new SiteStore($this->site);
+        $store->put('hero', 'Ours, not theirs', false);
+
+        $response = $this->postJson($this->url(), [
+            'html' => '<html><body><h1 data-edit="setting:hero">Template words</h1></body></html>',
+            'content' => [],
+        ], $this->reader());
+
+        $response->assertOk();
+        $this->assertStringNotContainsString('Ours, not theirs', $response->json('html'));
+        $this->assertStringContainsString('Template words', $response->json('html'));
+    }
+
     public function test_a_page_comes_back_marked_up_and_carrying_the_clients_words(): void
     {
         // The whole point in one case: the host sends what its theme rendered

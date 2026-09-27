@@ -153,13 +153,25 @@ class Api
      * the caller can serve the theme's own markup. Losing the editor for one
      * page view is a small thing; losing the website is not.
      */
-    public static function prepare(string $html, string $page, bool $editing): ?string
+    /**
+     * @param  array<string, string>|null  $content  The words this site holds
+     */
+    public static function prepare(string $html, string $page, bool $editing, ?array $content = null): ?string
     {
         $key = $editing
             ? (Session::forCurrentUser() ?? Settings::get('publishable_key'))
             : Settings::get('publishable_key');
 
-        $body = self::post('/prepare', $key, ['html' => $html, 'page' => $page]);
+        $payload = ['html' => $html, 'page' => $page];
+
+        // Sent even when empty, because empty is a real answer — a site
+        // nobody has written on — and leaving it out would ask the service to
+        // look the words up in a store that is no longer the one that matters.
+        if ($content !== null) {
+            $payload['content'] = $content;
+        }
+
+        $body = self::post('/prepare', $key, $payload);
         $prepared = $body['html'] ?? null;
 
         return is_string($prepared) && $prepared !== '' ? $prepared : null;

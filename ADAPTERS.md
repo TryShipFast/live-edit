@@ -40,17 +40,21 @@ Measured by counting rows, not by reading the design.
 | Adapter | Owns the content | Evidence |
 | --- | --- | --- |
 | Laravel | **the application** | 1 row in the app's own settings table, 0 in the control plane |
-| WordPress | **the control plane** | 12 content rows in the plane; WordPress holds only transients (licence, session, page cache) |
+| WordPress | **WordPress** | edits land in `wp_kastsbuild_content`; the plane's count stayed frozen at 12 across an edit and a publish |
 | Plain HTML | the control plane | as intended, the site has no data layer of its own |
 | Next.js | the control plane | 1 published row in the plane |
 
-**WordPress does not match the stated architecture.** The intention on record
-is that Laravel and WordPress both keep their own data and only ask us whether
-the licence is good. Laravel does. WordPress does not: the plugin never writes
-content into `wp_options`, `wp_posts` or `wp_postmeta`, and an edit goes to
-the plane like any cloud site. That is a deliberate-looking design — the
-plugin reads content and caches it — but it is not what the architecture says,
-and it changes the answer to "what happens to my words if we fall out".
+**WordPress now matches the stated architecture.** It keeps its client's words
+in tables of its own — `wp_kastsbuild_content` for published and held changes,
+`wp_kastsbuild_versions` for snapshots — so `wp db export` contains their
+content rather than an opaque reference to ours. The page is still sent to the
+service to be marked up, and the words go with it to be applied, but the
+service stores none of them: measured across an edit and a publish, its row
+count for that site did not move.
+
+The twelve rows it already held were copied down and left in place, frozen.
+Nothing writes to them again. A migration that goes wrong is survivable, at
+the cost of a second copy that will drift.
 
 ## Content types
 

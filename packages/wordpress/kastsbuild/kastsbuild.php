@@ -19,6 +19,7 @@
  * already manages. That is theirs.
  */
 use KastsBuild\Builder;
+use KastsBuild\Content;
 use KastsBuild\Credits;
 use KastsBuild\Frontend;
 use KastsBuild\Licence;
@@ -52,6 +53,7 @@ if (is_file(KASTSBUILD_PATH.'vendor/autoload.php')) {
     require KASTSBUILD_PATH.'vendor/autoload.php';
 }
 
+require KASTSBUILD_PATH.'includes/Content.php';
 require KASTSBUILD_PATH.'includes/Settings.php';
 require KASTSBUILD_PATH.'includes/Api.php';
 require KASTSBUILD_PATH.'includes/Licence.php';
@@ -63,6 +65,17 @@ require KASTSBUILD_PATH.'includes/Builder.php';
 require KASTSBUILD_PATH.'includes/Credits.php';
 
 add_action('plugins_loaded', function () {
+    // Before anything reads or writes them: a plugin updated by copying files
+    // over the old ones never fires its activation hook, and a missing table
+    // would lose a client's next edit rather than failing loudly.
+    Content::ensureTables();
+
+    // Once, for a site edited before its words lived here. Cheap after that:
+    // one option read.
+    if (Settings::configured()) {
+        Content::migrateFromService();
+    }
+
     Settings::boot();
     Frontend::boot();
     Publishing::boot();

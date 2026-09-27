@@ -417,12 +417,24 @@ class ContentController
         $validated = $request->validate([
             'html' => ['required', 'string', 'max:'.PrepareMarkup::MAX_BYTES],
             'page' => ['nullable', 'string', 'max:200'],
+            // A host that keeps its customers' words in its own database sends
+            // them with the page. Present and empty is a real answer — a site
+            // nobody has written on yet — and absent means the words are ours
+            // to look up.
+            'content' => ['sometimes', 'array'],
+            'content.*' => ['nullable', 'string'],
         ]);
 
         $site = ApiContext::site($request);
         $editing = ApiContext::token($request)->can(Ability::Write);
 
-        $result = $prepare($site, $validated['html'], $validated['page'] ?? '', $editing);
+        $result = $prepare(
+            $site,
+            $validated['html'],
+            $validated['page'] ?? '',
+            $editing,
+            $request->has('content') ? array_map(fn ($v) => (string) $v, $validated['content'] ?? []) : null
+        );
 
         Meter::record($site, Meter::TAG);
 

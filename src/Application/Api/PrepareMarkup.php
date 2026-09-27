@@ -38,7 +38,10 @@ class PrepareMarkup
     /**
      * @return array{html: string, applied: int, tagged: bool, version: int}
      */
-    public function __invoke(Site $site, string $html, string $page = '', bool $editing = false): array
+    /**
+     * @param  array<string, string>|null  $given  Words the caller holds itself
+     */
+    public function __invoke(Site $site, string $html, string $page = '', bool $editing = false, ?array $given = null): array
     {
         $store = new SiteStore($site);
         $scanner = new MarkupScanner;
@@ -52,14 +55,31 @@ class PrepareMarkup
             ? $html
             : ($scanner->apply($html, ['text', 'image', 'link', 'icon'], true, null, $page)['html'] ?? $html);
 
-        // An editor sees their own unpublished work laid over the published
-        // page; everybody else sees only what has been published. Same rule
-        // and the same order as the content endpoint, because a second answer
-        // to that question is how a half-typed sentence reaches a visitor.
-        $content = $store->published();
+        /*
+         * The words, from whoever owns them.
+         *
+         * A host that keeps its customers' content in its own database sends
+         * it along with the page and we store none of it. WordPress does
+         * exactly that: its client's words live in their WordPress tables, and
+         * this service applies them without ever holding a copy. Passing an
+         * empty array is a real answer — a site with nothing written yet —
+         * which is why the check is for null rather than for emptiness.
+         *
+         * Otherwise the words are ours to keep, as they are for a site with no
+         * data layer of its own, and the rule is the same one the content
+         * endpoint follows: an editor sees their own unpublished work laid
+         * over the published page, everybody else sees only what is published.
+         * A second answer to that question is how a half-typed sentence
+         * reaches a visitor.
+         */
+        if ($given !== null) {
+            $content = $given;
+        } else {
+            $content = $store->published();
 
-        if ($editing) {
-            $content = array_merge($content, $store->draftedSettings());
+            if ($editing) {
+                $content = array_merge($content, $store->draftedSettings());
+            }
         }
 
         $html = $content === [] ? $marked : $scanner->applyOverrides($marked, $content);
