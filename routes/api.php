@@ -221,6 +221,20 @@ Route::middleware([EnforceCors::class])
             ->name('live-edit.api.sign-in.password');
     });
 
+/*
+ * The sign-in page, served by the service.
+ *
+ * Under `web` because it is a page with a form and needs a session and a CSRF
+ * token — everything else in this file is an API and has neither.
+ */
+Route::middleware(['web', ThrottleApi::class.':sign_in'])->group(function () {
+    Route::get('/live-edit/sign-in', [SignInController::class, 'form'])
+        ->name('live-edit.sign-in.form');
+
+    Route::post('/live-edit/sign-in', [SignInController::class, 'submit'])
+        ->name('live-edit.sign-in.submit');
+});
+
 Route::get('/live-edit/sign-in/{token}', [SignInController::class, 'redeem'])
     ->middleware([ThrottleApi::class.':sign_in'])
     ->name('live-edit.sign-in.redeem');

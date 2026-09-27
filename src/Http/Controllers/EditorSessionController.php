@@ -5,6 +5,7 @@ namespace ShipFast\LiveEdit\Http\Controllers;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use ShipFast\LiveEdit\Support\EditorSession;
+use ShipFast\LiveEdit\Support\Licence;
 
 /**
  * Where the toolbar hands this site a session it was given.
@@ -48,5 +49,51 @@ class EditorSessionController
         $request->session()->regenerate();
 
         return response()->json(['ok' => true]);
+    }
+
+    /**
+     * The door an owner walks through to start editing.
+     *
+     * Two jobs in one address, because the round trip has to come back
+     * somewhere and sending it to a second URL would mean two things for a
+     * customer to know about.
+     *
+     * Arriving with nothing: off to the service to sign in.
+     * Arriving back from it: a token is in the fragment, which the server
+     * cannot see — so the page hands it to the route above and goes home.
+     */
+    public function enter(Request $request)
+    {
+        if (EditorSession::check()) {
+            return redirect($this->safeDestination($request));
+        }
+
+        if (! Licence::configured()) {
+            // Nothing to sign in to. Said plainly, because the alternative is
+            // a redirect to a service this site has never been told about.
+            return response(
+                'This site is not registered for editing yet. Add LIVE_EDIT_SITE and LIVE_EDIT_KEY to its environment.',
+                409
+            );
+        }
+
+        return response()->view('live-edit::enter', [
+            'signInUrl' => Licence::signInUrl($request->fullUrl()),
+            'destination' => $this->safeDestination($request),
+        ])->withHeaders(['Cache-Control' => 'no-store, private']);
+    }
+
+    /**
+     * Where to go after signing in, when the caller asked for somewhere.
+     *
+     * Only a path on this site. An absolute URL here would let a link decide
+     * where a freshly signed-in editor lands, which is somebody else's page
+     * wearing this site's session.
+     */
+    private function safeDestination(Request $request): string
+    {
+        $to = (string) $request->query('to', '/');
+
+        return str_starts_with($to, '/') && ! str_starts_with($to, '//') ? $to : '/';
     }
 }

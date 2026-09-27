@@ -85,6 +85,13 @@ Route::middleware(config('live-edit.view_middleware', ['web']))->group(function 
  * service, the toolbar receives a token, and it hands it here to be checked.
  */
 Route::middleware(config('live-edit.view_middleware', ['web']))->group(function () {
+    /*
+     * Where an owner goes to start editing, and where signing in comes back
+     * to. One address for both, so there is one thing for a customer to know.
+     */
+    Route::get('/live-edit/enter', [EditorSessionController::class, 'enter'])
+        ->name('live-edit.enter');
+
     Route::post('/live-edit/session', [EditorSessionController::class, 'store'])
         ->name('live-edit.session.store');
 

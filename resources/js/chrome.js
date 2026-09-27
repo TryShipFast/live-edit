@@ -87,6 +87,10 @@ button, input, select, textarea { font: inherit; color: inherit; margin: 0; }
   box-shadow: 0 20px 50px -10px rgba(11,12,15,.45);
   scrollbar-width: none;
 }
+.le-hello {
+  font-size: 13px; color: rgba(255,255,255,.72); white-space: nowrap;
+  padding-left: 10px; margin-left: 2px; border-left: 1px solid rgba(255,255,255,.14);
+}
 .le-mark {
   width: 34px; height: 34px; flex: none; border-radius: 999px; background: #fff;
   display: inline-flex; align-items: center; justify-content: center;
@@ -704,6 +708,19 @@ export function createChrome() {
     const statusText = el('span', null, 'Viewing as visitor');
     status.append(dot, statusText);
     toolbar.append(mark, status);
+
+    /* Who is editing, when we know.
+
+       Only for somebody who signed in with the service — a site using its own
+       accounts has never told us a name, and inventing one would be worse
+       than saying nothing. Dropped first on a narrow screen: it is a courtesy,
+       and every other thing on this bar is a control. */
+    const editor = window.liveEditEditor ?? null;
+
+    if (editor?.greeting) {
+        const hello = el('span', 'le-hello le-when-roomy', 'Welcome ' + editor.greeting);
+        toolbar.append(hello);
+    }
 
     let localeSelect = null;
     const locales = config.locales ?? {};

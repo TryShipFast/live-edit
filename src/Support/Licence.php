@@ -176,6 +176,20 @@ final class Licence
         )));
     }
 
+    /**
+     * Where this site's people go to sign in.
+     *
+     * On the service, so a password is never typed into the customer's own
+     * site and never crosses their server.
+     */
+    public static function signInUrl(string $returnTo): string
+    {
+        return self::host().'/live-edit/sign-in?'.http_build_query([
+            'site' => self::site(),
+            'return_to' => $returnTo,
+        ]);
+    }
+
     /** Forget what we were told, so the next check really asks. */
     public static function forget(): void
     {

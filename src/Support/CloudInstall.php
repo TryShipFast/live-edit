@@ -34,6 +34,29 @@ class CloudInstall
      * broken tag — or a warning about a key it is right not to have — printed
      * into every page.
      */
+    /**
+     * Tell the toolbar who it is talking to.
+     *
+     * Only when somebody signed in with us: a site using its own accounts has
+     * no name to offer, and the bar says nothing rather than guessing. Small
+     * enough to inline, and it has to be inline — a greeting that arrives
+     * after a request would appear a moment late, which looks like a bug on
+     * the one element whose job is to feel immediate.
+     */
+    private static function whoIsEditing(): string
+    {
+        $editor = EditorSession::current();
+
+        if ($editor === null) {
+            return '';
+        }
+
+        return '<script>window.liveEditEditor='.json_encode(
+            ['greeting' => $editor['greeting'] ?? null],
+            JSON_THROW_ON_ERROR | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT
+        ).';</script>';
+    }
+
     public static function script(): string
     {
         $site = trim((string) config('live-edit.cloud.site'));
@@ -74,7 +97,8 @@ class CloudInstall
                 return '';
             }
 
-            return '<script src="'.e(url('live-edit/runtime.js')).'" type="module" defer></script>';
+            return self::whoIsEditing()
+                .'<script src="'.e(url('live-edit/runtime.js')).'" type="module" defer></script>';
         }
 
         // The per-site install rather than the runtime directly, which is also
