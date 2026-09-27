@@ -86,6 +86,24 @@ moment their site allows SVG, this does too.
 
 ---
 
+### Style drafts held on the service before this release are not carried down
+**Adapter:** WordPress. **Recorded:** 2026-09-27. **Severity:** low.
+
+When WordPress took ownership of its words, publishing moved to the site while
+styling was still written to the service. Anything held unpublished there was
+stranded: it could be saved, and seen while editing, and could never go live.
+Three such drafts were found on the test site.
+
+Published styling is brought down on upgrade. Held styling is not, because it
+was never visible to anybody but its author and could not be published at all.
+A client who had a colour waiting will find it gone and will have to set it
+again - and this time it will publish.
+
+**To close it:** nothing to close. Carrying down work that could never have
+been released would restore a state the product never had.
+
+---
+
 ### Corrected: the misdiagnosis that started the React work
 **Adapter:** React, Next.js. **Recorded:** 2026-09-27.
 

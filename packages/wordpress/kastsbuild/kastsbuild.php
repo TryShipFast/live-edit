@@ -27,6 +27,7 @@ use KastsBuild\Media;
 use KastsBuild\PlaneSession;
 use KastsBuild\Publishing;
 use KastsBuild\Settings;
+use KastsBuild\Styles;
 
 if (! defined('ABSPATH')) {
     exit;
@@ -55,6 +56,7 @@ if (is_file(KASTSBUILD_PATH.'vendor/autoload.php')) {
 }
 
 require KASTSBUILD_PATH.'includes/Content.php';
+require KASTSBUILD_PATH.'includes/Styles.php';
 require KASTSBUILD_PATH.'includes/Settings.php';
 require KASTSBUILD_PATH.'includes/Api.php';
 require KASTSBUILD_PATH.'includes/Licence.php';
@@ -76,6 +78,7 @@ add_action('plugins_loaded', function () {
     // one option read.
     if (Settings::configured()) {
         Content::migrateFromService();
+        Styles::migrateFromService();
     }
 
     Settings::boot();

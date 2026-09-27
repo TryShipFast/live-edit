@@ -72,13 +72,26 @@ zero bytes of upload. The photographer's credit on the picture that was replaced
 was cleared in the same request, so no name was left under somebody else's
 photograph.
 
-**What is still not the client's: styles.** Corner rounding, spacing and the
-rest still go to `/live-edit/style` on the service, because the plugin does not
-claim that route. Nothing has been written there for this site yet - measured, 0
-rows - so nothing is lost today, but a client who changes a corner radius puts
-that row in our database rather than theirs. It is the same fix as the words:
-claim the route, keep a table. That is the next stage rather than a limitation,
-and it is called out here so the ownership claim above stays honest.
+Styling is theirs now too, in `wp_kastsbuild_styles`, and closing that gap
+turned out to fix a live fault rather than only a principle. Since the words
+moved, a style saved on WordPress went to the service as a draft while
+publishing happened here - so a client could change a colour, watch it apply
+while editing, press Publish, and no visitor would ever see it. Three such
+drafts were sitting stranded on this site. Measured end to end: a colour set in
+the drawer posted to the site's own route, listed in Changes as "text colour",
+published, and served to a visitor holding no cookies as
+`[data-style="..."]{color:#c2410c !important;}` - with the service holding 0
+style rows throughout.
+
+History carries it: restoring a version taken before the colour removed it, and
+restoring the snapshot that restore created put it back. Reverting a style
+leaves a held word alone, and "use default" publishes as removal rather than as
+a row that stays.
+
+**This half needs a package release to take effect.** The plugin sends styling
+with the page; a service running 0.9 ignores it and falls back to its own
+table, which is the old behaviour rather than a broken one. Sites upgrade
+safely in either order.
 
 ## Content types
 

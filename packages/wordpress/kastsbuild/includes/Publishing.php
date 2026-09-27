@@ -44,6 +44,18 @@ class Publishing
             'permission_callback' => $mayEdit,
         ]);
 
+        /*
+         * How a section looks, kept here with everything else that is the
+         * client's. It used to go to the service - the only part of their site
+         * that still did - so a client changing a background colour wrote that
+         * row into our database rather than their own.
+         */
+        register_rest_route('kastsbuild/v1', '/style', [
+            'methods' => 'POST',
+            'callback' => [self::class, 'style'],
+            'permission_callback' => $mayEdit,
+        ]);
+
         register_rest_route('kastsbuild/v1', '/changes', [
             'methods' => 'GET',
             'callback' => [self::class, 'changes'],
@@ -134,6 +146,53 @@ class Publishing
     }
 
     /**
+     * Save how one element looks, held back until somebody publishes.
+     *
+     * The properties are written as they arrive and checked on the way out
+     * rather than here: the service puts every one of them through its style
+     * policy before rendering any of it into a page. Keeping a second copy of
+     * that policy in this plugin is exactly the staleness the prepare endpoint
+     * exists to end, and a security rule is the worst thing to have two
+     * versions of - the one in a zip is always the old one.
+     *
+     * What is checked here is structure: a name that is a name, a value short
+     * enough to be one. That costs nothing and keeps obvious rubbish out of
+     * the client's own table.
+     */
+    public static function style(\WP_REST_Request $request): \WP_REST_Response
+    {
+        $key = trim((string) $request->get_param('key'));
+
+        if ($key === '' || ! preg_match('/^[A-Za-z0-9._-]{1,120}$/', $key)) {
+            return new \WP_REST_Response(['message' => 'That change did not say what it was changing.'], 422);
+        }
+
+        $props = $request->get_param('props');
+        $clean = [];
+
+        foreach (is_array($props) ? $props : [] as $prop => $value) {
+            if (is_string($prop) && preg_match('/^[A-Za-z]{1,40}$/', $prop)
+                && (is_string($value) || is_numeric($value) || $value === null)
+                && strlen((string) $value) <= 2000) {
+                $clean[$prop] = (string) $value;
+            }
+        }
+
+        // An empty set is how the editor says "put this back to the theme's
+        // own styling", so it is saved as a draft rather than ignored - and
+        // becomes a deletion when it is published.
+        Styles::put($key, array_filter($clean, static fn ($value) => $value !== ''), true);
+
+        return new \WP_REST_Response([
+            'saved' => true,
+            'key' => $key,
+            'held' => true,
+            'props' => $clean,
+            'pending' => Content::pending(),
+        ]);
+    }
+
+    /**
      * What is waiting to be published.
      *
      * Shaped the way the editor reads it - `before` and `after`, not `was` and
@@ -159,10 +218,11 @@ class Publishing
         $key = trim((string) $request->get_param('key'));
 
         if ($key !== '') {
-            return new \WP_REST_Response([
-                'reverted' => Content::revert($key, (string) ($request->get_param('locale') ?? '')) > 0,
-                'pending' => Content::pending(),
-            ]);
+            $reverted = ($request->get_param('kind') === 'style')
+                ? Styles::revert($key)
+                : Content::revert($key, (string) ($request->get_param('locale') ?? ''));
+
+            return new \WP_REST_Response(['reverted' => $reverted > 0, 'pending' => Content::pending()]);
         }
 
         return new \WP_REST_Response(['discarded' => Content::discard()]);

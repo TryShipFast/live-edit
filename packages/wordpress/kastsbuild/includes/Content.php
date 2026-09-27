@@ -26,7 +26,7 @@ namespace KastsBuild;
 class Content
 {
     /** Bumped when the tables change, so an upgrade knows to run dbDelta. */
-    private const SCHEMA = 1;
+    private const SCHEMA = 2;
 
     private const SCHEMA_OPTION = 'kastsbuild_schema';
 
@@ -89,6 +89,17 @@ class Content
             UNIQUE KEY one_value_per_key (content_key, locale, status),
             KEY by_status (status)
         ) {$collate};");
+
+        dbDelta('CREATE TABLE '.Styles::table().' (
+            id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+            style_key varchar(191) NOT NULL,
+            status varchar(12) NOT NULL DEFAULT \'published\',
+            props longtext NULL,
+            updated_at datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            PRIMARY KEY (id),
+            UNIQUE KEY one_set_per_key (style_key, status),
+            KEY by_status (status)
+        ) '.$collate.';');
 
         dbDelta("CREATE TABLE {$versions} (
             id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
@@ -156,16 +167,24 @@ class Content
         self::forget();
     }
 
-    /** How many changes are waiting to be published. */
+    /**
+     * How many changes are waiting to be published.
+     *
+     * Words and styling together, because the number on the Publish button
+     * answers "how much of my work is not live yet" and a changed colour is
+     * part of that work.
+     */
     public static function pending(): int
     {
         global $wpdb;
 
         self::ensureTables();
 
-        return (int) $wpdb->get_var(
+        $words = (int) $wpdb->get_var(
             $wpdb->prepare('SELECT COUNT(*) FROM '.self::contentTable().' WHERE status = %s', 'draft')
         );
+
+        return $words + Styles::pending();
     }
 
     /**
@@ -185,7 +204,13 @@ class Content
             $wpdb->prepare('SELECT content_key, locale, value FROM '.self::contentTable().' WHERE status = %s', 'draft')
         );
 
-        if ($drafts === []) {
+        // Styling counts as something to publish. Checking only the words here
+        // meant somebody who had changed nothing but a colour pressed Publish
+        // and was told nothing had happened - correctly, as far as this
+        // function could see, and wrongly as far as they could.
+        $styled = Styles::pending();
+
+        if ($drafts === [] && $styled === 0) {
             return 0;
         }
 
@@ -203,9 +228,11 @@ class Content
 
         $wpdb->delete(self::contentTable(), ['status' => 'draft']);
 
+        $styled = Styles::release();
+
         self::forget();
 
-        return count($drafts);
+        return count($drafts) + $styled;
     }
 
     /**
@@ -258,6 +285,7 @@ class Content
 
         $count = self::pending();
         $wpdb->delete(self::contentTable(), ['status' => 'draft']);
+        Styles::discard();
 
         self::forget();
 
@@ -298,6 +326,11 @@ class Content
             ];
         }
 
+        // Styling is work somebody did and has not published, so it belongs
+        // in the same list. Listed after the words because a changed sentence
+        // is the thing people check first.
+        $changes = array_merge($changes, Styles::changes());
+
         return ['changes' => $changes, 'count' => count($changes)];
     }
 
@@ -331,7 +364,14 @@ class Content
             'created_at' => current_time('mysql', true),
             'author' => $author,
             'note' => $note,
-            'payload' => wp_json_encode(self::rows('published', null)),
+            // Words and styling together. A version that restored the
+            // sentences and left last month's colours behind would be a page
+            // that never existed, and "restore" would mean something the
+            // person pressing it did not ask for.
+            'payload' => wp_json_encode([
+                'content' => self::rows('published', null),
+                'styles' => Styles::published(),
+            ]),
         ]);
 
         return (int) $wpdb->insert_id;
@@ -359,10 +399,18 @@ class Content
 
         return array_map(static function ($row) {
             $payload = json_decode((string) $row->payload, true);
+            $payload = is_array($payload) ? $payload : [];
+
+            // A snapshot holds words and styling under their own keys, and an
+            // older one is a flat map of words. Counting the top level would
+            // report every recent version as holding two changes.
+            $held = array_key_exists('content', $payload)
+                ? count((array) $payload['content']) + count((array) ($payload['styles'] ?? []))
+                : count($payload);
 
             return [
                 'number' => (int) $row->id,
-                'changes' => is_array($payload) ? count($payload) : 0,
+                'changes' => $held,
                 'restored_from' => $row->note !== '' && str_starts_with((string) $row->note, 'restored:')
                     ? (int) substr((string) $row->note, 9)
                     : null,
@@ -399,11 +447,19 @@ class Content
             return null;
         }
 
-        $words = json_decode((string) $payload, true);
+        $saved = json_decode((string) $payload, true);
 
-        if (! is_array($words)) {
+        if (! is_array($saved)) {
             return null;
         }
+
+        /*
+         * Snapshots taken before styling was kept here are a flat map of
+         * words, with no 'content' key. Read as though they had one, they
+         * would restore a page with nothing on it.
+         */
+        $words = array_key_exists('content', $saved) ? (array) $saved['content'] : $saved;
+        $styles = array_key_exists('styles', $saved) ? (array) $saved['styles'] : null;
 
         self::snapshot($author, 'restored:'.$id);
 
@@ -414,6 +470,13 @@ class Content
 
         foreach ($words as $key => $value) {
             self::put((string) $key, $value === null ? null : (string) $value, false);
+        }
+
+        // Only where the snapshot has something to say about styling. An old
+        // one does not, and clearing what the site looks like on the strength
+        // of a version that never recorded it would be a change nobody made.
+        if ($styles !== null) {
+            Styles::replace($styles);
         }
 
         self::forget();

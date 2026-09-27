@@ -2,7 +2,9 @@
 
 namespace ShipFast\LiveEdit\Application\Api;
 
+use Illuminate\Validation\ValidationException;
 use ShipFast\LiveEdit\Domain\Content\SiteStore;
+use ShipFast\LiveEdit\Domain\Content\StylePolicy;
 use ShipFast\LiveEdit\Domain\Site\Site;
 use ShipFast\LiveEdit\Mapper\MarkupScanner;
 use ShipFast\LiveEdit\Support\StyleCss;
@@ -40,9 +42,16 @@ class PrepareMarkup
      */
     /**
      * @param  array<string, string>|null  $given  Words the caller holds itself
+     * @param  array{published?: array<string, array<string, string>>, draft?: array<string, array<string, string>>}|null  $givenStyles  Styling the caller holds itself
      */
-    public function __invoke(Site $site, string $html, string $page = '', bool $editing = false, ?array $given = null): array
-    {
+    public function __invoke(
+        Site $site,
+        string $html,
+        string $page = '',
+        bool $editing = false,
+        ?array $given = null,
+        ?array $givenStyles = null
+    ): array {
         $store = new SiteStore($site);
         $scanner = new MarkupScanner;
 
@@ -102,7 +111,7 @@ class PrepareMarkup
         }
 
         return [
-            'html' => $this->withStyling($html, $store, $editing),
+            'html' => $this->withStyling($html, $store, $editing, $givenStyles),
             'applied' => count($content),
             'tagged' => ! $alreadyMarked,
             'version' => (int) ($store->version() ?? 0),
@@ -123,15 +132,20 @@ class PrepareMarkup
      * for a host that cannot run it, and it reuses the renderer content.js is
      * kept in step with rather than growing a second answer.
      */
-    private function withStyling(string $html, SiteStore $store, bool $editing): string
+    private function withStyling(string $html, SiteStore $store, bool $editing, ?array $given = null): string
     {
         // Passed in rather than left to the renderer to look up. Its fallback
         // reads every style row on the service, which on a host serving more
         // than one site is another client's colours.
-        $css = StyleCss::render(
-            $editing ? $store->draftedStyles() : [],
-            $store->publishedStyles(),
-        );
+        $css = $given !== null
+            ? StyleCss::render(
+                $editing ? $this->safeStyles($given['draft'] ?? []) : [],
+                $this->safeStyles($given['published'] ?? []),
+            )
+            : StyleCss::render(
+                $editing ? $store->draftedStyles() : [],
+                $store->publishedStyles(),
+            );
 
         if (trim($css) === '') {
             return $html;
@@ -148,5 +162,60 @@ class PrepareMarkup
         return $position === false
             ? $html.$tag
             : substr($html, 0, $position).$tag.substr($html, $position);
+    }
+
+    /**
+     * Styling from a host, put through the policy before it is rendered.
+     *
+     * The renderer writes values straight into a `<style>` tag, which is safe
+     * only because everything it has ever rendered was validated on the way
+     * into our own tables. Styling that arrives with the page has not been:
+     * a value ending `</style><script>` would close the tag and run.
+     *
+     * Not a question of trusting the host. The host is passing on whatever was
+     * in its database, which a client typed, which is the same untrusted path
+     * as our own write endpoint - it simply arrives by a different door, and
+     * a door without the check on it is the whole of the problem.
+     *
+     * A bad value is dropped rather than refused, because this renders a page.
+     * Somebody visiting a site should not get an error because one saved
+     * colour is malformed; they should get the page, without it.
+     *
+     * The policy stays here rather than being copied into a plugin, which is
+     * what this whole endpoint exists to avoid. A security rule is the worst
+     * thing to keep two versions of, and the one in the zip is always the old
+     * one.
+     *
+     * @param  array<string, array<string, string>>  $styles
+     * @return array<string, array<string, string>>
+     */
+    private function safeStyles(array $styles): array
+    {
+        $policy = app(StylePolicy::class);
+        $safe = [];
+
+        foreach ($styles as $key => $props) {
+            if (! is_string($key) || ! is_array($props) || ! $policy->permitsKey($key)) {
+                continue;
+            }
+
+            $clean = [];
+
+            // One property at a time, so a single malformed colour costs that
+            // colour rather than every other thing set on the same element.
+            foreach ($props as $prop => $value) {
+                try {
+                    $clean += $policy->clean([$prop => $value]);
+                } catch (ValidationException) {
+                    continue;
+                }
+            }
+
+            if ($clean !== []) {
+                $safe[$key] = $clean;
+            }
+        }
+
+        return $safe;
     }
 }

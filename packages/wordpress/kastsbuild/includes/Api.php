@@ -56,6 +56,22 @@ class Api
     }
 
     /**
+     * The styling the service still holds for this site.
+     *
+     * Read once, when this site takes ownership of its own. Published only and
+     * with the publishable key, because that is what it is: what visitors can
+     * already see.
+     *
+     * @return array<string, array<string, string>>
+     */
+    public static function styles(): array
+    {
+        $body = self::get('/content', (string) Settings::get('publishable_key'));
+
+        return is_array($body['styles'] ?? null) ? $body['styles'] : [];
+    }
+
+    /**
      * What the live content currently is, as a short token.
      *
      * Not the version number. A site with publishing turned off changes its
@@ -156,8 +172,13 @@ class Api
     /**
      * @param  array<string, string>|null  $content  The words this site holds
      */
-    public static function prepare(string $html, string $page, bool $editing, ?array $content = null): ?string
-    {
+    public static function prepare(
+        string $html,
+        string $page,
+        bool $editing,
+        ?array $content = null,
+        ?array $styles = null
+    ): ?string {
         $key = $editing
             ? (Session::forCurrentUser() ?? Settings::get('publishable_key'))
             : Settings::get('publishable_key');
@@ -169,6 +190,12 @@ class Api
         // look the words up in a store that is no longer the one that matters.
         if ($content !== null) {
             $payload['content'] = $content;
+        }
+
+        // And the styling, on the same terms. Absent means "look it up",
+        // which for this site would find a store nothing writes to any more.
+        if ($styles !== null) {
+            $payload['styles'] = $styles;
         }
 
         $body = self::post('/prepare', $key, $payload);

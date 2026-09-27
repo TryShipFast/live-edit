@@ -101,7 +101,13 @@ class Frontend
         // their own database, and the service applies them without keeping a
         // copy — which is what makes "your content stays in your WordPress"
         // true rather than a description of an intention.
-        $prepared = Api::prepare($html, self::pagePath(), $editing, Content::forViewer($editing));
+        $prepared = Api::prepare(
+            $html,
+            self::pagePath(),
+            $editing,
+            Content::forViewer($editing),
+            Styles::forViewer($editing)
+        );
 
         if ($prepared === null) {
             /*
@@ -246,6 +252,7 @@ class Frontend
                     '/live-edit/changes' => rest_url('kastsbuild/v1/changes'),
                     '/live-edit/publish' => rest_url('kastsbuild/v1/publish'),
                     '/live-edit/versions' => rest_url('kastsbuild/v1/versions'),
+                    '/live-edit/style' => rest_url('kastsbuild/v1/style'),
                     // Pictures too: they go into this site's own media
                     // library, so the client's photographs are theirs in the
                     // same way their words are.

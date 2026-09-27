@@ -423,6 +423,16 @@ class ContentController
             // to look up.
             'content' => ['sometimes', 'array'],
             'content.*' => ['nullable', 'string'],
+            // And its styling, for the same reason and by the same rule. Each
+            // value is put through the style policy before anything is
+            // rendered from it — see PrepareMarkup::safeStyles, which is where
+            // that has to happen rather than here, because the same check must
+            // cover every way styling can reach the renderer.
+            'styles' => ['sometimes', 'array'],
+            'styles.published' => ['sometimes', 'array'],
+            'styles.draft' => ['sometimes', 'array'],
+            'styles.*.*' => ['sometimes', 'array'],
+            'styles.*.*.*' => ['nullable', 'string', 'max:2000'],
         ]);
 
         $site = ApiContext::site($request);
@@ -433,7 +443,8 @@ class ContentController
             $validated['html'],
             $validated['page'] ?? '',
             $editing,
-            $request->has('content') ? array_map(fn ($v) => (string) $v, $validated['content'] ?? []) : null
+            $request->has('content') ? array_map(fn ($v) => (string) $v, $validated['content'] ?? []) : null,
+            $request->has('styles') ? (array) ($validated['styles'] ?? []) : null
         );
 
         Meter::record($site, Meter::TAG);
