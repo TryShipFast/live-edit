@@ -640,6 +640,33 @@ select.le-input {
  * so these go in the document, not the shadow root.
  */
 export const PAGE_CSS = `
+/*
+ * Room for the bar.
+ *
+ * It is fixed to the bottom of the viewport and floats over whatever is
+ * there, which for most sites is the last line of the footer and, on a short
+ * page, the very thing somebody came to edit. Scrolling does not help: the
+ * page ends underneath it. So the document is given a strip of clearance for
+ * as long as the editor is on screen, and gets it back the moment the editor
+ * goes.
+ *
+ * scroll-padding as well as padding, so anchoring to something near the end
+ * of the page does not land it behind the bar either.
+ */
+html:has(#live-edit-ui) {
+  scroll-padding-bottom: 96px;
+}
+body:has(#live-edit-ui) {
+  padding-bottom: 96px;
+}
+/* Sticky footers and cookie bars sit at the bottom too, and two things
+   claiming the same corner is how a client ends up unable to reach either.
+   The bar is ours and is the newer arrival, so it lifts itself rather than
+   covering theirs. */
+@media (max-width: 700px) {
+  html:has(#live-edit-ui) { scroll-padding-bottom: 112px; }
+  body:has(#live-edit-ui) { padding-bottom: 112px; }
+}
 body.editing [data-edit],
 body.editing [data-edit-href]:not([data-edit]),
 /* The picture itself is marked the same way the words are. */

@@ -104,6 +104,21 @@ const bootLiveEdit = () => {
         // host theme's CSS can neither style it nor be broken by it.
         const ui = createChrome();
 
+        /**
+         * Tell the client something went wrong, in the editor's own voice.
+         *
+         * window.alert was doing this. It works, in that the message is
+         * impossible to miss, and it is wrong in three ways: it stops the
+         * page dead until somebody clicks, it looks like the browser talking
+         * rather than the editor, and it sat beside a toast system used for
+         * every other message, so a refused save and a successful one arrived
+         * through different machinery.
+         *
+         * Long, because a refusal is usually a sentence worth reading, and
+         * unlike an alert a toast will not wait for you.
+         */
+        const notify = (message) => ui.toast(String(message ?? '').trim() || 'Something went wrong.', 9000);
+
         const toastMessage = sessionStorage.getItem('tb_toast');
         if (toastMessage) {
             sessionStorage.removeItem('tb_toast');
@@ -572,7 +587,7 @@ const bootLiveEdit = () => {
                             // Repaint the live preview with the stored URL.
                             input.dispatchEvent(new Event('input', { bubbles: true }));
                         } catch (error) {
-                            window.alert(plainly(error, 'save that'));
+                            notify(plainly(error, 'save that'));
                         }
                     },
                 });
@@ -998,6 +1013,16 @@ const bootLiveEdit = () => {
         let credits = null;
 
         const loadCredits = async () => {
+            /*
+             * Credits are the service's, and only a site whose content we hold
+             * has any. A self-hosted install has no such endpoint, so this
+             * asked for one on every page load and got a 404 in the client's
+             * console for its trouble.
+             */
+            if (!window.liveEditApi) {
+                return;
+            }
+
             try {
                 const response = await request('/live-edit/credits', { method: 'GET' });
                 credits = await response.json();
@@ -1031,6 +1056,13 @@ const bootLiveEdit = () => {
          */
         const loadStyleVocabulary = async () => {
             if (window.liveEditStyleProps && window.liveEditStyles) return;
+
+            // Same as the credits: there is no content endpoint on a site that
+            // keeps its own. What such a site accepts is printed into the page
+            // beside the runtime instead, so by here there is nothing to ask.
+            if (!window.liveEditApi) {
+                return;
+            }
 
             try {
                 const response = await request('/live-edit/content', { method: 'GET' });
@@ -1582,7 +1614,7 @@ const bootLiveEdit = () => {
 
             if (email) {
                 await session.requestLink(api, email, window).catch(() => {});
-                window.alert('If that address can edit this site, a link is on its way.');
+                notify('If that address can edit this site, a link is on its way.');
             }
 
             // Back to how a visitor sees it, rather than a page that still
@@ -1808,7 +1840,7 @@ const bootLiveEdit = () => {
                     attrInputs.forEach((input) => formData.append(input.dataset.imgAttr, input.value));
                     if (!file && !url && attrInputs.length === 0) {
                         restoreButton();
-                        window.alert('Choose a file from your computer or paste an image URL first.');
+                        notify('Choose a file from your computer or paste an image URL first.');
                         return;
                     }
                     await request('/live-edit/image', { method: 'POST', body: formData });
@@ -1841,7 +1873,7 @@ const bootLiveEdit = () => {
                 settle('Saved \u2713', current.key ?? null, current.savedValue ?? null);
             } catch (error) {
                 restoreButton();
-                window.alert(error.message);
+                notify(error.message);
             }
         };
 
@@ -2474,7 +2506,7 @@ const bootLiveEdit = () => {
                         });
                         const data = await res.json();
                         if (data.moved) reloadWithToast('Reordered \u2713');
-                        else window.alert(direction === 'up' ? 'Already first.' : 'Already last.');
+                        else notify(direction === 'up' ? 'Already first.' : 'Already last.');
                     });
                     return button;
                 };
@@ -2506,7 +2538,7 @@ const bootLiveEdit = () => {
                     });
                     reloadWithToast(message);
                 } catch (error) {
-                    window.alert(error.message);
+                    notify(error.message);
                 }
             };
 

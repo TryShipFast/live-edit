@@ -164,4 +164,34 @@ class EditorSignsInWithUsTest extends TestCase
         $this->assertFalse(Hash::check('wrong', $hash));
         $this->assertTrue(Hash::check('the-right-one', $hash));
     }
+
+    public function test_the_session_is_not_left_in_the_address_bar(): void
+    {
+        $this->serviceSays($this->aGoodSession());
+        EditorSession::start('kbe_good');
+
+        /*
+         * Already signed in, arriving with a session still in the fragment.
+         *
+         * A browser carries a fragment across a redirect when the new address
+         * has none, so this path handed somebody their page with a working
+         * session on screen. The fragment exists precisely so the token never
+         * reaches a server or a log, and leaving it visible at the end of the
+         * journey gives all of that back to the first shared link.
+         */
+        $this->get('/live-edit/enter?to=/about')
+            ->assertRedirect('/about#');
+    }
+
+    public function test_somewhere_else_is_not_a_destination(): void
+    {
+        $this->serviceSays($this->aGoodSession());
+        EditorSession::start('kbe_good');
+
+        // An absolute address here would let a link decide where a freshly
+        // signed-in editor lands, which is somebody else's page wearing this
+        // site's session.
+        $this->get('/live-edit/enter?to=https://somewhere-else.test/steal')
+            ->assertRedirect('/#');
+    }
 }

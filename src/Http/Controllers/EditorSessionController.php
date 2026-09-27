@@ -65,7 +65,20 @@ class EditorSessionController
     public function enter(Request $request)
     {
         if (EditorSession::check()) {
-            return redirect($this->safeDestination($request));
+            /*
+             * The trailing hash is not a typo.
+             *
+             * A browser carries the fragment across a redirect when the new
+             * address has none of its own, so somebody who was already signed
+             * in and arrived here with a session in the fragment was sent on
+             * to their page with it still in the address bar. An empty
+             * fragment is a fragment, and replaces it.
+             *
+             * The fragment exists so a session never reaches a server or a
+             * log; leaving it on screen at the end of the journey gives all
+             * of that back to the first shared link or screenshot.
+             */
+            return redirect($this->safeDestination($request).'#');
         }
 
         if (! Licence::configured()) {

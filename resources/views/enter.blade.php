@@ -68,6 +68,14 @@
             var token = decodeURIComponent(match[1]);
             history.replaceState(null, '', window.location.pathname + window.location.search);
 
+            // And the fragment is emptied outright. replaceState alone left it
+            // in the address bar on the way through, so the token arrived at
+            // the destination still visible, which is the one thing putting it
+            // in a fragment was meant to avoid.
+            if (window.location.hash) {
+                window.location.hash = '';
+            }
+
             fetch('{{ route('live-edit.session.store') }}', {
                 method: 'POST',
                 headers: {
@@ -81,7 +89,12 @@
                 body: JSON.stringify({ token: token })
             })
                 .then(function (r) { return r.ok ? r.json() : Promise.reject(r); })
-                .then(function () { window.location.replace(home); })
+                .then(function () {
+                    // Absolute, so nothing of this URL travels with it. A
+                    // relative replace resolves against an address that still
+                    // carries the session.
+                    window.location.replace(new URL(home, window.location.origin).href);
+                })
                 .catch(function () {
                     say.textContent = 'That sign-in could not be completed.';
                     say.insertAdjacentHTML('afterend', '<p><a href="' + signIn + '">Try again</a></p>');

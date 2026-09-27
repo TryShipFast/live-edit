@@ -81,6 +81,29 @@ class ThrottleApi
     {
         $retryAfter = $this->limiter->availableIn($key);
 
+        $headers = [
+            'Retry-After' => (string) $retryAfter,
+            'RateLimit-Limit' => (string) $max,
+            'RateLimit-Remaining' => '0',
+            'RateLimit-Reset' => (string) $retryAfter,
+        ];
+
+        /*
+         * A page with a form has to fail like a page.
+         *
+         * This guards an API and a sign-in form alike, and answered both with
+         * JSON. So somebody locked out of signing in was shown a raw object
+         * where their form had been, which reads as the site being broken
+         * rather than as them having tried too often. The API keeps the JSON;
+         * a browser asking for HTML gets something it can read.
+         */
+        if (! request()->expectsJson() && request()->acceptsHtml()) {
+            return response()->view('live-edit::too-many', [
+                'retryAfter' => $retryAfter,
+                'minutes' => (int) ceil($retryAfter / 60),
+            ], 429, $headers);
+        }
+
         return response()->json([
             'error' => [
                 'type' => 'rate_limit_error',
@@ -88,10 +111,7 @@ class ThrottleApi
                 'retry_after' => $retryAfter,
             ],
         ], 429, [
-            'Retry-After' => (string) $retryAfter,
-            'RateLimit-Limit' => (string) $max,
-            'RateLimit-Remaining' => '0',
-            'RateLimit-Reset' => (string) $retryAfter,
+            ...$headers,
         ]);
     }
 

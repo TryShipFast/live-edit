@@ -57,6 +57,50 @@ class CloudInstall
         ).';</script>';
     }
 
+    /**
+     * What this installation will accept as styling, and how it speaks.
+     *
+     * An install that stores its own content has no content API to ask, so
+     * the editor asked anyway and got a 404 on every page load. Two costs:
+     * a pair of failed requests in the console of every page a client edits,
+     * and a style panel with no vocabulary, which draws no controls at all
+     * and says "nothing on this element can be restyled" on everything.
+     *
+     * A host that supplies these itself is left alone. tokreamsblue does,
+     * from its own partial, and knows things about its theme that config
+     * here does not.
+     */
+    private static function whatThisSiteAccepts(): string
+    {
+        $offered = array_filter([
+            'liveEditStyleProps' => config('live-edit.style_props'),
+            'liveEditSelects' => config('live-edit.select_options'),
+            'liveEditRich' => [
+                'settings' => config('live-edit.rich_settings'),
+                'fields' => config('live-edit.rich_fields'),
+            ],
+            'liveEditDefaultLocale' => config('live-edit.default_locale'),
+        ], fn ($value) => filled($value));
+
+        if ($offered === []) {
+            return '';
+        }
+
+        $lines = '';
+
+        foreach ($offered as $name => $value) {
+            // Only where the host has not spoken. Overwriting would take a
+            // site's own icon list or locale away on the next page load.
+            $lines .= sprintf(
+                'window.%1$s=window.%1$s??%2$s;',
+                $name,
+                json_encode($value, JSON_THROW_ON_ERROR | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT)
+            );
+        }
+
+        return '<script>'.$lines.'</script>';
+    }
+
     public static function script(): string
     {
         $site = trim((string) config('live-edit.cloud.site'));
@@ -98,6 +142,7 @@ class CloudInstall
             }
 
             return self::whoIsEditing()
+                .self::whatThisSiteAccepts()
                 .'<script src="'.e(url('live-edit/runtime.js')).'" type="module" defer></script>';
         }
 
