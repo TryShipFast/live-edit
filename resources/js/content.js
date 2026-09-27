@@ -35,8 +35,18 @@ const failure = (message, status) => Object.assign(new Error(message), { status 
 
 const PREFIX = 'setting:';
 
-/** What a value means depends on what is holding it. */
-export const applyValue = (element, value) => {
+/**
+ * What a value means depends on what is holding it.
+ *
+ * `keepRuns` is for the editor previewing a value as somebody types. A
+ * half-typed sentence shares almost nothing with the one on the page, so the
+ * rewrite path would collapse a sentence's runs of text on the very first
+ * keystroke — and every keystroke after it would then be editing a sentence
+ * that had already lost its shape. Keeping the empty runs in place means the
+ * caller can put the original back and re-apply, so the preview is computed
+ * from what the page said rather than from what the last keystroke left.
+ */
+export const applyValue = (element, value, { keepRuns = false } = {}) => {
     const tag = element.tagName?.toLowerCase();
 
     if (tag === 'img') {
@@ -51,7 +61,7 @@ export const applyValue = (element, value) => {
         return;
     }
 
-    applyWords(element, value);
+    applyWords(element, value, keepRuns);
 };
 
 /**
@@ -72,7 +82,7 @@ export const applyValue = (element, value) => {
  * writing markup from a network response into a page is how a content service
  * becomes a way to run scripts on every visitor's browser.
  */
-const applyWords = (element, value) => {
+const applyWords = (element, value, keepRuns = false) => {
     const runs = [...element.childNodes].filter((node) => node.nodeType === TEXT_NODE);
 
     if (runs.length === 0) {
@@ -170,7 +180,15 @@ const applyWords = (element, value) => {
     // elements between the runs belong, so the sentence becomes one run —
     // which loses the arrangement but never a word the person typed.
     writeRun(runs[0], value);
-    runs.slice(1).forEach((node) => node.remove());
+    runs.slice(1).forEach((node) => {
+        if (keepRuns) {
+            node.nodeValue = '';
+
+            return;
+        }
+
+        node.remove();
+    });
 };
 
 /**

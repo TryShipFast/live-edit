@@ -59,7 +59,7 @@ and it changes the answer to "what happens to my words if we fall out".
 | Headings and paragraphs | ✓ | ✓ | ✓ | ? | ✓ |
 | Buttons and labels | ? | ? | ? | ? | ? |
 | Links (text and href) | ? | ? | ? | ? | ✓ |
-| Nested / mixed content | ✗ | ? | ? | ? | ? |
+| Nested / mixed content | ✓ | ✓ | ✓ | ? | ✓ |
 | Images | ? | ? | ? | ? | ? |
 | Background images | ? | ? | ? | ? | ? |
 | Lists and repeated items | ? | ? | ? | ? | ? |
@@ -69,9 +69,12 @@ and it changes the answer to "what happens to my words if we fall out".
 | Rich text (bold, italic) | ? | ? | ? | ? | ? |
 | Alt text and SEO fields | ? | ? | ? | ? | ? |
 
-Nested / mixed content is ✗ on Laravel and untested elsewhere, but the fault
-is in the shared editor rather than in any adapter, so it should be assumed
-present on all five until measured otherwise.
+Nested / mixed content was measured on five shapes — a decoration before the
+words, an icon before them, a badge after them, an inline phrase between them,
+and a wrapper holding them. The fix is in the shared editor and in the server's
+applier, with both halves compared against each other, so it is ticked
+everywhere the editor runs. React is a question mark only because nothing has
+been run against a plain React app at all.
 
 ## Platform-specific rows
 

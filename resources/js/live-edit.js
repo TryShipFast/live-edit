@@ -2359,20 +2359,53 @@ const bootLiveEdit = () => {
             if (!box) return;
 
             const was = ownTextOf(element);
+
+            /*
+             * What the page said, run by run, kept so every keystroke is
+             * applied to that rather than to what the last keystroke left.
+             *
+             * A sentence with a bold phrase in it is two runs of text. Typing
+             * replaces the whole box, so the first character shares almost
+             * nothing with the sentence on the page — and applying that
+             * directly collapsed the runs, after which the phrase had already
+             * lost its place and no later keystroke could put it back.
+             */
+            const runsOf = (node) => [...node.childNodes].filter((child) => child.nodeType === 3);
+            const original = runsOf(element).map((node) => node.nodeValue);
+
+            const putBackWhatThePageSaid = () => {
+                const now = runsOf(element);
+
+                if (now.length !== original.length) {
+                    return false;
+                }
+
+                now.forEach((node, index) => {
+                    node.nodeValue = original[index];
+                });
+
+                return true;
+            };
+
             let shown = false;
 
             // Put back what the page said, for Cancel and for the × — and for
             // switching to another element, which is the same thing from the
             // page's point of view.
             current.restore = () => {
-                if (shown && putWords) putWords(element, was);
+                if (!shown || !putWords) return;
+
+                if (!putBackWhatThePageSaid()) {
+                    putWords(element, was);
+                }
             };
 
             box.addEventListener('input', () => {
                 if (!putWords) return;
 
                 shown = true;
-                putWords(element, box.value);
+                putBackWhatThePageSaid();
+                putWords(element, box.value, { keepRuns: true });
             });
 
             // Fetched once and kept. The first keystroke may land before it

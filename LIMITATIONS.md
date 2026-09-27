@@ -16,24 +16,6 @@ Toy pages agree with whatever the code already does.
 
 ## Open
 
-### Editing a node with mixed content can move its siblings
-**Adapter:** all. **Found:** 2026-09-27, Laravel (learnkasts course page).
-
-An eyebrow label was a coloured status dot followed by text, both inside one
-element. Editing it through the drawer replaced the whole container's text, so
-the dot ended up on the wrong side of the words, and a second, empty change
-appeared in the publish list for the dot's own node.
-
-The selection is landing on the container when it should land on the text node
-inside it. Somebody editing a sentence should not be able to move a decoration
-they never touched, and an empty change they did not make should not turn up in
-the list of things they are about to publish.
-
-**To close it:** select the text node rather than its parent when a container
-mixes text with inline elements, and leave sibling elements untouched. Worth
-doing before design protection, since it is the same question — what exactly
-did the person mean to change.
-
 ### The Laravel entry route returns to the application's own destination
 **Adapter:** Laravel. **Found:** 2026-09-27.
 
@@ -147,6 +129,10 @@ Kept because a fault that happened once can happen again.
 
 | What | Adapter | Fixed in |
 | --- | --- | --- |
+| Editing a sentence with a bold phrase in it destroyed every word on the far side of the phrase, silently | all | unreleased |
+| The editor invented a space where an inline element had been, so the words it showed were not the words the page held | all | unreleased |
+| The space between an icon and its label was dropped on every edit, so a button read "→Book a call" | all | unreleased |
+| A marked-up phrase was the one part of a sentence a client could not edit | all | unreleased |
 | The same element got a different key depending on which directory the codemod was pointed at, silently orphaning every edit already made | React, Next.js | unreleased |
 | One JSX expression in the package meant Next.js rendered nothing at all — no build error, no console error, every page blank | React, Next.js | unreleased |
 | The runtime wrote `data-admin`, `data-edit` and `data-kb-bg` before React hydrated, which is enough for React to distrust the tree | React, Next.js | unreleased |
@@ -171,9 +157,14 @@ Not limitations. Rows nobody has run, listed so they are not mistaken for
 passing. A tick is only written here after it has been driven in a browser.
 
 **Every adapter:** lists and repeated components, tables, forms, SVG and icons,
-background images, CSS-generated content, rich text (bold, italic, links),
-alt text and SEO fields, responsive behaviour after an edit, page-load
-overhead.
+background images, CSS-generated content, alt text and SEO fields, responsive
+behaviour after an edit, page-load overhead.
+
+Nested and mixed content has now been measured on five shapes — a decoration
+before the words, an icon before them, a badge after them, an inline phrase
+between them, and a wrapper holding them — and each is covered by tests on
+both halves. What is still unmeasured there is rich text as an editing
+capability: making a word bold, rather than editing a word that already is.
 
 **Laravel:** Blade components and nested components, Eloquent-backed
 collections, conditional content, `@foreach` output.
@@ -189,6 +180,20 @@ whether an edit survives a client-side route change. Detection is measured and
 good — 86 elements across 15 files, 142 in the DOM once the runtime has run.
 What is not yet proven is persistence through a re-render, which the first two
 open items above are about.
+
+---
+
+### A sentence changed in two places at once loses its arrangement
+**Adapter:** all. **Found:** 2026-09-27. **Severity:** low.
+
+Editing words on both sides of a bold phrase in one go leaves nothing to say
+which side of the phrase the new words belong on, so the runs of text collapse
+into one and the phrase ends up trailing the sentence. No words are lost, and
+a single change — which is what an edit almost always is — keeps everything in
+place.
+
+**To close it:** align each run separately rather than placing one contiguous
+change, if this ever turns out to bother anybody. It may not be worth it.
 
 ---
 

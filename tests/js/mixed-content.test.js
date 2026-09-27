@@ -74,6 +74,69 @@ describe('a sentence with an element inside it', () => {
     });
 });
 
+describe('previewing a value as somebody types', () => {
+    /*
+     * Typing replaces the whole box, so the first character shares almost
+     * nothing with the sentence on the page. Applied directly, that collapsed
+     * the runs on keystroke one — and every keystroke after it was editing a
+     * sentence that had already lost its shape, so the bold phrase could never
+     * find its way back.
+     *
+     * This is the round trip the editor makes: put back what the page said,
+     * then apply the box as it stands.
+     */
+    const typing = (html, finalValue) => {
+        const element = document.createElement('div');
+        element.innerHTML = html;
+
+        const runsOf = (node) => [...node.childNodes].filter((child) => child.nodeType === 3);
+        const original = runsOf(element).map((node) => node.nodeValue);
+
+        for (let at = 1; at <= finalValue.length; at += 1) {
+            const now = runsOf(element);
+
+            if (now.length === original.length) {
+                now.forEach((node, index) => {
+                    node.nodeValue = original[index];
+                });
+            }
+
+            applyValue(element, finalValue.slice(0, at), { keepRuns: true });
+        }
+
+        return element.innerHTML;
+    };
+
+    it('still has the bold phrase in place after every keystroke', () => {
+        // One change, which is what an edit usually is. Every intermediate
+        // value straddles both runs and would have collapsed them; only the
+        // finished sentence decides where the words go.
+        expect(typing(SENTENCE, 'We build for the , not a photograph.'))
+            .toBe('We build for the <strong>street it stands on</strong>, not a photograph.');
+    });
+
+    it('loses no words when two separate parts of the sentence change at once', () => {
+        // Changing a word on each side of the phrase leaves nothing to say
+        // which side of it the new words belong on, so the runs collapse. That
+        // is the documented fallback: the arrangement goes, the words do not.
+        const result = typing(SENTENCE, 'We build for the , not a postcard.');
+
+        expect(result).toContain('We build for the , not a postcard.');
+        expect(result).toContain('<strong>street it stands on</strong>');
+    });
+
+    it('keeps the runs so the original can be put back', () => {
+        // Removing them instead left detached nodes the editor could not
+        // restore, so Cancel could not undo a preview.
+        const element = document.createElement('div');
+        element.innerHTML = SENTENCE;
+
+        applyValue(element, 'W', { keepRuns: true });
+
+        expect([...element.childNodes].filter((n) => n.nodeType === 3)).toHaveLength(2);
+    });
+});
+
 describe('a decoration beside the words', () => {
     it('keeps a leading icon in front of them, with its space', () => {
         // Without the space the icon wears the sentence: "→Book a call".
