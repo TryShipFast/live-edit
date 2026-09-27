@@ -46,6 +46,58 @@ lands somebody in a dashboard when they asked to edit a website.
 the way the static adapter and the WordPress plugin already do with
 `?kb-enter=1`, and return them to that page rather than to the host's default.
 
+### A client-rendered tree reverts DOM-level edits
+**Adapter:** React, Next.js. **Found:** 2026-09-27.
+
+The codemod decides a file is a server component when it has no
+`"use client"` of its own. That is not what makes a component server-side: a
+file imported by a client component is client-rendered whatever its own
+directive says. The template tested has `"use client"` on its root layout, so
+every component in it is client-rendered, and the codemod classified twelve of
+fifteen files as server.
+
+For the ones it calls server it writes the marker and no hook, on the
+reasoning that there is no React on the client to undo the edit. Where that
+reasoning is wrong the edit is applied to the DOM and then reverted by the
+next render — which the provider triggers itself when it finishes fetching
+content.
+
+Running the codemod with `--client` avoids it, but nothing tells anybody to.
+
+**To close it:** classify by the import graph rather than by the file's own
+directive, or treat a client root layout as making the whole tree client-side.
+Until then `--client` is the answer for App Router projects and should be what
+the console prints.
+
+### The codemod cannot change its mind
+**Adapter:** React, Next.js. **Found:** 2026-09-27.
+
+Re-running with `--client` over already-tagged files reports "0 elements in 0
+files" and does nothing. The skip is deliberate — a second run must not
+re-key a client's existing edits — but it means somebody who runs the plain
+version, finds their edits reverting, and reaches for `--client` gets a
+success message and no change.
+
+**To close it:** say what was skipped and why, and offer to add hooks to
+elements that already carry a marker without changing their keys.
+
+### React has no way to learn about the editing session
+**Adapter:** React, Next.js. **Found:** 2026-09-27.
+
+The provider takes `sessionKey` as a prop, and the README shows it arriving
+from the server. It cannot: the session is handed back in a URL fragment,
+which browsers never send to a server. Measured on the running app — the
+runtime had the session (`liveEditApi.token` set, body marked, 142 elements
+tagged) while the provider reported `editable: false`.
+
+The consequence is that edits go into the DOM rather than through React, which
+is the arrangement the provider exists to avoid.
+
+**To close it:** let the provider fall back to the session the runtime already
+found, in an effect so it cannot affect hydration, and have the runtime
+announce it. Keep the prop for applications that genuinely have a server-side
+session.
+
 ---
 
 ## Fixed
@@ -54,6 +106,10 @@ Kept because a fault that happened once can happen again.
 
 | What | Adapter | Fixed in |
 | --- | --- | --- |
+| The same element got a different key depending on which directory the codemod was pointed at, silently orphaning every edit already made | React, Next.js | unreleased |
+| One JSX expression in the package meant Next.js rendered nothing at all — no build error, no console error, every page blank | React, Next.js | unreleased |
+| The runtime wrote `data-admin`, `data-edit` and `data-kb-bg` before React hydrated, which is enough for React to distrust the tree | React, Next.js | unreleased |
+| The npm package was named after something this product is not called | React, Next.js | unreleased |
 | A page the server marked editable got no editor unless its layout had `@liveEdit`, so an app with several layouts half-worked in silence | Laravel | v0.8.4 |
 | A folder of HTML files had no way to start editing at all; the session arrives in a fragment and nothing put one there | Plain HTML | v0.8.3 |
 | Registration discarded the port, so a site on `:8110` was checked on port 443 and reported unreachable | all | v0.8.3 |
@@ -86,8 +142,12 @@ images, menus, WooCommerce content, behaviour alongside other plugins.
 
 **Plain HTML:** relative URLs across subdirectories, multi-page asset paths.
 
-**React and Next.js:** everything. Detection is not the question — whether an
-edit survives a re-render, a route change and hydration is.
+**React and Next.js:** images, lists and mapped elements, nested components,
+client-side state, `next/image`, dynamic routes, static generation, and
+whether an edit survives a client-side route change. Detection is measured and
+good — 86 elements across 15 files, 142 in the DOM once the runtime has run.
+What is not yet proven is persistence through a re-render, which the first two
+open items above are about.
 
 ---
 
