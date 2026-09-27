@@ -6,6 +6,7 @@ use Illuminate\Contracts\View\View;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Http\Response;
 use ShipFast\LiveEdit\Domain\Site\PasswordSignIn;
 use ShipFast\LiveEdit\Domain\Site\SignIn;
 use ShipFast\LiveEdit\Domain\Site\Site;
@@ -155,8 +156,16 @@ class SignInController
      * In the fragment, never the query: a fragment is not sent to the server,
      * stays out of access logs, and is not passed on in a Referer header when
      * the page later loads anything else.
+     *
+     * Handed over by a page rather than a redirect. Browsers apply the
+     * `form-action` content-security directive to the whole redirect chain,
+     * so a service with a sensible `form-action 'self'` silently refuses to
+     * follow a 302 to a customer's domain — and refuses it with no error and
+     * no message, leaving the form sitting there as though nothing happened.
+     * The alternative, naming every customer domain in our own policy, is a
+     * list that grows with sales and breaks when it falls behind.
      */
-    public function submit(Request $request): RedirectResponse
+    public function submit(Request $request): RedirectResponse|Response
     {
         $validated = $request->validate([
             'site' => ['required', 'string', 'max:63'],
@@ -181,9 +190,9 @@ class SignInController
 
         $separator = str_contains($validated['return_to'], '#') ? '&' : '#';
 
-        return redirect()
-            ->away($validated['return_to'].$separator.'kb_session='.urlencode($result['token']))
-            ->withHeaders(['Cache-Control' => 'no-store, private']);
+        return response()->view('live-edit::handing-back', [
+            'returnTo' => $validated['return_to'].$separator.'kb_session='.urlencode($result['token']),
+        ])->withHeaders(['Cache-Control' => 'no-store, private']);
     }
 
     /**

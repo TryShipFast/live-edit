@@ -2,7 +2,6 @@
 
 namespace ShipFast\LiveEdit\Support;
 
-use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Session;
 
 /**
@@ -38,9 +37,8 @@ final class EditorSession
         }
 
         try {
-            $response = Http::timeout(8)
+            $response = Licence::client()
                 ->withToken($token)
-                ->acceptJson()
                 ->get(Licence::endpoint('session'));
         } catch (\Throwable $e) {
             return null;

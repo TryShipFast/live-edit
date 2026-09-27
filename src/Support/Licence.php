@@ -2,9 +2,11 @@
 
 namespace ShipFast\LiveEdit\Support;
 
+use Illuminate\Http\Client\PendingRequest;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
+use ShipFast\LiveEdit\Domain\Site\SiteVerification;
 
 /**
  * Whether this installation is licensed to edit.
@@ -88,9 +90,8 @@ final class Licence
     private static function ask(): array
     {
         try {
-            $response = Http::timeout(5)
+            $response = self::client(5)
                 ->withToken(self::key())
-                ->acceptJson()
                 ->get(self::endpoint('licence'), [
                     // What this installation believes it is. A server can
                     // say anything, which the service knows — it is a
@@ -174,6 +175,25 @@ final class Licence
             fn (string $email) => mb_strtolower(trim($email)),
             explode(',', (string) config('live-edit.editors', ''))
         )));
+    }
+
+    /**
+     * An HTTP client for talking to the service.
+     *
+     * Certificate checking is relaxed for a development hostname and nowhere
+     * else — the same rule, and the same reason, as the domain verifier: a
+     * .test host is served with a certificate nothing trusts, and holding it
+     * to one means the whole arrangement cannot be exercised until it is in
+     * production. For anything that could be a real service, a certificate
+     * that does not check out is exactly the case this must refuse.
+     */
+    public static function client(int $timeoutSeconds = 8): PendingRequest
+    {
+        $client = Http::timeout($timeoutSeconds)->acceptJson();
+
+        $host = (string) parse_url(self::host(), PHP_URL_HOST);
+
+        return SiteVerification::isLocal($host) ? $client->withoutVerifying() : $client;
     }
 
     /**
