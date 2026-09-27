@@ -49,18 +49,44 @@ class TagsEditableMarkup
             return $response;
         }
 
-        if (! $this->worthTagging($request, $response)) {
+        if (! $this->isARewritablePage($request, $response)) {
             return $response;
         }
 
         $html = (string) $response->getContent();
+
+        /*
+         * Whether this request is an editor's, which decides how much is done
+         * to the page — but NOT whether the client's words are put back.
+         *
+         * Those two were one check, and it made the product quietly useless:
+         * a client could edit a sentence, save it, see it on their own next
+         * page load, and every visitor carried on reading the original. The
+         * edit was stored the whole time and never reached anybody.
+         */
+        $forAnEditor = Gate::allows('live-edit') && Licence::permits();
 
         // The editor mounts off the body, not off the script tag, so a page
         // with neither attribute loads the runtime and then does nothing —
         // which is exactly what "installed it and no toolbar appeared" looks
         // like from the outside. @liveEdit sits in the head and cannot reach
         // the body, so it is done here.
-        $html = $this->markBodyAsEditable($html);
+        if ($forAnEditor) {
+            $html = $this->markBodyAsEditable($html);
+        }
+
+        /*
+         * The keys have to exist before stored words can be matched to them,
+         * so a visitor's page is scanned too — but only when there is
+         * something to put back. With nothing stored, which is every page of
+         * a site nobody has edited yet, a visitor costs exactly one cheap
+         * query and no parse at all.
+         */
+        $stored = $this->storedWords($forAnEditor);
+
+        if (! $forAnEditor && $stored === []) {
+            return $response;
+        }
 
         /*
          * A page that already carries keys keeps them.
@@ -71,56 +97,38 @@ class TagsEditableMarkup
          * re-deriving keys over the top would hang a client's saved work off
          * a different key than the one it was saved under.
          */
-        if (str_contains($html, 'data-edit')) {
-            $response->setContent($html);
+        if (! str_contains($html, 'data-edit')) {
+            $tagged = (new MarkupScanner)->apply(
+                $html,
+                ['text', 'image', 'link', 'icon'],
+                true,
+                null,
+                trim($request->path(), '/'),
+            )['html'] ?? null;
 
-            return $response;
+            if (is_string($tagged) && $tagged !== '') {
+                $html = $tagged;
+            }
         }
 
-        $tagged = (new MarkupScanner)->apply(
-            $html,
-            ['text', 'image', 'link', 'icon'],
-            true,
-            null,
-            trim($request->path(), '/'),
-        )['html'] ?? null;
-
-        if (is_string($tagged) && $tagged !== '') {
-            $html = $tagged;
+        if ($stored !== []) {
+            $html = (new MarkupScanner)->applyOverrides($html, $stored);
         }
 
-        $response->setContent($this->applyStoredWords($html));
+        /*
+         * A visitor is served the words, not the scaffolding.
+         *
+         * The attributes exist only so the overrides could be matched. Left
+         * in, they would tell anybody reading the source that this site is
+         * editable and hand them the key for every sentence on it.
+         */
+        if (! $forAnEditor) {
+            $html = preg_replace('/\s+data-edit(?:-[a-z-]+)?="[^"]*"/i', '', $html) ?? $html;
+        }
+
+        $response->setContent($html);
 
         return $response;
-    }
-
-    /**
-     * Put the client's saved words back onto the page.
-     *
-     * The half that is easy to forget, and it fails quietly: tagging alone
-     * gives a page that can be edited and saves successfully, and then shows
-     * the template's original wording on the next load. Every part reports
-     * success and the work appears to vanish.
-     *
-     * A named key does not need this — the host's own template asks its model
-     * for the value and renders it. A derived key has nowhere to be rendered
-     * from, because the words are hardcoded in the Blade file, so the only
-     * moment they can be swapped is here.
-     *
-     * Drafts are laid over the published values for an editor, and only for
-     * an editor. Same rule and the same order as everywhere else, because a
-     * second answer to "who sees unpublished work" is how a half-typed
-     * sentence reaches a visitor.
-     */
-    private function applyStoredWords(string $html): string
-    {
-        $stored = $this->publishedSettings();
-
-        if (DraftStore::visibleToViewer()) {
-            $stored = array_merge($stored, DraftStore::settings());
-        }
-
-        return $stored === [] ? $html : (new MarkupScanner)->applyOverrides($html, $stored);
     }
 
     /** @return array<string, string> */
@@ -168,7 +176,14 @@ class TagsEditableMarkup
         return substr_replace($html, $replacement, $position, strlen($body));
     }
 
-    private function worthTagging(Request $request, Response $response): bool
+    /**
+     * Whether this response is HTML we could safely rewrite at all.
+     *
+     * Deliberately says nothing about who is asking: the client's published
+     * words belong on a visitor's page just as much as on an editor's, and
+     * folding that question in here is what hid them from everybody.
+     */
+    private function isARewritablePage(Request $request, Response $response): bool
     {
         // A streamed or downloadable response has no body to rewrite, and
         // reading one to find out would consume it.
@@ -191,6 +206,23 @@ class TagsEditableMarkup
             return false;
         }
 
-        return Gate::allows('live-edit') && Licence::permits();
+        return true;
+    }
+
+    /**
+     * The client's words, published — plus their unpublished ones if they are
+     * the one looking.
+     *
+     * @return array<string, string>
+     */
+    private function storedWords(bool $forAnEditor): array
+    {
+        $stored = $this->publishedSettings();
+
+        if ($forAnEditor && DraftStore::visibleToViewer()) {
+            $stored = array_merge($stored, DraftStore::settings());
+        }
+
+        return $stored;
     }
 }
