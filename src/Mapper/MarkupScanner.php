@@ -21,7 +21,26 @@ use ShipFast\LiveEdit\Support\SvgSanitiser;
 class MarkupScanner
 {
     /** Leaf elements whose text is worth editing. */
-    protected const TEXT_TAGS = ['h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'p', 'pre', 'address', 'li', 'blockquote', 'figcaption', 'figure', 'span', 'div', 'button', 'label', 'th', 'td', 'dt', 'dd', 'summary', 'caption', 'cite', 'q'];
+    protected const TEXT_TAGS = ['h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'p', 'pre', 'address', 'li', 'blockquote', 'figcaption', 'figure', 'span', 'div', 'button', 'label', 'th', 'td', 'dt', 'dd', 'summary', 'caption', 'cite', 'q',
+        // Emphasis carries words too, and a client asking to change the bold
+        // phrase in a sentence is asking for the most ordinary thing there
+        // is. It was the one part of a sentence they could not touch.
+        //
+        // Safe only since the applier stopped flattening a sentence into its
+        // first run of text: before that, tagging both the paragraph and the
+        // phrase inside it meant an edit to either could destroy the other.
+        // Now each writes into its own words and leaves the rest alone.
+        ...self::PHRASE_TAGS];
+
+    /**
+     * Emphasis, which carries words like anything else.
+     *
+     * Kept as its own list because a phrase inside a sentence is reached
+     * differently from a paragraph: the walk stops at the first editable
+     * thing, so without naming these it would never look inside a sentence at
+     * all and the bold words stayed unreachable.
+     */
+    protected const PHRASE_TAGS = ['strong', 'b', 'em', 'i', 'mark', 'small', 'code', 'u'];
 
     /**
      * Inline tags that don't disqualify an element from being a text leaf.
@@ -1271,7 +1290,9 @@ class MarkupScanner
                 // paragraph is editable for its words, and stopping here left
                 // the picture unreachable — a client could see it, could not
                 // replace it, and nothing said why.
-                if ($this->hasCounterInside($child) || $this->hasMediaInside($child)) {
+                if ($this->hasCounterInside($child)
+                    || $this->hasMediaInside($child)
+                    || $this->hasPhraseInside($child)) {
                     $this->walk($child);
                 }
 
@@ -1486,6 +1507,26 @@ class MarkupScanner
         foreach (['img', 'svg', 'video', 'iframe', 'audio'] as $tag) {
             if ($element->getElementsByTagName($tag)->length > 0) {
                 return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * Whether a phrase worth editing sits inside this element.
+     *
+     * The bold words in a sentence. Stopping at the sentence left them
+     * unreachable: a client could reword everything around them and not the
+     * three words the designer chose to emphasise, with nothing to say why.
+     */
+    protected function hasPhraseInside(DOMElement $element): bool
+    {
+        foreach (self::PHRASE_TAGS as $tag) {
+            foreach ($element->getElementsByTagName($tag) as $inside) {
+                if ($inside instanceof DOMElement && $this->isTextLeaf($inside)) {
+                    return true;
+                }
             }
         }
 

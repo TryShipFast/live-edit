@@ -21,6 +21,53 @@ class MarkupScannerTest extends TestCase
         return array_map(fn ($c) => $c['sample'], array_values(array_filter($result['candidates'], fn ($c) => $c['kind'] === $kind)));
     }
 
+    public function test_a_bold_phrase_inside_a_sentence_can_be_edited_on_its_own(): void
+    {
+        /*
+         * It was the one part of a sentence a client could not touch. The
+         * paragraph was editable and its emphasis was not, so "we design for
+         * the STREET IT STANDS ON" could be reworded everywhere except the
+         * three words the designer had chosen to emphasise.
+         *
+         * Only safe since the applier stopped flattening a sentence into its
+         * first run of text. Before that, tagging both the paragraph and the
+         * phrase inside it meant an edit to either could destroy the other.
+         */
+        $html = '<p>We design for the <strong>street it stands on</strong>, not a photograph.</p>';
+
+        $applied = (new MarkupScanner)->apply($html, ['text'], true)['html'];
+
+        $this->assertMatchesRegularExpression('/<strong data-edit="setting:auto:[a-f0-9]{12}"/', $applied);
+        $this->assertMatchesRegularExpression('/<p data-edit="setting:auto:[a-f0-9]{12}"/', $applied);
+    }
+
+    public function test_the_paragraph_and_the_phrase_inside_it_keep_separate_keys(): void
+    {
+        // Two targets, two histories. Sharing a key would make an edit to one
+        // silently rewrite the other.
+        $html = '<p>We design for the <strong>street it stands on</strong>, not a photograph.</p>';
+
+        $applied = (new MarkupScanner)->apply($html, ['text'], true)['html'];
+
+        preg_match_all('/data-edit="setting:(auto:[a-f0-9]{12})"/', $applied, $found);
+
+        $this->assertCount(2, $found[1]);
+        $this->assertCount(2, array_unique($found[1]));
+    }
+
+    public function test_a_decoration_with_no_words_of_its_own_is_not_offered_as_text(): void
+    {
+        // The pulsing dot beside a badge. Offering it as editable text put an
+        // empty change in somebody's publish list for a thing they never
+        // touched and could not see.
+        $html = '<div class="badge"><span class="dot"></span> Next cohort starts in May</div>';
+
+        $applied = (new MarkupScanner)->apply($html, ['text'], true)['html'];
+
+        $this->assertStringNotContainsString('<span class="dot" data-edit', $applied);
+        $this->assertMatchesRegularExpression('/<div class="badge" data-edit="setting:auto:[a-f0-9]{12}"/', $applied);
+    }
+
     public function test_auto_apply_writes_stable_keys_that_survive_text_edits(): void
     {
         $html = '<section><h1>Hello</h1><p>World</p></section>';
@@ -716,15 +763,25 @@ class MarkupScannerTest extends TestCase
         }
     }
 
-    public function test_the_marked_up_word_keeps_its_tag_rather_than_being_offered_separately(): void
+    public function test_the_marked_up_word_is_editable_and_keeps_its_tag(): void
     {
-        // Tagging both the paragraph and the child would let one edit append a
-        // stray phrase beside the other. The paragraph is the editable thing;
-        // the applier replaces its text nodes and leaves the child alone, so
-        // the <code> keeps its tag and whatever the theme styles it with.
+        /*
+         * This used to assert the opposite, and its reason was sound at the
+         * time: tagging both the paragraph and the word inside it would let an
+         * edit to either destroy the other, because the applier flattened a
+         * sentence into its first run of text.
+         *
+         * That is fixed — each now writes into its own words and leaves the
+         * rest alone — so the reason is gone and the cost of the old behaviour
+         * is left: the marked-up word was the one part of a sentence a client
+         * could not touch, with nothing to say why.
+         *
+         * What has not changed is that the tag survives. A client rewording
+         * the phrase must not cost the theme its styling.
+         */
         $html = (new MarkupScanner)->apply('<div><p>Use <code>wp-config.php</code> here.</p></div>', ['text'], true)['html'];
 
-        $this->assertSame(1, substr_count($html, 'data-edit="setting:'), 'the marked-up word was offered as a second edit');
+        $this->assertSame(2, substr_count($html, 'data-edit="setting:'), 'the paragraph and the word should each be editable');
         $this->assertMatchesRegularExpression('/<code[^>]*>wp-config\.php<\/code>/', $html, 'the marked-up word lost its tag');
     }
 
