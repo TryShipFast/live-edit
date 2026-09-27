@@ -150,6 +150,22 @@ class CloudInstall
 
             return self::whoIsEditing()
                 .self::whatThisSiteAccepts()
+                /*
+                 * Whether there is unpublished work, and where to preview it.
+                 *
+                 * @liveEditPublishing exists for a host that wants to place
+                 * this itself, and was the only way to get it. So a site that
+                 * switched publishing on got a Publish button that was never
+                 * wired to anything: it read "Published", stayed disabled,
+                 * and clicking it did nothing, while the client's changes sat
+                 * in drafts that nothing on the page could release.
+                 *
+                 * A second directive nobody is told about is not a
+                 * configuration step, it is a trap. Printed here, alongside
+                 * everything else the editor needs, and still only for
+                 * somebody who may edit.
+                 */
+                .EditorConfig::publishingScript()
                 .'<script src="'.e(url('live-edit/runtime.js')).'" type="module" defer></script>';
         }
 

@@ -28,6 +28,17 @@ Route::middleware(array_merge(
         Route::post('/undo', [LiveEditController::class, 'undo'])->name('undo');
         Route::post('/publish', [LiveEditController::class, 'publish'])->name('publish');
         Route::post('/draft/discard', [LiveEditController::class, 'discardDraft'])->name('draft.discard');
+
+        /*
+         * What is waiting, and taking one item back.
+         *
+         * The content API answers both for a site we host. A site keeping its
+         * own drafts had neither, so the publish dialog opened, said it could
+         * not list what was waiting, and offered to publish it anyway, which
+         * is the one moment a client wants to see the list.
+         */
+        Route::get('/changes', [LiveEditController::class, 'changes'])->name('changes');
+        Route::delete('/changes', [LiveEditController::class, 'discardChange'])->name('changes.revert');
     });
 
 /*

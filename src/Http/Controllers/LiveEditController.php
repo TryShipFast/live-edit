@@ -12,6 +12,7 @@ use Illuminate\Validation\ValidationException;
 use ShipFast\LiveEdit\Domain\Content\EditPolicy;
 use ShipFast\LiveEdit\Domain\Content\ImageStore;
 use ShipFast\LiveEdit\Domain\Content\StylePolicy;
+use ShipFast\LiveEdit\Models\Draft;
 use ShipFast\LiveEdit\Models\EditRevision;
 use ShipFast\LiveEdit\Models\ElementStyle;
 use ShipFast\LiveEdit\Support\DraftStore;
@@ -312,6 +313,68 @@ class LiveEditController extends Controller
      * The count goes back so the editor can say what happened rather than just
      * claiming success.
      */
+    /**
+     * What is waiting to go live, for the review before it does.
+     *
+     * The same question the content API answers for a site we host, asked of
+     * this application's own drafts. Without it the publish dialog opened,
+     * said it could not list what was waiting, and offered to publish it
+     * anyway, which is the one moment a client wants to see the list.
+     */
+    public function changes(): JsonResponse
+    {
+        abort_unless(DraftStore::enabled(), 404);
+
+        $published = ($this->settingModel())::query()->pluck('value', 'key');
+
+        $changes = Draft::query()
+            ->orderByDesc('updated_at')
+            ->get()
+            ->map(fn (Draft $draft) => [
+                'key' => $draft->subject,
+                'kind' => $draft->kind,
+                'label' => $draft->subject,
+                'before' => $draft->kind === 'setting' ? ($published[$draft->subject] ?? null) : null,
+                'after' => $draft->kind === 'setting' ? ($draft->payload['value'] ?? null) : null,
+                'at' => $draft->updated_at?->toIso8601String(),
+            ])
+            ->values()
+            ->all();
+
+        return response()->json(['changes' => $changes, 'count' => count($changes)])
+            // One person's unfinished work. Nothing may hold it, anywhere.
+            ->withHeaders(['Cache-Control' => 'no-store, private']);
+    }
+
+    /**
+     * Take one change back before anybody sees it.
+     *
+     * The draft is deleted rather than overwritten with the old value, so
+     * what remains is the published page exactly as it was. Writing the old
+     * value back would leave a draft saying "make this what it already is",
+     * which counts as a change and publishes as one.
+     *
+     * Named for what a client does rather than for the verb the route uses:
+     * revert() here is already the undo stack's own helper, which puts a
+     * published value back, and the two would be easy to confuse.
+     */
+    public function discardChange(Request $request): JsonResponse
+    {
+        abort_unless(DraftStore::enabled(), 404);
+
+        $validated = $request->validate([
+            'key' => ['required', 'string', 'max:200'],
+            'kind' => ['nullable', 'string', 'max:40'],
+        ]);
+
+        Draft::query()
+            ->where('kind', $validated['kind'] ?? 'setting')
+            ->where('subject', $validated['key'])
+            ->delete();
+
+        return $this->saved();
+    }
+
     public function publish(): JsonResponse
     {
         abort_unless(DraftStore::enabled(), 404);
