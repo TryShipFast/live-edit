@@ -40,7 +40,7 @@ Measured by counting rows, not by reading the design.
 | Adapter | Owns the content | Evidence |
 | --- | --- | --- |
 | Laravel | **the application** | 1 row in the app's own settings table, 0 in the control plane |
-| WordPress | **WordPress** | edits land in `wp_kastsbuild_content`, snapshots in `wp_kastsbuild_versions`, restore is local; the plane's count stayed frozen at 12 throughout |
+| WordPress | **WordPress** | words in `wp_kastsbuild_content`, snapshots in `wp_kastsbuild_versions`, pictures in the site's own media library; the plane's count stayed frozen at 12 and it received 0 bytes of media |
 | Plain HTML | the control plane | as intended, the site has no data layer of its own |
 | Next.js | the control plane | 1 published row in the plane |
 
@@ -61,6 +61,25 @@ rebuilt the dependency. Measured: restoring version 1 put twelve values back,
 the page returned to what it had said before, the restore itself was kept as
 version 2 so it can be undone, and the plane never moved.
 
+Pictures are the client's as well. An upload becomes a real attachment in their
+media library, so it appears in the grid, in the block editor, in `wp db export`
+and in whatever backup they run. Measured twice: once at the HTTP level, and once
+by clicking through the editor's own drawer in a browser. A 1800x1200 photograph
+chosen in the drawer produced a library row holding the untouched original and a
+472x552 copy cropped to the 236x276 box the design had; the page pointed at the
+client's own domain; a visitor with no cookies saw it; and the service recorded
+zero bytes of upload. The photographer's credit on the picture that was replaced
+was cleared in the same request, so no name was left under somebody else's
+photograph.
+
+**What is still not the client's: styles.** Corner rounding, spacing and the
+rest still go to `/live-edit/style` on the service, because the plugin does not
+claim that route. Nothing has been written there for this site yet - measured, 0
+rows - so nothing is lost today, but a client who changes a corner radius puts
+that row in our database rather than theirs. It is the same fix as the words:
+claim the route, keep a table. That is the next stage rather than a limitation,
+and it is called out here so the ownership claim above stays honest.
+
 ## Content types
 
 | | Laravel | WordPress | Plain HTML | React | Next.js |
@@ -69,7 +88,7 @@ version 2 so it can be undone, and the plane never moved.
 | Buttons and labels | ? | ? | ? | ? | ? |
 | Links (text and href) | ? | ? | ? | ? | ✓ |
 | Nested / mixed content | ✓ | ✓ | ✓ | ? | ✓ |
-| Images | ? | ✓ detect | ? | ? | ? |
+| Images | ? | ✓ | ? | ? | ? |
 | Background images | ? | ? | ? | ? | ? |
 | Lists and repeated items | ? | ✓ detect | ✓ | ? | ✓ |
 | Tables | ? | ? | ? | ? | ? |
@@ -83,8 +102,13 @@ WordPress was re-run on the current runtime and detects 107 elements, 37
 lists and 8 images on an Astra and Elementor site. Its image drawer offers
 replace, alt text, title attribute and remove; alt text was set through the
 editor and survived a reload, which is the first SEO-adjacent field measured
-anywhere. Its lists and image replacement are marked "detect" rather than ✓
-because detection was measured and the edit itself was not.
+anywhere. Image **replacement** is now ✓ there, clicked through in a browser: Edit site,
+click the picture, choose a file, type alt text, Save changes, Publish. The
+browser's only POST about that picture went to the site's own route; a visitor
+holding no cookies then saw the new photograph and the new alt text. This is the
+first adapter where replacing a picture has been watched end to end. Its
+lists are still marked "detect" because detection was measured and the edit
+itself was not.
 
 Lists were measured on two adapters. A nine-card grid on the static site and a
 three-plan pricing table in Next.js: editing one item leaves the others

@@ -23,6 +23,7 @@ use KastsBuild\Content;
 use KastsBuild\Credits;
 use KastsBuild\Frontend;
 use KastsBuild\Licence;
+use KastsBuild\Media;
 use KastsBuild\PlaneSession;
 use KastsBuild\Publishing;
 use KastsBuild\Settings;
@@ -61,6 +62,7 @@ require KASTSBUILD_PATH.'includes/Session.php';
 require KASTSBUILD_PATH.'includes/PlaneSession.php';
 require KASTSBUILD_PATH.'includes/Frontend.php';
 require KASTSBUILD_PATH.'includes/Publishing.php';
+require KASTSBUILD_PATH.'includes/Media.php';
 require KASTSBUILD_PATH.'includes/Builder.php';
 require KASTSBUILD_PATH.'includes/Credits.php';
 
@@ -79,6 +81,7 @@ add_action('plugins_loaded', function () {
     Settings::boot();
     Frontend::boot();
     Publishing::boot();
+    Media::boot();
     Builder::boot();
     // Signing in with the service, for a site whose editors have no
     // WordPress account. Booted always: it does nothing until somebody

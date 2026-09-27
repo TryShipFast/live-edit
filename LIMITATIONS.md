@@ -64,6 +64,28 @@ change, if this ever turns out to bother anybody. It may not be worth it.
 
 ---
 
+### WordPress will not accept an SVG, where the service will
+**Adapter:** WordPress. **Recorded:** 2026-09-27. **Severity:** low.
+
+Pictures now go into the client's own media library, which means uploads pass
+WordPress's file-type check rather than ours. WordPress refuses SVG, so an SVG
+logo that uploads fine on every other adapter is refused here with WordPress's
+own wording: "Sorry, you are not allowed to upload this file type." Measured.
+
+Not fixed, deliberately. The service accepts SVG because it sanitises the file
+and serves it from a different origin; WordPress serves the library from the
+client's own domain, where a gap in any sanitiser is stored XSS on their site.
+Core refuses SVG for that reason, and overriding it from this plugin would
+change a security property of somebody's site without their ever being asked.
+
+**What a client should do instead:** upload a PNG, or install one of the SVG
+plugins if they accept the trade — the route uses WordPress's own check, so the
+moment their site allows SVG, this does too.
+
+**To close it:** nothing to close on our side. It is the host's decision.
+
+---
+
 ### Corrected: the misdiagnosis that started the React work
 **Adapter:** React, Next.js. **Recorded:** 2026-09-27.
 
@@ -79,6 +101,25 @@ Kept as a correction rather than deleted, because the reasoning was wrong in a
 way worth recognising: a plausible mechanism was written down as though it had
 been observed. The classification fix was still worth making on its own terms,
 and is listed above.
+
+---
+
+### A fitted picture is not the one the media library would pick
+**Adapter:** WordPress. **Recorded:** 2026-09-27. **Severity:** low.
+
+A replacement is cropped to the box it was dropped into, and the page is given
+that copy. The library holds the untouched original and WordPress's own
+generated sizes, so anybody using the picture elsewhere gets a sensible file -
+but the cropped copy is ours, not a size WordPress manages, and it carries no
+`srcset`: a phone downloads the same file a laptop does.
+
+Kept out of the attachment's size metadata on purpose, because a thumbnail
+regeneration rebuilds that list from registered sizes and would have deleted a
+file the page points at. Measured: after a full regeneration the picture is
+still there, and deleting the picture still removes it.
+
+**To close it:** generate a small set of widths per box rather than one, and
+write a `srcset` the page can use. Worth doing when picture-heavy sites show up.
 
 ---
 

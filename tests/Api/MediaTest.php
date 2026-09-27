@@ -122,6 +122,52 @@ class MediaTest extends TestCase
         $this->assertSame([400, 400], [$size[0], $size[1]], 'the image reached the bucket unfitted');
     }
 
+    public function test_a_big_enough_photograph_is_kept_sharp_for_a_retina_screen(): void
+    {
+        // The box is measured in the browser in CSS pixels, and the screens
+        // that matter draw two device pixels for each one. Fitted to the box
+        // exactly, every replacement looked soft beside the template's own
+        // photographs, which were not.
+        if (! extension_loaded('gd')) {
+            $this->markTestSkipped('GD is not available.');
+        }
+
+        $response = $this->post($this->url(), [
+            'file' => UploadedFile::fake()->image('photo.jpg', 2400, 1600),
+            'fitWidth' => 400,
+            'fitHeight' => 300,
+        ], $this->as($this->session));
+
+        $response->assertOk();
+
+        $size = getimagesizefromstring(Storage::disk('s3')->get($response->json('path')));
+
+        $this->assertSame([800, 600], [$size[0], $size[1]], 'the box was filled at one pixel per CSS pixel');
+    }
+
+    public function test_a_small_photograph_is_never_enlarged_to_fill_the_box(): void
+    {
+        // Invented detail, paid for in bandwidth, and worse looking than the
+        // honest smaller file the browser would have scaled itself. The shape
+        // still has to be the box's, or the layout goes.
+        if (! extension_loaded('gd')) {
+            $this->markTestSkipped('GD is not available.');
+        }
+
+        $response = $this->post($this->url(), [
+            'file' => UploadedFile::fake()->image('small.jpg', 500, 500),
+            'fitWidth' => 400,
+            'fitHeight' => 300,
+        ], $this->as($this->session));
+
+        $response->assertOk();
+
+        $size = getimagesizefromstring(Storage::disk('s3')->get($response->json('path')));
+
+        // 500 wide is 1.25 boxes, so that is all the density available.
+        $this->assertSame([500, 375], [$size[0], $size[1]]);
+    }
+
     public function test_a_publishable_key_cannot_upload(): void
     {
         $this->post($this->url(), ['file' => UploadedFile::fake()->image('x.jpg')], $this->as($this->publishable))

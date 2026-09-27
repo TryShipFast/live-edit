@@ -18,7 +18,23 @@ class ImageFitter
     protected const MAX_EDGE = 4000;
 
     /**
-     * Rewrite the file at $path so it exactly fills $width x $height.
+     * How many image pixels to keep per CSS pixel of the box.
+     *
+     * The box is measured in the browser in CSS pixels, and most screens that
+     * matter draw two device pixels for each of them. Fitted to the box exactly
+     * the replacement is correct and looks soft on every phone and every recent
+     * laptop, next to the template's own photographs which were not.
+     *
+     * Never an upscale: see density(). Two rather than three because the file
+     * grows with the square of this and the returns stop being visible.
+     */
+    protected const DENSITY = 2;
+
+    /**
+     * Rewrite the file at $path so it fills a $width x $height box.
+     *
+     * The result has the box's shape and, where the original was big enough to
+     * allow it, more pixels than the box has - see DENSITY.
      *
      * Returns false when the file is not an image type we can process, in
      * which case the original is left untouched rather than corrupted.
@@ -38,6 +54,11 @@ class ImageFitter
         }
 
         [$sourceWidth, $sourceHeight] = $info;
+
+        $density = self::density($width, $height, $sourceWidth, $sourceHeight);
+        $width = (int) min(round($width * $density), self::MAX_EDGE);
+        $height = (int) min(round($height * $density), self::MAX_EDGE);
+
         $source = self::read($path, $info[2]);
         if ($source === null) {
             return false;
@@ -63,6 +84,27 @@ class ImageFitter
         imagedestroy($target);
 
         return $written;
+    }
+
+    /**
+     * How much bigger than the box we may go, given what the original holds.
+     *
+     * Bounded by the original in both directions, so the crop is always a
+     * selection of real pixels. Enlarging a small photograph to fill a retina
+     * box invents detail, costs bandwidth for it, and looks worse than the
+     * honest smaller file the browser would have scaled itself.
+     */
+    protected static function density(int $width, int $height, int $sourceWidth, int $sourceHeight): float
+    {
+        if ($width < 1 || $height < 1) {
+            return 1.0;
+        }
+
+        return max(1.0, min(
+            (float) self::DENSITY,
+            $sourceWidth / $width,
+            $sourceHeight / $height
+        ));
     }
 
     /** @return \GdImage|null */

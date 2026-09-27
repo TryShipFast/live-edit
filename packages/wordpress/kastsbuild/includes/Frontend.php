@@ -246,6 +246,11 @@ class Frontend
                     '/live-edit/changes' => rest_url('kastsbuild/v1/changes'),
                     '/live-edit/publish' => rest_url('kastsbuild/v1/publish'),
                     '/live-edit/versions' => rest_url('kastsbuild/v1/versions'),
+                    // Pictures too: they go into this site's own media
+                    // library, so the client's photographs are theirs in the
+                    // same way their words are.
+                    '/live-edit/upload' => rest_url('kastsbuild/v1/media'),
+                    '/live-edit/image' => rest_url('kastsbuild/v1/media'),
                 ],
                 'routeHeaders' => ['X-WP-Nonce' => wp_create_nonce('wp_rest')],
                 // Where to tell the page builder what changed, so its own copy
