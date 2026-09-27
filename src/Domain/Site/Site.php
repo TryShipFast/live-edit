@@ -93,6 +93,44 @@ class Site extends Model
     }
 
     /**
+     * Whether this site still holds a licence key that works.
+     *
+     * Not "has a key": a key that expired last month is a lapsed licence, and
+     * a revoked one is a rotated or withdrawn licence. What matters is
+     * whether any of them is alive right now.
+     *
+     * The distinction this draws is deliberate. Rotating a key revokes the
+     * old one and issues a new one, and must not throw an editor out
+     * mid-sentence; a licence running out must. So it asks whether ANY usable
+     * licence key remains, which is true through a rotation and false once
+     * the last one lapses.
+     *
+     * Sessions are excluded because they are not licences. One is minted per
+     * sign-in and lives hours, so counting them would mean a site stayed
+     * licensed for as long as somebody kept editing it.
+     *
+     * A site that has never been issued a licence key at all is treated as
+     * live, and that is the same rule the packages follow on the other side:
+     * nothing configured means carry on. Reading "never had one" as "lapsed"
+     * would stop editing on every site that predates keys having an expiry,
+     * which is a licence decision made by accident.
+     */
+    public function hasLiveLicence(): bool
+    {
+        $licences = $this->tokens()
+            ->whereIn('type', [TokenType::Publishable->value, TokenType::Secret->value]);
+
+        if ((clone $licences)->doesntExist()) {
+            return true;
+        }
+
+        return $licences
+            ->whereNull('revoked_at')
+            ->where(fn ($q) => $q->whereNull('expires_at')->orWhere('expires_at', '>', now()))
+            ->exists();
+    }
+
+    /**
      * Mint a key. The plain text comes back once, here and nowhere else — it is
      * not recoverable afterwards, by us or by anyone who reads the database.
      *

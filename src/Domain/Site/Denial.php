@@ -23,6 +23,7 @@ enum Denial: string
     case OriginNotAllowed = 'origin_not_allowed';
     case MissingAbility = 'missing_ability';
     case SiteMismatch = 'site_mismatch';
+    case LicenceLapsed = 'licence_lapsed';
 
     /** Whether this is "who are you" (401) or "not you" (403). */
     public function status(): int
@@ -42,6 +43,7 @@ enum Denial: string
             self::SecretInBrowser => 'A secret key must not be used from a browser.',
             self::SiteSuspended => 'This site is suspended.',
             self::SiteMismatch => 'This key does not belong to that site.',
+            self::LicenceLapsed => 'This licence has ended, so this site can no longer be edited. The website itself is unaffected.',
             default => 'Invalid or missing API key.',
         };
     }

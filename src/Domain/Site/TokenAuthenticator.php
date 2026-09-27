@@ -73,6 +73,29 @@ class TokenAuthenticator
             return AuthenticationResult::denied(Denial::MissingAbility);
         }
 
+        /*
+         * A lapsed licence stops writing, whichever key is presented.
+         *
+         * Last, so the more specific refusals answer first. A key offered to
+         * the wrong site should hear that it is the wrong site, not that the
+         * licence has lapsed: the second is true of that site and tells the
+         * caller nothing about what they actually did.
+         *
+         * The checks above only ask about the credential in hand, so a
+         * sign-in session minted an hour ago kept working after the site's
+         * licence ran out: it is neither revoked nor expired itself. The
+         * editor would disappear on the next page load and anybody already
+         * editing could carry on saving until their session ran down.
+         *
+         * Reading is left alone. A site's published words belong on its
+         * pages whatever its billing is doing, and taking a customer's
+         * website down over a licence is the one thing this product promises
+         * not to do.
+         */
+        if ($needs !== null && $needs !== Ability::Read && ! $site->hasLiveLicence()) {
+            return AuthenticationResult::denied(Denial::LicenceLapsed);
+        }
+
         return AuthenticationResult::allowed($token, $site);
     }
 }
