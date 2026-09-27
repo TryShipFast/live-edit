@@ -1,11 +1,28 @@
-# shipfast/live-edit
+# ShipFast Live Edit
 
-Config-driven, in-place live-edit CMS for Laravel sites. Tag HTML elements in
-your Blade views, and signed-in admins edit content, images, links, icons,
-styles, collections and navigation directly on the live page — no separate
-admin screens for content.
+In-place editing for sites that are already built. Tag the elements, and the
+people who own the site edit text, images, links, icons, styles and lists on
+the page itself. There are no admin screens for content, because the page is
+the admin screen.
 
-## What the package provides
+It runs on five kinds of site, through adapters over one engine:
+
+| | How it is installed |
+| --- | --- |
+| **Laravel** | this package, tagging Blade views |
+| **WordPress** | a plugin, keeping the client's content in their own database |
+| **Plain HTML** | one script tag |
+| **Next.js** | `@shipfast/live-edit-react`, with a codemod |
+| **React** | the same package, provider and overlay |
+
+What has actually been driven through a browser on a real site, adapter by
+adapter, is in [ADAPTERS.md](ADAPTERS.md). What does not work yet, and whether
+it is being fixed or lived with, is in [LIMITATIONS.md](LIMITATIONS.md).
+
+The rest of this file is the Laravel adapter. The others have their own
+instructions in the console when a site is registered.
+
+## What the Laravel package provides
 
 - **Endpoints** (`ShipFast\LiveEdit\Http\Controllers\LiveEditController`) for
   settings, records (create / update / move / delete), images (replace / alt /

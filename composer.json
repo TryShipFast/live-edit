@@ -1,6 +1,7 @@
 {
     "name": "shipfast/live-edit",
-    "description": "Config-driven, in-place live-edit CMS for Laravel sites: tag HTML elements, edit content, images, links, icons, styles, collections and nav in place.",
+    "description": "ShipFast Live Edit: in-place editing for sites that are already built, on Laravel, WordPress, Next.js, React or plain HTML. Tag the elements; the people who own the site edit text, images, links, icons, styles and lists on the page itself.",
+    "keywords": ["live-edit", "in-place-editing", "cms", "laravel", "wordpress", "nextjs", "react", "static-site"],
     "type": "library",
     "license": "proprietary",
     "authors": [

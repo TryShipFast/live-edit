@@ -23,7 +23,7 @@ class Settings
 
     public static function menu(): void
     {
-        add_options_page('KastsBuild Live Edit', 'Live Edit', 'manage_options', 'kastsbuild', [self::class, 'screen']);
+        add_options_page('ShipFast Live Edit', 'Live Edit', 'manage_options', 'kastsbuild', [self::class, 'screen']);
     }
 
     public static function register(): void
