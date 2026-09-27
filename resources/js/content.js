@@ -73,9 +73,9 @@ export const applyValue = (element, value) => {
  * becomes a way to run scripts on every visitor's browser.
  */
 const applyWords = (element, value) => {
-    const ownText = [...element.childNodes].filter((node) => node.nodeType === TEXT_NODE);
+    const runs = [...element.childNodes].filter((node) => node.nodeType === TEXT_NODE);
 
-    if (ownText.length === 0) {
+    if (runs.length === 0) {
         // No words of its own. A wrapper around a single element that holds
         // them — the button above — is the one case where where they go is not
         // a guess; anything else is left alone rather than rearranged.
@@ -92,17 +92,102 @@ const applyWords = (element, value) => {
         return;
     }
 
-    ownText.forEach((node, index) => {
-        if (index > 0) {
-            node.remove();
+    if (runs.length === 1) {
+        writeRun(runs[0], value);
 
-            return;
+        return;
+    }
+
+    /*
+     * Words on both sides of something else.
+     *
+     * "We design for the <strong>street it stands on</strong>, not for a
+     * photograph" is two runs of text with an element between them. Writing
+     * the whole sentence into the first run and deleting the rest — which is
+     * what this did — destroyed every word after the bold phrase and left the
+     * phrase itself trailing the sentence. Silently: the page still read as a
+     * sentence, just not theirs.
+     *
+     * So work out what actually changed, by matching the unchanged start and
+     * the unchanged end against what was there, and write that back into
+     * whichever run it belongs to. Correcting a typo or rewording a clause
+     * leaves the bold phrase exactly where the designer put it, which is
+     * nearly every edit anybody makes.
+     */
+    const olds = runs.map((node) => node.nodeValue);
+    const before = olds.join('');
+
+    let start = 0;
+
+    while (start < before.length && start < value.length && before[start] === value[start]) {
+        start += 1;
+    }
+
+    let end = 0;
+
+    while (
+        end < before.length - start
+        && end < value.length - start
+        && before[before.length - 1 - end] === value[value.length - 1 - end]
+    ) {
+        end += 1;
+    }
+
+    const from = start;
+    const to = before.length - end;
+    const replacement = value.slice(start, value.length - end);
+
+    let at = 0;
+    let placed = false;
+
+    const next = olds.map((text) => {
+        const runStart = at;
+        const runEnd = at + text.length;
+        at = runEnd;
+
+        // Only when the whole change sits inside this one run. A change that
+        // straddles two runs says nothing about which side of the element
+        // between them the new words belong on, and guessing is how the words
+        // got lost in the first place.
+        if (placed || from < runStart || to > runEnd) {
+            return text;
         }
 
-        // Keep the space that separated these words from a sibling link, or
-        // the sentence closes up against it.
-        node.nodeValue = value + (/\s$/.test(node.nodeValue) ? ' ' : '');
+        placed = true;
+
+        return text.slice(0, from - runStart) + replacement + text.slice(to - runStart);
     });
+
+    if (placed) {
+        runs.forEach((node, index) => {
+            node.nodeValue = next[index];
+        });
+
+        return;
+    }
+
+    // A rewrite rather than an edit. Nothing can be inferred about where the
+    // elements between the runs belong, so the sentence becomes one run —
+    // which loses the arrangement but never a word the person typed.
+    writeRun(runs[0], value);
+    runs.slice(1).forEach((node) => node.remove());
+};
+
+/**
+ * Put words into one run of text, keeping the spaces that held it apart.
+ *
+ * A published value arrives trimmed, and the space that separated these words
+ * from a neighbouring icon or link is not part of the words. Without this an
+ * icon ends up wearing the sentence: "→Book a call". The space is only added
+ * back when the value does not already carry one, so a value that came
+ * straight from the page round-trips unchanged.
+ */
+const writeRun = (node, value) => {
+    const had = node.nodeValue;
+    const lead = /^\s/.test(had) && !/^\s/.test(value) ? ' ' : '';
+    const trail = /\s$/.test(had) && !/\s$/.test(value) ? ' ' : '';
+
+    node.nodeValue = lead + value + trail;
 };
 
 const TEXT_NODE = 3;

@@ -247,4 +247,34 @@ describe('what a visitor sees, applied by the server and by the browser', () => 
 
         expect(b).toBe(s);
     });
+
+    it('writes an edit back into a sentence that has an element inside it, the same way', () => {
+        // The fault this closes was in both halves at once: each wrote the
+        // whole sentence into the first run of text and deleted the rest, so
+        // the words after a bold phrase were destroyed and the phrase ended up
+        // trailing the sentence. Fixing one and not the other would mean the
+        // same edit reading differently live and in an export.
+        const html = '<p data-edit="setting:hero">We design for the <strong>street it stands on</strong>, not a photograph.</p>';
+        const edit = { hero: 'We build for the , not a photograph.' };
+
+        const fromServer = asDocument(server(html, edit).html).querySelector('p');
+        const fromBrowser = browser(html, edit).querySelector('p');
+
+        expect(fromBrowser.querySelector('strong')).not.toBeNull();
+        expect(fromServer.querySelector('strong')).not.toBeNull();
+        expect(fromBrowser.textContent.trim()).toBe(fromServer.textContent.trim());
+        expect(fromBrowser.textContent).toContain('not a photograph.');
+    });
+
+    it('keeps a leading icon in front of the words in both halves', () => {
+        const html = '<a data-edit="setting:cta"><svg width="8"></svg> Book a call</a>';
+        const edit = { cta: 'Book a visit' };
+
+        const fromServer = asDocument(server(html, edit).html).querySelector('a');
+        const fromBrowser = browser(html, edit).querySelector('a');
+
+        expect(fromBrowser.firstElementChild.tagName.toLowerCase()).toBe('svg');
+        expect(fromServer.firstElementChild.tagName.toLowerCase()).toBe('svg');
+        expect(fromBrowser.textContent).toBe(fromServer.textContent);
+    });
 });

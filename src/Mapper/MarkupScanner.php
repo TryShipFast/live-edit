@@ -1300,6 +1300,122 @@ class MarkupScanner
         return null;
     }
 
+    /**
+     * Put words into one run of text, keeping the spaces that held it apart.
+     *
+     * A published value arrives trimmed, and the space that separated these
+     * words from a neighbouring icon or link is not part of the words. Only
+     * added back when the value does not already carry one, so a value taken
+     * from the page round-trips unchanged.
+     */
+    protected function writeRun(DOMNode $run, string $value): void
+    {
+        $had = (string) $run->nodeValue;
+        $lead = preg_match('/^\\s/', $had) && ! preg_match('/^\\s/', $value) ? ' ' : '';
+        $trailing = preg_match('/\\s$/', $had) && ! preg_match('/\\s$/', $value) ? ' ' : '';
+
+        $run->nodeValue = $lead.$value.$trailing;
+    }
+
+    /**
+     * Write an edit back into a sentence that has an element inside it.
+     *
+     * "We design for the <strong>street it stands on</strong>, not for a
+     * photograph" is two runs of text with an element between them. Writing
+     * the whole sentence into the first run and deleting the rest — which is
+     * what this did — destroyed every word after the bold phrase and left the
+     * phrase trailing the sentence. Silently: the page still read as a
+     * sentence, just not the client's.
+     *
+     * So work out what actually changed, by matching the unchanged start and
+     * end against what was there, and write that back into whichever run it
+     * belongs to. The browser's applier does exactly this; the two disagreeing
+     * would mean the same edit reading differently live and in an export.
+     *
+     * @param  array<int, DOMNode>  $runs
+     */
+    protected function writeAcrossRuns(DOMElement $node, array $runs, string $value): void
+    {
+        $olds = array_map(static fn (DOMNode $run): string => (string) $run->nodeValue, $runs);
+        $before = implode('', $olds);
+
+        $start = 0;
+        $shortest = min(strlen($before), strlen($value));
+
+        while ($start < $shortest && $before[$start] === $value[$start]) {
+            $start++;
+        }
+
+        $end = 0;
+
+        while ($end < strlen($before) - $start
+            && $end < strlen($value) - $start
+            && $before[strlen($before) - 1 - $end] === $value[strlen($value) - 1 - $end]) {
+            $end++;
+        }
+
+        // Back off to a character boundary. These offsets are counted in
+        // bytes, and cutting inside a multi-byte letter would write broken
+        // UTF-8 into somebody's page — which in Yoruba or French is most
+        // sentences rather than an edge case.
+        $start = $this->onACharacterBoundary($before, $start);
+        $end = strlen($before) - $this->onACharacterBoundary($before, strlen($before) - $end);
+
+        $from = $start;
+        $to = strlen($before) - $end;
+        $replacement = substr($value, $start, strlen($value) - $end - $start);
+
+        $at = 0;
+        $placed = false;
+        $next = [];
+
+        foreach ($olds as $text) {
+            $runStart = $at;
+            $runEnd = $at + strlen($text);
+            $at = $runEnd;
+
+            // Only when the whole change sits inside this one run. A change
+            // straddling two runs says nothing about which side of the element
+            // between them the new words belong on, and guessing is how the
+            // words were lost in the first place.
+            if ($placed || $from < $runStart || $to > $runEnd) {
+                $next[] = $text;
+
+                continue;
+            }
+
+            $placed = true;
+            $next[] = substr($text, 0, $from - $runStart).$replacement.substr($text, $to - $runStart);
+        }
+
+        if ($placed) {
+            foreach ($runs as $index => $run) {
+                $run->nodeValue = $next[$index];
+            }
+
+            return;
+        }
+
+        // A rewrite rather than an edit. Nothing can be inferred about where
+        // the elements between the runs belong, so the sentence becomes one
+        // run — which loses the arrangement but never a word.
+        $this->writeRun($runs[0], $value);
+
+        foreach (array_slice($runs, 1) as $run) {
+            $node->removeChild($run);
+        }
+    }
+
+    /** Move an offset back until it sits between characters, not inside one. */
+    protected function onACharacterBoundary(string $text, int $offset): int
+    {
+        while ($offset > 0 && $offset < strlen($text) && (ord($text[$offset]) & 0xC0) === 0x80) {
+            $offset--;
+        }
+
+        return $offset;
+    }
+
     /** Whether a counter sits somewhere below this element. */
     /**
      * Put new words where the old ones were, leaving alone whatever else the
@@ -1313,22 +1429,27 @@ class MarkupScanner
      */
     protected function writeWords(DOMElement $node, string $value): void
     {
-        $replaced = false;
+        $runs = [];
 
         foreach (iterator_to_array($node->childNodes) as $child) {
-            if ($child->nodeType !== XML_TEXT_NODE) {
-                continue;
+            if ($child->nodeType === XML_TEXT_NODE) {
+                $runs[] = $child;
             }
-            if ($replaced) {
-                $node->removeChild($child);
-
-                continue;
-            }
-            // Keep the spacing that separated the text from a sibling link.
-            $trailing = preg_match('/\s$/', $child->nodeValue) ? ' ' : '';
-            $child->nodeValue = $value.$trailing;
-            $replaced = true;
         }
+
+        if (count($runs) === 1) {
+            $this->writeRun($runs[0], $value);
+
+            return;
+        }
+
+        if ($runs !== []) {
+            $this->writeAcrossRuns($node, $runs, $value);
+
+            return;
+        }
+
+        $replaced = false;
 
         if ($replaced) {
             return;

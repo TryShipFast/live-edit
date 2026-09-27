@@ -117,13 +117,21 @@ export const displayedValue = ({ editValue, ownText, fullText }) => {
     return fullText ?? '';
 };
 
-/** The words an element contributes itself, ignoring its children. */
+/**
+ * The words an element contributes itself, ignoring its children.
+ *
+ * Joined with nothing, not with a space. A sentence broken by a bold phrase
+ * is two runs of text, and putting a space between them added one the page
+ * never had — visible as a gap before the comma in "the , not for a
+ * photograph". It also meant the string the editor showed was not quite the
+ * string the page held, so writing it back could not be exact.
+ */
 export const ownTextOf = (element) =>
     element.children.length
         ? [...element.childNodes]
             .filter((node) => node.nodeType === 3)
             .map((node) => node.textContent)
-            .join(' ')
+            .join('')
         : element.textContent;
 
 /**
