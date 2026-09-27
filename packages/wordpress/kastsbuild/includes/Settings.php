@@ -84,9 +84,20 @@ class Settings
         return in_array($value, ['wp', 'service', 'either'], true) ? $value : 'either';
     }
 
+    /**
+     * The WordPress capability that means somebody may edit the words.
+     *
+     * Defaults to this plugin's own, which activation grants to
+     * administrators and which a site owner can grant to anybody else without
+     * handing over the rest of wp-admin along with it.
+     *
+     * A site that had set edit_theme_options keeps it: the stored value wins,
+     * and an upgrade that silently changed who may edit would be a security
+     * decision made on somebody's behalf.
+     */
     public static function capability(): string
     {
-        return self::get('capability', 'edit_theme_options') ?: 'edit_theme_options';
+        return self::get('capability', 'kastsbuild_edit') ?: 'kastsbuild_edit';
     }
 
     public static function configured(): bool
@@ -152,8 +163,13 @@ class Settings
                     <tr>
                         <th scope="row"><label for="kb-cap">Who may edit</label></th>
                         <td><input name="kastsbuild_settings[capability]" id="kb-cap" type="text" class="regular-text"
-                                   value="<?php echo esc_attr($s['capability'] ?? 'edit_theme_options'); ?>">
-                            <p class="description">A WordPress capability, used when they sign in with WordPress. <code>edit_theme_options</code> means administrators.</p></td>
+                                   value="<?php echo esc_attr($s['capability'] ?? self::capability()); ?>">
+                            <p class="description">
+                                A WordPress capability, used when they sign in with WordPress.
+                                <code>kastsbuild_edit</code> is this plugin's own and means only "may edit the words";
+                                administrators have it. <code>edit_theme_options</code> means administrators and
+                                everything else they can do.
+                            </p></td>
                     </tr>
                 </table>
                 <?php submit_button(); ?>

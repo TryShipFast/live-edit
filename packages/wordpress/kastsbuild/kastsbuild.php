@@ -97,6 +97,29 @@ add_action('plugins_loaded', function () {
     Credits::boot();
 });
 
+/*
+ * A capability that means "may edit the words", and nothing else.
+ *
+ * The plugin shipped gated on edit_theme_options, which in practice means
+ * administrator. So letting a client fix a typo meant handing them the media
+ * library, the plugins screen, the users list and everybody else's drafts.
+ * That is a poor trade for a paragraph, and it is the reason sites end up
+ * with four administrators who should not be.
+ *
+ * Granted to administrators on activation so nothing changes for a site that
+ * installs this and reads no further. A site owner can then grant it to an
+ * Editor or Author role, or to one person, and that is all it gives them.
+ */
+register_activation_hook(__FILE__, function () {
+    foreach (['administrator'] as $name) {
+        $role = get_role($name);
+
+        if ($role !== null) {
+            $role->add_cap('kastsbuild_edit');
+        }
+    }
+});
+
 register_deactivation_hook(__FILE__, function () {
     // Cached pages carry editing markup. Left behind after the plugin is
     // switched off, visitors would be served attributes for an editor that is
