@@ -29,10 +29,21 @@ class RequiresLicence
 
         $reason = Licence::reason();
 
+        /*
+         * Each refusal says what happened and what to do about it.
+         *
+         * They arrive at the same moment and mean entirely different things:
+         * one wants paying, one wants a key pasting, one wants a conversation
+         * with us. "Not licensed to edit" is true of all three and useful for
+         * none of them, and it is the message somebody screenshots and sends
+         * to support.
+         */
         $message = match ($reason) {
-            'expired' => 'This licence has expired. Renew it to carry on editing — your website is unaffected.',
-            'domain_mismatch' => 'This licence belongs to a different domain.',
-            'suspended' => 'This site is suspended.',
+            'expired' => 'This licence has expired. Renew it to carry on editing. Your website is unaffected.',
+            'rejected' => 'This key is no longer accepted. It was probably replaced or revoked: copy the current one from your dashboard into this site\'s environment.',
+            'domain_mismatch' => 'This licence is registered to a different domain, so editing is refused here.',
+            'suspended' => 'This site is suspended. Your website is unaffected.',
+            'unverified' => 'This site has not proved it owns its domain yet. Finish that in your dashboard.',
             default => 'This installation is not licensed to edit.',
         };
 
