@@ -197,6 +197,18 @@ final class Licence
     }
 
     /**
+     * This site's own page in the console.
+     *
+     * Where somebody goes to see when their licence runs out, add a colleague
+     * or take one off. Only meaningful once a site is registered, since
+     * without a slug there is no page to open.
+     */
+    public static function consoleUrl(): ?string
+    {
+        return self::configured() ? self::host().'/sites/'.rawurlencode(self::site()) : null;
+    }
+
+    /**
      * Where this site's people go to sign in.
      *
      * On the service, so a password is never typed into the customer's own

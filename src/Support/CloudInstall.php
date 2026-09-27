@@ -52,7 +52,14 @@ class CloudInstall
         }
 
         return '<script>window.liveEditEditor='.json_encode(
-            ['greeting' => $editor['greeting'] ?? null],
+            [
+                'greeting' => $editor['greeting'] ?? null,
+                // Where their own dashboard is, so the bar can offer a way
+                // back to it. A site that never registered has no page to
+                // open, and the bar shows no way in rather than a dead one.
+                'console' => Licence::consoleUrl(),
+                'signOut' => url('live-edit/session'),
+            ],
             JSON_THROW_ON_ERROR | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT
         ).';</script>';
     }

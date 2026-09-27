@@ -95,6 +95,11 @@ button, input, select, textarea { font: inherit; color: inherit; margin: 0; }
   width: 34px; height: 34px; flex: none; border-radius: 999px; background: #fff;
   display: inline-flex; align-items: center; justify-content: center;
 }
+/* Only when it goes somewhere. A mark that lifts under the pointer and then
+   does nothing is a worse lie than one that never moved. */
+a.le-mark { cursor: pointer; transition: transform .12s ease, box-shadow .12s ease; }
+a.le-mark:hover { transform: translateY(-1px); box-shadow: 0 0 0 3px rgba(255,255,255,.16); }
+a.le-mark:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
 .le-sep { width: 1px; height: 20px; flex: none; background: #2A2C31; }
 /* A round button for the one-glyph controls: undo, redo. */
 .le-round {
@@ -728,10 +733,32 @@ export function createChrome() {
     /* The mark, so the bar is plainly ours and not something the theme grew.
        A white disc on carbon: one shape, no colour, which is the whole idea
        of this bar. */
-    const mark = el('span', 'le-mark');
+    /*
+     * A link when there is somewhere to go, a plain mark when there is not.
+     *
+     * The dashboard is where a licence is renewed and colleagues are added or
+     * removed, and until now the only route to it was remembering the
+     * address. The mark is the one thing on this bar that is plainly ours and
+     * was doing nothing, which is exactly what a way home should be.
+     *
+     * A site that has not registered has no page to open, so it keeps the
+     * mark and gets no dead link.
+     */
+    const consoleUrl = window.liveEditEditor?.console ?? null;
+    const mark = el(consoleUrl ? 'a' : 'span', 'le-mark');
     mark.innerHTML = '<svg width="16" height="16" viewBox="0 0 32 32" aria-hidden="true">'
         + '<rect x="3" y="3" width="20" height="20" rx="3" fill="none" stroke="#0B0C0F" stroke-width="2.5"/>'
         + '<path d="M16 15 L16 30 L19.6 26.4 L22.2 31.2 L24.6 30 L22 25.3 L27 25.3 Z" fill="#3148F5" stroke="#fff" stroke-width="1.4" stroke-linejoin="round"/></svg>';
+
+    if (consoleUrl) {
+        mark.href = consoleUrl;
+        // A new tab, because the client is in the middle of editing a page and
+        // sending them away would lose whatever they had open.
+        mark.target = '_blank';
+        mark.rel = 'noopener';
+        mark.title = 'Your dashboard: licence, editors, settings';
+        mark.setAttribute('aria-label', 'Open your dashboard');
+    }
 
     /* Empty until editing starts.
 
