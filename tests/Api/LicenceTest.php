@@ -86,6 +86,42 @@ class LicenceTest extends TestCase
             ->assertJsonPath('licence.reason', null);
     }
 
+    public function test_a_server_that_names_no_domain_has_not_named_the_wrong_one(): void
+    {
+        /*
+         * The case that switched the editor off on correctly licensed sites.
+         *
+         * A browser sends an Origin. A server asking on its own behalf — the
+         * WordPress plugin, a Laravel install checking on a schedule — sends
+         * nothing, and "nothing" was being read as "not your domain", so
+         * every such install was told its licence belonged to somebody else.
+         * It went unseen only because the check could not reach us from a
+         * local install at all and fell open instead.
+         */
+        [, $key] = $this->licensedSite();
+
+        // No Origin, no claimed domain. Exactly what wp_remote_get sends.
+        $this->ask($key)
+            ->assertOk()
+            ->assertJsonPath('licence.valid', true)
+            ->assertJsonPath('licence.domain_matches', null)
+            ->assertJsonPath('licence.observed_domain', null)
+            ->assertJsonPath('licence.reason', null);
+    }
+
+    public function test_a_server_naming_somebody_elses_domain_is_still_a_mismatch(): void
+    {
+        // Saying nothing is unknown; saying the wrong thing is still wrong.
+        // A claim can be made up, which is why this is a tripwire rather than
+        // a lock, but a tripwire that ignores what it is told is not one.
+        [, $key] = $this->licensedSite();
+
+        $this->ask($key, [], ['domain' => 'somebody-else.com'])
+            ->assertJsonPath('licence.valid', false)
+            ->assertJsonPath('licence.domain_matches', false)
+            ->assertJsonPath('licence.reason', 'domain_mismatch');
+    }
+
     public function test_a_key_used_from_an_unlisted_origin_never_reaches_the_licence_check(): void
     {
         [, $key] = $this->licensedSite();

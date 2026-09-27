@@ -13,6 +13,7 @@ use ShipFast\LiveEdit\Http\Api\V1\MediaController;
 use ShipFast\LiveEdit\Http\Api\V1\SessionController;
 use ShipFast\LiveEdit\Http\Api\V1\SignInController;
 use ShipFast\LiveEdit\Http\Api\V1\SiteController;
+use ShipFast\LiveEdit\Http\Middleware\RecoversAnExpiredSignIn;
 
 /*
  * The site is named in the path rather than inferred from the key, because a
@@ -227,7 +228,7 @@ Route::middleware([EnforceCors::class])
  * Under `web` because it is a page with a form and needs a session and a CSRF
  * token — everything else in this file is an API and has neither.
  */
-Route::middleware(['web', ThrottleApi::class.':sign_in'])->group(function () {
+Route::middleware([RecoversAnExpiredSignIn::class, 'web', ThrottleApi::class.':sign_in'])->group(function () {
     Route::get('/live-edit/sign-in', [SignInController::class, 'form'])
         ->name('live-edit.sign-in.form');
 

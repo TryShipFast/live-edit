@@ -105,7 +105,23 @@ class Licence
     /** @return array<string, mixed> */
     private static function ask(): array
     {
-        $probe = Api::probe('/licence', (string) Settings::get('publishable_key'));
+        /*
+         * Name the site we are, because nothing else here can.
+         *
+         * A browser sends an Origin the page cannot forge, which is what
+         * makes the domain check real. A plugin asking on its own behalf has
+         * no such thing, so it says where it is: a claim, which a thief could
+         * also make, and which is therefore a tripwire rather than a lock.
+         * Worth sending anyway — a key being used from a domain that is not
+         * the licensed one is exactly the thing worth knowing about, and in
+         * silence we would never hear it.
+         */
+        $home = (string) wp_parse_url(home_url('/'), PHP_URL_HOST);
+
+        $probe = Api::probe(
+            '/licence'.($home !== '' ? '?domain='.rawurlencode($home) : ''),
+            (string) Settings::get('publishable_key')
+        );
         $status = $probe['status'];
 
         if ($status !== null && $status < 400) {

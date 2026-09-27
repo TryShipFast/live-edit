@@ -55,10 +55,31 @@ class LicenceController
         $expiresAt = $token->expires_at;
         $lapsed = $expiresAt !== null && $expiresAt->isPast();
 
-        // An unverified site has no domain to match against, so "mismatch" is
-        // not a thing that can be said about it yet — it is simply unproven,
-        // which is a different message and a different fix.
-        $matches = $site->isVerified() ? $site->ownsDomain($observed) : null;
+        /*
+         * Three answers, not two: yes, no, and nothing was said.
+         *
+         * An unverified site has no domain to match against, so "mismatch"
+         * cannot be said about it yet — it is unproven, which is a different
+         * message and a different fix.
+         *
+         * And a caller that named no domain has not named the wrong one. A
+         * server asking on its own behalf — the WordPress plugin, a Laravel
+         * install checking its licence on a schedule — has no Origin to send
+         * and nothing to claim, and reading that silence as a mismatch told
+         * every one of them their licence was registered to somebody else's
+         * domain. It switched the editor off on correctly licensed sites, and
+         * the only reason nobody saw it is that the check could not reach us
+         * at all from a local install, so it fell open instead.
+         *
+         * Nothing is lost by saying so. The domain check has teeth in a
+         * browser, where the Origin cannot be forged, and that path is
+         * unchanged.
+         */
+        $matches = match (true) {
+            ! $site->isVerified() => null,
+            $observed === '' => null,
+            default => $site->ownsDomain($observed),
+        };
 
         return response()->json([
             'licence' => [

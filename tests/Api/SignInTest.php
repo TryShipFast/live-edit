@@ -2,7 +2,10 @@
 
 namespace ShipFast\LiveEdit\Tests\Api;
 
+use Illuminate\Http\Request;
+use Illuminate\Session\TokenMismatchException;
 use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Facades\Route;
 use Illuminate\Testing\TestResponse;
 use ShipFast\LiveEdit\Domain\Site\Ability;
 use ShipFast\LiveEdit\Domain\Site\ApiToken;
@@ -10,6 +13,7 @@ use ShipFast\LiveEdit\Domain\Site\Editor;
 use ShipFast\LiveEdit\Domain\Site\SignInToken;
 use ShipFast\LiveEdit\Domain\Site\Site;
 use ShipFast\LiveEdit\Domain\Site\TokenAuthenticator;
+use ShipFast\LiveEdit\Http\Middleware\RecoversAnExpiredSignIn;
 use ShipFast\LiveEdit\Mail\SignInLink;
 use ShipFast\LiveEdit\Tests\TestCase;
 
@@ -251,6 +255,54 @@ class SignInTest extends TestCase
         }
 
         $this->ask()->assertStatus(429);
+    }
+
+    public function test_a_form_left_open_too_long_comes_back_rather_than_dying(): void
+    {
+        // "419 PAGE EXPIRED" is a sentence for a developer, on the one page
+        // in this product a non-technical client is guaranteed to meet. A
+        // grey number on a white page gives them nothing to do except ring
+        // somebody who cannot reproduce it, because a reload fixes it.
+        //
+        // Driven through the middleware itself: the test harness turns CSRF
+        // off, so posting a wrong token here would prove nothing at all.
+        $this->get('/live-edit/sign-in?site=acme&return_to='.urlencode('https://acme.test/about'));
+
+        $request = Request::create('/live-edit/sign-in', 'POST', ['email' => 'amaka@acme.test']);
+        $request->setLaravelSession(session()->driver());
+
+        $response = (new RecoversAnExpiredSignIn)->handle(
+            $request,
+            fn () => throw new TokenMismatchException('CSRF token mismatch.')
+        );
+
+        $this->assertSame(302, $response->getStatusCode());
+        $this->assertNotNull(session('live-edit.sign-in.error'));
+
+        // Their address survives, so coming back means typing a password
+        // rather than starting again.
+        $this->assertSame('amaka@acme.test', session()->getOldInput('email'));
+    }
+
+    public function test_the_recovery_runs_before_the_check_it_recovers_from(): void
+    {
+        // Ordering is the whole trick and it is invisible. Middleware added
+        // to a route runs AFTER the web group's, by which point the mismatch
+        // has already become a 419 response and there is nothing left to
+        // catch. Listed ahead of "web", it wraps it.
+        $route = collect(Route::getRoutes()->getRoutes())
+            ->first(fn ($r) => $r->uri() === 'live-edit/sign-in' && in_array('POST', $r->methods(), true));
+
+        // The `web` group is still a name at this point and is expanded by
+        // the router at dispatch, so what can be checked here is that ours is
+        // listed ahead of it. That is the thing a future edit would break.
+        $middleware = $route->gatherMiddleware();
+        $ours = array_search(RecoversAnExpiredSignIn::class, $middleware, true);
+        $web = array_search('web', $middleware, true);
+
+        $this->assertNotFalse($ours, 'the recovery is not on the route at all');
+        $this->assertNotFalse($web, 'the sign-in form is no longer in the web group, so it has no CSRF check');
+        $this->assertLessThan($web, $ours, 'the recovery must wrap the web group, not follow it');
     }
 
     public function test_editors_are_managed_through_provisioning(): void
