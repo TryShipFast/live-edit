@@ -22,7 +22,7 @@ class Publishing
     {
         // WordPress's own answer to "may this person change this site", which
         // is the only place that question can honestly be answered.
-        $mayEdit = fn () => Session::viewerMayEdit();
+        $mayEdit = fn () => Session::mayEditOrWhyNot();
 
         register_rest_route('kastsbuild/v1', '/publish', [
             'methods' => 'POST',

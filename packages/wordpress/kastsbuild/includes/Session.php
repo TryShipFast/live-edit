@@ -40,6 +40,39 @@ class Session
     }
 
     /**
+     * The same question, answered so WordPress can repeat the answer.
+     *
+     * A permission callback that returns false makes WordPress say "Sorry,
+     * you are not allowed to do that", which is true and useless. Somebody
+     * whose plan lapsed while they had the page open gets told they are not
+     * allowed, when what happened is that a bill is due, and the message they
+     * screenshot for support says nothing about it.
+     *
+     * Returning a WP_Error instead lets the real sentence through, which the
+     * licence class has already written.
+     *
+     * @return true|\WP_Error
+     */
+    public static function mayEditOrWhyNot()
+    {
+        if (self::viewerMayEdit()) {
+            return true;
+        }
+
+        if (! Licence::permits()) {
+            // 402 rather than 403: this is not "you may not", it is "this
+            // needs paying for", and the editor can tell them apart.
+            return new \WP_Error('kastsbuild_licence', Licence::message(), ['status' => 402]);
+        }
+
+        return new \WP_Error(
+            'kastsbuild_forbidden',
+            __('You are signed out of the editor. Open the page again to sign back in.', 'kastsbuild'),
+            ['status' => 401]
+        );
+    }
+
+    /**
      * A session key for the signed-in user, minted once and reused until it is
      * nearly spent.
      *

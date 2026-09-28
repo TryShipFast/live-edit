@@ -89,7 +89,7 @@ class Media
 
     public static function route(): void
     {
-        $mayEdit = fn () => Session::viewerMayEdit();
+        $mayEdit = fn () => Session::mayEditOrWhyNot();
 
         /*
          * Both shapes the editor sends: a bare file, wanting an address back

@@ -52,7 +52,7 @@ class Builder
             // Session::viewerMayEdit rather than the capability alone: it is
             // the one place that knows about the licence and about somebody
             // who signed in with the service rather than with WordPress.
-            'permission_callback' => fn () => Session::viewerMayEdit(),
+            'permission_callback' => fn () => Session::mayEditOrWhyNot(),
             'callback' => [self::class, 'sync'],
         ]);
     }

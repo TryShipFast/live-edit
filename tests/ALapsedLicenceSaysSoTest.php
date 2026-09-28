@@ -4,6 +4,7 @@ namespace ShipFast\LiveEdit\Tests;
 
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
+use ShipFast\LiveEdit\Domain\Site\Denial;
 use ShipFast\LiveEdit\Support\Licence;
 
 /**
@@ -76,6 +77,31 @@ class ALapsedLicenceSaysSoTest extends TestCase
         Http::fake(['*' => Http::response(['error' => ['message' => 'Nope.']], 401)]);
 
         $this->assertSame('rejected', Licence::reason());
+    }
+
+    public function test_each_refusal_has_its_own_sentence(): void
+    {
+        /*
+         * Found in a browser, not here. A real lapse on a real WordPress
+         * install answered "Invalid or missing API key", because Expired and
+         * Revoked both fell through to the default. That is the one message
+         * guaranteed to send somebody hunting for a key, and the key was
+         * never the problem: the bill was.
+         */
+        $expired = Denial::Expired->publicMessage();
+        $revoked = Denial::Revoked->publicMessage();
+
+        $this->assertNotSame($expired, $revoked, 'a lapse and a withdrawn key read identically');
+        $this->assertStringNotContainsString('Invalid or missing', $expired);
+        $this->assertStringNotContainsString('Invalid or missing', $revoked);
+
+        // The lapse says the website is fine, because that is the first thing
+        // anybody asks and the thing they are most afraid of.
+        $this->assertStringContainsString('website', $expired);
+
+        // The withdrawn key says where to get another, which is the only one
+        // of the two that a new key actually fixes.
+        $this->assertStringContainsString('dashboard', $revoked);
     }
 
     public function test_an_outage_is_not_a_refusal(): void

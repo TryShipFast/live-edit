@@ -65,19 +65,32 @@ class Licence
      */
     public static function message(): string
     {
-        switch (self::reason()) {
+        return self::messageFrom((string) self::reason());
+    }
+
+    /**
+     * The words for one reason, separated from looking the reason up.
+     *
+     * Pure, so it can be checked without a WordPress install or a network,
+     * which is the only reason these sentences are ever checked at all.
+     */
+    public static function messageFrom(string $reason): string
+    {
+        switch ($reason) {
             case 'expired':
-                return __('This licence has expired. Renew it to carry on editing. Your website is unaffected.', 'kastsbuild');
+                return self::t('This licence has expired. Renew it to carry on editing. Your website is unaffected.');
             case 'rejected':
-                return __('This key is no longer accepted. It was probably replaced or revoked: copy the current one from your dashboard into this plugin\'s settings.', 'kastsbuild');
+                return self::t('This key is no longer accepted. It was probably replaced or revoked: copy the current one from your dashboard into this plugin\'s settings.');
+            case 'licence_lapsed':
+                return self::t('This licence has ended. Renew it to carry on editing. Your website is unaffected.');
             case 'domain_mismatch':
-                return __('This licence is registered to a different domain, so editing is refused here.', 'kastsbuild');
+                return self::t('This licence is registered to a different domain, so editing is refused here.');
             case 'suspended':
-                return __('This site is suspended. Your website is unaffected.', 'kastsbuild');
+                return self::t('This site is suspended. Your website is unaffected.');
             case 'unverified':
-                return __('This site has not proved it owns its domain yet. Finish that in your dashboard.', 'kastsbuild');
+                return self::t('This site has not proved it owns its domain yet. Finish that in your dashboard.');
             default:
-                return __('This installation is not licensed to edit.', 'kastsbuild');
+                return self::t('This installation is not licensed to edit.');
         }
     }
 
@@ -100,6 +113,50 @@ class Licence
     public static function forget(): void
     {
         delete_transient(self::ANSWER);
+    }
+
+    /**
+     * A string, translated when there is a WordPress to translate it.
+     *
+     * ABSPATH is the canonical "am I inside WordPress" marker. The probe
+     * exists so these sentences can be checked outside one: they are the words
+     * a customer reads at the worst moment, they were wrong for weeks, and a
+     * message nothing can reach is a message nothing will ever check.
+     *
+     * WordPress's __() takes a text domain as its second argument and
+     * Laravel's takes an array of replacements, so in a suite where both could
+     * be loaded, calling it unguarded is a type error rather than a
+     * translation.
+     */
+    private static function t(string $text): string
+    {
+        return defined('ABSPATH') ? __($text, 'kastsbuild') : $text;
+    }
+
+    /**
+     * Which kind of refusal the service just sent.
+     *
+     * Separated out and left testable for the same reason as messageFrom:
+     * it is the piece that was wrong, and it was wrong invisibly.
+     *
+     * @param  array<string, mixed>  $body
+     */
+    private static function reasonFromRefusal(array $body): string
+    {
+        $said = isset($body['error']['reason']) ? (string) $body['error']['reason'] : '';
+
+        switch ($said) {
+            case 'expired':
+            case 'licence_lapsed':
+                return 'expired';
+            case 'site_suspended':
+                return 'suspended';
+            default:
+                // Including 'revoked', and including an older service that
+                // names nothing at all: a customer's plugin is not upgraded
+                // on the day the service is.
+                return 'rejected';
+        }
     }
 
     /** @return array<string, mixed> */
@@ -146,7 +203,23 @@ class Licence
         // A 401 or 403 is the service saying plainly that this key is not
         // good. That is an answer, not an outage.
         if ($status === 401 || $status === 403) {
-            return ['valid' => false, 'reason' => 'rejected', 'expires_at' => null, 'days_remaining' => null];
+            /*
+             * Which kind of "not good", because the two commonest have
+             * opposite fixes. A lapsed licence wants paying and the key in
+             * this plugin's settings is fine; a withdrawn key wants
+             * replacing and the billing is fine.
+             *
+             * Reading only the status code meant every customer whose plan
+             * ran out was told to copy a new key out of their dashboard, and
+             * went looking for a key that was never the problem.
+             *
+             * An older service sends no reason, so the blunt answer stays as
+             * the fallback: a customer's plugin is not upgraded on the day
+             * the service is.
+             */
+            $reason = self::reasonFromRefusal(is_array($probe['data'] ?? null) ? $probe['data'] : []);
+
+            return ['valid' => false, 'reason' => $reason, 'expires_at' => null, 'days_remaining' => null];
         }
 
         $lastGood = get_transient(self::LAST_GOOD);

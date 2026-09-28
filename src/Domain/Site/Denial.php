@@ -44,6 +44,18 @@ enum Denial: string
             self::SiteSuspended => 'This site is suspended.',
             self::SiteMismatch => 'This key does not belong to that site.',
             self::LicenceLapsed => 'This licence has ended, so this site can no longer be edited. The website itself is unaffected.',
+            /*
+             * These two arrive identically and have opposite fixes, so they
+             * must not share a sentence.
+             *
+             * Found by watching a real lapse happen in a browser: the licence
+             * ran out and the site was told "Invalid or missing API key",
+             * which is the one message guaranteed to send somebody looking for
+             * a key that was never the problem. The key was fine. The bill was
+             * not.
+             */
+            self::Expired => 'This licence has ended, so this site can no longer be edited. The website itself is unaffected.',
+            self::Revoked => 'This key has been withdrawn. Copy the current one from your dashboard into this site\'s settings.',
             default => 'Invalid or missing API key.',
         };
     }
