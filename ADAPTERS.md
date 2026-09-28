@@ -126,7 +126,7 @@ safely in either order.
 | Alt text | ? | ✓ | ? | ? | ? |
 | AI rewrite and shorten | ✓ service | ✓ service | ✓ service | ✓ service | ✓ service |
 | AI generated picture | ✓ service | ✓ service | ✓ service | ✓ service | ✓ service |
-| Stock photo picker | ? | ? | ? | ? | ? |
+| Stock photo picker | ? | ? | ✓ | ? | ? |
 | SEO fields (title, description) | ? | ? | ? | ? | ? |
 
 WordPress was re-run on the current runtime and detects 107 elements, 37
@@ -165,6 +165,17 @@ Measured against OpenAI, not a stub. Rewrite returned a sensible sentence in
 came back as a typed reason rather than an exception. A picture took 38s and
 five credits and arrived as a real 1024x1024 photograph with no lettering in
 it, which is what the prompt framing exists to force.
+
+The stock photo picker is ✓ on plain HTML, clicked through: Free photos,
+searched, twelve real photographs with the photographer named under each, one
+chosen, the use reported back to Unsplash as their terms require, saved as a
+219 character address and painted for a visitor holding no cookies. Both
+providers were driven directly as well: Unsplash in 1.5s with a key, and
+Openverse in 1.8s with no key at all, which is the claim that a customer who
+never signs up for anything still gets free photographs.
+
+What that run also found is in LIMITATIONS.md: a photograph used as a
+background is stored with no photographer's name anywhere.
 
 Running it for real is also what found the fault described in LIMITATIONS.md:
 every one of these tests stubbed a response carrying a `url`, and the model

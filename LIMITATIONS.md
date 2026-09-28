@@ -219,7 +219,39 @@ than their behaviour.
 
 ---
 
-### Corrected: the misdiagnosis that started the React work
+### A free photograph used as a background credits nobody
+**Adapter:** all. **Recorded:** 2026-09-28. **Severity:** high, because it is a
+licence obligation rather than a defect.
+
+Replacing a picture stores the photographer beside it: the address, the alt
+text and four fields of credit, all as settings, and the attributions endpoint
+can list them. Using the same photograph as a section background stores the
+address and nothing else.
+
+Measured on the real thing. A photograph was chosen through the picker, the
+use was reported to Unsplash correctly, and afterwards the style row held one
+field, `backgroundImage`. No credit setting existed, the attributions endpoint
+listed zero, and the photographer's name appeared nowhere in the site's data.
+The only place it was ever shown was a toast at the moment of choosing, which
+is gone as soon as it fades.
+
+The editor says this out loud on purpose - the code notes that a background
+has no element of its own to carry a credit - but telling somebody once, in a
+message that disappears, is not the same as them having discharged the
+obligation. The photograph stays on the page for years.
+
+It matters more for Openverse than for Unsplash. Unsplash asks for
+attribution; a Creative Commons licence requires it, and Openverse is what a
+customer with no API key gets by default. So the default path produces the
+strongest obligation and the least credit.
+
+**To close it, one of:** store the credit fields with the style the way they
+are stored beside a picture, so the data at least exists and the attributions
+endpoint can see it; render a small credits line for a page that uses any
+attributed photograph; or refuse to offer attribution-required photographs as
+backgrounds at all. The first is cheap and makes the other two possible. What
+is not defensible is the current state, where the obligation exists and the
+information needed to meet it was never kept.
 **Adapter:** React, Next.js. **Recorded:** 2026-09-27.
 
 This register carried an entry saying a client-rendered tree reverted
