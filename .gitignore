@@ -7,3 +7,7 @@ vendor/orchestra/testbench-core/laravel/storage/app/
 # What `npm pack` leaves behind when somebody inspects a tarball before
 # publishing. Build output of a version that may never be released.
 *.tgz
+
+# Built artefacts. The zip is made from the source on demand and should not
+# be committed: a stale one in the repo is the version somebody installs.
+/dist/

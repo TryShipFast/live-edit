@@ -1,0 +1,39 @@
+#!/usr/bin/env bash
+#
+# Package the WordPress plugin as a zip somebody can install.
+#
+# There was no way to hand this to a customer. The plugin lives inside the
+# engine repo, which is private, so "clone it" is not an answer, and copying a
+# folder over FTP is how a site ends up running half of one version and half of
+# another. A zip is what the WordPress admin's own Upload Plugin button
+# expects.
+#
+# The version in the filename comes from the plugin header, so the file cannot
+# claim to be a version the code does not.
+set -euo pipefail
+
+root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+src="$root/packages/wordpress/kastsbuild"
+out="$root/dist"
+
+version="$(grep -m1 '^ \* Version:' "$src/kastsbuild.php" | sed 's/.*Version:[[:space:]]*//')"
+
+if [ -z "$version" ]; then
+    echo "No version in the plugin header. Refusing to build something unnamed." >&2
+    exit 1
+fi
+
+mkdir -p "$out"
+zip_path="$out/shipfast-live-edit-$version.zip"
+rm -f "$zip_path"
+
+# Zipped from the parent so the archive contains a kastsbuild/ directory,
+# which is what WordPress unpacks into wp-content/plugins.
+(
+    cd "$(dirname "$src")"
+    zip -r -q "$zip_path" "$(basename "$src")" \
+        -x '*.DS_Store' '*/node_modules/*' '*/.git/*' '*.map'
+)
+
+echo "$zip_path"
+echo "version $version, $(du -h "$zip_path" | cut -f1)"
