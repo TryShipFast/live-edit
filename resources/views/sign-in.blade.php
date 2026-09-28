@@ -134,6 +134,13 @@
             border-radius: 9px;
         }
 
+        .or {
+            margin: 22px 0 18px;
+            text-align: center;
+            font-size: 13px;
+            color: var(--muted);
+        }
+
         .foot {
             margin: 26px 0 0;
             padding-top: 18px;
@@ -168,6 +175,23 @@
             <p class="error" role="alert">{{ $error }}</p>
         @endif
 
+        @if ($continueAs ?? null)
+            {{-- Already signed in to the console, which is where they came
+                 from. Asking for a second password here would be asking them
+                 to keep a credential for a person they are already proved to
+                 be, which is the whole reason one editor account spans every
+                 site somebody works on. --}}
+            <form method="post" action="{{ route('live-edit.sign-in.continue') }}">
+                @csrf
+                <input type="hidden" name="site" value="{{ $site->slug }}">
+                <input type="hidden" name="return_to" value="{{ $returnTo }}">
+
+                <button type="submit">Continue as {{ $continueAs->name ?: $continueAs->email }}</button>
+            </form>
+
+            <p class="or">or sign in as somebody else</p>
+        @endif
+
         <form method="post" action="{{ route('live-edit.sign-in.submit') }}">
             @csrf
             <input type="hidden" name="site" value="{{ $site->slug }}">
@@ -175,8 +199,11 @@
 
             <div class="field">
                 <label for="email">Email</label>
+                {{-- Not focused when there is a button above it: taking the
+                     cursor into a form somebody is not going to fill in
+                     scrolls the page past the thing they came here to press. --}}
                 <input id="email" name="email" type="email" autocomplete="username"
-                       value="{{ $email }}" required autofocus spellcheck="false">
+                       value="{{ $email }}" required @unless ($continueAs ?? null) autofocus @endunless spellcheck="false">
             </div>
 
             <div class="field">

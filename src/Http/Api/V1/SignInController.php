@@ -7,6 +7,8 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
+use ShipFast\LiveEdit\Domain\Site\Editor;
+use ShipFast\LiveEdit\Domain\Site\EditorSession;
 use ShipFast\LiveEdit\Domain\Site\PasswordSignIn;
 use ShipFast\LiveEdit\Domain\Site\SignIn;
 use ShipFast\LiveEdit\Domain\Site\Site;
@@ -147,7 +149,71 @@ class SignInController
             'returnTo' => $returnTo,
             'email' => (string) $request->old('email', ''),
             'error' => $request->session()->get('live-edit.sign-in.error'),
+            // Their own account, when they are already signed in to it.
+            'continueAs' => $this->whoIsAlreadySignedIn($request, $site),
         ]);
+    }
+
+    /**
+     * The editor account belonging to whoever is signed in to the console.
+     *
+     * This page is served by the service and nowhere else, so a session here
+     * is a console session: the person who buys the plans and registers the
+     * sites. Asking them for a second password, on a page they reached from
+     * an application they are already signed in to, is asking them to keep a
+     * credential for a person they are already proved to be.
+     *
+     * Matched by address rather than by ownership, and that is the narrower
+     * of the two on purpose. Owning a site does not by itself mean an editor
+     * account exists to sign in as, and this must not conjure one: it offers
+     * a way in only where somebody has already been given one, which is the
+     * same rule every other route in follows.
+     */
+    private function whoIsAlreadySignedIn(Request $request, Site $site): ?Editor
+    {
+        $user = $request->user();
+
+        if ($user === null || ! filled($user->email ?? null)) {
+            return null;
+        }
+
+        $editor = Editor::query()
+            ->whereRaw('lower(email) = ?', [mb_strtolower(trim((string) $user->email))])
+            ->first();
+
+        return $editor !== null && $editor->mayEdit($site) ? $editor : null;
+    }
+
+    /**
+     * Let somebody already signed in to the console straight through.
+     *
+     * Everything is checked again here rather than carried from the page:
+     * who they are comes from the session, the site from the database, and
+     * the return address from the site's own list. The form posts nothing
+     * that decides anything, because a form is a thing anybody can post.
+     */
+    public function continueAsSelf(Request $request): RedirectResponse|Response
+    {
+        $validated = $request->validate([
+            'site' => ['required', 'string', 'max:63'],
+            'return_to' => ['required', 'url', 'max:500'],
+        ]);
+
+        $site = Site::query()->where('slug', $validated['site'])->first();
+
+        if ($site === null || ! $site->isActive() || ! $this->mayReturnTo($site, $validated['return_to'])) {
+            return redirect()->away('https://tryshipfast.com');
+        }
+
+        $editor = $this->whoIsAlreadySignedIn($request, $site);
+
+        if ($editor === null) {
+            // Signed out in another tab, or removed from the site since the
+            // page was drawn. The password form is still there for them.
+            return back()->with('live-edit.sign-in.error', 'Sign in again to carry on.');
+        }
+
+        return $this->handBack($validated['return_to'], EditorSession::begin($site, $editor)['token']);
     }
 
     /**
@@ -188,10 +254,22 @@ class SignInController
                 ->with('live-edit.sign-in.error', 'That address and password do not match an editor of this site.');
         }
 
-        $separator = str_contains($validated['return_to'], '#') ? '&' : '#';
+        return $this->handBack($validated['return_to'], $result['token']);
+    }
+
+    /**
+     * Send them home holding a session.
+     *
+     * In the fragment, never the query: a fragment is not sent to the server,
+     * stays out of access logs, and is not passed on in a Referer header when
+     * the page later loads anything else.
+     */
+    private function handBack(string $returnTo, string $token): Response
+    {
+        $separator = str_contains($returnTo, '#') ? '&' : '#';
 
         return response()->view('live-edit::handing-back', [
-            'returnTo' => $validated['return_to'].$separator.'kb_session='.urlencode($result['token']),
+            'returnTo' => $returnTo.$separator.'kb_session='.urlencode($token),
         ])->withHeaders(['Cache-Control' => 'no-store, private']);
     }
 

@@ -95,23 +95,13 @@ class SignIn
         // Single use, marked before the key is issued: a link forwarded to
         // somebody else, or replayed from a mailbox later, is spent.
         $record->forceFill(['used_at' => now()])->save();
-        $editor->forceFill(['last_seen_at' => now()])->save();
-        $editor->sawOn($site);
 
-        $expiresAt = now()->addSeconds(max(60, (int) config('live-edit.api.session_ttl', 1800)));
-
-        [, $plainToken] = $site->issueToken(
-            TokenType::Session,
-            $editor->name ?: $editor->email,
-            $editor->abilities($site),
-            $expiresAt,
-            $editor->id,
-        );
+        $session = EditorSession::begin($site, $editor);
 
         return [
-            'token' => $plainToken,
+            'token' => $session['token'],
             'return_to' => $record->return_to,
-            'expires_at' => $expiresAt->toIso8601String(),
+            'expires_at' => $session['expires_at'],
         ];
     }
 

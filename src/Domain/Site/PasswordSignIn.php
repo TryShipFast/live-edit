@@ -80,24 +80,7 @@ final class PasswordSignIn
             $editor->forceFill(['password' => Hash::make($password)])->save();
         }
 
-        $editor->forceFill(['last_seen_at' => now()])->save();
-        $editor->sawOn($site);
-
-        $expiresAt = now()->addSeconds(max(60, (int) config('live-edit.api.session_ttl', 1800)));
-
-        [, $plain] = $site->issueToken(
-            TokenType::Session,
-            $editor->name ?: $editor->email,
-            $editor->abilities($site),
-            $expiresAt,
-            $editor->id,
-        );
-
-        return [
-            'token' => $plain,
-            'editor' => $editor,
-            'expires_at' => $expiresAt->toIso8601String(),
-        ];
+        return EditorSession::begin($site, $editor);
     }
 
     /**

@@ -234,6 +234,11 @@ Route::middleware([RecoversAnExpiredSignIn::class, 'web', ThrottleApi::class.':s
 
     Route::post('/live-edit/sign-in', [SignInController::class, 'submit'])
         ->name('live-edit.sign-in.submit');
+
+    // For somebody already signed in to the console. Nothing it posts
+    // decides anything: who they are comes from the session.
+    Route::post('/live-edit/sign-in/continue', [SignInController::class, 'continueAsSelf'])
+        ->name('live-edit.sign-in.continue');
 });
 
 Route::get('/live-edit/sign-in/{token}', [SignInController::class, 'redeem'])
