@@ -4,6 +4,7 @@ namespace ShipFast\LiveEdit\Http\Api\V1;
 
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use ShipFast\LiveEdit\Domain\Site\LocalAddress;
 use ShipFast\LiveEdit\Domain\Site\Site;
 use ShipFast\LiveEdit\Domain\Site\SiteVerification;
 use ShipFast\LiveEdit\Http\Api\ApiContext;
@@ -76,9 +77,35 @@ class LicenceController
          * unchanged.
          */
         $matches = match (true) {
-            ! $site->isVerified() => null,
+            // Nothing was said. A server asking on its own behalf has no
+            // Origin and has claimed nothing, and reading that silence as a
+            // mismatch switched the editor off on correctly licensed sites.
             $observed === '' => null,
-            default => $site->ownsDomain($observed),
+
+            // Verified: the licensed domain, and nothing else.
+            $site->isVerified() => $site->ownsDomain($observed),
+
+            /*
+             * Not verified yet, which is every site between installing the
+             * plugin and proving the domain. It cannot be held to a domain
+             * nobody has proved, so this used to say nothing at all and allow
+             * every address in the site's list.
+             *
+             * That was the way around the whole pricing model: register one
+             * site, never verify it, add a second business's domain to the
+             * list of addresses, and run the editor on both for one licence.
+             * Found by asking what stopped it. Nothing did.
+             *
+             * So: somewhere that cannot be a website on the internet is fine,
+             * because installing the plugin means trying it somewhere first
+             * and that somewhere is a local address. The domain they claimed
+             * is fine too, unproven or not, because claiming one and using it
+             * is not the abuse. Any OTHER public address is a second live
+             * site, and is refused until it holds a licence of its own.
+             */
+            LocalAddress::is($observed) => null,
+            SiteVerification::covers((string) $site->domain, $observed) => null,
+            default => false,
         };
 
         return response()->json([
