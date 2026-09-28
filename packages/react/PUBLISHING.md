@@ -64,3 +64,30 @@ number and it means the same thing in both places.
 Bump `version` in `package.json` before publishing. npm refuses to overwrite a
 published version, and unpublishing is only allowed for 72 hours, so a wrong
 number is a wasted version rather than something to undo.
+
+## After the first publish: releasing from CI
+
+Configure the trusted publisher once, on npmjs.com, on this package's Settings
+tab: GitHub Actions, organisation `TryShipFast`, repository `live-edit`,
+workflow `publish-react.yml`.
+
+From then on a release is:
+
+```
+# bump packages/react/package.json first, then
+git tag react-v0.10.1 && git push origin react-v0.10.1
+```
+
+The prefix matters. This repository ships two packages from one history: a
+plain `vX.Y.Z` tag is the PHP engine going to Packagist, and `react-vX.Y.Z` is
+this one going to npm. They move on their own schedules, which is why the
+composer rename went out as v0.10.1 while this package was still 0.10.0.
+
+No token, no one-time code, nothing to leak. The workflow refuses to publish if
+the tag and `package.json` disagree.
+
+## The README on npm
+
+npm renders the README from the tarball of the version being published, and
+never looks at the repository. Fixing wording in git changes nothing on
+npmjs.com until the next release carries it.

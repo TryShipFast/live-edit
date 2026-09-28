@@ -16,12 +16,19 @@
 #   Repository:           live-edit
 #   Workflow filename:    publish-react.yml
 #
-# After that, releasing is `git tag vX.Y.Z && git push --tags`.
+# After that, releasing this package is:
+#   git tag react-vX.Y.Z && git push origin react-vX.Y.Z
+# and the PHP engine keeps its own plain vX.Y.Z tags for Packagist.
 name: Publish the React adapter
 
+# Its own tag prefix, because this repository ships two packages from one
+# history. A plain v* tag is the PHP engine going to Packagist, and the React
+# adapter moves on its own schedule: the composer rename went out as v0.10.1
+# while this package was still 0.10.0, and a shared trigger would have failed
+# that publish on a version check for no reason anybody would enjoy debugging.
 on:
   push:
-    tags: ['v*']
+    tags: ['react-v*']
   # So a release can be made without tagging, and so the first run can be
   # tried deliberately rather than by pushing a tag and hoping.
   workflow_dispatch:
@@ -62,9 +69,9 @@ jobs:
       # and the repository disagree and nobody notices until somebody reports
       # a bug against a version that was never built.
       - name: Check the tag and the manifest agree
-        if: startsWith(github.ref, 'refs/tags/v')
+        if: startsWith(github.ref, 'refs/tags/react-v')
         run: |
-          TAG="${GITHUB_REF_NAME#v}"
+          TAG="${GITHUB_REF_NAME#react-v}"
           PKG=$(node -p "require('./packages/react/package.json').version")
           if [ "$TAG" != "$PKG" ]; then
             echo "tag $TAG does not match package.json $PKG"
