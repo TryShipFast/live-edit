@@ -1,4 +1,4 @@
-# Publishing @shipfast/live-edit-react
+# Publishing @shipfasts/live-edit-react
 
 A checklist, not an essay. Run everything from `packages/react`.
 
@@ -10,7 +10,7 @@ customer can install. `publishConfig.access` is set to `public` in
 ## Before the first publish, once
 
 1. The `@shipfast` org must exist on npmjs.com and the publishing account must
-   be a member of it. Nobody owns the scope today: `npm view @shipfast/live-edit-react`
+   be a member of it. Nobody owns the scope today: `npm view @shipfasts/live-edit-react`
    returns a 404. Create the org at npmjs.com/org/create if it is not there.
 2. Turn on 2FA for the account if it is not already on. npm requires it for
    publishing to a new scope, and it is the only thing standing between a
@@ -38,13 +38,13 @@ afterwards, it is not source.
 ## Check afterwards
 
 ```bash
-npm view @shipfast/live-edit-react version    # the version you just sent
-npm view @shipfast/live-edit-react files      # not private, not empty
+npm view @shipfasts/live-edit-react version    # the version you just sent
+npm view @shipfasts/live-edit-react files      # not private, not empty
 
 cd $(mktemp -d)
 npm init -y >/dev/null
-npm install @shipfast/live-edit-react react@19
-node -e "import('@shipfast/live-edit-react').then(m => console.log(Object.keys(m)))"
+npm install @shipfasts/live-edit-react react@19
+node -e "import('@shipfasts/live-edit-react').then(m => console.log(Object.keys(m)))"
 npx live-edit-codemod --help
 ```
 

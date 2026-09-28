@@ -12,7 +12,7 @@ It runs on five kinds of site, through adapters over one engine:
 | **Laravel** | this package, tagging Blade views |
 | **WordPress** | a plugin, keeping the client's content in their own database |
 | **Plain HTML** | one script tag |
-| **Next.js** | `@shipfast/live-edit-react`, with a codemod |
+| **Next.js** | `@shipfasts/live-edit-react`, with a codemod |
 | **React** | the same package, provider and overlay |
 
 What has actually been driven through a browser on a real site, adapter by

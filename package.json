@@ -1,5 +1,5 @@
 {
-  "name": "@shipfast/live-edit",
+  "name": "@shipfasts/live-edit",
   "private": true,
   "type": "module",
   "description": "Runtime for the shipfast/live-edit in-place editor.",

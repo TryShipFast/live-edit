@@ -19,7 +19,7 @@ Toy pages agree with whatever the code already does.
 ### The React package is not published anywhere a customer can install from
 **Adapter:** React, Next.js. **Found:** 2026-09-27. **Updated:** 2026-09-27.
 
-The console tells a customer to run `npm install @shipfast/live-edit-react`.
+The console tells a customer to run `npm install @shipfasts/live-edit-react`.
 That package does not exist on npm: the registry still returns 404, and the
 repo it lives in is private, so `npm install` from git is not open to them
 either. The instruction cannot be followed by anybody outside this machine.

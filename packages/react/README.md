@@ -1,4 +1,4 @@
-# @shipfast/live-edit-react
+# @shipfasts/live-edit-react
 
 In-place editing of **static** content in React and Next.js apps — the words and
 assets that live in the template, not data from your API or database. Dynamic
@@ -10,7 +10,7 @@ Laravel, WordPress and plain HTML; this is the React and Next.js adapter.
 ## Install
 
 ```bash
-npm install @shipfast/live-edit-react
+npm install @shipfasts/live-edit-react
 ```
 
 React 18 or 19, Node 18 or newer. The package is ESM with no build step, so
@@ -33,7 +33,7 @@ it survives re-renders, survives routing, and needs no fight with the reconciler
 ## Use
 
 ```jsx
-import { LiveEditProvider, useContent } from '@shipfast/live-edit-react';
+import { LiveEditProvider, useContent } from '@shipfasts/live-edit-react';
 
 export default function Layout({ children, content, sessionKey }) {
   return (
