@@ -51,15 +51,25 @@ class LicenceClientTest extends TestCase
         Http::fake(['*/licence*' => Http::response(['licence' => $licence], $status)]);
     }
 
-    public function test_an_install_with_no_licence_configured_carries_on(): void
+    public function test_an_install_with_no_licence_configured_does_not_edit(): void
     {
+        /*
+         * This used to assert the opposite, and the opposite was the product
+         * given away: an install naming no site and holding no key was
+         * treated as licensed, so the way past every check was to have
+         * nothing to check.
+         *
+         * It is not an outage and must not be confused with one. A site that
+         * cannot reach us keeps working, which is the case below.
+         */
         config()->set('live-edit.licence', ['host' => null, 'site' => null, 'key' => null]);
         Http::fake();
 
-        $this->assertTrue(Licence::permits());
+        $this->assertFalse(Licence::permits());
+        $this->assertTrue(Licence::unregistered());
 
-        // And nothing is asked of the service at all. An install that never
-        // opted in should not be making requests to us on every page.
+        // And still nothing is asked of the service. An install that never
+        // opted in should not be making requests to us on every page view.
         Http::assertNothingSent();
     }
 

@@ -35,7 +35,15 @@ class PublishedWordsReachVisitorsTest extends TestCase
         $app['config']->set('live-edit.auto_tag', true);
         $app['config']->set('live-edit.auto_keys', true);
         $app['config']->set('live-edit.setting_model', LiveEditSetting::class);
-        $app['config']->set('live-edit.licence', ['host' => null, 'site' => null, 'key' => null]);
+        // Registered, because an install that names no site and holds no key
+        // is refused the editor now: it gets an invitation to register
+        // instead, which is a different test.
+        $app['config']->set('live-edit.licence', [
+            'host' => 'https://live.shipfast.test',
+            'site' => 'acme',
+            'key' => 'kbp_test_licence_key',
+            'ttl' => 86400,
+        ]);
     }
 
     protected function setUp(): void

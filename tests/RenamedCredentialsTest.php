@@ -87,10 +87,11 @@ class RenamedCredentialsTest extends TestCase
     public function test_an_unconfigured_install_is_still_unconfigured(): void
     {
         // The rename must not accidentally make a site look licensed. An
-        // install with none of these set edits freely and always has.
+        // install with none of these set is unregistered, and unregistered
+        // does not edit.
         $this->withLicence(['site' => null, 'key' => null]);
 
         $this->assertFalse(Licence::configured());
-        $this->assertTrue(Licence::permits());
+        $this->assertFalse(Licence::permits());
     }
 }

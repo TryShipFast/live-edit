@@ -3,6 +3,7 @@
 namespace ShipFast\LiveEdit\Tests;
 
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Cache;
 use Orchestra\Testbench\TestCase as Orchestra;
 use ShipFast\LiveEdit\LiveEditServiceProvider;
 use ShipFast\LiveEdit\Tests\Fixtures\Setting;
@@ -22,11 +23,39 @@ abstract class TestCase extends Orchestra
         $this->loadMigrationsFrom(__DIR__.'/Fixtures/migrations');
     }
 
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        // Answered here so no test asks the network whether an invented
+        // licence is real. A test that wants a lapsed or refused one
+        // overwrites this key itself.
+        Cache::forever('live-edit.licence.v1.answer', [
+            'valid' => true,
+            'site' => 'test-site',
+            'checked_at' => now()->toIso8601String(),
+        ]);
+    }
+
     protected function defineEnvironment($app): void
     {
         $app['config']->set('app.key', 'base64:'.base64_encode(random_bytes(32)));
         $app['config']->set('database.default', 'testbench');
 
+        /*
+         * A registered site, because that is what almost every test here is
+         * about: a customer who has paid, editing their own words.
+         *
+         * An install that names no site and holds no key is now refused the
+         * editor, which is the point of registering at all. Leaving the suite
+         * unregistered would have meant every one of these tests quietly
+         * exercising the one state the product does not support, and the
+         * thirty-three failures that appeared when that changed were the
+         * suite saying so.
+         *
+         * The answer is primed rather than fetched so no test reaches for the
+         * network to find out whether a made-up licence is valid.
+         */
         /*
          * SQLite in memory, unless a MySQL database is named.
          *
@@ -60,6 +89,22 @@ abstract class TestCase extends Orchestra
         // a 'Widget' collection with body/icon/image fields. If the generic
         // controller works here, it works for any host's own models.
         $app['config']->set('live-edit', [
+            /*
+             * A registered site, because that is what almost every test here
+             * is about: a customer who has paid, editing their own words.
+             *
+             * An install naming no site and holding no key is now refused the
+             * editor, which is the point of registering at all. Without this
+             * the whole suite would be exercising the one state the product
+             * does not support, and the thirty-three failures that appeared
+             * when the rule changed were the suite saying exactly that.
+             */
+            'licence' => [
+                'host' => 'https://live.shipfast.test',
+                'site' => 'test-site',
+                'key' => 'kbp_test_licence_key',
+                'ttl' => 86400,
+            ],
             'setting_model' => Setting::class,
             'middleware' => ['web'],
             'default_locale' => 'en',

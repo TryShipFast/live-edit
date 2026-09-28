@@ -67,6 +67,19 @@ class TagsEditableMarkup
          */
         $forAnEditor = Gate::allows('live-edit') && Licence::permits();
 
+        /*
+         * Installed, allowed to edit, and never registered.
+         *
+         * This used to be the one case that edited freely: an install with no
+         * site and no key was treated as licensed, so the way past every
+         * check here was to have nothing to check. Now it does not edit, and
+         * the person who installed it is told why and what to do, once, in a
+         * strip only they can see. Silence would read as the package being
+         * broken, and somebody who has installed it is somebody trying to buy
+         * from us.
+         */
+        $askToRegister = ! $forAnEditor && Licence::unregistered() && Gate::allows('live-edit');
+
         // The editor mounts off the body, not off the script tag, so a page
         // with neither attribute loads the runtime and then does nothing —
         // which is exactly what "installed it and no toolbar appeared" looks
@@ -75,6 +88,12 @@ class TagsEditableMarkup
         if ($forAnEditor) {
             $html = $this->markBodyAsEditable($html);
             $html = $this->carriesTheRuntime($html);
+        }
+
+        if ($askToRegister) {
+            $response->setContent($this->invitesRegistration($html));
+
+            return $response;
         }
 
         /*
@@ -173,6 +192,39 @@ class TagsEditableMarkup
      * layout that has it is left alone, which is how somebody controls where
      * the tag sits.
      */
+    /**
+     * A strip inviting whoever installed this to register the site.
+     *
+     * Shown only to somebody the host's own gate already trusts to edit, so a
+     * visitor never sees it and it cannot be used to work out that a site runs
+     * this. Self-contained styles, because it has to look deliberate on a page
+     * whose CSS we have never seen, and no script, because an unregistered
+     * install is exactly where loading our runtime would be wrong.
+     *
+     * Dismissable for the session. Somebody mid-way through building a site
+     * should be able to get on with it, and a strip that cannot be closed is
+     * one they will remove by removing the package.
+     */
+    private function invitesRegistration(string $html): string
+    {
+        if (! preg_match('/<\/body\s*>/i', $html)) {
+            return $html;
+        }
+
+        $where = e(Licence::registerUrl());
+        $host = e(request()->getHost());
+
+        $strip = <<<HTML
+            <div id="live-edit-register" role="status" style="position:fixed;left:16px;right:16px;bottom:16px;z-index:2147483000;margin:0 auto;max-width:640px;display:flex;gap:12px;align-items:center;padding:14px 16px;border-radius:12px;background:#111827;color:#fff;font:14px/1.45 system-ui,-apple-system,Segoe UI,Roboto,sans-serif;box-shadow:0 10px 30px rgba(0,0,0,.25)">
+                <span style="flex:1">Live Edit is installed on <strong>{$host}</strong> but this site is not registered, so editing is switched off.</span>
+                <a href="{$where}" target="_blank" rel="noopener" style="flex:none;background:#fff;color:#111827;text-decoration:none;font-weight:600;padding:8px 14px;border-radius:8px">Register this site</a>
+                <button type="button" aria-label="Dismiss" onclick="this.parentNode.remove()" style="flex:none;background:transparent;border:0;color:#9ca3af;font-size:18px;line-height:1;cursor:pointer;padding:4px">&times;</button>
+            </div>
+            HTML;
+
+        return preg_replace('/<\/body\s*>/i', $strip.'</body>', $html, 1) ?? $html;
+    }
+
     private function carriesTheRuntime(string $html): string
     {
         $script = CloudInstall::script();

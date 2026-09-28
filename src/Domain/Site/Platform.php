@@ -25,6 +25,25 @@ enum Platform: string
     case Html = 'html';
 
     /** How to say it to somebody, spelled the way they spell it. */
+    /**
+     * Whether this kind of site keeps its client's words in its own database.
+     *
+     * WordPress does, since its plugin took ownership of content, history,
+     * pictures and styling. Laravel always did: the package runs inside the
+     * application and writes to its tables. For those two the service holds no
+     * content at all, so it cannot say what is waiting to be published, and a
+     * dashboard that prints "nothing waiting" is stating something it does not
+     * know. The honest answer there is to say where the answer lives.
+     *
+     * The others have no data layer of their own, which is the deliberate
+     * shape of the framework-agnostic product: the service holds their words,
+     * so it can answer.
+     */
+    public function keepsItsOwnContent(): bool
+    {
+        return $this === self::WordPress || $this === self::Laravel;
+    }
+
     public function label(): string
     {
         return match ($this) {

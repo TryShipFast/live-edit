@@ -295,6 +295,25 @@ write a `srcset` the page can use. Worth doing when picture-heavy sites show up.
 
 ---
 
+### Installs that were never registered will stop editing on upgrade
+**Adapter:** Laravel, and any self-hosted install. **Recorded:** 2026-09-28.
+**Severity:** high on the day somebody upgrades.
+
+The licence check used to permit anything it could not identify: an install
+naming no site and holding no key was treated as licensed. That is now refused,
+which is the point of registering at all, and it means any install running
+without a licence today loses its editor the moment it takes this version.
+
+Known to be in that state: the ShipFast marketing site and the console's own
+marketing pages, which have no site or key configured at all, and tokreamsblue,
+which is a live client on an old release with no licence configured. Their
+websites are unaffected either way. What stops is the editing.
+
+**Before deploying this anywhere:** register those sites and put their keys in
+place. The strip that appears says what is missing and links to the page that
+fixes it, so the failure is at least self-explanatory, but a client discovering
+it on their own site is a worse way to find out than us doing it first.
+
 ## One-off, unexplained
 
 Recorded rather than chased, so that a second sighting is recognised as a

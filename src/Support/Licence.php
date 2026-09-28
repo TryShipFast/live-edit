@@ -55,13 +55,61 @@ final class Licence
         return self::key() !== '' && self::site() !== '' && self::host() !== '';
     }
 
+    /**
+     * Whether the editor may run here at all.
+     *
+     * An install that names no site and holds no key has never been
+     * registered, and used to be treated as permitted: anybody could take the
+     * package, install it, and have a working editor for as long as they
+     * liked. That is the product given away by an `if` at the top of a
+     * function, and it made every other protection here decorative, since the
+     * way past a licence check was to have no licence.
+     *
+     * So an unregistered install does not edit. It is not an error and it is
+     * not silence either: the person who installed it is shown what to do
+     * about it, because somebody who has got this far is trying to buy from
+     * us, not steal from us.
+     *
+     * This is a different thing from being unable to reach the service, which
+     * still keeps working. A customer whose editor stops because our server is
+     * having a bad afternoon is a customer we have taken money from and
+     * failed. See status() and GRACE_DAYS.
+     */
     public static function permits(): bool
     {
         if (! self::configured()) {
-            return true;
+            return false;
         }
 
         return (bool) (self::status()['valid'] ?? true);
+    }
+
+    /**
+     * Installed, but never told which site it is.
+     *
+     * Kept apart from "permits" so the page can say the useful thing. A
+     * licence that has lapsed and a licence that never existed need different
+     * sentences, and telling somebody their licence expired when they have
+     * simply not registered yet sends them looking for a receipt.
+     */
+    public static function unregistered(): bool
+    {
+        return ! self::configured();
+    }
+
+    /**
+     * Where somebody is sent to register this site.
+     *
+     * Distinct from consoleUrl below, which opens an existing site's page and
+     * needs a slug this install does not have yet. The host is configurable
+     * because it is a deployment fact, and defaulted because an unregistered
+     * install has no configuration to read it from.
+     */
+    public static function registerUrl(): string
+    {
+        $host = rtrim((string) config('live-edit.licence.host', 'https://live.tryshipfast.com'), '/');
+
+        return ($host !== '' ? $host : 'https://live.tryshipfast.com').'/sites';
     }
 
     /**

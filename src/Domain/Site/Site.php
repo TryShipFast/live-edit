@@ -74,6 +74,24 @@ class Site extends Model
     }
 
     /**
+     * Work saved and not yet published.
+     *
+     * Only ever the whole answer for a site whose content we hold. WordPress
+     * and Laravel keep their own, so this counts nothing for them and says
+     * nothing about them: see Platform::keepsItsOwnContent.
+     */
+    public function drafts(): HasMany
+    {
+        return $this->hasMany(Draft::class, 'site_id');
+    }
+
+    /** Every publish this site has made, newest last. */
+    public function versions(): HasMany
+    {
+        return $this->hasMany(Version::class, 'site_id');
+    }
+
+    /**
      * A removed site takes its content with it.
      *
      * The tables cascade, but only where the database is enforcing foreign
