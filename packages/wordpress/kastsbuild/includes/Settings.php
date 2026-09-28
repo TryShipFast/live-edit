@@ -67,9 +67,26 @@ class Settings
         return is_array($stored) ? $stored : [];
     }
 
+    /**
+     * Where the service lives, with our own address as the default.
+     *
+     * It shipped empty, so every customer typed this by hand into a box, and
+     * a URL typed by hand is a URL with a typo in it. The plugin then looks
+     * broken in a way that points at us rather than at the missing slash.
+     *
+     * A customer running their own service still overrides it in the box.
+     */
+    public const DEFAULT_API_BASE = 'https://live.tryshipfast.com/api/live-edit/v1';
+
     public static function get(string $key, string $default = ''): string
     {
-        return (string) (self::all()[$key] ?? $default);
+        $value = (string) (self::all()[$key] ?? $default);
+
+        if ($key === 'api_base' && trim($value) === '') {
+            return self::DEFAULT_API_BASE;
+        }
+
+        return $value;
     }
 
     /**
@@ -103,6 +120,8 @@ class Settings
 
     public static function configured(): bool
     {
+        // The address has a default now, so the only thing that makes an
+        // install unconfigured is not knowing which site it is.
         return self::get('site') !== '' && self::get('api_base') !== '';
     }
 
@@ -130,6 +149,7 @@ class Settings
                     <tr>
                         <th scope="row"><label for="kb-base">API address</label></th>
                         <td><input name="kastsbuild_settings[api_base]" id="kb-base" type="url" class="regular-text"
+                                   placeholder="<?php echo esc_attr(self::DEFAULT_API_BASE); ?>"
                                    value="<?php echo esc_attr($s['api_base'] ?? ''); ?>"
                                    placeholder="https://cms.example.com/api/live-edit/v1"></td>
                     </tr>
