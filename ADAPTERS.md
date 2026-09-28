@@ -124,6 +124,9 @@ safely in either order.
 | SVG and icons | ? | ? | ? | ? | ? |
 | Rich text (bold, italic) | ? | ? | ? | ? | ? |
 | Alt text | ? | ✓ | ? | ? | ? |
+| AI rewrite and shorten | ✓ service | ✓ service | ✓ service | ✓ service | ✓ service |
+| AI generated picture | ✓ service | ✓ service | ✓ service | ✓ service | ✓ service |
+| Stock photo picker | ? | ? | ? | ? | ? |
 | SEO fields (title, description) | ? | ? | ? | ? | ? |
 
 WordPress was re-run on the current runtime and detects 107 elements, 37
@@ -151,6 +154,22 @@ and a wrapper holding them. The fix is in the shared editor and in the server's
 applier, with both halves compared against each other, so it is ticked
 everywhere the editor runs. React is a question mark only because nothing has
 been run against a plain React app at all.
+
+The AI rows read "service" because they were driven against the real provider
+rather than through each adapter's drawer. The call is the same one from every
+adapter, so proving it once proves the hard part; what is not yet measured is
+the click.
+
+Measured against OpenAI, not a stub. Rewrite returned a sensible sentence in
+3.2s for one credit, shorten in 1.7s for one, and a refusal with no credits
+came back as a typed reason rather than an exception. A picture took 38s and
+five credits and arrived as a real 1024x1024 photograph with no lettering in
+it, which is what the prompt framing exists to force.
+
+Running it for real is also what found the fault described in LIMITATIONS.md:
+every one of these tests stubbed a response carrying a `url`, and the model
+they are pointed at only ever sends base64. Stub-shaped tests proved the
+bookkeeping perfectly and could not see that the feature did not work.
 
 ## Platform-specific rows
 

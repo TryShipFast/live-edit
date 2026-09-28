@@ -3,6 +3,8 @@
 namespace ShipFast\LiveEdit\Application\Api;
 
 use Illuminate\Support\Facades\Http;
+use ShipFast\LiveEdit\Domain\Content\ImageStore;
+use ShipFast\LiveEdit\Domain\Content\SiteStore;
 use ShipFast\LiveEdit\Domain\Credits\Credits;
 use ShipFast\LiveEdit\Domain\Site\Site;
 
@@ -51,7 +53,7 @@ class ImagineAPicture
             return ['images' => [], 'balance' => $this->credits->balance($site), 'reason' => 'not_enough_credits'];
         }
 
-        $images = $this->ask($prompt, $count);
+        $images = $this->keep($site, $this->ask($prompt, $count));
 
         if ($images === []) {
             return [
@@ -62,6 +64,72 @@ class ImagineAPicture
         }
 
         return ['images' => $images, 'balance' => $balance];
+    }
+
+    /**
+     * Store anything that came back as bytes, and hand back addresses.
+     *
+     * The model this is pointed at returns base64 and never a URL, so what
+     * arrived was a two megabyte data: URI per picture. It looked right: the
+     * picker showed it, clicking it repainted the page, and the client could
+     * see their picture. Then Save refused it, because a data: URI is not an
+     * http address and two megabytes is not a two thousand character field.
+     * Five credits spent on a picture that could never be kept.
+     *
+     * Every test passed throughout, because every test stubbed the provider
+     * with a response carrying a url, which this provider does not send.
+     *
+     * Stored here rather than in the browser because the browser is the worst
+     * place for it: four generated pictures is eight megabytes of base64 to
+     * ship, hold in memory and re-upload, and doing it here fixes the same
+     * fault for every adapter at once. A URL is what the rest of the pipeline
+     * has always expected.
+     *
+     * @param  array<int, string>  $images
+     * @return array<int, string>
+     */
+    protected function keep(Site $site, array $images): array
+    {
+        $store = app(ImageStore::class);
+        $directory = (new SiteStore($site))->mediaDirectory();
+
+        return collect($images)
+            ->map(function (string $image) use ($store, $directory) {
+                // Already an address: nothing to store, and a provider that
+                // sends one is entitled to keep serving it.
+                if (! str_starts_with($image, 'data:')) {
+                    return $image;
+                }
+
+                [$meta, $encoded] = array_pad(explode(',', $image, 2), 2, null);
+
+                if ($encoded === null || ! str_contains((string) $meta, ';base64')) {
+                    return null;
+                }
+
+                $bytes = base64_decode($encoded, true);
+
+                if ($bytes === false || $bytes === '') {
+                    return null;
+                }
+
+                $mime = trim(str_replace(['data:', ';base64'], '', (string) $meta)) ?: 'image/png';
+                $extension = match ($mime) {
+                    'image/jpeg', 'image/jpg' => 'jpg',
+                    'image/webp' => 'webp',
+                    default => 'png',
+                };
+
+                try {
+                    return $store->url($store->put($bytes, $mime, $extension, $directory));
+                } catch (\Throwable) {
+                    // Treated as "nothing usable came back", which refunds.
+                    return null;
+                }
+            })
+            ->filter()
+            ->values()
+            ->all();
     }
 
     /**

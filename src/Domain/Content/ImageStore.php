@@ -92,6 +92,27 @@ class ImageStore
     }
 
     /**
+     * Keep bytes we already hold, rather than a file somebody uploaded.
+     *
+     * A generated picture arrives as bytes in an HTTP response, with no file
+     * on any disk to wrap in an UploadedFile. It still has to be stored, for
+     * the same reason an upload does: what goes into a page must be an address
+     * the page can fetch, and the alternative is carrying the whole picture
+     * around as a data: URI, which is how an image nobody can save happens.
+     *
+     * @param  string  $extension  Without the dot.
+     */
+    public function put(string $bytes, string $mime, string $extension, ?string $directory = null): string
+    {
+        $directory = trim($directory ?: (string) config('live-edit.media_directory', 'live-edit'), '/');
+        $path = $directory.'/'.bin2hex(random_bytes(16)).'.'.ltrim($extension, '.');
+
+        Storage::disk($this->disk())->put($path, $bytes, $this->objectOptions($mime));
+
+        return $path;
+    }
+
+    /**
      * What is stored alongside the bytes.
      *
      * The name is random, so a given URL is that picture forever — replacing

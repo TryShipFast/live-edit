@@ -3,6 +3,7 @@
 namespace ShipFast\LiveEdit\Tests\Api;
 
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Storage;
 use ShipFast\LiveEdit\Application\Api\FindPhotos;
 use ShipFast\LiveEdit\Application\Api\ImagineAPicture;
 use ShipFast\LiveEdit\Domain\Credits\Credits;
@@ -166,6 +167,71 @@ class PicturesTest extends TestCase
 
         $this->assertCount(4, $made['images'], 'one picture is a verdict; four is a choice');
         $this->assertSame(5, $made['balance']);
+    }
+
+    public function test_a_picture_that_arrives_as_bytes_is_stored_and_answered_as_an_address(): void
+    {
+        /*
+         * The model this is pointed at, gpt-image-1, returns base64 and never
+         * a url. What came back was a two megabyte data: URI per picture, and
+         * it looked like it worked: the picker showed it and clicking it
+         * repainted the page. Save then refused it, because a data: URI is
+         * not an http address and two megabytes is not a two thousand
+         * character field. Five credits for a picture nobody could keep.
+         *
+         * Measured against the real provider, not reasoned about. Every test
+         * here passed throughout, because every one of them stubbed a
+         * response carrying a url.
+         */
+        $this->withImageModel();
+        $disk = config('live-edit.disk', 'public');
+        Storage::fake($disk);
+
+        $png = base64_encode(
+            base64_decode('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==', true)
+        );
+
+        Http::fake(['*' => Http::response(['data' => [['b64_json' => $png]]], 200)]);
+
+        app(Credits::class)->grant($this->site, 10);
+
+        $made = app(ImagineAPicture::class)($this->site, 'a film camera on a desk', 1);
+
+        $this->assertCount(1, $made['images']);
+        $this->assertStringStartsNotWith('data:', $made['images'][0], 'a data: URI cannot be saved by any of the endpoints that receive it');
+        $this->assertNotEmpty(Storage::disk($disk)->allFiles(), 'the picture the client paid for was not kept anywhere');
+    }
+
+    public function test_bytes_that_cannot_be_decoded_are_refunded_rather_than_offered(): void
+    {
+        // Answering with a broken address would charge five credits for a
+        // picture the page cannot load, which is worse than admitting it.
+        $this->withImageModel();
+        Storage::fake(config('live-edit.disk', 'public'));
+        Http::fake(['*' => Http::response(['data' => [['b64_json' => 'not base64 at all !!!']]], 200)]);
+
+        app(Credits::class)->grant($this->site, 10);
+
+        $made = app(ImagineAPicture::class)($this->site, 'a film camera on a desk', 1);
+
+        $this->assertSame([], $made['images']);
+        $this->assertSame('no_suggestion', $made['reason']);
+        $this->assertSame(10, $made['balance'], 'nothing usable arrived, so nothing should have been charged');
+    }
+
+    public function test_a_provider_that_does_send_an_address_is_left_alone(): void
+    {
+        $this->withImageModel();
+        $disk = config('live-edit.disk', 'public');
+        Storage::fake($disk);
+        Http::fake(['*' => Http::response(['data' => [['url' => 'https://img.test/1.png']]], 200)]);
+
+        app(Credits::class)->grant($this->site, 10);
+
+        $made = app(ImagineAPicture::class)($this->site, 'a film camera on a desk', 1);
+
+        $this->assertSame(['https://img.test/1.png'], $made['images']);
+        $this->assertSame([], Storage::disk($disk)->allFiles(), 'nothing to store when the provider is already serving it');
     }
 
     public function test_it_asks_for_a_photograph_with_no_lettering_in_it(): void

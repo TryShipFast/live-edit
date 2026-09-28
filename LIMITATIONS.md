@@ -184,6 +184,41 @@ column should not be sold as finished just because its critical path is green.
 
 ---
 
+### Fixed: a generated picture could be paid for and never kept
+**Adapter:** all. **Recorded and fixed:** 2026-09-28.
+
+Generating a picture charged five credits, showed the client their picture,
+repainted the page when they clicked it, and then refused to save it.
+
+The model configured here, gpt-image-1, returns base64 and never a url. The
+editor turned that into a two megabyte `data:` URI and put it straight into
+the value to be saved. Both endpoints that receive such a value refuse it, on
+two independent grounds: a `data:` URI is not an http address, and two
+megabytes is not a two thousand character field. Measured both ways.
+
+Every test passed throughout. Each one stubbed the provider with a response
+carrying a `url`, so the suite proved the bookkeeping - charged once, refunded
+when nothing arrives, key never leaving the server - against a response shape
+the provider does not send.
+
+**Fixed on the server rather than in the browser.** The bytes are stored and
+an address is handed back, which is what the rest of the pipeline has always
+expected. Four generated pictures would otherwise be eight megabytes of base64
+shipped to a browser, held in memory and uploaded again, and fixing it here
+fixes it for every adapter at once. Bytes that cannot be decoded are treated
+as nothing usable, which refunds. A provider that does send a url is left
+alone.
+
+Measured after the fix against the real provider: 38s, five credits, a 1.4MB
+1024x1024 PNG stored, a 96 character address, and both endpoints that used to
+refuse it now accept it.
+
+**The lesson worth keeping:** a stub is written from what we expect the other
+side to send. When it is also the only test, it tests our expectation rather
+than their behaviour.
+
+---
+
 ### Corrected: the misdiagnosis that started the React work
 **Adapter:** React, Next.js. **Recorded:** 2026-09-27.
 
