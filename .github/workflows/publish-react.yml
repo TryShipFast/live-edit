@@ -59,10 +59,18 @@ jobs:
       - name: Use an npm that understands trusted publishing
         run: npm install -g npm@latest
 
+      # Only the tests that cover what is being published, and only the ones
+      # that need nothing but Node. tests/js as a whole does not qualify: some
+      # of it drives the PHP applier through a subprocess to prove the browser
+      # and the server agree, which needs a PHP toolchain this job has no
+      # reason to install. The first run failed on exactly that, which is the
+      # guard working and the selection being wrong.
       - name: Check the tests that guard this package
         run: |
           npm ci --ignore-scripts
-          npx vitest run tests/js tests/react
+          npx vitest run \
+            tests/react \
+            tests/js/codemod-renders-what-jsx-rendered.test.js
 
       # Refuse to publish a version that does not match the tag. A tag saying
       # v0.11.0 that ships 0.10.0 is worse than a failed release: the registry
