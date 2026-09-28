@@ -19,6 +19,23 @@ use Illuminate\Validation\ValidationException;
 class StylePolicy
 {
     /**
+     * Who took the photograph in this style, kept beside it.
+     *
+     * A picture replaced on an element stores the photographer as settings
+     * next to it, and the credits page reads them. The same photograph used as
+     * a section background stored the address and nothing else, so the
+     * photographer's name existed only in a toast that faded. Unsplash asks to
+     * be credited and a Creative Commons licence requires it, which made the
+     * default path - Openverse, for a customer with no key - the one carrying
+     * the strongest obligation and the least information to meet it.
+     *
+     * These are never rendered as CSS. The renderer only knows the visual
+     * props and ignores everything else, which is what lets them travel with
+     * the style rather than needing a second store of their own.
+     */
+    public const CREDIT = ['credit', 'creditBy', 'creditUrl', 'creditSource', 'creditSourceUrl'];
+
+    /**
      * The props the site declares, narrowed to the ones given and checked.
      *
      * A prop that is not declared is dropped rather than refused: the panel
@@ -36,6 +53,35 @@ class StylePolicy
     {
         $allowed = (array) config('live-edit.style_props');
         $clean = [];
+
+        // Kept before the visual props are considered, because they are not
+        // visual and the site does not declare them: they belong to whatever
+        // photograph the style is carrying.
+        foreach (self::CREDIT as $field) {
+            if (! array_key_exists($field, $props)) {
+                continue;
+            }
+
+            $said = trim((string) ($props[$field] ?? ''));
+
+            if ($said === '') {
+                continue;
+            }
+
+            throw_if(
+                mb_strlen($said) > 300,
+                ValidationException::withMessages(['props' => "Invalid value for {$field}."])
+            );
+
+            // The two that become links have to be addresses, for the same
+            // reason a background does: they are rendered into a page.
+            throw_if(
+                str_ends_with($field, 'Url') && ! $this->permits('url', $said),
+                ValidationException::withMessages(['props' => "Invalid value for {$field}."])
+            );
+
+            $clean[$field] = $said;
+        }
 
         foreach (array_intersect_key($props, $allowed) as $prop => $value) {
             if ($value === null || $value === '') {

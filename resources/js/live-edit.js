@@ -606,7 +606,8 @@ const bootLiveEdit = () => {
                 const ways = el('div', 'le-ways');
                 const replace = el('button', 'le-btn le-wide', 'Replace background');
                 replace.type = 'button';
-                replace.addEventListener('click', () => openImagePicker(element, async ({ url, file, credit }) => {
+                replace.addEventListener('click', () => openImagePicker(element, async (chosenPicture) => {
+                    const { url, file, credit } = chosenPicture;
                     let address = url;
 
                     if (file) {
@@ -632,9 +633,31 @@ const bootLiveEdit = () => {
                     // Repaint the live preview with the stored address.
                     input.dispatchEvent(new Event('input', { bubbles: true }));
 
-                    // A background has no element of its own to carry a
-                    // credit, and no theme renders one for it. Said out loud
-                    // here so nobody is under an obligation they cannot see.
+                    /*
+                     * Kept with the picture, not only said out loud.
+                     *
+                     * A background has no element of its own to carry a
+                     * credit, so this used to be a toast and nothing else: the
+                     * photographer's name existed for four seconds and was
+                     * never stored anywhere. The obligation outlives the
+                     * toast by years, and the credits page cannot name
+                     * somebody it was never told about.
+                     *
+                     * Stashed against the address it belongs to, so a credit
+                     * can never be saved beside a different picture. That is
+                     * the same rule the image drawer follows: no credit is a
+                     * gap, the wrong credit is a false statement about who
+                     * took the photograph.
+                     */
+                    input.dataset.kbCreditFor = address;
+                    input.dataset.kbCredit = JSON.stringify({
+                        credit: credit ?? '',
+                        creditBy: chosenPicture.creditBy ?? '',
+                        creditUrl: chosenPicture.creditUrl ?? '',
+                        creditSource: chosenPicture.creditSource ?? '',
+                        creditSourceUrl: chosenPicture.creditSourceUrl ?? '',
+                    });
+
                     if (credit) ui.toast(credit, 4000);
                 }, 'Free photos', 'background'));
                 ways.append(replace);
@@ -783,6 +806,22 @@ const bootLiveEdit = () => {
                     props[input.dataset.styleProp] = useDefault ? '' : input.value;
                 } else {
                     props[input.dataset.styleProp] = input.value;
+                }
+
+                /*
+                 * The photographer travels with the photograph.
+                 *
+                 * Only while the field still holds the picture the credit was
+                 * taken for. Somebody who picks a photograph and then pastes a
+                 * different address over it must not publish the first
+                 * photographer's name under the second one's work.
+                 */
+                if (input.dataset.kbCredit && input.dataset.kbCreditFor === input.value) {
+                    try {
+                        Object.assign(props, JSON.parse(input.dataset.kbCredit));
+                    } catch {
+                        // A credit we cannot read is one we do not send.
+                    }
                 }
             });
             return props;

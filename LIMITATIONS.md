@@ -219,9 +219,8 @@ than their behaviour.
 
 ---
 
-### A free photograph used as a background credits nobody
-**Adapter:** all. **Recorded:** 2026-09-28. **Severity:** high, because it is a
-licence obligation rather than a defect.
+### Fixed: a free photograph used as a background credited nobody
+**Adapter:** all. **Recorded and fixed:** 2026-09-28.
 
 Replacing a picture stores the photographer beside it: the address, the alt
 text and four fields of credit, all as settings, and the attributions endpoint
@@ -245,13 +244,21 @@ attribution; a Creative Commons licence requires it, and Openverse is what a
 customer with no API key gets by default. So the default path produces the
 strongest obligation and the least credit.
 
-**To close it, one of:** store the credit fields with the style the way they
-are stored beside a picture, so the data at least exists and the attributions
-endpoint can see it; render a small credits line for a page that uses any
-attributed photograph; or refuse to offer attribution-required photographs as
-backgrounds at all. The first is cheap and makes the other two possible. What
-is not defensible is the current state, where the obligation exists and the
-information needed to meet it was never kept.
+**Fixed by keeping the photographer with the photograph.** The credit fields
+travel with the style, the way they travel beside a picture, and the credits
+page reads both. No new design decision was needed: that page already exists
+precisely so nobody's hero gets a caption added to it.
+
+The credit is stashed against the address it belongs to and sent only while
+the field still holds that picture, so somebody who picks a photograph and
+then pastes a different address over it cannot publish the first
+photographer's name under the second one's work. No credit is a gap; the wrong
+credit is a false statement about who took it.
+
+Credits are never rendered as CSS: the renderer knows the visual props and
+ignores the rest, which is what lets them ride along with a style rather than
+needing a store of their own. A credit link is checked as an address for the
+same reason a background image is.
 **Adapter:** React, Next.js. **Recorded:** 2026-09-27.
 
 This register carried an entry saying a client-rendered tree reverted

@@ -2,12 +2,14 @@
 
 namespace ShipFast\LiveEdit\Tests\Api;
 
+use Illuminate\Validation\ValidationException;
 use ShipFast\LiveEdit\Domain\Content\SiteStore;
 use ShipFast\LiveEdit\Domain\Content\StylePolicy;
 use ShipFast\LiveEdit\Domain\Site\Ability;
 use ShipFast\LiveEdit\Domain\Site\Site;
 use ShipFast\LiveEdit\Domain\Site\TokenType;
 use ShipFast\LiveEdit\Models\Draft;
+use ShipFast\LiveEdit\Support\StyleCss;
 use ShipFast\LiveEdit\Tests\TestCase;
 
 /**
@@ -83,6 +85,47 @@ class StyleTest extends TestCase
         $store = new SiteStore($this->site->fresh());
 
         return array_merge($store->publishedStyles(), $store->draftedStyles());
+    }
+
+    public function test_a_photographer_is_kept_with_the_photograph_they_took(): void
+    {
+        // A background has no element of its own to hang a credit on, so the
+        // words live with the style. Without this the name was shown once in
+        // a toast and stored nowhere, and the credits page had nothing to
+        // print.
+        $clean = app(StylePolicy::class)->clean([
+            'backgroundImage' => 'https://img.test/hero.jpg',
+            'credit' => 'Photo by Jeremy Yap on Unsplash',
+            'creditBy' => 'Jeremy Yap',
+            'creditUrl' => 'https://unsplash.test/@jeremyyap',
+            'creditSource' => 'Unsplash',
+        ]);
+
+        $this->assertSame('Jeremy Yap', $clean['creditBy']);
+        $this->assertSame('Photo by Jeremy Yap on Unsplash', $clean['credit']);
+    }
+
+    public function test_a_credit_link_has_to_be_an_address(): void
+    {
+        // It is rendered into a page as a link, so it gets the same treatment
+        // a background image does.
+        $this->expectException(ValidationException::class);
+
+        app(StylePolicy::class)->clean(['creditUrl' => 'javascript:alert(1)']);
+    }
+
+    public function test_a_credit_is_never_rendered_as_css(): void
+    {
+        // The renderer knows the visual props and ignores the rest, which is
+        // what lets a credit travel with a style rather than needing a store
+        // of its own.
+        $css = StyleCss::render([], ['hero' => [
+            'background' => '#112233',
+            'credit' => 'Photo by Jeremy Yap on Unsplash',
+        ]]);
+
+        $this->assertStringContainsString('#112233', $css);
+        $this->assertStringNotContainsString('Jeremy', $css);
     }
 
     public function test_a_section_can_be_restyled_from_a_static_site(): void

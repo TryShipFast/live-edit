@@ -3,6 +3,7 @@
 namespace ShipFast\LiveEdit\Tests\Api;
 
 use ShipFast\LiveEdit\Application\Api\ListAttributions;
+use ShipFast\LiveEdit\Domain\Content\SiteStore;
 use ShipFast\LiveEdit\Domain\Site\Site;
 use ShipFast\LiveEdit\Domain\Site\TokenType;
 use ShipFast\LiveEdit\Models\Draft;
@@ -65,6 +66,63 @@ class AttributionsTest extends TestCase
     protected function listed(): array
     {
         return app(ListAttributions::class)($this->site->fresh())['attributions'];
+    }
+
+    /** A photograph used as a section background, which is a style. */
+    protected function background(string $key, string $by, string $source = 'Unsplash'): void
+    {
+        (new SiteStore($this->site))->putStyle($key, [
+            'backgroundImage' => 'https://img.test/'.$key.'.jpg',
+            'credit' => "Photo by {$by} on {$source}",
+            'creditBy' => $by,
+            'creditUrl' => 'https://unsplash.test/@'.strtolower($by),
+            'creditSource' => $source,
+        ], false);
+    }
+
+    public function test_a_photograph_used_as_a_background_names_its_photographer_too(): void
+    {
+        /*
+         * It did not. A background is a style, not a setting, so it carried
+         * the address and nothing else, and the photographer's name lived in
+         * a toast that faded. Measured on the real thing: the style row held
+         * one field, the credits page listed nobody, and the name appeared
+         * nowhere in the site's data.
+         *
+         * It matters most on the path a customer with no API key takes, which
+         * is Openverse, where the licence requires the credit rather than
+         * asking for it.
+         */
+        $this->background('shero', 'Jeremy');
+
+        $this->assertSame([[
+            'credit' => 'Photo by Jeremy on Unsplash',
+            'by' => 'Jeremy',
+            'byUrl' => 'https://unsplash.test/@jeremy',
+            'source' => 'Unsplash',
+            'sourceUrl' => null,
+        ]], $this->listed());
+    }
+
+    public function test_a_background_credit_is_dropped_when_the_picture_it_belongs_to_is_gone(): void
+    {
+        // Naming a photographer for a photograph that was replaced credits
+        // them for something nobody can see.
+        (new SiteStore($this->site))->putStyle('shero', [
+            'credit' => 'Photo by Jeremy on Unsplash',
+            'creditBy' => 'Jeremy',
+        ], false);
+
+        $this->assertSame([], $this->listed());
+    }
+
+    public function test_one_photographer_is_thanked_once_across_pictures_and_backgrounds(): void
+    {
+        // The same photograph used both ways is still one obligation.
+        $this->picture('auto:hero', 'Jefferson');
+        $this->background('shero', 'Jefferson');
+
+        $this->assertCount(1, $this->listed());
     }
 
     public function test_it_names_the_photographer_and_where_the_picture_came_from(): void

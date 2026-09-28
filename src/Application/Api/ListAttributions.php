@@ -4,6 +4,7 @@ namespace ShipFast\LiveEdit\Application\Api;
 
 use ShipFast\LiveEdit\Domain\Content\Companions;
 use ShipFast\LiveEdit\Domain\Content\SiteStore;
+use ShipFast\LiveEdit\Domain\Content\StylePolicy;
 use ShipFast\LiveEdit\Domain\Site\Site;
 
 /**
@@ -54,6 +55,35 @@ class ListAttributions
         }
 
         /*
+         * Photographs used as backgrounds, which are styles rather than
+         * settings and so were invisible to the loop above.
+         *
+         * A background has no element of its own to hang a credit on, which is
+         * why the words live with the style itself. It is the same obligation:
+         * a photograph on the page, a photographer who asked to be named. The
+         * page it appears on is this same credits page, so nobody's design is
+         * touched to satisfy it.
+         */
+        foreach ((new SiteStore($site))->publishedStyles() as $props) {
+            $credit = trim((string) ($props['credit'] ?? ''));
+
+            // And only where the picture is still there. A credit for a
+            // background somebody has since replaced names a photographer
+            // whose work is no longer on the page.
+            if ($credit === '' || trim((string) ($props['backgroundImage'] ?? '')) === '') {
+                continue;
+            }
+
+            $found[] = [
+                'credit' => $credit,
+                'by' => $this->said($props, 'creditBy'),
+                'byUrl' => $this->said($props, 'creditUrl'),
+                'source' => $this->said($props, 'creditSource'),
+                'sourceUrl' => $this->said($props, 'creditSourceUrl'),
+            ];
+        }
+
+        /*
          * One line per photographer, not one per picture.
          *
          * A client who uses four photographs by the same person is not asked
@@ -73,6 +103,22 @@ class ListAttributions
         usort($list, fn (array $a, array $b) => strcasecmp((string) $a['by'], (string) $b['by']));
 
         return ['attributions' => $list, 'count' => count($list)];
+    }
+
+    /**
+     * One of a style's own credit fields.
+     *
+     * @param  array<string, mixed>  $props
+     */
+    protected function said(array $props, string $field): ?string
+    {
+        if (! in_array($field, StylePolicy::CREDIT, true)) {
+            return null;
+        }
+
+        $said = trim((string) ($props[$field] ?? ''));
+
+        return $said === '' ? null : $said;
     }
 
     /**
