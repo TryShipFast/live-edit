@@ -1,5 +1,5 @@
 {
-    "name": "shipfast/live-edit",
+    "name": "shipfasts/live-edit",
     "description": "ShipFast Live Edit: in-place editing for sites that are already built, on Laravel, WordPress, Next.js, React or plain HTML. Tag the elements; the people who own the site edit text, images, links, icons, styles and lists on the page itself.",
     "keywords": ["live-edit", "in-place-editing", "cms", "laravel", "wordpress", "nextjs", "react", "static-site"],
     "type": "library",

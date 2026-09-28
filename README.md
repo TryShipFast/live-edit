@@ -41,7 +41,7 @@ instructions in the console when a site is registered.
 Two steps.
 
 ```bash
-composer require shipfast/live-edit
+composer require shipfasts/live-edit
 php artisan migrate
 ```
 
