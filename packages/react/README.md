@@ -35,14 +35,12 @@ it survives re-renders, survives routing, and needs no fight with the reconciler
 ```jsx
 import { LiveEditProvider, useContent } from '@shipfasts/live-edit-react';
 
-export default function Layout({ children, content, sessionKey }) {
+export default function App({ children }) {
   return (
     <LiveEditProvider
       site="acme"
       apiBase="https://cms.example.com/api/live-edit/v1"
       publishableKey={process.env.NEXT_PUBLIC_KB_KEY}
-      sessionKey={sessionKey}   // absent for visitors; present only for editors
-      content={content}         // fetched on the server, so there is no flash
     >
       {children}
     </LiveEditProvider>
@@ -58,6 +56,36 @@ The second argument is the words already in the component. That matters more
 than it looks: the component still renders its own copy with no provider, no
 network and no content at all. Adding this cannot leave a page blank, and
 removing it later leaves working code behind.
+
+## The two optional props
+
+Three are required: `site`, `apiBase` and `publishableKey`. The others have
+defaults that are right for most applications, and one of them used to appear
+in this example in a way that implied it was needed. It is not.
+
+**`content`** is the client's words, fetched on your server so they are already
+in the HTML that arrives. Leave it out and the provider fetches them itself on
+mount: the page paints your template's original copy, then repaints with the
+client's. Behind a login nobody minds. On a public page they will, because the
+repaint is visible and a crawler that does not run JavaScript indexes the
+template instead of the client's site. Pass it wherever you can render on the
+server, which in practice means Next.js.
+
+```jsx
+// app/layout.jsx, a server component
+const { settings } = await fetch(`${apiBase}/${site}/content`, {
+  headers: { Authorization: `Bearer ${publishableKey}` },
+}).then((r) => r.json());
+
+return <LiveEditProvider site={site} apiBase={apiBase} publishableKey={key} content={settings}>…
+```
+
+**`sessionKey`** you almost certainly do not need. Somebody signing in is
+handed their session in a URL fragment, and a browser never sends a fragment to
+a server, so a server component cannot know it and a prop threaded down from
+one is always empty. The provider finds the session itself and waits to be told
+when the runtime has one. Pass this only if your own server mints sessions, as
+below, and already knows who is at the keyboard.
 
 ## Minting a session
 
