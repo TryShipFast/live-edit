@@ -174,7 +174,28 @@ final class Licence
             // A 401 or 403 is the service telling us plainly that this key is
             // not good. That is an answer, not an outage.
             if (in_array($response->status(), [401, 403], true)) {
-                return ['valid' => false, 'reason' => 'rejected', 'expires_at' => null, 'days_remaining' => null, 'editors' => []];
+                /*
+                 * Which kind of "not good" decides what we tell the customer,
+                 * and the two commonest are opposites.
+                 *
+                 * A lapsed licence wants paying and the key in the environment
+                 * file is fine. A revoked key wants replacing and the billing
+                 * is fine. Both arrive as 401, so reading only the status code
+                 * meant every customer whose plan ran out was sent to hunt for
+                 * a key that was never the problem, and the one whose key had
+                 * genuinely been rotated was told the same thing by accident.
+                 *
+                 * Older versions of the service send no reason. Falling back
+                 * to the blunt answer keeps them working.
+                 */
+                $reason = match ((string) $response->json('error.reason', '')) {
+                    'expired', 'licence_lapsed' => 'expired',
+                    'site_suspended' => 'suspended',
+                    'revoked' => 'rejected',
+                    default => 'rejected',
+                };
+
+                return ['valid' => false, 'reason' => $reason, 'expires_at' => null, 'days_remaining' => null, 'editors' => []];
             }
 
             return self::whenUnreachable('http_'.$response->status());

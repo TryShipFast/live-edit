@@ -44,6 +44,16 @@ class AuthenticateApiToken
             return response()->json([
                 'error' => [
                     'type' => 'authentication_error',
+                    // The machine-readable half of the same sentence, so an
+                    // install can act on which refusal this is rather than
+                    // guessing from the status code. A 401 covers both "your
+                    // licence ran out" and "this key was revoked", and those
+                    // have opposite fixes: one wants paying, the other wants a
+                    // new key pasted in. Told apart only by this.
+                    //
+                    // Nothing is given away. Whoever reads this is already
+                    // holding the key and already being handed the message.
+                    'reason' => $denial->value,
                     'message' => $denial->publicMessage(),
                 ],
             ], $denial->status(), [
