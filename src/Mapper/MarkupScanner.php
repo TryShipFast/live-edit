@@ -205,6 +205,13 @@ class MarkupScanner
             return; // already tagged — apply is idempotent
         }
 
+        // Somebody else is already writing here. Guarded at the point of
+        // writing rather than in one caller, because a tag added by any other
+        // path would break the page the same way.
+        if ($this->isFrameworkWritten($node)) {
+            return;
+        }
+
         $key = $this->autoMode ? 'auto:'.$this->autoKey($node) : $candidate['key'];
 
         // In auto mode the key is derived from the element's own words, which
@@ -1159,6 +1166,42 @@ class MarkupScanner
     }
 
     /** The same question asked of an element and everything above it. */
+    /**
+     * Whether a framework is already writing this element's text.
+     *
+     * Found on our own pricing page. Every price carried x-text, so Alpine
+     * wrote the yearly figure the moment somebody pressed Yearly, and the
+     * editor wrote the published words straight back over it: the toggle
+     * flipped, the numbers did not, and the page looked broken in a way no
+     * error anywhere explained.
+     *
+     * Tagging one of these is wrong twice over. The words are not content, so
+     * editing them is editing a value the framework recalculates on its next
+     * render and throws away. And the attribute is a declaration that
+     * something else owns this text, which is exactly the thing this product
+     * must not fight: a React component was given a whole adapter for the same
+     * reason, and an Alpine or Vue binding deserves the same respect for the
+     * price of a list.
+     *
+     * Attributes rather than heuristics, because each of these is a promise by
+     * the page's author about who writes here.
+     */
+    protected function isFrameworkWritten(DOMElement $element): bool
+    {
+        foreach ([
+            'x-text', 'x-html',         // Alpine
+            'v-text', 'v-html',         // Vue
+            'ng-bind', 'ng-bind-html',  // Angular
+            'data-bind',                // Knockout, and a common hand-rolled name
+        ] as $attribute) {
+            if ($element->hasAttribute($attribute)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
     protected function insideChrome(DOMElement $element): bool
     {
         for ($node = $element; $node instanceof DOMElement; $node = $node->parentNode) {

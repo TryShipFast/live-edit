@@ -182,6 +182,22 @@ every one of these tests stubbed a response carrying a `url`, and the model
 they are pointed at only ever sends base64. Stub-shaped tests proved the
 bookkeeping perfectly and could not see that the feature did not work.
 
+## Text a framework is already writing
+
+Not tagged, on any adapter. An element carrying `x-text`, `v-text`, `ng-bind`
+or their html variants has an author who has said out loud that something else
+writes there, and tagging it means the editor and the framework overwriting
+each other on every render.
+
+Found on our own pricing page, which is the right place to find it. Alpine
+wrote the yearly figure when somebody pressed Yearly and the editor wrote the
+published words straight back: the toggle flipped, the numbers did not move,
+and nothing reported an error. Measured after the fix: zero of those elements
+tagged, and all four prices switch between monthly and yearly.
+
+React needed a whole adapter for this problem. Alpine and Vue needed a list of
+four attribute names.
+
 ## Platform-specific rows
 
 | Laravel | | | WordPress | |
