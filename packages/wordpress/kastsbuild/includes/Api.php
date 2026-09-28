@@ -172,13 +172,16 @@ class Api
     /**
      * @param  array<string, string>|null  $content  The words this site holds
      */
+    /**
+     * @return array{html: string, limit: ?array<string, mixed>}|null
+     */
     public static function prepare(
         string $html,
         string $page,
         bool $editing,
         ?array $content = null,
         ?array $styles = null
-    ): ?string {
+    ): ?array {
         $key = $editing
             ? (Session::forCurrentUser() ?? Settings::get('publishable_key'))
             : Settings::get('publishable_key');
@@ -201,7 +204,22 @@ class Api
         $body = self::post('/prepare', $key, $payload);
         $prepared = $body['html'] ?? null;
 
-        return is_string($prepared) && $prepared !== '' ? $prepared : null;
+        if (! is_string($prepared) || $prepared === '') {
+            return null;
+        }
+
+        /*
+         * Whether editing was withheld, and why.
+         *
+         * The answer used to be thrown away here, which made asking pointless:
+         * the plugin said "this person may edit", the service replied "not
+         * this page, they are over their allowance", and the plugin rendered
+         * the drawer anyway because it only ever read the markup.
+         */
+        return [
+            'html' => $prepared,
+            'limit' => is_array($body['limit'] ?? null) ? $body['limit'] : null,
+        ];
     }
 
     /** @return array<string, mixed> */

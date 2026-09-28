@@ -86,7 +86,7 @@ Signing out is `POST /live-edit/sign-out`.
 ### The three values a site is given
 
 ```env
-LIVE_EDIT_HOST=https://live.shipfast.com
+LIVE_EDIT_HOST=https://live.tryshipfast.com
 LIVE_EDIT_SITE_ID=acme
 LIVE_EDIT_APP_KEY=kbp_…
 ```

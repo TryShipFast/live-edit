@@ -92,6 +92,28 @@ final class Licence
      * sentences, and telling somebody their licence expired when they have
      * simply not registered yet sends them looking for a receipt.
      */
+    /**
+     * What this site's plan covers, as numbers.
+     *
+     * Empty when nothing was said, which means no limit rather than none
+     * allowed. A service that cannot be reached, an older service that does
+     * not send these, and a site with an unlimited plan all look the same
+     * here, and all three must leave the customer editing.
+     *
+     * @return array<string, int>
+     */
+    public static function limits(): array
+    {
+        if (! self::configured()) {
+            return [];
+        }
+
+        return array_filter(
+            (array) (self::status()['limits'] ?? []),
+            fn ($v) => is_int($v) || (is_string($v) && $v !== '')
+        );
+    }
+
     public static function unregistered(): bool
     {
         return ! self::configured();
@@ -155,6 +177,7 @@ final class Licence
                     'reason' => $licence['reason'] ?? null,
                     'expires_at' => $licence['expires_at'] ?? null,
                     'days_remaining' => $licence['days_remaining'] ?? null,
+                    'limits' => (array) ($licence['limits'] ?? []),
                     'editors' => array_values(array_filter(array_map(
                         fn ($email) => mb_strtolower(trim((string) $email)),
                         (array) ($licence['editors'] ?? [])

@@ -99,6 +99,18 @@ class LicenceController
                 'reason' => $this->reason($site, $lapsed, $matches),
 
                 /*
+                 * What this site's plan covers, as numbers.
+                 *
+                 * Sent from here because an install that tags its own pages
+                 * never calls the content API and would otherwise be held to
+                 * nothing. The numbers are the whole vocabulary: this package
+                 * has never heard of a plan, a price or an upgrade, which is
+                 * what lets it be installed by somebody who has not seen our
+                 * price list. Absent means no limit.
+                 */
+                'limits' => (object) ((array) ($site->limits ?? [])),
+
+                /*
                  * Who may edit this site, answered here rather than configured
                  * on the site.
                  *

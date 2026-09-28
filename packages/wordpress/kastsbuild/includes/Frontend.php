@@ -20,6 +20,16 @@ namespace KastsBuild;
  */
 class Frontend
 {
+    /**
+     * Why editing was withheld on this page, when it was.
+     *
+     * Held so the strip at the bottom can say it. Null on every ordinary
+     * page, which is nearly all of them.
+     *
+     * @var array<string, mixed>|null
+     */
+    private static $withheld = null;
+
     private const CACHE_PREFIX = 'kastsbuild_page_';
 
     public static function boot(): void
@@ -137,19 +147,86 @@ class Frontend
             return $html;
         }
 
-        $tagged = $prepared;
+        /*
+         * The service decides what this plan covers, and says so.
+         *
+         * Asked for an editable page and told the allowance is spent, the
+         * page is still rendered exactly as a visitor sees it and only the
+         * editing is withheld. The website is never the thing taken away.
+         */
+        if ($editing && is_array($prepared['limit'] ?? null)) {
+            $editing = false;
+            self::$withheld = $prepared['limit'];
+        }
+
+        $tagged = $prepared['html'];
 
         if ($editing) {
             $tagged = self::markBodyForEditing($tagged);
         } else {
-            set_transient(self::cacheKey(), $tagged, HOUR_IN_SECONDS * 6);
-            // The copy of last resort, kept far longer than the ordinary page
-            // cache, because its whole job is to still be there on the day the
-            // service is not.
-            set_transient(self::lastGoodKey(), $tagged, WEEK_IN_SECONDS);
+            /*
+             * Not cached when editing was withheld. This markup is a visitor's
+             * copy of a page somebody was trying to edit, and storing it under
+             * the ordinary key would serve it back after they upgrade, so the
+             * page they just paid to edit would carry on refusing.
+             */
+            if (self::$withheld === null) {
+                set_transient(self::cacheKey(), $tagged, HOUR_IN_SECONDS * 6);
+                // The copy of last resort, kept far longer than the ordinary
+                // page cache, because its whole job is to still be there on
+                // the day the service is not.
+                set_transient(self::lastGoodKey(), $tagged, WEEK_IN_SECONDS);
+            }
+        }
+
+        if (self::$withheld !== null) {
+            $tagged = self::saysWhyEditingIsOff($tagged);
         }
 
         return $tagged;
+    }
+
+    /**
+     * A strip saying why this page has no editor on it.
+     *
+     * Only for somebody who was trying to edit: a visitor never sees it, and
+     * the check that decided that has already run. Without it the page simply
+     * has no drawer, which reads as the product being broken rather than as a
+     * limit being reached, and the customer writes to support instead of
+     * upgrading.
+     *
+     * Deliberately plain and dismissable, at the bottom, over nothing.
+     */
+    private static function saysWhyEditingIsOff(string $html): string
+    {
+        $message = isset(self::$withheld['message']) ? (string) self::$withheld['message'] : '';
+
+        if ($message === '') {
+            return $html;
+        }
+
+        // Said by the service, which knows its own address. Reconstructing it
+        // from the API base was right until the day the API moved.
+        $console = isset(self::$withheld['url']) ? (string) self::$withheld['url'] : '';
+
+        $strip = '<div id="kb-limit" style="position:fixed;left:50%;bottom:18px;transform:translateX(-50%);'
+            .'z-index:2147483646;max-width:min(640px,calc(100vw - 32px));display:flex;gap:12px;align-items:flex-start;'
+            .'padding:12px 14px;border-radius:12px;background:#0B0C0F;color:#F4F5F7;'
+            .'font:400 13px/1.5 ui-sans-serif,-apple-system,BlinkMacSystemFont,\'Segoe UI\',sans-serif;'
+            .'box-shadow:0 8px 30px rgba(0,0,0,.28)">'
+            .'<span style="flex:1">'.esc_html($message).'</span>';
+
+        if ($console !== '') {
+            $strip .= '<a href="'.esc_url($console).'" style="color:#7FB0FF;text-decoration:none;white-space:nowrap">'
+                .esc_html__('See plans', 'kastsbuild').'</a>';
+        }
+
+        $strip .= '<button type="button" onclick="this.parentNode.remove()" aria-label="'
+            .esc_attr__('Dismiss', 'kastsbuild')
+            .'" style="background:none;border:0;color:#9A9DA5;cursor:pointer;padding:0 2px;line-height:1">&times;</button>'
+            .'</div>';
+
+        return str_ireplace('</body>', $strip.'</body>', $html);
     }
 
     /** The last page the service gave us for this address, whatever its age. */
@@ -159,11 +236,36 @@ class Frontend
     }
 
     /** Which page this is, so keys scoped to a page stay on it. */
+    /**
+     * What to call this page, so that two pages are never one.
+     *
+     * The path, which on nearly every site is the whole answer. Not the query
+     * string: "/shop?sort=price" is the same page asked a different question,
+     * and counting each as its own would fill a site's records with one page
+     * wearing a hundred hats.
+     *
+     * Except on a site with pretty permalinks switched off, where the path is
+     * "/" for every page in the site and the identity is the query string.
+     * Left as the path alone, every page of such a site shared one set of
+     * keys: editing the About page wrote over the home page's words, and the
+     * page allowance counted a whole site as one page. Only that case gets the
+     * id appended, so sites with permalinks on keep the names they already
+     * have and nothing is re-tagged for them.
+     */
     private static function pagePath(): string
     {
         $path = parse_url((string) ($_SERVER['REQUEST_URI'] ?? '/'), PHP_URL_PATH);
+        $path = is_string($path) && $path !== '' ? $path : '/';
 
-        return is_string($path) ? substr($path, 0, 200) : '/';
+        if ($path === '/' && function_exists('is_front_page') && ! is_front_page()) {
+            $id = function_exists('get_queried_object_id') ? (int) get_queried_object_id() : 0;
+
+            if ($id > 0) {
+                $path = '/?id='.$id;
+            }
+        }
+
+        return substr($path, 0, 200);
     }
 
     /**

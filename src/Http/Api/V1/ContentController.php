@@ -17,6 +17,7 @@ use ShipFast\LiveEdit\Application\Api\PrepareMarkup;
 use ShipFast\LiveEdit\Application\Api\PublishSite;
 use ShipFast\LiveEdit\Application\Api\ReadPublishedContent;
 use ShipFast\LiveEdit\Application\Api\TagMarkup;
+use ShipFast\LiveEdit\Domain\Content\PageAllowance;
 use ShipFast\LiveEdit\Domain\Content\SiteSnapshot;
 use ShipFast\LiveEdit\Domain\Content\SiteStore;
 use ShipFast\LiveEdit\Domain\Credits\Credits;
@@ -438,6 +439,39 @@ class ContentController
         $site = ApiContext::site($request);
         $editing = ApiContext::token($request)->can(Ability::Write);
 
+        /*
+         * A plan can cover fewer pages than the site has.
+         *
+         * Over the allowance, the page is prepared as a VISITOR sees it:
+         * published words, published styling, no editing. The website is
+         * never the thing that is withheld, here or anywhere else in this
+         * product, so somebody who has run out sees their own page working
+         * and is told why the drawer is not on it.
+         */
+        $allowance = new PageAllowance((string) $site->id, (array) ($site->limits ?? []));
+        $refusal = null;
+
+        if ($editing && ! $allowance->permits($validated['page'] ?? '')) {
+            $editing = false;
+            $refusal = $allowance->refusal();
+
+            /*
+             * Where to go about it, said by the service rather than worked out
+             * by each adapter.
+             *
+             * The WordPress plugin had been reconstructing this by stripping
+             * "/api/live-edit/v1" off the address it calls. That happened to
+             * be right, and would stop being right the first time the API
+             * moved or a customer put it behind a path of their own. We know
+             * our own address; nobody else should have to guess it.
+             */
+            $console = rtrim((string) config('live-edit.licence.host', ''), '/');
+
+            if ($console !== '') {
+                $refusal['url'] = $console.'/billing';
+            }
+        }
+
         $result = $prepare(
             $site,
             $validated['html'],
@@ -448,6 +482,13 @@ class ContentController
         );
 
         Meter::record($site, Meter::TAG);
+
+        if ($refusal !== null) {
+            // Alongside the page rather than instead of it. The caller has
+            // something to render and something to say, and an error response
+            // would have left it with neither.
+            $result['limit'] = $refusal;
+        }
 
         return response()->json($result)->withHeaders([
             // One person's unfinished work must never be held anywhere. A

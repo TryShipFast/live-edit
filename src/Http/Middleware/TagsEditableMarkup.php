@@ -5,6 +5,7 @@ namespace ShipFast\LiveEdit\Http\Middleware;
 use Closure;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
+use ShipFast\LiveEdit\Domain\Content\PageAllowance;
 use ShipFast\LiveEdit\Mapper\MarkupScanner;
 use ShipFast\LiveEdit\Support\CloudInstall;
 use ShipFast\LiveEdit\Support\DraftStore;
@@ -66,6 +67,31 @@ class TagsEditableMarkup
          * edit was stored the whole time and never reached anybody.
          */
         $forAnEditor = Gate::allows('live-edit') && Licence::permits();
+
+        /*
+         * A plan can cover fewer pages than the site has.
+         *
+         * Checked here as well as in the content API because a Laravel host
+         * tags its own pages and never calls it: enforced only there, the
+         * limit would bind WordPress and quietly not bind Laravel, which is
+         * the kind of half-built rule that gets discovered by a customer.
+         *
+         * The page keeps rendering either way. Only the editing is withheld,
+         * which is the same rule a lapsed licence follows and for the same
+         * reason: the website is never ours to take away.
+         */
+        $overThePageLimit = false;
+
+        if ($forAnEditor) {
+            // Scoped by the slug this install was given, because a customer's
+            // own database has no sites table to point at.
+            $allowance = new PageAllowance(Licence::site(), Licence::limits());
+
+            if (! $allowance->permits($this->pageOf($request))) {
+                $forAnEditor = false;
+                $overThePageLimit = true;
+            }
+        }
 
         /*
          * Installed, allowed to edit, and never registered.
@@ -153,6 +179,18 @@ class TagsEditableMarkup
     }
 
     /** @return array<string, string> */
+    /**
+     * Which page of the site this request is.
+     *
+     * The path and nothing else. A query string is the same page asked a
+     * different question, and counting "/shop?sort=price" as its own page
+     * would spend a whole allowance on one page with filters on it.
+     */
+    private function pageOf(Request $request): string
+    {
+        return '/'.trim($request->path(), '/');
+    }
+
     private function publishedSettings(): array
     {
         $model = config('live-edit.setting_model');

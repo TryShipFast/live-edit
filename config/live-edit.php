@@ -358,7 +358,7 @@ return [
          * recorded so the application can say so once, rather than a customer
          * discovering it when support for it is finally removed.
          */
-        'host' => env('LIVE_EDIT_HOST', env('LIVE_EDIT_LICENCE_HOST', env('LIVE_EDIT_CLOUD_HOST', 'https://live.shipfast.com'))),
+        'host' => env('LIVE_EDIT_HOST', env('LIVE_EDIT_LICENCE_HOST', env('LIVE_EDIT_CLOUD_HOST', 'https://live.tryshipfast.com'))),
         'site' => env('LIVE_EDIT_SITE_ID', env('LIVE_EDIT_SITE', env('LIVE_EDIT_LICENCE_SITE', env('LIVE_EDIT_CLOUD_SITE')))),
         'key' => env('LIVE_EDIT_APP_KEY', env('LIVE_EDIT_KEY', env('LIVE_EDIT_LICENCE_KEY'))),
 
