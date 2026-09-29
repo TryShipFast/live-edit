@@ -26,6 +26,28 @@ enum Platform: string
 
     /** How to say it to somebody, spelled the way they spell it. */
     /**
+     * Whether this adapter is finished enough to be sold as finished.
+     *
+     * React and Next.js are not, and the reason is specific rather than a
+     * general nervousness: the codemod tags a JSX element whose only child is
+     * a plain string, which is the correct rule, and it means anything
+     * rendered from an array is untouched. On a real page that is the
+     * catalogue cards, the categories, the quick links and the testimonials,
+     * which is most of what a visitor reads.
+     *
+     * Said here rather than in a marketing decision somewhere, so that
+     * anybody choosing a platform is told at the moment they choose. Selling
+     * it as equal to Laravel and WordPress and letting a customer discover
+     * the gap on their own site is the expensive way for them to find out.
+     *
+     * See LIMITATIONS.md: "Anything inside a .map() is not editable".
+     */
+    public function isPreview(): bool
+    {
+        return $this === self::React || $this === self::NextJs;
+    }
+
+    /**
      * Whether this kind of site keeps its client's words in its own database.
      *
      * WordPress does, since its plugin took ownership of content, history,
@@ -61,8 +83,8 @@ enum Platform: string
         return match ($this) {
             self::WordPress => 'A WordPress site, with wp-admin and plugins.',
             self::Laravel => 'A Laravel application, with Blade templates.',
-            self::NextJs => 'A Next.js site, with the app or pages router.',
-            self::React => 'A React app built with Vite or Create React App.',
+            self::NextJs => 'A Next.js site, with the app or pages router. Headings and standalone text are editable; lists built from data are not yet.',
+            self::React => 'A React app built with Vite or Create React App. Headings and standalone text are editable; lists built from data are not yet.',
             self::Html => 'Hand written HTML files, or anything we have not named.',
         };
     }
