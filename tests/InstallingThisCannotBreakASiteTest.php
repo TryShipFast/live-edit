@@ -96,4 +96,58 @@ class InstallingThisCannotBreakASiteTest extends TestCase
         $this->assertSame(200, $response->getStatusCode());
         $this->assertStringContainsString('The words already in the template', (string) $response->getContent());
     }
+
+    private function wordsLiveWithTheService(): void
+    {
+        config()->set('live-edit.cloud.site', 'learnkasts');
+        config()->set('live-edit.cloud.host', 'https://live.tryshipfast.com');
+    }
+
+    public function test_a_cloud_site_never_reaches_for_a_local_database(): void
+    {
+        /*
+         * The root cause, rather than another guard on another read.
+         *
+         * A site whose words live with us is served our runtime, which tags
+         * the markup in the browser and fetches content over the API.
+         * Nothing in that arrangement involves the host's database - and on
+         * an API-driven frontend there is no such database. Reading one
+         * anyway took a live site down twice: the first fix guarded one
+         * reader, and the next one along was not guarded either.
+         *
+         * The site's owner asked the right question, which was why a cloud
+         * install was reading local settings at all. This is the answer in
+         * the form of a test: the connection is one that cannot answer, and
+         * nothing here may ask it.
+         */
+        $this->withNoDatabase();
+        $this->wordsLiveWithTheService();
+        config()->set('live-edit.auto_tag', true);
+
+        $this->assertSame([], PublishedContent::settings());
+        $this->assertSame([], PublishedContent::styles());
+        $this->assertNull(PublishedContent::version());
+
+        $html = '<html lang="en"><body><h1>The theme\'s own words</h1></body></html>';
+
+        $response = (new TagsEditableMarkup)->handle(
+            Request::create('/', 'GET'),
+            fn (): Response => new Response($html, 200, ['Content-Type' => 'text/html'])
+        );
+
+        $this->assertSame(200, $response->getStatusCode());
+        // Untouched: not merely un-broken, but not rewritten at all. There is
+        // nothing here for this middleware to apply.
+        $this->assertSame($html, (string) $response->getContent());
+    }
+
+    public function test_a_site_that_keeps_its_own_words_still_reads_them(): void
+    {
+        // The rule must not become "never read anything". A normal install
+        // still keeps its content here and still renders it.
+        config()->set('live-edit.cloud.site', null);
+        config()->set('live-edit.cloud.host', null);
+
+        $this->assertIsArray(PublishedContent::settings());
+    }
 }

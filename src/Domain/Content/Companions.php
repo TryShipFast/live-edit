@@ -40,6 +40,12 @@ final class Companions
         'CreditUrl',
         'CreditBy',
         'Credit',
+        // The densities a fitted replacement was made at. Added to the
+        // appliers and to the WordPress media route on 2026-09-29 and NOT
+        // added here, which meant the policy refused the very key the save
+        // was writing: a client replaced a picture and was told "Unknown
+        // setting" for a companion this package had just invented.
+        'Srcset',
         'Title',
         'Href',
         'Alt',

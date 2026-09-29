@@ -11,6 +11,7 @@ use ShipFast\LiveEdit\Mapper\MarkupScanner;
 use ShipFast\LiveEdit\Support\CloudInstall;
 use ShipFast\LiveEdit\Support\DraftStore;
 use ShipFast\LiveEdit\Support\Licence;
+use ShipFast\LiveEdit\Support\WhereTheWordsLive;
 use Symfony\Component\HttpFoundation\BinaryFileResponse;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpFoundation\StreamedResponse;
@@ -51,6 +52,7 @@ class TagsEditableMarkup
         if (! config('live-edit.auto_tag', false)) {
             return $response;
         }
+
 
         if (! $this->isARewritablePage($request, $response)) {
             return $response;
@@ -130,6 +132,30 @@ class TagsEditableMarkup
          * a site nobody has edited yet, a visitor costs exactly one cheap
          * query and no parse at all.
          */
+        /*
+         * A site whose words live with us reads none of them from here.
+         *
+         * Everything above still runs, and has to: a layout that never got
+         * the directive still needs the runtime and the body marker, which
+         * is this middleware's other job and has nothing to do with content.
+         *
+         * What stops here is the database. In that arrangement the service
+         * serves the page its own runtime, which tags the markup in the
+         * browser and fetches content over the API - so tagging and applying
+         * here is not merely wasted work. On an API-driven frontend there is
+         * no local database at all, and asking for one took a live site down
+         * on every deploy.
+         *
+         * Guarding each read was treating the symptom; the question was why
+         * a cloud install reads local settings at all, and the answer is that
+         * it should not.
+         */
+        if (WhereTheWordsLive::withTheService()) {
+            $response->setContent($html);
+
+            return $response;
+        }
+
         $stored = $this->storedWords($forAnEditor);
 
         if (! $forAnEditor && $stored === []) {

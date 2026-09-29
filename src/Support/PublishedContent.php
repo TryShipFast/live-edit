@@ -3,6 +3,7 @@
 namespace ShipFast\LiveEdit\Support;
 
 use Illuminate\Support\Facades\Schema;
+use ShipFast\LiveEdit\Support\WhereTheWordsLive;
 use ShipFast\LiveEdit\Models\ElementStyle;
 use ShipFast\LiveEdit\Models\Version;
 use Throwable;
@@ -29,6 +30,15 @@ class PublishedContent
      */
     public static function settings(?string $locale = null): array
     {
+        /*
+         * A site whose words live with us has nothing to read here, and the
+         * database it would read from may not exist at all. Asked anyway,
+         * this took an API-driven frontend off the internet.
+         */
+        if (WhereTheWordsLive::withTheService()) {
+            return [];
+        }
+
         $locale ??= app()->getLocale();
         $snapshot = self::current($locale);
 
@@ -88,6 +98,10 @@ class PublishedContent
      */
     public static function styles(?string $locale = null): array
     {
+        if (WhereTheWordsLive::withTheService()) {
+            return [];
+        }
+
         $snapshot = self::current($locale ?? app()->getLocale());
 
         return $snapshot['styles'] ?? self::orNothing(
@@ -98,6 +112,10 @@ class PublishedContent
     /** The version being served, or null when nothing has been published. */
     public static function version(): ?int
     {
+        if (WhereTheWordsLive::withTheService()) {
+            return null;
+        }
+
         // An installation upgrades the package before it runs the migration,
         // and for the time in between this asks for a table that is not there
         // yet. Every page five-hundreds if that is allowed to throw, so a
