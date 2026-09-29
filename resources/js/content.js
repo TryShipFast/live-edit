@@ -176,8 +176,24 @@ const applyWords = (element, value, keepRuns = false) => {
         return;
     }
 
+    /*
+     * The change touched more than one run: words were altered on both sides
+     * of the element between them. One contiguous replacement cannot say which
+     * side the new words belong on, but the boundary itself can often still be
+     * found, because the words immediately touching it did not change.
+     */
+    const shares = splitAcrossRuns(olds, value);
+
+    if (shares !== null) {
+        runs.forEach((node, index) => {
+            node.nodeValue = shares[index];
+        });
+
+        return;
+    }
+
     // A rewrite rather than an edit. Nothing can be inferred about where the
-    // elements between the runs belong, so the sentence becomes one run —
+    // elements between the runs belong, so the sentence becomes one run,
     // which loses the arrangement but never a word the person typed.
     writeRun(runs[0], value);
     runs.slice(1).forEach((node) => {
@@ -189,6 +205,144 @@ const applyWords = (element, value, keepRuns = false) => {
 
         node.remove();
     });
+};
+
+/**
+ * Every character the old words and the new ones still have in common, as
+ * pairs of positions: a longest common subsequence, backtracked.
+ *
+ * Only ever reached when the cheap path has already failed, which is the
+ * uncommon case, so the table it builds is paid for rarely. It is bounded
+ * anyway by the caller, because this is quadratic and a page can carry a
+ * paragraph far longer than a sentence.
+ */
+const matchedPairs = (before, value) => {
+    const n = before.length;
+    const m = value.length;
+    const width = m + 1;
+    const table = new Int32Array((n + 1) * width);
+
+    for (let i = n - 1; i >= 0; i -= 1) {
+        for (let j = m - 1; j >= 0; j -= 1) {
+            table[i * width + j] = before[i] === value[j]
+                ? table[(i + 1) * width + j + 1] + 1
+                : Math.max(table[(i + 1) * width + j], table[i * width + j + 1]);
+        }
+    }
+
+    const pairs = [];
+
+    for (let i = 0, j = 0; i < n && j < m;) {
+        if (before[i] === value[j]) {
+            pairs.push([i, j]);
+            i += 1;
+            j += 1;
+        } else if (table[(i + 1) * width + j] >= table[i * width + j + 1]) {
+            i += 1;
+        } else {
+            j += 1;
+        }
+    }
+
+    return pairs;
+};
+
+/** Unchanged characters touching a boundary, counted without a break on either side. */
+const anchorAt = (pairs, boundary) => {
+    const byOld = new Map(pairs.map(([bi, vj]) => [bi, vj]));
+
+    const runLength = (step) => {
+        let length = 0;
+
+        for (let i = step < 0 ? boundary - 1 : boundary; byOld.has(i); i += step) {
+            // Contiguous in the new words too. Scattered letters that happen to
+            // survive are not an anchor, they are a coincidence.
+            const next = byOld.get(i + step);
+
+            length += 1;
+
+            if (next === undefined || Math.abs(next - byOld.get(i)) !== 1) {
+                break;
+            }
+        }
+
+        return length;
+    };
+
+    return Math.max(runLength(-1), runLength(1));
+};
+
+/**
+ * Each run's share of the new words, or null when it cannot be known.
+ *
+ * The runs of a sentence are separated by something else on the page, and that
+ * something has no position in a plain string of words. Editing on both sides
+ * of a bold phrase in one go used to collapse the sentence into a single run
+ * and leave the phrase trailing it, because the only question that was asked
+ * was whether the whole change fitted inside one run.
+ *
+ * The better question is where each boundary went, and unchanged words
+ * touching it answer that: in "We design for the <b>...</b>, not a
+ * photograph", rewording the first word and the last leaves "for the " and
+ * ", not a " untouched on either side of the phrase, which is more than enough
+ * to say where the phrase still belongs.
+ *
+ * One thing has to hold before a split is trusted: every boundary is touched
+ * by unchanged words, contiguous in both the old string and the new. Letters
+ * that happen to survive a rewrite scattered about are not an anchor, and
+ * requiring them to run on unbroken in both is what tells the two apart.
+ *
+ * A guard on how much of the sentence survived overall was tried first and
+ * thrown away: it rejected "Call <a>us</a> or <a>write</a> today" becoming
+ * "Ring ... now", where both words changed and both boundaries were still
+ * sitting in untouched text. How much of a short sentence survives says very
+ * little; what is touching the boundary says everything, and it is the
+ * question actually being asked.
+ *
+ * When it fails the caller falls back to collapsing, which costs the
+ * arrangement. Whichever path is taken, the shares tile the new words exactly,
+ * so no word can be lost either way.
+ */
+const splitAcrossRuns = (olds, value) => {
+    const before = olds.join('');
+
+    // Quadratic, and only worth it on the scale of a sentence.
+    if (before.length === 0 || value.length === 0 || before.length * value.length > 250000) {
+        return null;
+    }
+
+    const pairs = matchedPairs(before, value);
+
+    const byOld = new Map(pairs.map(([bi, vj]) => [bi, vj]));
+    const shares = [];
+    let taken = 0;
+    let at = 0;
+
+    for (const text of olds.slice(0, -1)) {
+        at += text.length;
+
+        if (anchorAt(pairs, at) < 3) {
+            return null;
+        }
+
+        // The boundary sits after the last surviving character that came from
+        // before it.
+        let mapped = taken;
+
+        for (let i = at - 1; i >= 0; i -= 1) {
+            if (byOld.has(i)) {
+                mapped = Math.max(taken, byOld.get(i) + 1);
+                break;
+            }
+        }
+
+        shares.push(value.slice(taken, mapped));
+        taken = mapped;
+    }
+
+    shares.push(value.slice(taken));
+
+    return shares;
 };
 
 /**

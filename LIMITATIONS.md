@@ -164,35 +164,47 @@ file also has to understand, which is a design decision and not a patch.
 **Who it affects:** a bespoke Laravel site whose developer hand-keyed a list
 *and* whose client then adds an item to it. Neither half is common alone.
 
-### A sentence changed in two places at once loses its arrangement
-**Adapter:** all. **Found:** 2026-09-27. **Severity:** low.
+### Fixed: a sentence changed in two places at once lost its arrangement
+**Adapter:** all. **Found:** 2026-09-27. **Fixed:** 2026-09-29.
 
-Editing words on both sides of a bold phrase in one go leaves nothing to say
-which side of the phrase the new words belong on, so the runs of text collapse
-into one and the phrase ends up trailing the sentence. No words are lost, and
-a single change — which is what an edit almost always is — keeps everything in
-place.
+**Fixed.** Editing words on both sides of a bold phrase in one go used to
+collapse the sentence's runs of text into one and leave the phrase trailing
+it. No words were ever lost, which is why this sat at low severity, but the
+designer's arrangement was.
 
-**To close it:** align each run separately rather than placing one contiguous
-change, if this ever turns out to bother anybody. It may not be worth it.
+The old question was whether the whole change fitted inside a single run, and
+a change on both sides of the phrase does not. The better question is where
+the boundary between the runs went, and an edit like that answers it: the
+words immediately touching the phrase are exactly the ones nobody edited. In
+"We design for the <b>street it stands on</b>, not a photograph", rewording
+the first word and the last leaves "for the " and ", not a " untouched either
+side of it, which is more than enough to say where the phrase still belongs.
 
----
+So the appliers now locate each boundary against the unchanged characters
+around it, and split the new words there. A split is only trusted where the
+anchoring text runs on unbroken in **both** the old string and the new;
+letters that survive a rewrite scattered about are not an anchor, and
+insisting on contiguity in both is what still tells an edit from a rewrite.
+A sentence genuinely replaced outright collapses exactly as before, because
+nothing can be inferred there and guessing is how words were lost originally.
 
-### Style drafts held on the service before this release are not carried down
-**Adapter:** WordPress. **Recorded:** 2026-09-27. **Severity:** low.
+Whichever path is taken the shares tile the new words exactly, so the
+invariant that mattered is unchanged: the arrangement can still be lost, a
+word cannot.
 
-When WordPress took ownership of its words, publishing moved to the site while
-styling was still written to the service. Anything held unpublished there was
-stranded: it could be saved, and seen while editing, and could never go live.
-Three such drafts were found on the test site.
+**Done in both appliers**, which was the greater part of the work. The browser
+applies this for most sites and the scanner applies it server-side for hosts
+that render their own pages, and the same edit reading differently live and in
+an export is worse than either being wrong. The PHP side works in characters
+rather than bytes, so the multi-byte offsets the old code had to step around
+cannot arise. Pinned in French as well as English.
 
-Published styling is brought down on upgrade. Held styling is not, because it
-was never visible to anybody but its author and could not be published at all.
-A client who had a colour waiting will find it gone and will have to set it
-again - and this time it will publish.
-
-**To close it:** nothing to close. Carrying down work that could never have
-been released would restore a state the product never had.
+**Worth keeping:** a guard on how much of the sentence survived overall was
+written first and thrown away. It rejected "Call <a>us</a> or <a>write</a>
+today" becoming "Ring ... now", where both words changed and both boundaries
+were still sitting in untouched text. How much of a short sentence survives
+says very little. What is touching the boundary says everything, and it is
+the question actually being asked.
 
 ---
 
@@ -423,12 +435,33 @@ place. The strip that appears says what is missing and links to the page that
 fixes it, so the failure is at least self-explanatory, but a client discovering
 it on their own site is a worse way to find out than us doing it first.
 
-## Not ours to close
+## Settled, not open
 
-Behaviour that looks like a fault, is understood, and is somebody else's
-decision to make. Kept because the question comes back, and because "we looked
-at it and it is deliberate" is worth more than silence the second time
-somebody asks.
+Behaviour that looks like a fault, has been looked at, and is deliberately
+staying as it is - whether the decision was the host's or ours. Kept in
+writing because the question comes back, and because "we looked at it and
+chose this" is worth more than silence the second time somebody asks.
+
+These are not work. Counting them as work was making the register report more
+outstanding than exists.
+
+### Style drafts held on the service before this release are not carried down
+**Adapter:** WordPress. **Recorded:** 2026-09-27. **Severity:** low.
+
+When WordPress took ownership of its words, publishing moved to the site while
+styling was still written to the service. Anything held unpublished there was
+stranded: it could be saved, and seen while editing, and could never go live.
+Three such drafts were found on the test site.
+
+Published styling is brought down on upgrade. Held styling is not, because it
+was never visible to anybody but its author and could not be published at all.
+A client who had a colour waiting will find it gone and will have to set it
+again - and this time it will publish.
+
+**To close it:** nothing to close. Carrying down work that could never have
+been released would restore a state the product never had.
+
+---
 
 ### WordPress will not accept an SVG, where the service will
 **Adapter:** WordPress. **Recorded:** 2026-09-27. **Severity:** low.

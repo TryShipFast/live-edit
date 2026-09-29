@@ -55,6 +55,47 @@ class MarkupScannerTest extends TestCase
         $this->assertCount(2, array_unique($found[1]));
     }
 
+    public function test_an_edit_either_side_of_a_phrase_leaves_the_phrase_where_it_was(): void
+    {
+        /*
+         * The browser's applier and this one have to give the same answer:
+         * this runs for a host that renders server-side, content.js runs for
+         * everybody else, and the same edit reading differently live and in an
+         * export is worse than either being wrong.
+         *
+         * Changing a word on each side of the bold phrase is not one
+         * contiguous change, so it used to collapse the sentence into a single
+         * run and leave the phrase trailing it. The words touching the phrase
+         * were never edited, and they are what says where it still belongs.
+         */
+        $scanner = new MarkupScanner;
+        $html = '<p>We design for the <strong>street it stands on</strong>, not a photograph.</p>';
+        $tagged = $scanner->apply($html, ['text'], true)['html'];
+
+        preg_match('/<p data-edit="setting:(auto:[a-f0-9]{12})"/', $tagged, $m);
+
+        $applied = $scanner->applyOverrides($tagged, [$m[1] => 'We build for the , not a postcard.']);
+
+        $this->assertStringContainsString('We build for the <strong', $applied);
+        $this->assertStringContainsString('</strong>, not a postcard.', $applied);
+    }
+
+    public function test_it_splits_on_characters_so_an_accented_sentence_is_not_cut_in_half(): void
+    {
+        // Offsets counted in bytes would fall inside a letter here, which in
+        // Yoruba or French is most sentences rather than an edge case.
+        $scanner = new MarkupScanner;
+        $html = '<p>Nous créons pour la <strong>rue</strong>, pas pour une école.</p>';
+        $tagged = $scanner->apply($html, ['text'], true)['html'];
+
+        preg_match('/<p data-edit="setting:(auto:[a-f0-9]{12})"/', $tagged, $m);
+
+        $applied = $scanner->applyOverrides($tagged, [$m[1] => 'Nous bâtissons pour la , pas pour une carte.']);
+
+        $this->assertStringContainsString('Nous bâtissons pour la <strong', $applied);
+        $this->assertStringContainsString('</strong>, pas pour une carte.', $applied);
+    }
+
     public function test_a_decoration_with_no_words_of_its_own_is_not_offered_as_text(): void
     {
         // The pulsing dot beside a badge. Offering it as editable text put an

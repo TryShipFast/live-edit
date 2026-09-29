@@ -63,6 +63,55 @@ describe('a sentence with an element inside it', () => {
         expect(ownTextOf(element)).toBe('We design for the , not a photograph.');
     });
 
+    it('keeps it in place when words change on both sides at once', () => {
+        // The change is no longer one contiguous stretch: it lands either side
+        // of the bold phrase. What says where the phrase still belongs is the
+        // words touching it, "for the " and ", not a ", which nobody edited.
+        expect(edited(SENTENCE, (words) => words.replace('design', 'build').replace('photograph', 'postcard')))
+            .toBe('We build for the <strong>street it stands on</strong>, not a postcard.');
+    });
+
+    it('places both changes when an element sits between three runs', () => {
+        expect(edited(
+            'Call <a href="#">us</a> or <a href="#">write</a> today',
+            (w) => w.replace('Call', 'Ring').replace('today', 'now'),
+        )).toBe('Ring <a href="#">us</a> or <a href="#">write</a> now');
+    });
+
+    it('collapses rather than guess when the boundary has nothing holding it', () => {
+        // Both sides of the phrase rewritten with nothing left touching it.
+        // Splitting here would cut the new sentence at an invented point and
+        // wrap the phrase around the cut, which reads as the product moving
+        // somebody's words. Losing the arrangement is the lesser fault.
+        const result = edited(SENTENCE, () => 'Totally new wording throughout here');
+
+        expect(result).toContain('Totally new wording throughout here');
+        expect(result).toContain('<strong>street it stands on</strong>');
+    });
+
+    it('keeps every word whichever path it takes', () => {
+        const changes = [
+            (w) => w.replace('design', 'build'),
+            (w) => w.replace('design', 'build').replace('photograph', 'postcard'),
+            (w) => w.replace('We design for the', 'Built around'),
+            () => 'Something completely different',
+            () => '',
+        ];
+
+        for (const change of changes) {
+            const element = document.createElement('div');
+            element.innerHTML = SENTENCE;
+            const wanted = change(ownTextOf(element));
+
+            applyValue(element, wanted);
+
+            // The shares tile the value exactly, so the words on the page are
+            // the words somebody typed, wherever the phrase ended up.
+            expect(ownTextOf(element).replace(/\s+/g, ' ').trim())
+                .toBe(wanted.replace(/\s+/g, ' ').trim());
+        }
+    });
+
     it('loses no words when somebody replaces the sentence outright', () => {
         // Nothing can be inferred about where the element belongs in a
         // sentence that shares nothing with the old one, so the runs collapse
@@ -115,14 +164,14 @@ describe('previewing a value as somebody types', () => {
             .toBe('We build for the <strong>street it stands on</strong>, not a photograph.');
     });
 
-    it('loses no words when two separate parts of the sentence change at once', () => {
-        // Changing a word on each side of the phrase leaves nothing to say
-        // which side of it the new words belong on, so the runs collapse. That
-        // is the documented fallback: the arrangement goes, the words do not.
-        const result = typing(SENTENCE, 'We build for the , not a postcard.');
-
-        expect(result).toContain('We build for the , not a postcard.');
-        expect(result).toContain('<strong>street it stands on</strong>');
+    it('keeps the phrase in place when two separate parts change at once', () => {
+        // This used to collapse, and the fallback was documented as the cost
+        // of not knowing which side of the phrase the new words belonged on.
+        // The words touching the phrase were never edited, and they are what
+        // says where it still goes, keystroke by keystroke as well as at the
+        // end.
+        expect(typing(SENTENCE, 'We build for the , not a postcard.'))
+            .toBe('We build for the <strong>street it stands on</strong>, not a postcard.');
     });
 
     it('keeps the runs so the original can be put back', () => {

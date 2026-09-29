@@ -1503,14 +1503,177 @@ class MarkupScanner
             return;
         }
 
+        /*
+         * The change touched more than one run: words either side of the
+         * element between them were altered in the same edit. One contiguous
+         * replacement cannot say which side the new words belong on, but the
+         * boundary itself can usually still be found, because the words
+         * touching it were not changed.
+         */
+        $shares = $this->splitAcrossRuns($olds, $value);
+
+        if ($shares !== null) {
+            foreach ($runs as $index => $run) {
+                $run->nodeValue = $shares[$index];
+            }
+
+            return;
+        }
+
         // A rewrite rather than an edit. Nothing can be inferred about where
         // the elements between the runs belong, so the sentence becomes one
-        // run — which loses the arrangement but never a word.
+        // run, which loses the arrangement but never a word.
         $this->writeRun($runs[0], $value);
 
         foreach (array_slice($runs, 1) as $run) {
             $node->removeChild($run);
         }
+    }
+
+    /**
+     * Each run's share of the new words, or null when it cannot be known.
+     *
+     * The mirror of splitAcrossRuns() in content.js, and it has to stay one:
+     * the same edit is applied here for a host that renders server-side and
+     * there for everybody else, and the two disagreeing means a sentence
+     * reading differently live and in an export.
+     *
+     * The runs of a sentence are held apart by something else on the page, and
+     * that something has no position in a plain string of words. Editing on
+     * both sides of a bold phrase at once used to collapse the sentence into
+     * one run and leave the phrase trailing it. What says where the phrase
+     * still belongs is the words touching it, which an edit like that leaves
+     * alone: in "We design for the <b>...</b>, not a photograph", rewording
+     * the first word and the last leaves "for the " and ", not a " untouched
+     * either side of it.
+     *
+     * A split is only trusted when every boundary is touched by unchanged
+     * words that run on unbroken in both the old string and the new. Letters
+     * that survive a rewrite scattered about are not an anchor, and insisting
+     * they be contiguous in both is what tells an edit from a rewrite.
+     *
+     * Worked in characters rather than bytes, which is why there is no dance
+     * with character boundaries here: an offset counted in characters cannot
+     * fall inside a letter.
+     *
+     * @param  array<int, string>  $olds
+     * @return array<int, string>|null
+     */
+    protected function splitAcrossRuns(array $olds, string $value): ?array
+    {
+        $before = mb_str_split(implode('', $olds));
+        $after = mb_str_split($value);
+
+        // Quadratic, and only worth paying on the scale of a sentence.
+        if ($before === [] || $after === [] || count($before) * count($after) > 250000) {
+            return null;
+        }
+
+        $byOld = $this->matchedPairs($before, $after);
+
+        if ($byOld === []) {
+            return null;
+        }
+
+        $shares = [];
+        $taken = 0;
+        $at = 0;
+
+        foreach (array_slice($olds, 0, -1) as $text) {
+            $at += mb_strlen($text);
+
+            if ($this->anchorAt($byOld, $at) < 3) {
+                return null;
+            }
+
+            // The boundary sits after the last surviving character that came
+            // from before it.
+            $mapped = $taken;
+
+            for ($i = $at - 1; $i >= 0; $i--) {
+                if (isset($byOld[$i])) {
+                    $mapped = max($taken, $byOld[$i] + 1);
+                    break;
+                }
+            }
+
+            $shares[] = mb_substr($value, $taken, $mapped - $taken);
+            $taken = $mapped;
+        }
+
+        $shares[] = mb_substr($value, $taken);
+
+        return $shares;
+    }
+
+    /**
+     * Every character the old words and the new still share, as a map from
+     * position in the old to position in the new: a longest common
+     * subsequence, backtracked.
+     *
+     * @param  array<int, string>  $before
+     * @param  array<int, string>  $after
+     * @return array<int, int>
+     */
+    protected function matchedPairs(array $before, array $after): array
+    {
+        $n = count($before);
+        $m = count($after);
+        $table = array_fill(0, ($n + 1) * ($m + 1), 0);
+        $width = $m + 1;
+
+        for ($i = $n - 1; $i >= 0; $i--) {
+            for ($j = $m - 1; $j >= 0; $j--) {
+                $table[$i * $width + $j] = $before[$i] === $after[$j]
+                    ? $table[($i + 1) * $width + $j + 1] + 1
+                    : max($table[($i + 1) * $width + $j], $table[$i * $width + $j + 1]);
+            }
+        }
+
+        $pairs = [];
+
+        for ($i = 0, $j = 0; $i < $n && $j < $m;) {
+            if ($before[$i] === $after[$j]) {
+                $pairs[$i] = $j;
+                $i++;
+                $j++;
+            } elseif ($table[($i + 1) * $width + $j] >= $table[$i * $width + $j + 1]) {
+                $i++;
+            } else {
+                $j++;
+            }
+        }
+
+        return $pairs;
+    }
+
+    /**
+     * Unchanged characters touching a boundary, counted without a break on
+     * either side.
+     *
+     * @param  array<int, int>  $byOld
+     */
+    protected function anchorAt(array $byOld, int $boundary): int
+    {
+        $lengths = [];
+
+        foreach ([-1, 1] as $step) {
+            $length = 0;
+
+            for ($i = $step < 0 ? $boundary - 1 : $boundary; isset($byOld[$i]); $i += $step) {
+                $length++;
+
+                // Contiguous in the new words too. Letters that happen to
+                // survive scattered are a coincidence, not an anchor.
+                if (! isset($byOld[$i + $step]) || abs($byOld[$i + $step] - $byOld[$i]) !== 1) {
+                    break;
+                }
+            }
+
+            $lengths[] = $length;
+        }
+
+        return max($lengths);
     }
 
     /** Move an offset back until it sits between characters, not inside one. */
