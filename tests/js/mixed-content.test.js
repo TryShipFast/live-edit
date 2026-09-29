@@ -123,6 +123,57 @@ describe('a sentence with an element inside it', () => {
     });
 });
 
+describe('replacing a picture the theme made responsive', () => {
+    /*
+     * src is the last thing a browser consults. A srcset on the image beats
+     * it, a <source> in a surrounding <picture> beats both, and WordPress puts
+     * a srcset on content images by itself - so a bought theme carries one
+     * almost everywhere and this is reachable rather than theoretical.
+     *
+     * The symptom is the bad kind: the client sees their new picture in the
+     * editor, publishes, and the site keeps showing the old one on every
+     * screen the theme's list happens to cover.
+     */
+    const applied = (html, value) => {
+        const holder = document.createElement('div');
+        holder.innerHTML = html;
+
+        applyValue(holder.querySelector('img'), value);
+
+        return holder.innerHTML;
+    };
+
+    it('clears the source list that would outrank the new picture', () => {
+        const out = applied(
+            '<img src="/theme.jpg" srcset="/theme-800.jpg 800w" sizes="100vw">',
+            '/clients-own.jpg',
+        );
+
+        expect(out).toContain('src="/clients-own.jpg"');
+        expect(out).not.toContain('theme-800.jpg');
+        expect(out).not.toContain('sizes=');
+    });
+
+    it('drops the art-directed sources around it', () => {
+        const out = applied(
+            '<picture><source srcset="/theme-wide.jpg" media="(min-width: 60em)">'
+            + '<img src="/theme.jpg"></picture>',
+            '/clients-own.jpg',
+        );
+
+        expect(out).toContain('src="/clients-own.jpg"');
+        expect(out).not.toContain('theme-wide.jpg');
+    });
+
+    it('agrees with the applier that runs on the server', () => {
+        // A rule one applier follows and the other does not is a picture that
+        // changes on a static page and not on a rendered one.
+        const out = applied('<img src="/theme.jpg" srcset="/theme-800.jpg 800w">', '/clients-own.jpg');
+
+        expect(out).not.toContain('srcset');
+    });
+});
+
 describe('previewing a value as somebody types', () => {
     /*
      * Typing replaces the whole box, so the first character shares almost

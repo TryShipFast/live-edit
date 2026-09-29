@@ -416,6 +416,40 @@ and is listed above.
 
 ---
 
+### Fixed: a replaced picture kept showing the theme's original
+**Adapter:** all, WordPress worst. **Found:** 2026-09-29. **Fixed:** 2026-09-29.
+**Severity:** was high, and was not in this register until it was found.
+
+**Fixed.** `src` is the last thing a browser consults. A `srcset` on the image
+beats it, and a `<source>` inside a surrounding `<picture>` beats both. Both
+appliers set `src` and left those behind, so a client replaced a picture, saw
+their own photograph in the editor, published, and the live site kept serving
+the theme's - on every screen the old list happened to cover, which is every
+phone and most laptops.
+
+Found while reading the area around the fitted-picture entry below, not by a
+customer, and reachable rather than theoretical: WordPress puts a `srcset` on
+content images by itself, so a bought theme carries one almost everywhere.
+
+The sharpest part is that the rule was already written down. The browser's
+repair path clears `srcset` when it puts a picture back and says why in a
+comment: a responsive source list outranks `src`. Neither applier acted on it,
+and nothing tested an applier against a themed image, so a rule the codebase
+knew was never applied where it mattered most.
+
+Both appliers now take the source list away with the replacement, including
+the `<source>` elements of a surrounding `<picture>`, which outrank the image
+entirely and would otherwise keep the theme's art direction over the client's
+picture. `sizes` goes too: it describes an arrangement that no longer exists.
+An image nobody replaced keeps everything, because a theme's own responsive
+pictures are one of the things it was bought for.
+
+**Related:** the entry below is the other half of the same subject and is
+still open. With the theme's list gone, a replaced picture is now served as
+exactly one file at one size, which is what that entry is about.
+
+---
+
 ### A fitted picture is not the one the media library would pick
 **Adapter:** WordPress. **Recorded:** 2026-09-27. **Severity:** low.
 

@@ -51,6 +51,7 @@ export const applyValue = (element, value, { keepRuns = false } = {}) => {
 
     if (tag === 'img') {
         element.setAttribute('src', value);
+        clearTheSourcesAround(element);
 
         return;
     }
@@ -62,6 +63,36 @@ export const applyValue = (element, value, { keepRuns = false } = {}) => {
     }
 
     applyWords(element, value, keepRuns);
+};
+
+/**
+ * Take away the responsive sources that would outrank a replaced picture.
+ *
+ * src is the last thing a browser consults: a srcset on the image beats it,
+ * and a <source> in a surrounding <picture> beats both. Replacing a picture
+ * and leaving those behind shows the client their new photograph in the
+ * editor and the theme's original on the live site.
+ *
+ * The same rule, and the same removal, as the scanner applies server-side.
+ * The repair path below has always known it; the two appliers did not, and a
+ * rule one of them follows is a picture that changes on a static page and not
+ * on a rendered one.
+ */
+const clearTheSourcesAround = (element) => {
+    element.removeAttribute('srcset');
+    // A description of an arrangement that no longer exists.
+    element.removeAttribute('sizes');
+
+    if (element.parentElement?.tagName !== 'PICTURE') {
+        return;
+    }
+
+    // The children directly, rather than a ":scope >" query: the sources that
+    // outrank this picture are its own siblings, and asking for them that way
+    // keeps this the same walk the scanner does server-side.
+    for (const child of [...element.parentElement.children]) {
+        if (child.tagName === 'SOURCE') child.remove();
+    }
 };
 
 /**

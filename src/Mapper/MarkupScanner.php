@@ -414,6 +414,7 @@ class MarkupScanner
             $key = substr($value, strlen('setting:'));
             if (array_key_exists($key, $overrides) && strtolower($node->tagName) === 'img') {
                 $node->setAttribute('src', $overrides[$key]);
+                $this->clearTheSourcesAround($node);
             }
 
             // The description is stored beside the picture. The browser
@@ -853,6 +854,46 @@ class MarkupScanner
 
             if (str_starts_with($node->getAttribute('data-style'), 's')) {
                 $node->setAttribute('data-style', 's'.$this->autoKey($node));
+            }
+        }
+    }
+
+    /**
+     * Take away the responsive sources that would outrank a replaced picture.
+     *
+     * `src` is the last thing a browser consults. A `srcset` on the image
+     * beats it, and a `<source>` inside a surrounding `<picture>` beats both.
+     * So replacing the picture and leaving those behind shows the client their
+     * new photograph in the editor and the theme's original on the live site,
+     * on every screen the old list happens to cover, which is every phone and
+     * most laptops.
+     *
+     * Worth being clear about how reachable this is: WordPress puts a `srcset`
+     * on content images by itself, so a bought theme carries one almost
+     * everywhere. The browser's repair path already knew the rule and said so
+     * in a comment. Neither applier acted on it.
+     *
+     * `sizes` goes with the list it describes. Left alone it is harmless but
+     * it is also a description of an arrangement that no longer exists.
+     *
+     * Only ever a consequence of replacing a picture. A theme's own responsive
+     * images are one of the things it was bought for, and nothing here touches
+     * an image nobody changed.
+     */
+    protected function clearTheSourcesAround(DOMElement $img): void
+    {
+        $img->removeAttribute('srcset');
+        $img->removeAttribute('sizes');
+
+        $parent = $img->parentNode;
+
+        if (! $parent instanceof DOMElement || strtolower($parent->tagName) !== 'picture') {
+            return;
+        }
+
+        foreach (iterator_to_array($parent->childNodes) as $child) {
+            if ($child instanceof DOMElement && strtolower($child->tagName) === 'source') {
+                $parent->removeChild($child);
             }
         }
     }

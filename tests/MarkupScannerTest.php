@@ -96,6 +96,59 @@ class MarkupScannerTest extends TestCase
         $this->assertStringContainsString('</strong>, pas pour une carte.', $applied);
     }
 
+    public function test_replacing_a_picture_clears_the_source_list_that_outranks_it(): void
+    {
+        /*
+         * A responsive source list beats src, so replacing a picture without
+         * clearing it leaves the theme's original on every screen the list
+         * covers - which is every phone and most laptops. The client sees
+         * their new picture in the editor, publishes, and the site shows the
+         * old one.
+         *
+         * Reachable rather than theoretical: WordPress puts a srcset on
+         * content images by itself, so a bought theme has one almost
+         * everywhere. The browser's repair path already knew this rule and
+         * said so in a comment; neither applier did.
+         */
+        $scanner = new MarkupScanner;
+        $html = '<img data-edit-img="setting:hero" src="/theme.jpg"'
+            .' srcset="/theme-800.jpg 800w, /theme-1600.jpg 1600w" sizes="100vw">';
+
+        $applied = $scanner->applyOverrides($html, ['hero' => '/clients-own.jpg']);
+
+        $this->assertStringContainsString('src="/clients-own.jpg"', $applied);
+        $this->assertStringNotContainsString('theme-800.jpg', $applied);
+        $this->assertStringNotContainsString('sizes=', $applied);
+    }
+
+    public function test_replacing_a_picture_drops_the_art_directed_sources_around_it(): void
+    {
+        // A <picture>'s own sources outrank the img entirely, so clearing the
+        // img's srcset is not enough on its own: the theme's art direction
+        // would still win every match.
+        $scanner = new MarkupScanner;
+        $html = '<picture><source srcset="/theme-wide.jpg" media="(min-width: 60em)">'
+            .'<img data-edit-img="setting:hero" src="/theme.jpg"></picture>';
+
+        $applied = $scanner->applyOverrides($html, ['hero' => '/clients-own.jpg']);
+
+        $this->assertStringContainsString('src="/clients-own.jpg"', $applied);
+        $this->assertStringNotContainsString('theme-wide.jpg', $applied);
+    }
+
+    public function test_a_picture_nobody_replaced_keeps_its_source_list(): void
+    {
+        // The clearing is a consequence of replacing, not something done to
+        // every image on the page. A theme's own responsive pictures are one
+        // of the things it was bought for.
+        $scanner = new MarkupScanner;
+        $html = '<img data-edit-img="setting:hero" src="/theme.jpg" srcset="/theme-800.jpg 800w">';
+
+        $applied = $scanner->applyOverrides($html, ['somethingElse' => 'x']);
+
+        $this->assertStringContainsString('theme-800.jpg', $applied);
+    }
+
     public function test_a_decoration_with_no_words_of_its_own_is_not_offered_as_text(): void
     {
         // The pulsing dot beside a badge. Offering it as editable text put an
