@@ -823,19 +823,76 @@ class MarkupScanner
             if (! $node instanceof DOMElement) {
                 continue;
             }
-            foreach (['data-edit' => 'setting:auto:', 'data-edit-img' => 'setting:auto:', 'data-edit-bg' => 'setting:auto:'] as $attr => $prefix) {
-                if (str_starts_with($node->getAttribute($attr), $prefix)) {
-                    $salt = $attr === 'data-edit-bg' ? '#bg' : '';
-                    $node->setAttribute($attr, $prefix.$this->autoKey($node, $salt));
+            foreach (['data-edit', 'data-edit-img', 'data-edit-bg'] as $attr) {
+                $current = $node->getAttribute($attr);
+
+                if (! str_starts_with($current, 'setting:')) {
+                    continue;
                 }
+
+                if (str_starts_with($current, 'setting:auto:')) {
+                    $salt = $attr === 'data-edit-bg' ? '#bg' : '';
+                    $node->setAttribute($attr, 'setting:auto:'.$this->autoKey($node, $salt));
+
+                    continue;
+                }
+
+                $node->setAttribute($attr, 'setting:'.$this->derivedKey(
+                    substr($current, strlen('setting:')),
+                    $newId,
+                ));
             }
-            if (str_starts_with($node->getAttribute('data-edit-href'), 'auto:')) {
+
+            $href = $node->getAttribute('data-edit-href');
+
+            if (str_starts_with($href, 'auto:')) {
                 $node->setAttribute('data-edit-href', 'auto:'.$this->autoKey($node, '#href'));
+            } elseif ($href !== '') {
+                $node->setAttribute('data-edit-href', $this->derivedKey($href, $newId));
             }
+
             if (str_starts_with($node->getAttribute('data-style'), 's')) {
                 $node->setAttribute('data-style', 's'.$this->autoKey($node));
             }
         }
+    }
+
+    /**
+     * A key for a copied item, derived from the key it was copied from.
+     *
+     * An auto key is a hash of where the element sits, and because that path
+     * is measured from the item's own id, re-hashing it after the copy has
+     * been given its id is all the separation it needs. A key a developer
+     * wrote by hand has no such structure to re-derive from, so it used to be
+     * left exactly as it was: the copy shared the original's key, and editing
+     * one card rewrote the other.
+     *
+     * Leaving it alone was deliberate rather than an oversight. The key means
+     * something to the config the developer declared it in, and inventing an
+     * unrelated one would leave that declaration pointing at nothing.
+     *
+     * Suffixing keeps both halves. `courses.two.title@n1a2b3` is a different
+     * key, so the two cards hold separate content, and the declaration it came
+     * from is still legible in it - by eye and to anything that cares to look,
+     * because the base is everything before the "@".
+     *
+     * Nothing needs to fall back to the base to read it. An added item is a
+     * copy of the markup, so it arrives carrying the words it was copied from
+     * already on the page; the stored value only has to exist once somebody
+     * edits the copy, and then it is that copy's own.
+     *
+     * The "@" is safe where ":" would not have been: keys are split on ":" to
+     * separate a locale from the rest, and a key carrying one would read as a
+     * language nobody declared.
+     */
+    protected function derivedKey(string $key, string $itemId): string
+    {
+        // A copy of a copy must not grow a chain of ids. Added ids are minted
+        // as "n" and a base-36 timestamp, which is specific enough to strip
+        // without touching a key that happens to contain an "@".
+        $base = preg_replace('/@n[0-9a-z]+$/', '', $key) ?? $key;
+
+        return $base.'@'.$itemId;
     }
 
     /**

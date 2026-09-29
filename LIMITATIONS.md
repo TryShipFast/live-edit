@@ -142,27 +142,53 @@ blank one, and will now have two cards saying the same thing until they notice.
 **To close it:** copy the item the person was on, or start the new one empty
 with the design intact. Worth a decision rather than a guess.
 
-### A copied list item shares its keys when the keys were written by hand
+### Fixed: a copied list item shared its keys when the keys were written by hand
 **Adapter:** Laravel and any site tagged with semantic keys.
-**Found:** 2026-09-29. **Severity:** low, and narrow.
+**Found:** 2026-09-29. **Fixed:** 2026-09-29.
 
-Adding an item copies one and gives the copy its own keys, so editing the new
-card cannot rewrite the card it came from. That rekeying only rewrites **auto**
-keys (`setting:auto:…`), which is every model-less site: kb-tag, the WordPress
-plugin and the cloud product all tag that way.
+**Fixed.** Adding an item copies one, and the copy now gets its own keys
+whether the original's were written by the scanner or by a developer. Editing
+the new card can no longer rewrite the card it came from.
 
-A key a developer wrote by hand — `data-edit="setting:courses.two.title"` — is
-deliberately left alone, because it means something to the config file it is
-declared in and inventing a new one would leave that config pointing at
-nothing. The consequence is that on a hand-keyed list, a copied item shares
-the original's keys, and editing one edits both.
+An auto key is a hash of where the element sits, measured from the item's own
+id, so giving the copy its id and re-hashing was all the separation that case
+ever needed. A hand-written key has no such structure to re-derive from, and
+was left exactly as it was: the copy carried `courses.two.title` like its
+original, and the two cards shared one value.
 
-Found while testing the add-item rule rather than by a customer, and left
-rather than patched: the fix is a naming rule for derived keys that the config
-file also has to understand, which is a design decision and not a patch.
+Leaving it alone had a real reason, which is why this was recorded as a design
+decision rather than patched at the time. The key means something to the
+config the developer declared it in, and inventing an unrelated one would
+leave that declaration pointing at nothing.
 
-**Who it affects:** a bespoke Laravel site whose developer hand-keyed a list
-*and* whose client then adds an item to it. Neither half is common alone.
+**The rule: suffix, do not replace.** `courses.two.title@n1a2b3` is a
+different key, so the cards hold separate content, and the declaration it came
+from is still legible in it - by eye, and to anything that cares to look,
+because the base is everything before the `@`.
+
+Three things made it smaller than it looked:
+
+- **Nothing has to fall back to the base to read it.** An added item is a copy
+  of the markup, so it arrives already carrying the words it was copied from.
+  A stored value only needs to exist once somebody edits the copy, and by then
+  it is that copy's own.
+- **`@` is safe where `:` would not have been.** Keys are split on `:` to
+  separate a locale from the rest, and a key carrying one would have read as a
+  language nobody declared. That trap is already recorded in the code: taking
+  any prefix once read the scanner's own `auto:` keys as a language called
+  "auto" and dropped every one of them.
+- **Nothing validates content keys against a declared list.** Checked rather
+  than assumed: saving a setting accepts any string, in the engine and over
+  the API both. The one key rule that would have refused an `@` guards element
+  styles, and those rekey to `s` plus a hash.
+
+**One thing worth knowing:** a copy of a copy strips the previous suffix
+rather than appending, so a key cannot grow a chain of ids over repeated
+copies. Added ids are minted as `n` and a base-36 timestamp, which is specific
+enough to strip without disturbing a key that happens to contain an `@`.
+
+Done for links as well as words, since a card's button is the other half of
+the same fault: two copied cards pointing at one place.
 
 ### Fixed: a sentence changed in two places at once lost its arrangement
 **Adapter:** all. **Found:** 2026-09-27. **Fixed:** 2026-09-29.

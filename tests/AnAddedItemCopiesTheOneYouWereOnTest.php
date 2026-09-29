@@ -103,11 +103,10 @@ class AnAddedItemCopiesTheOneYouWereOnTest extends TestCase
          * new item needs its own keys, or editing it would rewrite the card it
          * was copied from.
          *
-         * Auto keys, because those are the ones rekeying rewrites and the
-         * ones every model-less site uses — kb-tag, the WordPress plugin and
-         * the cloud product all tag this way. A hand-authored semantic key is
-         * left alone deliberately, which has a consequence recorded in
-         * LIMITATIONS.md.
+         * Auto keys, because those are every model-less site: kb-tag, the
+         * WordPress plugin and the cloud product all tag this way. A key a
+         * developer wrote by hand is derived instead, which the tests below
+         * cover.
          */
         $html = '<ul data-edit-list="courses">'
             .'<li data-edit-item="one"><h2 data-edit="setting:auto:aaa">One words</h2></li>'
@@ -123,6 +122,65 @@ class AnAddedItemCopiesTheOneYouWereOnTest extends TestCase
         preg_match_all('/setting:auto:([a-f0-9]+)/', $out, $found);
         $this->assertCount(3, $found[1]);
         $this->assertCount(3, array_unique($found[1]), 'the copy shares a key with the item it came from');
+    }
+
+    public function test_a_hand_written_key_is_derived_rather_than_shared(): void
+    {
+        /*
+         * An auto key is a hash of where the element sits, measured from the
+         * item's own id, so re-hashing it separates a copy. A hand-written key
+         * has no such structure, and used to be left exactly as it was: the
+         * copy carried "courses.two.title" like the card it came from, and
+         * editing one rewrote the other.
+         *
+         * Suffixing keeps both halves. The copy holds its own content because
+         * the key differs, and the declaration the key came from is still
+         * legible in it.
+         */
+        $out = $this->render($this->list('one', 'two'), ['one', 'two', 'new1']);
+
+        $this->assertStringContainsString('data-edit="setting:two.title"', $out, 'the original moved');
+        $this->assertStringContainsString('data-edit="setting:two.title@new1"', $out);
+    }
+
+    public function test_a_copy_of_a_copy_does_not_grow_a_chain_of_ids(): void
+    {
+        // Adding beside an added card derives from a key that already carries
+        // a suffix. Appending blindly would give "two.title@new1@new2", and
+        // again on the next copy, until the key is mostly punctuation.
+        $out = $this->render($this->list('one', 'two'), ['one', 'two', 'new1', 'new2']);
+
+        $this->assertStringContainsString('data-edit="setting:two.title@new2"', $out);
+        $this->assertStringNotContainsString('@new1@new2', $out);
+    }
+
+    public function test_editing_a_copy_leaves_the_card_it_came_from_alone(): void
+    {
+        // The fault this closes, stated as somebody would meet it: two cards
+        // saying different things, not one edit showing up in both.
+        $html = $this->list('one', 'two');
+
+        $out = (new MarkupScanner)->applyOverrides($html, [
+            'courses' => json_encode(['one', 'two', 'new1']),
+            'two.title@new1' => 'Only the copy changed',
+        ]);
+
+        $this->assertStringContainsString('Only the copy changed', $out);
+        $this->assertSame(1, substr_count($out, 'Two words'), 'editing the copy disturbed the original');
+    }
+
+    public function test_a_hand_written_link_key_is_derived_too(): void
+    {
+        // Same fault, same fix, on the attribute that holds where a card's
+        // button points. Two cards linking to one place is the visible form.
+        $html = '<ul data-edit-list="courses">'
+            .'<li data-edit-item="one"><a data-edit-href="one.link" href="/a">Go</a></li>'
+            .'</ul>';
+
+        $out = (new MarkupScanner)->applyOverrides($html, ['courses' => json_encode(['one', 'new1'])]);
+
+        $this->assertStringContainsString('data-edit-href="one.link"', $out);
+        $this->assertStringContainsString('data-edit-href="one.link@new1"', $out);
     }
 
     public function test_an_untouched_list_is_left_alone(): void
