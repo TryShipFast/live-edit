@@ -59,9 +59,6 @@ class LapsedLicenceStopsWritingTest extends TestCase
         $site = $this->site();
         [, $publishable] = $site->issueToken(TokenType::Publishable, 'Web', null, now()->subDay());
 
-        // The key itself is expired, so this particular one is refused for
-        // being expired rather than for the licence. What matters is which
-        // answer a LIVE key gets, below.
         $site->issueToken(TokenType::Secret, 'Server', null, now()->subDay());
 
         [, $session] = $site->issueToken(TokenType::Session, 'Tope', [Ability::Read, Ability::Write], now()->addHour());
@@ -71,7 +68,23 @@ class LapsedLicenceStopsWritingTest extends TestCase
             'a customer\'s published words belong on their pages whatever the billing is doing'
         );
         $this->assertSame('licence_lapsed', $this->deny($site, $session, Ability::Write));
-        $this->assertSame('expired', $this->deny($site, $publishable, Ability::Read));
+
+        /*
+         * An expired licence key reads too, and that is the point rather than
+         * an oversight. This asserted 'expired' until a static site showed
+         * what refusing a read actually costs: the page is filled in the
+         * browser, so the customer's published words vanished and the
+         * template's original text came back.
+         *
+         * Writing with the same key is still refused, below.
+         */
+        $this->assertNull(
+            $this->deny($site, $publishable, Ability::Read),
+            'a lapse took a static site\'s published words off the page'
+        );
+        // Refused for the plainer reason: a publishable key is printed in a
+        // page and has never been allowed to write anything, lapse or no lapse.
+        $this->assertSame('missing_ability', $this->deny($site, $publishable, Ability::Write));
     }
 
     public function test_rotating_a_key_does_not_throw_an_editor_out(): void

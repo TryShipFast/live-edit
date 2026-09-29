@@ -188,12 +188,31 @@ class LicenceTest extends TestCase
             'verified_at' => now(),
         ]);
 
+        $site->forceFill(['allowed_origins' => ['https://acme.test']])->save();
+
         [, $key] = $site->issueToken(TokenType::Publishable, 'Web', null, now()->subDay());
 
-        // Expired keys are refused by the authenticator before they ever
-        // reach the licence endpoint, which is the stronger answer: a lapsed
-        // licence stops working rather than merely reporting that it has.
-        $this->ask($key, ['Origin' => 'https://acme.test'])->assertUnauthorized();
+        /*
+         * This used to expect a 401, on the reasoning that refusing outright
+         * is the stronger answer: a lapsed licence should stop working rather
+         * than merely report that it has.
+         *
+         * That was the wrong trade, and the cost only showed up on a static
+         * site. Refusing the key outright refuses READS as well, and a static
+         * page is filled in the browser, so a lapse took every word the
+         * customer had published off their live website and put the template's
+         * original text back. Stronger enforcement, and the one thing this
+         * product promises never to do.
+         *
+         * So the key authenticates and the endpoint answers honestly: not
+         * valid, and here is why. The install can then say "renew" instead of
+         * "this key is no longer accepted", which is the difference between
+         * somebody paying us and somebody hunting for a key.
+         */
+        $response = $this->ask($key, ['Origin' => 'https://acme.test'])->assertOk();
+
+        $response->assertJsonPath('licence.valid', false)
+            ->assertJsonPath('licence.reason', 'expired');
     }
 
     public function test_an_unverified_site_is_reported_as_unverified_rather_than_matched(): void

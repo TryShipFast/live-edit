@@ -46,7 +46,31 @@ class TokenAuthenticator
             return AuthenticationResult::denied(Denial::Revoked);
         }
 
-        if (! $token->isUsable()) {
+        /*
+         * An expired LICENCE key still reads.
+         *
+         * The rule further down says a lapsed licence costs the editor and
+         * never the website, and means it. This check fired first and denied
+         * everything, so on a static site — the one adapter where we hold the
+         * content — a lapse took every word the customer had ever published
+         * off their live page and put the template's original text back. The
+         * site stayed up saying somebody else's words.
+         *
+         * Billing pauses editing by dating these keys, so that is not a
+         * hypothetical path: it is what happens to anybody whose card fails.
+         *
+         * Only expiry, and only a licence key. A REVOKED key is still refused
+         * outright, because revoking is what you do to a key that has leaked
+         * and it must stop being useful for anything. A session token that has
+         * expired is still refused too: that is a person's credential with a
+         * lifetime of its own, and it has nothing to do with whether the site
+         * is paid for.
+         */
+        $expiredLicence = $token->expires_at !== null
+            && $token->expires_at->isPast()
+            && in_array($token->tokenType(), [TokenType::Publishable, TokenType::Secret], true);
+
+        if (! $token->isUsable() && ! $expiredLicence) {
             return AuthenticationResult::denied(Denial::Expired);
         }
 

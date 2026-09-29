@@ -166,14 +166,34 @@ been released would restore a state the product never had.
 
 ---
 
-### A lapsed licence takes a static site's published words off the page
-**Adapter:** plain HTML. **Recorded:** 2026-09-27. **Updated:** 2026-09-29.
-**Severity:** high, and it is a commercial decision rather than only a bug.
+### Fixed: a lapsed licence took a static site's published words off the page
+**Adapter:** plain HTML. **Recorded:** 2026-09-27. **Fixed:** 2026-09-29.
+**Severity:** was high, and was a commercial decision rather than only a bug.
 
-**More urgent since 2026-09-29 than when it was written.** This was recorded
-when nothing could take a payment, so no customer could lapse and the fault
-was theoretical. Payment now collects, plans now expire, and the sweep that
-pauses editing runs daily. The path described below is live.
+**Fixed.** An expired licence key now still reads. Writing with it is refused
+exactly as before, so a lapse costs the editor and leaves the website alone,
+which is what the other adapters always did.
+
+The decision described below was never actually taken. The rule allowing
+reads through a lapse was already written, already correct, and carried a
+comment saying that taking a customer's website down over a licence is the
+one thing this product promises not to do. It simply never ran: the
+key-expiry check above it denied everything first, reads included. So this
+was not a missing decision but a decision made and then made unreachable,
+which is the kind that survives every review.
+
+Two things stay refused, deliberately. A **revoked** key reads nothing,
+because revoking is what you do to a key that has leaked. An expired
+**session** reads nothing either: that is a person's credential with a
+lifetime of its own and has nothing to do with whether the site is paid for.
+Billing pauses editing by dating licence keys rather than revoking them,
+which is what makes the distinction hold.
+
+It was also more urgent than when recorded. It was written when nothing could
+take a payment, so no customer could lapse and the fault was theoretical.
+Payment collects now, plans expire, and the sweep runs daily.
+
+The original finding follows, for the history.
 
 Measured as a clean before and after on the video template, changing nothing
 but the key. With the key good, a visitor with no cookies reads the sentence
