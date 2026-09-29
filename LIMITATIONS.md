@@ -16,39 +16,48 @@ Toy pages agree with whatever the code already does.
 
 ## Open
 
-### The mapper writes labels and regions that nothing reads
-**Adapter:** all. **Found:** 2026-09-29.
+### Fixed: the mapper wrote labels and regions that nothing read
+**Adapter:** all. **Found:** 2026-09-29. **Fixed:** 2026-09-29.
 
-The auto-mapper's optional AI pass (`live-edit:scan --ai`) produces three
-things: semantic keys, human labels, and a region name for each band of the
-page. Only the first has a consumer.
+**Fixed, and the original finding was wrong on its facts.** Both outputs are
+read. The grep that produced this entry searched for the attribute spelling,
+`data-edit-label`, and the runtime reads it through the DOM property,
+`dataset.editLabel`, so every real consumer was invisible to it. Labels name
+the element in the panel chip and the panel subtitle; regions are read in two
+places, one of which names the band an element sits in.
 
-- **Keys** are used, on one path: a developer writing key names into
-  `config/live-edit.php` for a bespoke Laravel site.
-- **Labels** are written as `data-edit-label`. The editor never displays one.
-  The attribute appears exactly once in the runtime, in a list of attributes
-  to *preserve* while swapping an icon.
-- **Regions** are written as `data-edit-region` and are read by nothing at
-  all: no reference anywhere in the runtime or any adapter.
+What was actually wrong was narrower and worth fixing. The region is written
+only by the AI pass, and that pass did not ask the model about `header`, `nav`
+or `footer` - it stamped the tag's own name back as the region, on the sound
+reasoning that HTML already says what those bands are and a guess could only
+make it worse. But having settled "do not ask", it then answered anyway. So a
+`<header>` carried the region "Header", which is the word the editor derives
+from the tag regardless, and a `<nav>` carried "Navigation" where the panel's
+own vocabulary says "Menu" - the friendlier word, and the whole point of the
+function that picks it.
 
-Measured rather than assumed. A live WordPress page carries zero of either,
-and `kb-tag` without `--ai` tags 55 elements on the same page perfectly well
-without producing one.
+The model is only ever consulted about ambiguous `<section>`s, and a
+`<section>` has no tag-name answer, so the one case where a region carries
+real information already worked.
 
-**Who it affects:** nobody today, which is the point. It costs no customer
-anything and it misleads whoever reads the code next, because writing an
-attribute looks like a feature.
+Two changes, both small:
 
-**What it would take to close it:** decide what the region is for. It was
-plainly meant to give the editor a way to jump between the parts of a page,
-which is a good idea and half built. Either finish that and the labels earn
-their keep too, or delete both outputs and keep the pass to key naming, which
-is the only part anybody uses.
+- The AI pass no longer writes a region for a band HTML already names.
+  Settled now means do not ask **and** do not answer. A region means a name
+  somebody worked out.
+- Because that is what it means, a region now outranks the tag name in
+  `describeElement()` rather than losing to it. The two consumers disagreed
+  about this before, and the one that got it right said so in a comment.
 
-**Related:** the pass now has its own switch (`LIVE_EDIT_MAPPER_AI`) rather
-than sharing the one that sells the editor's AI features. It is off by
-default and also needs `--ai` on the command line, so it never runs on a
-customer's site.
+**Worth keeping from the original entry**, because the reasoning stands even
+though the premise did not: writing an attribute nothing consumes looks like a
+feature to whoever reads the code next. That is the cost, and it is paid in
+the wrong currency - not by a customer, by the next person.
+
+**Also worth keeping:** no fixture anywhere carried a `data-edit-region`,
+which is why the mismatch survived. The pass has its own switch
+(`LIVE_EDIT_MAPPER_AI`), is off by default and needs `--ai` on the command
+line as well, so none of this ever ran on a customer's site.
 
 ### Fixed: the React package could not be installed by a customer
 **Adapter:** React, Next.js. **Found:** 2026-09-27. **Fixed:** 2026-09-29.
@@ -166,28 +175,6 @@ place.
 
 **To close it:** align each run separately rather than placing one contiguous
 change, if this ever turns out to bother anybody. It may not be worth it.
-
----
-
-### WordPress will not accept an SVG, where the service will
-**Adapter:** WordPress. **Recorded:** 2026-09-27. **Severity:** low.
-
-Pictures now go into the client's own media library, which means uploads pass
-WordPress's file-type check rather than ours. WordPress refuses SVG, so an SVG
-logo that uploads fine on every other adapter is refused here with WordPress's
-own wording: "Sorry, you are not allowed to upload this file type." Measured.
-
-Not fixed, deliberately. The service accepts SVG because it sanitises the file
-and serves it from a different origin; WordPress serves the library from the
-client's own domain, where a gap in any sanitiser is stored XSS on their site.
-Core refuses SVG for that reason, and overriding it from this plugin would
-change a security property of somebody's site without their ever being asked.
-
-**What a client should do instead:** upload a PNG, or install one of the SVG
-plugins if they accept the trade — the route uses WordPress's own check, so the
-moment their site allows SVG, this does too.
-
-**To close it:** nothing to close on our side. It is the host's decision.
 
 ---
 
@@ -435,6 +422,35 @@ websites are unaffected either way. What stops is the editing.
 place. The strip that appears says what is missing and links to the page that
 fixes it, so the failure is at least self-explanatory, but a client discovering
 it on their own site is a worse way to find out than us doing it first.
+
+## Not ours to close
+
+Behaviour that looks like a fault, is understood, and is somebody else's
+decision to make. Kept because the question comes back, and because "we looked
+at it and it is deliberate" is worth more than silence the second time
+somebody asks.
+
+### WordPress will not accept an SVG, where the service will
+**Adapter:** WordPress. **Recorded:** 2026-09-27. **Severity:** low.
+
+Pictures now go into the client's own media library, which means uploads pass
+WordPress's file-type check rather than ours. WordPress refuses SVG, so an SVG
+logo that uploads fine on every other adapter is refused here with WordPress's
+own wording: "Sorry, you are not allowed to upload this file type." Measured.
+
+Not fixed, deliberately. The service accepts SVG because it sanitises the file
+and serves it from a different origin; WordPress serves the library from the
+client's own domain, where a gap in any sanitiser is stored XSS on their site.
+Core refuses SVG for that reason, and overriding it from this plugin would
+change a security property of somebody's site without their ever being asked.
+
+**What a client should do instead:** upload a PNG, or install one of the SVG
+plugins if they accept the trade — the route uses WordPress's own check, so the
+moment their site allows SVG, this does too.
+
+**To close it:** nothing to close on our side. It is the host's decision.
+
+---
 
 ## One-off, unexplained
 

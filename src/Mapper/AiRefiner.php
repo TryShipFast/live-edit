@@ -80,10 +80,19 @@ class AiRefiner
      */
     protected function nameRegions(array $candidates): array
     {
-        // HTML already states what some bands are. Asking the model to guess
-        // those invites it to call a <footer> "Features", so they are settled
-        // here and only the ambiguous <section>s are sent.
-        $certain = ['footer' => 'Footer', 'nav' => 'Navigation', 'header' => 'Header'];
+        /*
+         * HTML already states what some bands are. Asking the model to guess
+         * those invites it to call a <footer> "Features", so they are settled
+         * here and only the ambiguous <section>s are sent.
+         *
+         * Settled means "do not ask", not "answer for it". These used to be
+         * written out as regions too, which put "Header" on a <header> - the
+         * same word the editor derives from the tag anyway, and for <nav> a
+         * worse one: the panel says "Menu", which is the word a non-technical
+         * editor uses. A region now means a name somebody worked out, which
+         * is what lets it outrank the tag wherever it appears.
+         */
+        $obvious = ['footer', 'nav', 'header'];
 
         $bands = [];
         $regions = [];
@@ -92,10 +101,7 @@ class AiRefiner
             if ($band === null) {
                 continue;
             }
-            $known = $certain[$candidate['bandTag'] ?? ''] ?? null;
-            if ($known !== null) {
-                $regions[$band] = $known;
-
+            if (in_array($candidate['bandTag'] ?? '', $obvious, true)) {
                 continue;
             }
             $sample = is_string($candidate['sample'] ?? null) ? trim($candidate['sample']) : '';

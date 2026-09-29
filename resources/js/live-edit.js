@@ -363,6 +363,21 @@ const bootLiveEdit = () => {
         /** What this element is, in words a non-technical editor recognises. */
         const describeElement = (element) => {
             const tag = element.tagName;
+
+            /*
+             * A band the mapper named ("Hero", "Pricing", "Contact") beats the
+             * tag it happens to be written as. This has to come first: the
+             * region only ever lands on section, header, footer, nav, article
+             * or aside, and three of those six have a tag-name answer further
+             * down. "Hero" lost to "Header" and "Contact" to "Footer" on every
+             * page whose author used the semantic tag, which is every page
+             * worth mapping.
+             *
+             * labelForNode() already ranks them this way and says so. The two
+             * disagreeing is what made the region look like dead output.
+             */
+            if (element.dataset.editRegion) return element.dataset.editRegion;
+
             if (tag === 'IMG') return 'Image';
             if (tag === 'BUTTON') return 'Button';
             if (tag === 'A') return /\b(btn|button)\b/i.test(String(element.className)) ? 'Button' : 'Link';
@@ -374,7 +389,6 @@ const bootLiveEdit = () => {
             if (tag === 'HEADER') return 'Header';
             if (tag === 'FOOTER') return 'Footer';
             if (tag === 'FORM') return 'Form';
-            if (element.dataset.editRegion) return element.dataset.editRegion;
             if (element.hasAttribute('data-edit-item')) return 'Card';
             if (element.hasAttribute('data-edit-icon')) return 'Icon';
             if (element.hasAttribute('data-edit-svg')) return 'Drawing';

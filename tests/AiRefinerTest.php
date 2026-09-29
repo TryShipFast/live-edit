@@ -110,6 +110,31 @@ class AiRefinerTest extends TestCase
         $this->assertSame(['Features'], array_values(array_unique(array_column($refined, 'region'))));
     }
 
+    public function test_a_band_html_already_names_gets_no_region(): void
+    {
+        $this->enableAi();
+        // If the model is asked about a <header> at all, this answers it. The
+        // point of the test is that the answer never reaches the candidate.
+        Http::fake(['*' => Http::response([
+            'choices' => [[
+                'message' => ['content' => json_encode([
+                    'items' => [['i' => 0, 'label' => 'Headline']],
+                    'bands' => [['band' => 0, 'region' => 'Announcement']],
+                ])],
+            ]],
+        ])]);
+
+        $candidates = (new MarkupScanner)->scan('<header><h1>A</h1></header>')['candidates'];
+        $refined = app(AiRefiner::class)->refine($candidates);
+
+        /*
+         * The editor names a <header> from the tag, in its own vocabulary. A
+         * region here could only restate that or contradict it, and for <nav>
+         * it used to contradict it: "Navigation" against the panel's "Menu".
+         */
+        $this->assertArrayNotHasKey('region', array_filter($refined[0], fn ($v) => $v !== null));
+    }
+
     public function test_disabled_refiner_returns_candidates_untouched_and_calls_nothing(): void
     {
         Http::fake();
