@@ -78,6 +78,16 @@ class Settings
      */
     public const DEFAULT_API_BASE = 'https://live.tryshipfast.com/api/live-edit/v1';
 
+    /**
+     * Where a customer registers a site and finds their keys.
+     *
+     * A constant rather than something worked out from api_base. The plugin
+     * used to reconstruct addresses by stripping paths off each other, which
+     * was right until the day the API moved, and anybody running their own
+     * service is not buying licences from us anyway.
+     */
+    public const CONSOLE_URL = 'https://live.tryshipfast.com';
+
     public static function get(string $key, string $default = ''): string
     {
         $value = (string) (self::all()[$key] ?? $default);

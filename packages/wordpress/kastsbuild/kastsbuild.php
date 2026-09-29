@@ -105,10 +105,32 @@ add_action('plugins_loaded', function () {
             return;
         }
 
+        /*
+         * Two different situations wearing the same words.
+         *
+         * A site that has never been registered is somebody part way through
+         * setting the plugin up, and the only useful thing to show them is
+         * where to finish. A site that WAS working and has stopped is a
+         * problem, and should look like one.
+         */
+        $unregistered = Licence::unregistered();
+
         printf(
-            '<div class="notice notice-error"><p><strong>%s</strong> %s</p></div>',
-            esc_html__('Live editing is switched off.', 'kastsbuild'),
-            esc_html(Licence::message())
+            '<div class="notice notice-%s"><p><strong>%s</strong> %s%s</p></div>',
+            $unregistered ? 'warning' : 'error',
+            esc_html(
+                $unregistered
+                    ? __('Nearly there.', 'kastsbuild')
+                    : __('Live editing is switched off.', 'kastsbuild')
+            ),
+            esc_html(Licence::message()),
+            $unregistered
+                ? sprintf(
+                    ' <a href="%s" target="_blank" rel="noopener">%s</a>',
+                    esc_url(Licence::registerUrl()),
+                    esc_html__('Register this site', 'kastsbuild')
+                )
+                : ''
         );
     });
 

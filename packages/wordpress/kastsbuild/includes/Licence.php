@@ -41,10 +41,25 @@ class Licence
      */
     private const GRACE = 14 * DAY_IN_SECONDS;
 
+    /**
+     * Whether this installation may edit at all.
+     *
+     * An install that names no site and holds no key does NOT edit. That used
+     * to be the one case that edited freely: the way past every check here was
+     * to have nothing to check, so anybody could install the plugin and have
+     * the whole product for nothing. The Laravel side was closed months of
+     * work ago and this was missed, which is the trouble with the same
+     * decision living in two adapters.
+     *
+     * Not silence, either. Somebody who has just installed this is somebody
+     * trying to buy from us, and an editor that simply never appears reads as
+     * a broken plugin. They are told, in the admin, with the link that fixes
+     * it.
+     */
     public static function permits(): bool
     {
-        if (! Settings::configured()) {
-            return true;
+        if (self::unregistered()) {
+            return false;
         }
 
         $status = self::status();
@@ -52,9 +67,32 @@ class Licence
         return (bool) ($status['valid'] ?? true);
     }
 
+    /**
+     * Installed, and never told which site it is or given a key.
+     *
+     * Both halves, because they are the same moment from the customer's side:
+     * the plugin is in place and the settings page has not been filled in. A
+     * site with no key cannot ask us anything, so treating it as "key
+     * rejected" would tell somebody to replace a key they have never had.
+     */
+    public static function unregistered(): bool
+    {
+        return ! Settings::configured() || Settings::get('publishable_key') === '';
+    }
+
+    /** Where to go and register this site. */
+    public static function registerUrl(): string
+    {
+        return Settings::CONSOLE_URL.'/sites';
+    }
+
     public static function reason(): ?string
     {
-        return Settings::configured() ? (self::status()['reason'] ?? null) : null;
+        if (self::unregistered()) {
+            return 'unregistered';
+        }
+
+        return self::status()['reason'] ?? null;
     }
 
     /**
@@ -77,6 +115,8 @@ class Licence
     public static function messageFrom(string $reason): string
     {
         switch ($reason) {
+            case 'unregistered':
+                return self::t('This site is not registered yet, so editing is switched off. Add it in your dashboard to get a key, then paste the key into this plugin\'s settings.');
             case 'expired':
                 return self::t('This licence has expired. Renew it to carry on editing. Your website is unaffected.');
             case 'rejected':
