@@ -68,4 +68,52 @@ class TheDoorTellsAStrangerNothingTest extends TestCase
             $this->assertStringNotContainsString('javascript:', $body);
         }
     }
+
+    public function test_a_cloud_site_keeps_its_own_door_query(): void
+    {
+        /*
+         * The whole flow for a site whose words live with us, and it was
+         * broken end to end.
+         *
+         * The script we serve that site watches for ?kb-enter=1, takes it out
+         * of the address, sends the person to sign in and brings them back.
+         * It needs the page to render for any of that to happen.
+         *
+         * This middleware took the query away first and redirected to a route
+         * belonging to the other arrangement, so the script never ran. The
+         * owner of a correctly configured site could not get in at all: the
+         * door they were told to use said the site was not registered, and
+         * later answered 404.
+         */
+        config()->set('live-edit.licence.site', null);
+        config()->set('live-edit.licence.key', null);
+        config()->set('live-edit.cloud.site', 'learnkasts');
+        config()->set('live-edit.cloud.host', 'https://live.tryshipfast.com');
+
+        $handled = (new \ShipFast\LiveEdit\Http\Middleware\OpensTheEditorFromAnyPage)->handle(
+            \Illuminate\Http\Request::create('/about?kb-enter=1', 'GET'),
+            fn () => new \Symfony\Component\HttpFoundation\Response('the page itself', 200)
+        );
+
+        $this->assertSame(200, $handled->getStatusCode());
+        $this->assertStringContainsString('the page itself', (string) $handled->getContent());
+    }
+
+    public function test_a_site_that_keeps_its_own_content_still_uses_our_door(): void
+    {
+        // The other arrangement is unchanged: there the server owns the door,
+        // because there is no script of ours on the page to own it.
+        config()->set('live-edit.licence.site', 'acme');
+        config()->set('live-edit.licence.key', 'kbp_test');
+        config()->set('live-edit.cloud.site', null);
+        config()->set('live-edit.cloud.host', null);
+
+        $handled = (new \ShipFast\LiveEdit\Http\Middleware\OpensTheEditorFromAnyPage)->handle(
+            \Illuminate\Http\Request::create('/about?kb-enter=1', 'GET'),
+            fn () => new \Symfony\Component\HttpFoundation\Response('the page itself', 200)
+        );
+
+        $this->assertSame(302, $handled->getStatusCode());
+        $this->assertStringContainsString('live-edit/enter', $handled->headers->get('Location'));
+    }
 }

@@ -34,6 +34,27 @@ class OpensTheEditorFromAnyPage
             return $next($request);
         }
 
+        /*
+         * A site whose words live with us opens its own door, in the browser.
+         *
+         * The script we serve that site watches for ?kb-enter=1, takes it out
+         * of the address, sends the person to sign in and brings them back to
+         * the page they were on. It needs the page to render for any of that
+         * to happen.
+         *
+         * This middleware was taking the query away first and redirecting to
+         * a route that belongs to the other arrangement, so the script never
+         * ran and the owner of a correctly configured site could not get in
+         * at all: the door they were told to use went to a page that told
+         * them the site was not registered, and later to a 404.
+         *
+         * Whoever handles this has to be decided by where the content lives,
+         * and here that means standing aside.
+         */
+        if (filled(config('live-edit.cloud.site')) && filled(config('live-edit.cloud.host'))) {
+            return $next($request);
+        }
+
         // Where they were, without the marker — otherwise arriving back sends
         // them straight out again, and round it goes.
         $here = $request->fullUrlWithoutQuery(['kb-enter']);
