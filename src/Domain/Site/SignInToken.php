@@ -2,6 +2,7 @@
 
 namespace ShipFast\LiveEdit\Domain\Site;
 
+use ShipFast\LiveEdit\Models\Concerns\OnTheConfiguredConnection;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
@@ -10,6 +11,8 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  */
 class SignInToken extends Model
 {
+    use OnTheConfiguredConnection;
+
     protected $table = 'live_edit_sign_in_tokens';
 
     protected $fillable = ['editor_id', 'site_id', 'token_hash', 'return_to', 'expires_at'];

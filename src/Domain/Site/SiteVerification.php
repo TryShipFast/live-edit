@@ -278,7 +278,22 @@ final class SiteVerification
             // The site answered, so it is reachable; the proof is simply not
             // there yet. That is the common case — somebody clicked verify
             // before deploying — and it deserves its own message.
-            $reason = $page->successful() ? 'not_found' : 'unreachable';
+            /*
+             * Answered, but not with a page we can read.
+             *
+             * Told apart from silence deliberately. A site returning 500 is
+             * live, reachable and broken, and calling that "nothing answered"
+             * sends somebody to their DNS and their firewall while their own
+             * application is the thing erroring. Met for real on 2026-09-29:
+             * learnkasts.com answered a branded 500 page and the console
+             * reported it as unreachable.
+             */
+            $reason = match (true) {
+                $page->successful() => 'not_found',
+                $page->status() >= 500 => 'site_errored',
+                $page->status() === 404 => 'no_page_there',
+                default => 'unreachable',
+            };
         } catch (\Throwable $e) {
             $reason = 'unreachable';
         }

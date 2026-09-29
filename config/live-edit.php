@@ -63,6 +63,24 @@ return [
         'private_key_path' => env('CLOUDFRONT_PRIVATE_KEY_PATH'),
     ],
 
+    /*
+     * Which database connection this package's own tables live on.
+     *
+     * Null uses the application's default, which is right for almost every
+     * site and is what this has always done.
+     *
+     * Name one when the application's default is not where its data is. That
+     * sounds unlikely and is not: an app whose own models all name a
+     * connection explicitly can leave the default pointing at nothing for
+     * months, because nothing ever asks it for anything. This package then
+     * arrives and becomes the first thing that does.
+     *
+     * A live site met exactly that on 2026-09-29: the default was a SQLite
+     * file that did not exist on the server, the first request for
+     * live_edit_settings threw, and every page answered 500.
+     */
+    'connection' => env('LIVE_EDIT_DB_CONNECTION'),
+
     'theme' => env('LIVE_EDIT_THEME'),
     'chrome_view' => 'live-edit-chrome',
 

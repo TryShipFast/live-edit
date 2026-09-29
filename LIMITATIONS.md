@@ -305,6 +305,84 @@ in the terms, at the point of sale.
 
 ---
 
+### Fixed: installing the package could take a site down
+**Adapter:** Laravel. **Found:** 2026-09-29 on a live site. **Fixed:** same day.
+**Severity:** was total. Every page, 500.
+
+**Fixed.** A site with no usable database now has nothing stored, which is an
+ordinary state and exactly what a fresh install is. It renders the words
+already in its templates, as it did before anybody installed anything.
+
+What happened: an API-driven Laravel frontend added the engine. Its own pages
+need no database, so its default connection had pointed at a SQLite file that
+never existed on that server, harmlessly, for months. Nothing ever asked it
+for anything. The first request for `live_edit_settings` threw and every page
+on a live site answered 500.
+
+The site was fine. The application needed no database. This package was the
+only thing that did, and it took the whole site with it.
+
+Two faults, and the second is the instructive one:
+
+- **A guard that covered the wrong case.** `version()` already checked
+  `Schema::hasTable()`, with a comment about upgrades running before
+  migrations. But `hasTable()` needs a working connection to answer, so it
+  throws rather than returning false when there is no database at all. The
+  guard handled a missing table and not a missing database, and the second is
+  what happens on a real install.
+- **The next call along was unguarded.** With no version, the read falls
+  through to composing from the database, and that query had nothing around
+  it. A chain is only as guarded as its least guarded link.
+
+**Two things came out of it.** `LIVE_EDIT_DB_CONNECTION` lets a host say where
+this package's tables live, because until now it always took the application's
+default and there was no way to say otherwise. And `Schema` is now asked on
+the model's own connection rather than the default, which would have quietly
+asked the wrong database once a connection was named.
+
+**The rule this establishes, worth stating on its own:** installing this
+package must not be able to break a site. Not degrade it, not slow it: break
+it. Everything it reads from a host's database is now allowed to answer
+"nothing", and a site that renders its own words is the correct outcome of
+every failure here. Reported, never swallowed, because content that quietly
+stops appearing is its own kind of outage.
+
+**What it does not solve:** that site still has nowhere durable to keep words.
+See the entry below.
+
+---
+
+### A Laravel site with no database of its own cannot keep content
+**Adapter:** Laravel. **Found:** 2026-09-29. **Severity:** high for a whole
+class of customer.
+
+An API-driven frontend has no database worth the name. Its data comes from an
+API, its filesystem is a container that is replaced on every deploy, and
+asking its owner to provision a database in order to install an editor is
+asking them to buy infrastructure to use a content tool. They will say no, and
+they will be right.
+
+The engine has no answer for this today. A Laravel host always keeps its own
+content, and there is no switch to have the service keep it instead. The
+pieces exist and are proven elsewhere: `RemoteContent` reads published content
+over HTTP and is what static and React sites use, the content API already
+takes writes, and the keys already exist. **Nothing wires them together for a
+Laravel host**, and `RemoteContent` currently has no caller in the engine at
+all.
+
+SQLite is not the answer for these sites and should not be offered as one. On
+a container the file is recreated empty on every deploy, so a client would
+edit their home page, publish it, and lose every word at the next deploy,
+silently.
+
+**To close it:** a content-lives-on-the-service mode for the Laravel adapter.
+Reading through `RemoteContent`, writing through the content API, no
+migrations and no database required. That is the same arrangement the cloud
+product already sells to sites with no backend at all; Laravel is simply not
+allowed to choose it yet.
+
+---
+
 ### Translation is stored and served per locale, and nothing ever sets one
 **Adapter:** all, WordPress measured. **Found:** 2026-09-29. **Severity:** low
 today, high the day anybody builds the translation UI.

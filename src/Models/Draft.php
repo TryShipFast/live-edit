@@ -2,10 +2,13 @@
 
 namespace ShipFast\LiveEdit\Models;
 
+use ShipFast\LiveEdit\Models\Concerns\OnTheConfiguredConnection;
 use Illuminate\Database\Eloquent\Model;
 
 class Draft extends Model
 {
+    use OnTheConfiguredConnection;
+
     protected $table = 'live_edit_drafts';
 
     // site_id first and deliberately: left out of this list, mass

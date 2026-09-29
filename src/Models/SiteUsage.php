@@ -2,6 +2,7 @@
 
 namespace ShipFast\LiveEdit\Models;
 
+use ShipFast\LiveEdit\Models\Concerns\OnTheConfiguredConnection;
 use Illuminate\Database\Eloquent\Model;
 
 /**
@@ -9,6 +10,8 @@ use Illuminate\Database\Eloquent\Model;
  */
 class SiteUsage extends Model
 {
+    use OnTheConfiguredConnection;
+
     protected $table = 'live_edit_site_usage';
 
     protected $fillable = ['site_id', 'period', 'writes', 'publishes', 'uploads', 'tags', 'bytes_added'];

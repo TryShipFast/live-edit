@@ -2,6 +2,7 @@
 
 namespace ShipFast\LiveEdit\Domain\Site;
 
+use ShipFast\LiveEdit\Models\Concerns\OnTheConfiguredConnection;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\MassPrunable;
 use Illuminate\Database\Eloquent\Model;
@@ -14,6 +15,8 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  */
 class ApiToken extends Model
 {
+    use OnTheConfiguredConnection;
+
     use MassPrunable;
 
     protected $table = 'live_edit_api_tokens';

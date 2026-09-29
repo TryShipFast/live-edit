@@ -2,6 +2,7 @@
 
 namespace ShipFast\LiveEdit\Domain\Content;
 
+use ShipFast\LiveEdit\Models\Concerns\OnTheConfiguredConnection;
 use Illuminate\Database\Eloquent\Model;
 
 /**
@@ -14,6 +15,8 @@ use Illuminate\Database\Eloquent\Model;
  */
 class KeyMap extends Model
 {
+    use OnTheConfiguredConnection;
+
     protected $table = 'live_edit_key_maps';
 
     protected $guarded = [];
