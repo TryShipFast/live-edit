@@ -50,19 +50,23 @@ than sharing the one that sells the editor's AI features. It is off by
 default and also needs `--ai` on the command line, so it never runs on a
 customer's site.
 
-### The React package on npm is behind the source
-**Adapter:** React, Next.js. **Found:** 2026-09-27. **Updated:** 2026-09-29.
+### Fixed: the React package could not be installed by a customer
+**Adapter:** React, Next.js. **Found:** 2026-09-27. **Fixed:** 2026-09-29.
 
-**Mostly closed.** `@shipfasts/live-edit-react` was published on 2026-09-28
-and the scope exists, so `npm install @shipfasts/live-edit-react` now works
-and the console's instruction can be followed. Any summary still saying the
-package is unpublished or the scope needs creating is reading the 27th.
+**Fixed.** `@shipfasts/live-edit-react` is on npm, the scope exists, and
+0.11.0 is the `latest` tag, so the console's install instruction can be
+followed. Verified from a customer's side rather than assumed: a fresh
+`npm install` into an empty project links `node_modules/.bin/live-edit-codemod`
+and `npx live-edit-codemod --help` runs.
 
-What remains is smaller and worth keeping honest: **npm has 0.10.1 and the
-source is 0.11.0.** The published code is a hundred lines behind, under a
-version number that claims otherwise, so a customer installing today gets the
-older codemod without being told. One `npm publish` from `packages/react`
-closes it; it needs the second factor, which is why it has not happened here.
+**Worth knowing for the next publish**, because an hour went to it: this
+machine has two npms. The shell default is npm 10 on Node 21 and holds no
+token; the authenticated one is npm 11 on Node 22, under Herd. Publishing
+with the wrong one fails as `404 Not Found - PUT ... is not in this
+registry`, which reads as the package not existing rather than as not being
+logged in. `bin/publish-react` picks the right npm, prints who it thinks you
+are before sending anything, and refuses with the login command if you are
+nobody.
 
 The original entry, for the history it records:
 

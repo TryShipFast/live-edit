@@ -1,0 +1,45 @@
+#!/usr/bin/env bash
+#
+# Publish @shipfasts/live-edit-react.
+#
+# A script rather than a line in a README for two reasons, both learned the
+# hard way.
+#
+# This machine has two npms. The shell default is npm 10 on Node 21 and holds
+# no token; the authenticated one is npm 11 on Node 22, under Herd. Publishing
+# with the wrong one fails as "404 Not Found - PUT ... is not in this
+# registry", which reads as the package not existing rather than as not being
+# logged in, and sends you looking in entirely the wrong place.
+#
+# And the path to the right npm contains a space, so it cannot be pasted into
+# a shell without quoting that somebody will get wrong at eleven at night.
+set -euo pipefail
+
+node_bin="$HOME/Library/Application Support/Herd/config/nvm/versions/node/v22.21.1/bin"
+
+if [ ! -d "$node_bin" ]; then
+    echo "Node 22 is not where this expects it:" >&2
+    echo "  $node_bin" >&2
+    echo "Point node_bin at the Node that npm login was done on." >&2
+    exit 1
+fi
+
+export PATH="$node_bin:$PATH"
+
+cd "$(dirname "${BASH_SOURCE[0]}")/../packages/react"
+
+# Said out loud before anything is sent, because the failure this exists to
+# prevent is invisible until the publish is refused.
+echo "npm     $(npm --version)"
+echo "node    $(node --version)"
+echo -n "user    "
+npm whoami || {
+    echo
+    echo "Not logged in. Run, with the PATH above:" >&2
+    echo "  npm login --auth-type=web" >&2
+    exit 1
+}
+echo "version $(node -p "require('./package.json').version")"
+echo
+
+npm publish "$@"
