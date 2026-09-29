@@ -292,6 +292,23 @@ customer finding out on their own site.
 `Platform::isPreview()` marks the last two, and the platform picker says so at
 the moment somebody chooses, which is the only moment it is cheap to know.
 
+**Preview belongs to one of the two routes, and only one.** The product is
+sold two ways, and the framework question exists in just the first:
+
+| Route | Who | Framework |
+| --- | --- | --- |
+| Connect your existing site | developer or agency | Laravel, WordPress, Next.js, React, static HTML |
+| Buy a template | the site owner | none of their business |
+
+So a React limitation reaches a developer who chose React deliberately, on
+the route where a build step is a normal Tuesday. It cannot reach somebody
+who bought a template, connected a domain and started typing: that person
+never learns what their site is built with, which is the point of that route.
+
+Worth stating because "React: Preview" read on its own sounds like an
+apology to customers. It is a note to integrators, and the number of people
+it can surprise is bounded by the route they took.
+
 ## The React repeated-content milestone
 
 Scoped deliberately narrowly, because the first framing of it was much too
