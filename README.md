@@ -205,7 +205,7 @@ Add `--ai` to refine the mechanical keys into semantic ones with an LLM:
 php artisan live-edit:scan home.html --ai --config
 ```
 
-Set `LIVE_EDIT_AI=true` and `OPENAI_API_KEY` (provider-agnostic — override
+Set `LIVE_EDIT_MAPPER_AI=true` and `OPENAI_API_KEY` (provider-agnostic — override
 `LIVE_EDIT_AI_ENDPOINT` / `LIVE_EDIT_AI_MODEL` for a different model). The
 scanner still does all the *detection*; the LLM only renames/labels the
 elements it found (never adds or drops any), and any failure falls back to

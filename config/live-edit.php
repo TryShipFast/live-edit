@@ -152,11 +152,34 @@ return [
     'rich_settings' => [],
     'rich_fields' => [],
 
-    // Optional AI refinement of the auto-mapper's suggested keys/labels.
-    // Provider-agnostic; OpenAI chat-completions shape by default. The key is
-    // read from the environment, never stored here.
+    /*
+     * The model the product calls, and what it is allowed to be called for.
+     *
+     * `enabled` is about the EDITOR: rewriting a sentence, shortening one,
+     * making a picture. It is what a customer spends credits on and what
+     * costs us money, so switching it off must stop all of that.
+     *
+     * `mapper` is a different question with the same answer shape, which is
+     * why it had been sharing the switch: whether a developer running
+     * live-edit:scan may spend a call on nicer key names. That sharing is a
+     * trap. Turning AI off to stop paying for image generation would also
+     * have changed, silently, what a tagging plan came back with, and nobody
+     * would have connected the two.
+     *
+     * The mapper's pass is off by default and needs --ai on the command line
+     * as well, so it is three switches deep and never runs on a customer's
+     * site. See LIMITATIONS.md for what it currently produces that nothing
+     * reads.
+     *
+     * Provider-agnostic; OpenAI chat-completions shape by default. The key is
+     * read from the environment, never stored here.
+     */
     'ai' => [
         'enabled' => env('LIVE_EDIT_AI', false),
+
+        // The auto-mapper's optional naming pass. Its own switch, so a
+        // decision about the editor is not silently a decision about tooling.
+        'mapper' => env('LIVE_EDIT_MAPPER_AI', false),
         'endpoint' => env('LIVE_EDIT_AI_ENDPOINT', 'https://api.openai.com/v1/chat/completions'),
         'model' => env('LIVE_EDIT_AI_MODEL', 'gpt-4o-mini'),
         'api_key' => env('OPENAI_API_KEY'),

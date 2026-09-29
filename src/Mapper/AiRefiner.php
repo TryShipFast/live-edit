@@ -17,9 +17,18 @@ use Throwable;
  */
 class AiRefiner
 {
+    /**
+     * Its own switch, not the one that means "we sell AI features".
+     *
+     * This read live-edit.ai.enabled, which also gates the editor's rewrite
+     * and image generation. Turning that off to stop paying for pictures
+     * would have quietly changed what a tagging plan came back with, and the
+     * two events are far enough apart that nobody would have connected them.
+     */
     public function enabled(): bool
     {
-        return (bool) config('live-edit.ai.enabled') && filled(config('live-edit.ai.api_key'));
+        return (bool) config('live-edit.ai.mapper', false)
+            && filled(config('live-edit.ai.api_key'));
     }
 
     /**

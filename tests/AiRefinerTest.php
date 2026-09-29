@@ -10,7 +10,7 @@ class AiRefinerTest extends TestCase
 {
     protected function enableAi(): void
     {
-        config()->set('live-edit.ai.enabled', true);
+        config()->set('live-edit.ai.mapper', true);
         config()->set('live-edit.ai.api_key', 'sk-test');
         config()->set('live-edit.ai.endpoint', 'https://api.openai.com/v1/chat/completions');
         config()->set('live-edit.ai.model', 'gpt-test');
@@ -29,7 +29,7 @@ class AiRefinerTest extends TestCase
 
     public function test_it_is_disabled_without_a_key(): void
     {
-        config()->set('live-edit.ai.enabled', true);
+        config()->set('live-edit.ai.mapper', true);
         config()->set('live-edit.ai.api_key', null);
 
         $this->assertFalse(app(AiRefiner::class)->enabled());
@@ -113,7 +113,7 @@ class AiRefinerTest extends TestCase
     public function test_disabled_refiner_returns_candidates_untouched_and_calls_nothing(): void
     {
         Http::fake();
-        config()->set('live-edit.ai.enabled', false);
+        config()->set('live-edit.ai.mapper', false);
 
         $candidates = (new MarkupScanner)->scan('<h1>Hi</h1>')['candidates'];
         $refined = app(AiRefiner::class)->refine($candidates);

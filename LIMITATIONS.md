@@ -16,6 +16,40 @@ Toy pages agree with whatever the code already does.
 
 ## Open
 
+### The mapper writes labels and regions that nothing reads
+**Adapter:** all. **Found:** 2026-09-29.
+
+The auto-mapper's optional AI pass (`live-edit:scan --ai`) produces three
+things: semantic keys, human labels, and a region name for each band of the
+page. Only the first has a consumer.
+
+- **Keys** are used, on one path: a developer writing key names into
+  `config/live-edit.php` for a bespoke Laravel site.
+- **Labels** are written as `data-edit-label`. The editor never displays one.
+  The attribute appears exactly once in the runtime, in a list of attributes
+  to *preserve* while swapping an icon.
+- **Regions** are written as `data-edit-region` and are read by nothing at
+  all: no reference anywhere in the runtime or any adapter.
+
+Measured rather than assumed. A live WordPress page carries zero of either,
+and `kb-tag` without `--ai` tags 55 elements on the same page perfectly well
+without producing one.
+
+**Who it affects:** nobody today, which is the point. It costs no customer
+anything and it misleads whoever reads the code next, because writing an
+attribute looks like a feature.
+
+**What it would take to close it:** decide what the region is for. It was
+plainly meant to give the editor a way to jump between the parts of a page,
+which is a good idea and half built. Either finish that and the labels earn
+their keep too, or delete both outputs and keep the pass to key naming, which
+is the only part anybody uses.
+
+**Related:** the pass now has its own switch (`LIVE_EDIT_MAPPER_AI`) rather
+than sharing the one that sells the editor's AI features. It is off by
+default and also needs `--ai` on the command line, so it never runs on a
+customer's site.
+
 ### The React package is not published anywhere a customer can install from
 **Adapter:** React, Next.js. **Found:** 2026-09-27. **Updated:** 2026-09-27.
 
