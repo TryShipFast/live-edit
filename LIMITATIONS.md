@@ -431,10 +431,21 @@ and is listed above.
 
 **Fixed.** `src` is the last thing a browser consults. A `srcset` on the image
 beats it, and a `<source>` inside a surrounding `<picture>` beats both. Both
-appliers set `src` and left those behind, so a client replaced a picture, saw
-their own photograph in the editor, published, and the live site kept serving
-the theme's - on every screen the old list happened to cover, which is every
-phone and most laptops.
+appliers set `src` and left those behind, so the picture on the page stayed
+the theme's on every screen the old list covered, which is every phone and
+most laptops.
+
+**Corrected 2026-09-29: this was not a live-site-only fault, and describing it
+as one understated it.** Saves reload the page, and the reload renders through
+these same appliers. The drawer's preview is a separate element and always
+showed the new picture, so the sequence a client actually met was: replace a
+picture, see it in the drawer, press Save, read "Saved", watch the page reload
+- and find the old photograph still there.
+
+That is a worse failure than the one first written down, and a different one
+to diagnose. It does not look like a responsive-images subtlety on the live
+site. It looks like saving is broken, immediately, in front of the person
+doing it, whose reasonable next move is to try again.
 
 Found while reading the area around the fitted-picture entry below, not by a
 customer, and reachable rather than theoretical: WordPress puts a `srcset` on
