@@ -273,3 +273,67 @@ The most useful next measurements, in order: lists and repeated components
 (the biggest untested block, and the one customers will hit first), images,
 then Next.js re-render and client navigation once the codemod classification
 is fixed.
+
+---
+
+## Readiness, as of 2026-09-29
+
+Not every adapter is equally finished, and saying so is cheaper than a
+customer finding out on their own site.
+
+| Adapter | Position |
+| --- | --- |
+| Laravel | Production. The whole journey driven on a real application. |
+| WordPress | Production, with WordPress owning its own content and media. |
+| Plain HTML | Production. The licence question that qualified this is fixed: an expired licence key still reads, so a lapse costs the editor and not the published words. |
+| React | **Preview.** Repeated data is not editable. |
+| Next.js | **Preview**, for the same reason — React list support is the prerequisite. |
+
+`Platform::isPreview()` marks the last two, and the platform picker says so at
+the moment somebody chooses, which is the only moment it is cheap to know.
+
+## The React repeated-content milestone
+
+Scoped deliberately narrowly, because the first framing of it was much too
+wide. Repeated-data identity, persistence, ordering, add and remove, and
+versioning are **not** React work. They exist in the shared protocol and are
+proven on two adapters:
+
+```html
+<ul data-edit-list="courses">          <!-- the collection -->
+  <li data-edit-item="course_101">     <!-- stable item identity -->
+    <h2 data-edit="...">Title</h2>     <!-- editable field -->
+```
+
+with the order stored as content, so reordering and adding survive a publish
+like anything else.
+
+The React adapter's job is to speak that existing protocol for mapped data.
+Three problems, and only three:
+
+**1. Identity.** `data-edit-item` must come from the item's own data id.
+**Not the React `key`**: keys are routinely the array index, are often
+absent, and are never guaranteed stable across a refetch, so keying content on
+one silently reassigns somebody's edits to the wrong item when the data
+reorders. Where the data has no stable id, the adapter needs a fallback the
+customer can see rather than an unstable identity it invents quietly.
+
+**2. Surviving re-render.** React destroys and recreates DOM. The editing
+attributes have to come back with it, reusing what the provider already does
+for ordinary text rather than growing a second mechanism beside it.
+
+**3. Write-back.** The DOM is not the source of truth here, which is the real
+architectural difference from every other adapter. An edit has to reach the
+host application's own state so React renders the new value.
+
+### Decide before that session, not during it
+
+What a newly added item starts with is a **product rule for every adapter**,
+not something React settles for itself. Today the scanner copies the first
+item (`$template = reset($items)`), which is why "+ Add another" on the second
+of nine cards produces a copy of the first. The options are: copy the first,
+copy the item the person was working on, or start empty with the design
+intact. See LIMITATIONS.md.
+
+Answering it once here means Laravel, WordPress, React and whatever comes next
+all behave the same way. Leaving it open means deciding it twice.
