@@ -305,6 +305,49 @@ in the terms, at the point of sale.
 
 ---
 
+### Translation is stored and served per locale, and nothing ever sets one
+**Adapter:** all, WordPress measured. **Found:** 2026-09-29. **Severity:** low
+today, high the day anybody builds the translation UI.
+
+Every part of translation exists except the part that chooses a language.
+Content keys are locale-prefixed, `Snapshot::compose()` fills untranslated
+values from the default so a gap never renders blank, the WordPress table is
+unique on `(content_key, locale, status)`, the content API takes `?locale=`
+and `config('live-edit.locales')` is advertised in config.
+
+Three breaks in the chain, and nothing reaches any of it:
+
+- **The editor never sends a locale.** `live-edit.js` reads
+  `window.liveEditLocale` in two places and nothing anywhere assigns it.
+- **Media saves do not accept one.** `Media.php` calls `Content::put($key,
+  $value, true)` with no locale, so alt text, credits and the source list are
+  shared by every language. Right for the picture, wrong for its description.
+- **The plugin never asks for one.** `Frontend.php` calls
+  `Content::forViewer($editing)`, so a correctly stored `fr` row would not be
+  served even if one existed.
+
+**Why this is worth recording before the feature is built rather than after.**
+The save path *does* accept a locale, and defaults it to `''`. So a
+translation UI wired to the existing save - the obvious way to build it -
+would write the French words at locale `''`, which is the same row as the
+English. The unique key would replace rather than add. **Translating a page
+would silently destroy the words being translated from.**
+
+That cannot happen today only because there is no UI to trigger it. It is a
+trap laid for whoever picks up the translation task, not a fault in what
+ships.
+
+**To close it:** wire the locale end to end - editor to save to serve, media
+included - and prove a second locale round-trips, *before* any language menu
+exists. The menu is the last piece, not the first.
+
+**Not to be closed by:** putting a language switcher on the customer's site.
+A visitor gets whichever locale the site asks for, through `data-locale` on
+the script tag or the host's own i18n. A bought template designed monolingual
+has no switcher in it, and adding one is the thing this product does not do.
+
+---
+
 ### Anything inside a .map() is not editable, which on a real page is most of it
 **Adapter:** React, Next.js. **Recorded:** 2026-09-27. **Severity:** high for
 React, because it decides how much of a page a customer can actually change.
