@@ -100,7 +100,24 @@ app, which is most of them, failed to compile with an error pointing inside
 so creating the org is part of that same sitting. Until it is done, the
 Next.js and React install cards should not claim otherwise.
 
-### A new list item arrives carrying the first item's words
+### Fixed: a new list item arrived carrying the first item's words
+**Adapter:** all. **Found:** 2026-09-27. **Fixed:** 2026-09-29.
+
+**Fixed.** A new item now copies the one it was added from. Decided as a rule
+for every adapter rather than per adapter, so Laravel, WordPress, plain HTML
+and whatever React grows all behave the same, and the React list work does not
+have to settle it a second time.
+
+No protocol was needed. The editor already inserts a new id immediately after
+the item whose button was pressed, so the order says where it came from; the
+scanner walks back to the nearest known item. Two items added in a row leave
+an id with no element yet, which is why it walks rather than taking the entry
+immediately before: copying the wrong thing is bad, copying nothing is worse.
+An item added at the very top still falls back to the first, because in that
+case there is nothing else to copy.
+
+The original finding follows.
+
 **Adapter:** all. **Found:** 2026-09-27. **Severity:** low.
 
 "+ Add another" on the second card of a nine-card grid inserted a new card
@@ -115,6 +132,28 @@ blank one, and will now have two cards saying the same thing until they notice.
 
 **To close it:** copy the item the person was on, or start the new one empty
 with the design intact. Worth a decision rather than a guess.
+
+### A copied list item shares its keys when the keys were written by hand
+**Adapter:** Laravel and any site tagged with semantic keys.
+**Found:** 2026-09-29. **Severity:** low, and narrow.
+
+Adding an item copies one and gives the copy its own keys, so editing the new
+card cannot rewrite the card it came from. That rekeying only rewrites **auto**
+keys (`setting:auto:…`), which is every model-less site: kb-tag, the WordPress
+plugin and the cloud product all tag that way.
+
+A key a developer wrote by hand — `data-edit="setting:courses.two.title"` — is
+deliberately left alone, because it means something to the config file it is
+declared in and inventing a new one would leave that config pointing at
+nothing. The consequence is that on a hand-keyed list, a copied item shares
+the original's keys, and editing one edits both.
+
+Found while testing the add-item rule rather than by a customer, and left
+rather than patched: the fix is a naming rule for derived keys that the config
+file also has to understand, which is a design decision and not a patch.
+
+**Who it affects:** a bespoke Laravel site whose developer hand-keyed a list
+*and* whose client then adds an item to it. Neither half is common alone.
 
 ### A sentence changed in two places at once loses its arrangement
 **Adapter:** all. **Found:** 2026-09-27. **Severity:** low.

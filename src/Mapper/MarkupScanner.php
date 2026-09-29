@@ -315,17 +315,33 @@ class MarkupScanner
             if ($items === []) {
                 continue;
             }
-            $template = reset($items);
+            $first = reset($items);
 
-            foreach ($order as $id) {
+            foreach ($order as $position => $id) {
                 $id = (string) $id;
                 if (isset($items[$id])) {
                     $container->appendChild($items[$id]);
 
                     continue;
                 }
-                // An added item: copy the first one and give the copy its own
-                // keys, so editing it cannot disturb the original.
+
+                /*
+                 * An added item copies the one it was added from, and gets its
+                 * own keys so editing it cannot disturb the original.
+                 *
+                 * Which one that was is already in the order and needs no
+                 * extra protocol: the editor inserts a new id immediately
+                 * after the item whose "+ Add another" was pressed, so the
+                 * source is the nearest known item before it.
+                 *
+                 * This used to copy the first item always, which on a
+                 * nine-card grid meant pressing + beside the second card
+                 * produced a copy of the first. Two cards then said the same
+                 * thing, far apart, which is exactly how it goes unnoticed
+                 * until a visitor sees it.
+                 */
+                $template = $this->itemAddedFrom($items, $order, $position) ?? $first;
+
                 $clone = $template->cloneNode(true);
                 if ($clone instanceof DOMElement) {
                     $this->rekeyItem($clone, $id);
@@ -767,6 +783,33 @@ class MarkupScanner
      * Point a duplicated item's keys at its own id, so its content is stored
      * separately from the item it was copied from.
      */
+    /**
+     * The item a new one was added from: the nearest known item before it.
+     *
+     * Walks backwards rather than taking the entry immediately before,
+     * because two items added in a row leave an id in the order with no
+     * element yet. Copying the wrong thing is bad; copying nothing is worse.
+     *
+     * Null when there is nothing before it at all, which is an item added at
+     * the very top of a list. The caller falls back to the first item, which
+     * in that case is the only thing there is to copy.
+     *
+     * @param  array<string, DOMElement>  $items
+     * @param  array<int, mixed>  $order
+     */
+    protected function itemAddedFrom(array $items, array $order, int $position): ?DOMElement
+    {
+        for ($back = $position - 1; $back >= 0; $back--) {
+            $candidate = (string) ($order[$back] ?? '');
+
+            if (isset($items[$candidate])) {
+                return $items[$candidate];
+            }
+        }
+
+        return null;
+    }
+
     protected function rekeyItem(DOMElement $item, string $newId): void
     {
         $item->setAttribute('data-edit-item', $newId);

@@ -326,14 +326,13 @@ for ordinary text rather than growing a second mechanism beside it.
 architectural difference from every other adapter. An edit has to reach the
 host application's own state so React renders the new value.
 
-### Decide before that session, not during it
+### Decided, so the React session does not have to
 
-What a newly added item starts with is a **product rule for every adapter**,
-not something React settles for itself. Today the scanner copies the first
-item (`$template = reset($items)`), which is why "+ Add another" on the second
-of nine cards produces a copy of the first. The options are: copy the first,
-copy the item the person was working on, or start empty with the design
-intact. See LIMITATIONS.md.
+**A new item copies the one it was added from.** Settled on 2026-09-29 as a
+rule for every adapter, and already true of Laravel, WordPress and plain HTML.
+React inherits it rather than choosing again.
 
-Answering it once here means Laravel, WordPress, React and whatever comes next
-all behave the same way. Leaving it open means deciding it twice.
+It needed no protocol: the editor inserts a new id immediately after the item
+whose button was pressed, so the order already records where it came from.
+Whatever React does for identity, it should keep that property — the order is
+the record of provenance, not just of sequence.
