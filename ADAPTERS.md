@@ -531,6 +531,61 @@ shape here: clone the source item's object and give it the new id, so
 `itemIdentity()` finds the new identity and every field falls back to the
 copied values.
 
+### Measured on a real app: the common shape is not covered
+
+Run against `kb-next-real`, the Next.js blog starter, on 2026-09-29. The list
+work found **nothing**. Zero `data-edit-list`, on an app whose front page is a
+list of posts.
+
+```jsx
+// more-stories.tsx - the list
+{posts.map((post) => (
+  <PostPreview key={post.slug} title={post.title} excerpt={post.excerpt} … />
+))}
+
+// post-preview.tsx - the card, in another file
+<h3><Link href={`/posts/${slug}`}>{title}</Link></h3>
+<p className="…">{excerpt}</p>
+```
+
+Both refusals are correct and both are load-bearing. The map returns a
+**component**, whose children are props rather than DOM. The card's words are
+**expressions**, which is the rule that stops a key being attached to
+something that changes every render. Neither should be relaxed.
+
+And the result is that on the app most like a real customer's, list support
+does nothing at all. The toy JSX in the tests agreed with the code, and the
+real template found the limitation in one run - which is exactly what testing
+on rich sites is for.
+
+**What the milestone actually has to cover**, then, is two elements in two
+files with a component boundary between them, because that is how React is
+written. `<article>` with the words inline, which is what the tests use and
+what the codemod handles today, is the shape of an example rather than the
+shape of an app.
+
+**The sketch, not yet built.** Identity has to cross the component boundary at
+runtime, since no build-time tool can know that `PostPreview` is only ever
+rendered inside a list:
+
+- The mapped child is wrapped in a `<LiveEditItem id={itemIdentity(post)}>`
+  that provides context and renders no DOM of its own.
+- Inside the card, `useContent` composes its key with the identity from that
+  context when there is one, so the same component is per-item inside a list
+  and ordinary outside it.
+- Words that arrive as props are the unresolved part. `{title}` inside the
+  card is an expression, and the reason for refusing an expression genuinely
+  does weaken inside an item - the key carries the identity - but the codemod
+  cannot tell from `post-preview.tsx` alone that it will ever be in one.
+
+That last point is the real decision, and it is a decision rather than a
+detail: either the developer marks the component (a prop, a wrapper, an
+explicit call), or the tool infers it across files, or prop-driven words in
+cards stay uneditable and the milestone covers less than it appears to.
+
+Recorded rather than guessed at, because building the wrong one of those three
+is a week.
+
 ### Test the whole journey, not the part that is easy to reach
 
 The acceptance steps for this work are the project's own:

@@ -82,6 +82,54 @@ export const itemIdentity = (item) => {
 };
 
 /**
+ * Which field an item's identity came out of, or null.
+ *
+ * Needed because a copied item has to carry its new identity in the same field
+ * the original used. Setting `id` on an item whose identity lives in `uuid`
+ * produces a row with two identities, and which one wins is then a question
+ * about the order of a list in this file - exactly the kind of coupling that
+ * goes wrong quietly.
+ */
+export const identityFieldOf = (item) => {
+    if (item === null || typeof item !== 'object' || Array.isArray(item)) {
+        return null;
+    }
+
+    for (const field of STABLE_FIELDS) {
+        if (usable(item[field]) !== null) {
+            return field;
+        }
+    }
+
+    return null;
+};
+
+/**
+ * A copy of an item, carrying a new identity.
+ *
+ * This is how an added row exists at all. A client pressing "add" on a
+ * catalogue has not created a course in the host's database, and this adapter
+ * has no business inventing one - so the new row is a copy of the row it was
+ * added from, with its own identity, and its words are whatever the client
+ * then writes against that identity.
+ *
+ * Copying rather than starting empty is the rule already settled for every
+ * other adapter, on 2026-09-29, and React inherits it rather than choosing
+ * again. It also has a practical edge here: a copied item has every field the
+ * component reads, so a card cannot render half-blank because the developer's
+ * JSX touched a property an invented object did not have.
+ */
+export const copiedWithIdentity = (template, identity) => {
+    const field = identityFieldOf(template);
+
+    if (field === null || usable(identity) === null) {
+        return null;
+    }
+
+    return { ...template, [field]: identity };
+};
+
+/**
  * Whether a whole list can carry edits, and why not when it cannot.
  *
  * Asked of the array rather than of each item because the answer has to be one

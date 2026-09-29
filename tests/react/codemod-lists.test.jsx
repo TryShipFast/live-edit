@@ -108,6 +108,37 @@ ${list}
         expect(imports[0]).toContain('itemIdentity');
     });
 
+    it('passes the array through the adapter on its way to map', () => {
+        // Every other adapter reorders markup. Here the rows are a projection
+        // of an array, so anything done to the DOM is undone by the next
+        // render: the array itself has to pass through. A hook, called once
+        // per component rather than once per row.
+        const { code } = transform(client(list), { relativePath: 'C.jsx' });
+
+        expect(code).toMatch(/\{useLiveEditList\("list[a-f0-9]+", courses\)\.map\(/);
+    });
+
+    it('keeps the list key when it runs over its own output', () => {
+        /*
+         * The sharpest regression risk in the whole file. On a second run the
+         * thing being mapped is `useLiveEditList("list…", courses)` rather
+         * than `courses`, and hashing that would mint a different key and
+         * orphan every edit saved against the first - on an upgrade, to a site
+         * that was working.
+         */
+        const once = transform(client(list), { relativePath: 'C.jsx' });
+        const twice = transform(once.code, { relativePath: 'C.jsx' });
+
+        const keyOf = (code) => (code.match(/data-edit-list="(list[a-f0-9]+)"/) ?? [])[1];
+
+        expect(keyOf(twice.code)).toBe(keyOf(once.code));
+        // Wrapped once, not once per run: the second pass must recognise its
+        // own work rather than nest another call inside it.
+        expect(twice.code).not.toMatch(/useLiveEditList\([^)]*useLiveEditList/);
+        expect(twice.code.match(/useLiveEditList\(/g)).toHaveLength(1);
+        expect(twice.code).toBe(once.code);
+    });
+
     it('leaves an already tagged list alone on a second run', () => {
         const once = transform(client(list), { relativePath: 'C.jsx' });
         const twice = transform(once.code, { relativePath: 'C.jsx' });

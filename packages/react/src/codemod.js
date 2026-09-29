@@ -402,8 +402,35 @@ export const transform = (source, { relativePath = 'unknown', force = null } = {
      * is worse than one that was never offered.
      */
     const tagList = (container, { item, param, over }) => {
-        const name = source.slice(over.start, over.end);
-        const listKey = listKeyFor(relativePath, index++, name);
+        /*
+         * A second run sees its own work: the thing being mapped is now
+         * `useLiveEditList("list…", courses)` rather than `courses`. Hashing
+         * that would mint a different key and orphan every edit already saved
+         * against the first one, which is the failure key stability exists to
+         * prevent - and it would happen on an upgrade, to a site that was
+         * working.
+         *
+         * So a wrap that is already there is read rather than rewritten, and
+         * the key inside it is the key.
+         */
+        const wrapped = over.type === 'CallExpression'
+            && over.callee?.type === 'Identifier'
+            && over.callee.name === 'useLiveEditList';
+
+        const array = wrapped ? over.arguments?.[1] : over;
+        const held = wrapped && over.arguments?.[0]?.type === 'StringLiteral'
+            ? over.arguments[0].value
+            : null;
+
+        if (array === undefined || array === null) {
+            return;
+        }
+
+        const name = source.slice(array.start, array.end);
+        // Counted whether or not it is used, so a list already wrapped does
+        // not shift the keys of the lists after it in the same file.
+        const minted = listKeyFor(relativePath, index++, name);
+        const listKey = held ?? minted;
 
         // Claimed before anything else, so the ordinary rule cannot also fire
         // on the item or on anything inside it.
@@ -422,6 +449,24 @@ export const transform = (source, { relativePath = 'unknown', force = null } = {
                 start: container.openingElement.name.end,
                 end: container.openingElement.name.end,
                 text: ` data-edit-list="${listKey}"`,
+            });
+        }
+
+        if (!wrapped) {
+            /*
+             * The array passes through the adapter on its way to `.map()`, so
+             * the client's order, additions and removals are applied to the
+             * data rather than to the DOM. Every other adapter rearranges
+             * markup; here the markup is a projection, and anything done to it
+             * is undone by the next render.
+             *
+             * A hook, and legal: called once per component, not once per row.
+             */
+            needs.add('useLiveEditList');
+            edits.push({
+                start: array.start,
+                end: array.end,
+                text: `useLiveEditList(${JSON.stringify(listKey)}, ${name})`,
             });
         }
 
