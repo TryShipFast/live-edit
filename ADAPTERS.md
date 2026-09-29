@@ -326,6 +326,46 @@ for ordinary text rather than growing a second mechanism beside it.
 architectural difference from every other adapter. An edit has to reach the
 host application's own state so React renders the new value.
 
+### Which tool does which part
+
+Worth naming, because a session told only to "make .map() editable" can
+reasonably build all of it in the wrong place.
+
+- **`src/codemod.js`** emits the scaffolding. It reads source, so it is the
+  only thing that can see a `.map()` at all. A `data-edit-list` on the
+  container and a `data-edit-item` on the rendered item come from here.
+- **`src/provider.js`** keeps it alive across re-render and client
+  navigation, reusing what it already does for ordinary text.
+- **`src/bridge.js`** carries an edit back into the host's state.
+
+**Do not relax the codemod's single-text-child rule to do it.** It is
+load-bearing:
+
+```js
+if (children.length !== 1 || children[0].type !== 'JSXText') return;
+```
+
+That is what stops a key being attached to a sentence built from data, which
+would attach it to something that changes on every render. The list work adds
+a second rule beside it for a different shape. Reaching for this one and
+loosening it is the plausible wrong turn, and it produces a worse bug than the
+one being fixed.
+
+### Test the whole journey, not the part that is easy to reach
+
+The acceptance steps for this work are the project's own:
+
+> detect → edit → save → reload → **navigate** → publish → confirm as a visitor
+
+plus add, remove and reorder. **Navigate is the one that will be skipped and
+the one most likely to fail.** A client-side navigation re-mounts the component
+and re-runs the `.map()`, so every identity is derived again from nothing. A
+fallback keyed on position would silently reassign somebody's edits there, and
+a re-render test cannot catch it because the data has not changed.
+
+Publishing and then looking as a visitor matters for the same reason from the
+other side: a visitor's render has no provider and no editor in it.
+
 ### Decided, so the React session does not have to
 
 **A new item copies the one it was added from.** Settled on 2026-09-29 as a
