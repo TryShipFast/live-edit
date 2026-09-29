@@ -177,10 +177,19 @@ Three things made it smaller than it looked:
   language nobody declared. That trap is already recorded in the code: taking
   any prefix once read the scanner's own `auto:` keys as a language called
   "auto" and dropped every one of them.
-- **Nothing validates content keys against a declared list.** Checked rather
-  than assumed: saving a setting accepts any string, in the engine and over
-  the API both. The one key rule that would have refused an `@` guards element
-  styles, and those rekey to `s` plus a hash.
+- **Nothing validates content keys against a declared list, or against a
+  pattern.** Checked rather than assumed: saving a setting takes any shape of
+  string, in the engine and over the API both. The one key rule that would
+  have refused an `@` guards element styles, and those rekey to `s` plus a
+  hash.
+
+  Not *arbitrary*, though, and the difference has a bound worth stating: both
+  save paths cap a content key at 200 characters, and a suffix spends about
+  eleven of them. A hand-written base key longer than roughly 189 characters
+  would derive into one the save refuses, so the copy could be added and not
+  edited. Left rather than guarded, because the alternative is truncating the
+  base, which trades a key nobody will ever write for the one property that
+  makes this rule worth having: that the declaration stays recoverable.
 
 **One thing worth knowing:** a copy of a copy strips the previous suffix
 rather than appending, so a key cannot grow a chain of ids over repeated
@@ -465,7 +474,34 @@ file the page points at. Measured: after a full regeneration the picture is
 still there, and deleting the picture still removes it.
 
 **To close it:** generate a small set of widths per box rather than one, and
-write a `srcset` the page can use. Worth doing when picture-heavy sites show up.
+write a `srcset` the page can use.
+
+**Classified P2, and scheduled on its own.** Decided 2026-09-29, once the
+replacement defect above was fixed and this was all that remained of the
+subject. The distinction that settles it: replacement was *correctness* - the
+visitor saw a different picture from the one the client chose - and this is
+*efficiency*. A phone downloads a file larger than it needs and shows the
+right photograph.
+
+Smaller than it reads, which is the other half of why it can wait rather than
+being rushed in. The WordPress media route already stores companion values by
+suffix, `keyAlt` and `keyCredit` among them, and it owns the whole save: it
+fits the picture and writes the content itself. So a second width and a
+`keySrcset` beside it needs a line in each applier's existing suffix table and
+nothing from the editor, the protocol, or the content model.
+
+**Not to be folded into the React `.map()` milestone.** Written down because
+the two are adjacent in this register and nothing else keeps them apart: one
+is a contained media optimisation that can be picked up in an afternoon, the
+other is adapter architecture with its own acceptance journey. Letting the
+first ride along in the second's session is how a milestone stops being
+measurable.
+
+**One consequence of the fix above, stated so it is not a surprise:** a
+replaced picture used to have the theme's list on it, so a phone downloaded a
+theme variant - small, and of the wrong photograph. It now correctly
+downloads the fitted file, which is the 2x. Strictly better, and slightly
+more bytes on a 1x screen until this is done.
 
 ---
 
