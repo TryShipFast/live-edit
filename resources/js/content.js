@@ -583,14 +583,21 @@ export const applyContent = (root, settings) => {
         // without it the alt text the drawer collects is written down, kept,
         // and never reaches a screen reader or a search engine — which is the
         // whole reason for asking somebody to write one.
-        for (const [suffix, attribute] of [['Alt', 'alt'], ['Title', 'title']]) {
+        //
+        // Srcset is here rather than beside src because it is written the same
+        // way: stored against the picture, applied after it. Order matters and
+        // is not incidental - applyValue above clears the source list that
+        // came with the theme, and this puts back the one belonging to the
+        // picture that replaced it, if there is one.
+        for (const [suffix, attribute] of [['Alt', 'alt'], ['Title', 'title'], ['Srcset', 'srcset']]) {
             if (Object.hasOwn(settings, key + suffix)) {
                 const value = settings[key + suffix];
                 // An empty description is a decorative image, which is a
-                // meaningful answer: alt="" says "skip me". An empty title is
-                // not — it is a tooltip nobody wanted.
-                if (value === '' && attribute === 'title') {
-                    element.removeAttribute('title');
+                // meaningful answer: alt="" says "skip me". Nothing else here
+                // has a meaningful empty: an empty title is a tooltip nobody
+                // wanted, and an empty source list is no source list.
+                if (value === '' && attribute !== 'alt') {
+                    element.removeAttribute(attribute);
                 } else {
                     element.setAttribute(attribute, value);
                 }

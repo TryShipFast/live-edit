@@ -136,6 +136,66 @@ class MarkupScannerTest extends TestCase
         $this->assertStringNotContainsString('theme-wide.jpg', $applied);
     }
 
+    public function test_a_replacement_brings_its_own_source_list(): void
+    {
+        /*
+         * The other half of clearing the theme's. A fitted picture is made at
+         * more than one density, and the list saying so is stored beside it
+         * under the same suffix convention as the alt text.
+         *
+         * Order is the whole test: src is applied first and takes the theme's
+         * list away, then this puts back the one belonging to the picture that
+         * replaced it. The two steps fighting would give a page either the old
+         * photograph or no list at all.
+         */
+        $scanner = new MarkupScanner;
+        $html = '<img data-edit-img="setting:hero" src="/theme.jpg" srcset="/theme-800.jpg 800w">';
+
+        $applied = $scanner->applyOverrides($html, [
+            'hero' => '/fitted-1600.jpg',
+            'heroSrcset' => '/fitted-800.jpg 1x, /fitted-1600.jpg 2x',
+        ]);
+
+        $this->assertStringContainsString('src="/fitted-1600.jpg"', $applied);
+        $this->assertStringContainsString('srcset="/fitted-800.jpg 1x, /fitted-1600.jpg 2x"', $applied);
+        $this->assertStringNotContainsString('theme-800.jpg', $applied);
+    }
+
+    public function test_a_replacement_with_no_sizes_of_its_own_leaves_no_source_list(): void
+    {
+        // A pasted address is a file we did not make and know no sizes for.
+        // An empty list stored against it must clear, not write srcset="",
+        // which is a source list saying nothing and is not the same as none.
+        $scanner = new MarkupScanner;
+        $html = '<img data-edit-img="setting:hero" src="/theme.jpg" srcset="/theme-800.jpg 800w">';
+
+        $applied = $scanner->applyOverrides($html, [
+            'hero' => 'https://example.com/theirs.jpg',
+            'heroSrcset' => '',
+        ]);
+
+        $this->assertStringNotContainsString('srcset', $applied);
+    }
+
+    public function test_an_empty_description_still_means_skip_me(): void
+    {
+        // The empty rule changed shape when srcset joined it, so this pins the
+        // one case that must not move: alt="" is a real answer telling a
+        // screen reader to skip a decorative image, where every other empty
+        // here means the attribute should not be there.
+        $scanner = new MarkupScanner;
+        $html = '<img data-edit-img="setting:hero" src="/theme.jpg" alt="Old words" title="Old">';
+
+        $applied = $scanner->applyOverrides($html, [
+            'hero' => '/new.jpg',
+            'heroAlt' => '',
+            'heroTitle' => '',
+        ]);
+
+        $this->assertStringContainsString('alt=""', $applied);
+        $this->assertStringNotContainsString('title=', $applied);
+    }
+
     public function test_a_picture_nobody_replaced_keeps_its_source_list(): void
     {
         // The clearing is a consequence of replacing, not something done to

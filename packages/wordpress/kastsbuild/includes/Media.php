@@ -160,6 +160,24 @@ class Media
 
         if ($value !== null) {
             Content::put($key, $value, true);
+
+            /*
+             * The new picture's own source list, or none at all. Never the
+             * previous picture's.
+             *
+             * This has to be written on every change of picture rather than
+             * only when there is a list, because a source list outranks src:
+             * one left behind from the picture before would keep showing the
+             * photograph that was just replaced, on every screen it covers.
+             * That exact fault is recorded in LIMITATIONS.md as the appliers
+             * failing to clear the theme's, and leaving a stale one here
+             * would be the same fault reintroduced from the other end.
+             *
+             * A pasted address and a removal both land here with nothing,
+             * which is correct: we did not make those files and know no sizes
+             * for them.
+             */
+            Content::put($key.'Srcset', (string) ($uploaded['srcset'] ?? ''), true);
         }
 
         // Beside the picture, under the names the page already reads them by,
@@ -250,7 +268,11 @@ class Media
             ? self::fit($id, (string) $landed['file'], $fitWidth, $fitHeight)
             : null;
 
-        return ['url' => $fitted ?? (string) $landed['url'], 'id' => (int) $id];
+        return [
+            'url' => $fitted['url'] ?? (string) $landed['url'],
+            'srcset' => $fitted['srcset'] ?? '',
+            'id' => (int) $id,
+        ];
     }
 
     /**
@@ -266,18 +288,18 @@ class Media
      * takes this with it - see forget(). A stray file nothing knows about is
      * how an uploads directory grows forever.
      */
-    private static function fit(int $id, string $file, int $width, int $height): ?string
+    private static function fit(int $id, string $file, int $width, int $height): ?array
     {
-        $editor = wp_get_image_editor($file);
+        $probe = wp_get_image_editor($file);
 
-        if (is_wp_error($editor)) {
+        if (is_wp_error($probe)) {
             // Not a type WordPress can process - an SVG, most likely. The
             // original is correct and already in the library; it simply cannot
             // be cropped.
             return null;
         }
 
-        $size = $editor->get_size();
+        $size = $probe->get_size();
         $sourceWidth = (int) ($size['width'] ?? 0);
         $sourceHeight = (int) ($size['height'] ?? 0);
 
@@ -291,38 +313,107 @@ class Media
             $sourceHeight / max($height, 1)
         ));
 
-        $width = (int) round($width * $density);
-        $height = (int) round($height * $density);
+        $topWidth = (int) round($width * $density);
+        $topHeight = (int) round($height * $density);
 
         // Already the right shape and no bigger than we would make it: the
         // original is the best answer and a second identical file is waste.
-        if ($sourceWidth === $width && $sourceHeight === $height) {
+        if ($sourceWidth === $topWidth && $sourceHeight === $topHeight) {
             return null;
         }
 
-        if (is_wp_error($editor->resize($width, $height, true))) {
-            return null;
+        /*
+         * One file per density the box can actually use.
+         *
+         * The box is a known size in CSS pixels, which is what makes this
+         * simple: "1x" and "2x" describe it exactly and need no `sizes`
+         * attribute to go with them. Width descriptors would, and `sizes`
+         * is a description of the page's layout, which is the theme's
+         * business and not something that can be worked out from one box.
+         *
+         * The smaller one is only worth making when it is genuinely smaller.
+         * A source too small to give two densities gives one file and no
+         * source list, which is the honest answer rather than the same file
+         * offered twice.
+         */
+        $targets = [['w' => $width, 'h' => $height, 'x' => 1.0]];
+
+        if ($topWidth > $width) {
+            $targets[] = ['w' => $topWidth, 'h' => $topHeight, 'x' => $density];
         }
 
-        $saved = $editor->save($editor->generate_filename((string) self::FITTED));
+        $base = wp_get_attachment_url($id);
 
-        if (is_wp_error($saved) || ! is_array($saved) || ($saved['file'] ?? '') === '') {
+        if (! is_string($base) || $base === '') {
             return null;
         }
-
-        $fits = get_post_meta($id, self::FITS_META, true);
-        $fits = is_array($fits) ? $fits : [];
-        $fits[] = $saved['file'];
-
-        update_post_meta($id, self::FITS_META, array_values(array_unique($fits)));
 
         // Built from the original's own address so it needs no size registered
         // anywhere: same directory, different filename.
-        $url = wp_get_attachment_url($id);
+        $directory = trailingslashit(dirname($base));
 
-        return is_string($url) && $url !== ''
-            ? trailingslashit(dirname($url)).$saved['file']
-            : null;
+        $fits = get_post_meta($id, self::FITS_META, true);
+        $fits = is_array($fits) ? $fits : [];
+
+        $made = [];
+
+        foreach ($targets as $target) {
+            // A fresh editor per size: resize works on the image it holds, so
+            // reusing one would shrink the small copy out of the large one.
+            $editor = wp_get_image_editor($file);
+
+            if (is_wp_error($editor) || is_wp_error($editor->resize($target['w'], $target['h'], true))) {
+                continue;
+            }
+
+            $saved = $editor->save($editor->generate_filename(self::FITTED.'-'.$target['w']));
+
+            if (is_wp_error($saved) || ! is_array($saved) || ($saved['file'] ?? '') === '') {
+                continue;
+            }
+
+            $fits[] = $saved['file'];
+            $made[] = ['url' => $directory.$saved['file'], 'x' => $target['x']];
+        }
+
+        if ($made === []) {
+            return null;
+        }
+
+        update_post_meta($id, self::FITS_META, array_values(array_unique($fits)));
+
+        $largest = $made[count($made) - 1];
+
+        /*
+         * src is the largest, which is what this always returned. A browser
+         * that does not read a source list therefore behaves exactly as it did
+         * before this existed, and one that does picks the smaller file on a
+         * screen that cannot show the difference.
+         */
+        return [
+            'url' => $largest['url'],
+            'srcset' => count($made) > 1
+                ? implode(', ', array_map(
+                    static fn (array $m): string => $m['url'].' '.self::descriptor($m['x']),
+                    $made
+                ))
+                : '',
+        ];
+    }
+
+    /**
+     * "1x", "2x", "1.5x": trailing zeroes are noise in an attribute.
+     *
+     * Public because it is the one piece of this worth testing without a
+     * WordPress to run in, and because getting it wrong fails silently. A
+     * descriptor a browser cannot parse invalidates the whole list, and the
+     * page then falls back to src and looks exactly as it did - correct
+     * picture, largest file, on every phone. Nothing errors and nothing looks
+     * wrong; the saving simply never happens.
+     */
+    public static function descriptor(float $density): string
+    {
+        return rtrim(rtrim(number_format($density, 2, '.', ''), '0'), '.').'x';
     }
 
     /**

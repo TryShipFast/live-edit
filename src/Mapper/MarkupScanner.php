@@ -420,7 +420,12 @@ class MarkupScanner
             // The description is stored beside the picture. The browser
             // applies it the same way; two implementations of one rule is how
             // an exported page ends up missing the alt text the live one has.
-            foreach (['Alt' => 'alt', 'Title' => 'title'] as $suffix => $attribute) {
+            // Srcset rides here rather than beside src because it is written
+            // the same way: stored against the picture, applied after it.
+            // The order is load-bearing - setting src above cleared the list
+            // that came with the theme, and this puts back the one belonging
+            // to the picture that replaced it, when there is one.
+            foreach (['Alt' => 'alt', 'Title' => 'title', 'Srcset' => 'srcset'] as $suffix => $attribute) {
                 if (! array_key_exists($key.$suffix, $overrides)) {
                     continue;
                 }
@@ -428,9 +433,11 @@ class MarkupScanner
                 $described = (string) $overrides[$key.$suffix];
 
                 // alt="" is a real answer — it tells a screen reader to skip
-                // the image. An empty title is a tooltip nobody wanted.
-                if ($described === '' && $attribute === 'title') {
-                    $node->removeAttribute('title');
+                // the image. Nothing else here has a meaningful empty: an
+                // empty title is a tooltip nobody wanted and an empty source
+                // list is no source list.
+                if ($described === '' && $attribute !== 'alt') {
+                    $node->removeAttribute($attribute);
                 } else {
                     $node->setAttribute($attribute, $described);
                 }

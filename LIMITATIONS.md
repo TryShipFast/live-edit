@@ -459,51 +459,54 @@ exactly one file at one size, which is what that entry is about.
 
 ---
 
-### A fitted picture is not the one the media library would pick
-**Adapter:** WordPress. **Recorded:** 2026-09-27. **Severity:** low.
+### Fixed: a fitted picture was served at one size to every screen
+**Adapter:** WordPress. **Recorded:** 2026-09-27. **Fixed:** 2026-09-29.
 
-A replacement is cropped to the box it was dropped into, and the page is given
-that copy. The library holds the untouched original and WordPress's own
-generated sizes, so anybody using the picture elsewhere gets a sensible file -
-but the cropped copy is ours, not a size WordPress manages, and it carries no
-`srcset`: a phone downloads the same file a laptop does.
+**Fixed.** A replacement is now fitted to its box at more than one density and
+carries a source list saying so, so a phone downloads the smaller file and a
+laptop the larger. It used to be one file, made at 2x, sent to everything.
 
-Kept out of the attachment's size metadata on purpose, because a thumbnail
-regeneration rebuilds that list from registered sizes and would have deleted a
-file the page points at. Measured: after a full regeneration the picture is
-still there, and deleting the picture still removes it.
+**Why `x` descriptors and not `w`.** The box is a known size in CSS pixels,
+which is exactly what `1x` and `2x` describe, and they need no `sizes`
+attribute beside them. Width descriptors would, and `sizes` is a description
+of the page's layout: the theme's business, and not something derivable from
+one box. Picking the descriptor that matches what we actually know is what
+kept this small.
 
-**To close it:** generate a small set of widths per box rather than one, and
-write a `srcset` the page can use.
+**No regression is possible on the `src`.** It is still the largest file,
+which is what this always returned. A browser that does not read a source list
+behaves exactly as it did before; one that does picks the smaller file on a
+screen that cannot show the difference. The smaller copy is only made when it
+is genuinely smaller, so a source too poor for two densities gives one file
+and no list, which is honest rather than the same file offered twice.
 
-**Classified P2, and scheduled on its own.** Decided 2026-09-29, once the
-replacement defect above was fixed and this was all that remained of the
-subject. The distinction that settles it: replacement was *correctness* - the
-visitor saw a different picture from the one the client chose - and this is
-*efficiency*. A phone downloads a file larger than it needs and shows the
-right photograph.
+**The part that needed care is a stale list, not a missing one.** A source
+list outranks `src`, so one left behind from the previous picture keeps
+showing the photograph that was just replaced. That is the fault recorded
+above as the appliers failing to clear the theme's, and it would have been
+reintroduced from the other end by writing a list on upload and leaving it
+there. So the value is written on every change of picture, including a pasted
+address and a removal, both of which correctly store nothing: those are files
+we did not make and know no sizes for.
 
-Smaller than it reads, which is the other half of why it can wait rather than
-being rushed in. The WordPress media route already stores companion values by
-suffix, `keyAlt` and `keyCredit` among them, and it owns the whole save: it
-fits the picture and writes the content itself. So a second width and a
-`keySrcset` beside it needs a line in each applier's existing suffix table and
-nothing from the editor, the protocol, or the content model.
+**Where it lives.** Beside the picture under the same suffix convention as the
+alt text, `keySrcset`, which needed nothing new from the editor, the protocol
+or the content model. Both appliers apply it in the same order: `src` first,
+which takes the theme's list away, then the replacement's own list back.
 
-**Not to be folded into the React `.map()` milestone.** Written down because
-the two are adjacent in this register and nothing else keeps them apart: one
-is a contained media optimisation that can be picked up in an afternoon, the
-other is adapter architecture with its own acceptance journey. Letting the
-first ride along in the second's session is how a milestone stops being
-measurable.
+**Tested where it can be.** The appliers are pinned on both sides, including
+that an empty list clears the attribute rather than writing `srcset=""`, which
+is a source list saying nothing and is not the same as having none. The
+descriptor is pinned away from WordPress because its failure is silent: one a
+browser cannot parse invalidates the whole list, the page falls back to `src`,
+and it looks exactly right - correct picture, largest file, every phone.
+Making the files themselves needs an image editor and a library, and is not
+covered here.
 
-**One consequence of the fix above, stated so it is not a surprise:** a
-replaced picture used to have the theme's list on it, so a phone downloaded a
-theme variant - small, and of the wrong photograph. It now correctly
-downloads the fitted file, which is the 2x. Strictly better, and slightly
-more bytes on a 1x screen until this is done.
-
----
+**Still true, and still deliberate:** the fitted copies stay out of the
+attachment's size metadata, so a thumbnail regeneration cannot delete a file
+the page points at. They are recorded in the plugin's own bookkeeping instead
+and removed with the picture.
 
 ### Fixed: the two ways of registering a site disagreed about what that means
 **Adapter:** all. **Found:** 2026-09-29. **Fixed:** 2026-09-29.

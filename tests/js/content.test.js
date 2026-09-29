@@ -269,6 +269,37 @@ describe('the markers that are not data-edit', () => {
         expect(img.hasAttribute('title')).toBe(false);
     });
 
+    it('gives a replacement its own source list, after clearing the theme\'s', () => {
+        // Order is the whole test. Setting src takes the theme's list away,
+        // because a source list outranks src and the theme's points at the
+        // photograph being replaced; this then puts back the one belonging to
+        // the picture that replaced it. The same two steps, in the same order,
+        // as the applier that runs on the server.
+        document.body.innerHTML =
+            '<img data-edit-img="setting:auto:pic" src="/theme.png" srcset="/theme-800.png 800w">';
+
+        applyContent(document, {
+            'auto:pic': '/fitted-1600.png',
+            'auto:picSrcset': '/fitted-800.png 1x, /fitted-1600.png 2x',
+        });
+
+        const img = document.querySelector('img');
+        expect(img.getAttribute('src')).toBe('/fitted-1600.png');
+        expect(img.getAttribute('srcset')).toBe('/fitted-800.png 1x, /fitted-1600.png 2x');
+    });
+
+    it('leaves no source list when the replacement has no sizes of its own', () => {
+        // A pasted address is a file we did not make and know no sizes for.
+        // srcset="" is a source list saying nothing, which is not the same as
+        // having none, so the attribute has to go rather than be emptied.
+        document.body.innerHTML =
+            '<img data-edit-img="setting:auto:pic" src="/theme.png" srcset="/theme-800.png 800w">';
+
+        applyContent(document, { 'auto:pic': 'https://example.com/theirs.png', 'auto:picSrcset': '' });
+
+        expect(document.querySelector('img').hasAttribute('srcset')).toBe(false);
+    });
+
     it('leaves a picture alone when nothing was published for it', () => {
         document.body.innerHTML = '<img data-edit-img="setting:auto:pic" src="/old.png" alt="">';
 
