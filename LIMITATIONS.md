@@ -505,6 +505,40 @@ more bytes on a 1x screen until this is done.
 
 ---
 
+### Fixed: the two ways of registering a site disagreed about what that means
+**Adapter:** all. **Found:** 2026-09-29. **Fixed:** 2026-09-29.
+
+**Fixed.** A site could be registered from the console's form or from
+`live-edit:site create`, and the two produced different things. The form went
+through the Provisioner and got a domain, a verification code, a platform and
+both keys, dated. The command wrote the row itself and got a slug, a name and
+an origin list - no domain, so the licence was for no website and the origin
+check had nothing to compare against; no verification code, so it could never
+be verified; and no keys at all, so registering was two commands and the
+second was easy to miss.
+
+Harmless while the command was a developer's convenience, which is what it had
+always been. It stopped being harmless the moment the entry below made
+registering sites urgent, because a command is what somebody reaches for under
+time pressure, and a half-made site does not fail in the terminal - it fails
+later and somewhere else, as a licence refusal on a customer's page.
+
+Both ways in now go through the Provisioner, so there is one definition of a
+registered site. The command gained `--domain` and `--platform`, prints both
+keys once with the warning that they are kept only as hashes, and says plainly
+when a licence has been made for no website.
+
+**Pinned by comparison rather than by inventory.** The test registers a site
+both ways and asserts the two agree, instead of listing the fields a
+registered site happens to have today. A field added to one path and not the
+other is exactly the fault this existed to catch, and an inventory test would
+have gone on passing through it.
+
+Found while working out how to make the registrations below safe to perform,
+rather than by running it.
+
+---
+
 ### Installs that were never registered will stop editing on upgrade
 **Adapter:** Laravel, WordPress, and any self-hosted install.
 **Recorded:** 2026-09-28. **Updated:** 2026-09-29.

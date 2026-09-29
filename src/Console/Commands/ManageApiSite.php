@@ -3,7 +3,9 @@
 namespace ShipFast\LiveEdit\Console\Commands;
 
 use Illuminate\Console\Command;
+use Illuminate\Validation\ValidationException;
 use ShipFast\LiveEdit\Domain\Site\ApiToken;
+use ShipFast\LiveEdit\Domain\Site\Provisioner;
 use ShipFast\LiveEdit\Domain\Site\Site;
 use ShipFast\LiveEdit\Domain\Site\TokenType;
 
@@ -17,15 +19,17 @@ class ManageApiSite extends Command
         {action : create|key|list|revoke}
         {name? : the site slug, or the key id when revoking}
         {--origins= : comma separated origins allowed to call from a browser}
+        {--domain= : the website this licence is for, e.g. acme.com}
+        {--platform= : laravel|wordpress|static|react|nextjs}
         {--type=publishable : publishable|secret}
         {--label=API key}';
 
     protected $description = 'Manage API sites and keys';
 
-    public function handle(): int
+    public function handle(Provisioner $provisioner): int
     {
         return match ($this->argument('action')) {
-            'create' => $this->createSite(),
+            'create' => $this->createSite($provisioner),
             'key' => $this->issueKey(),
             'list' => $this->listAll(),
             'revoke' => $this->revoke(),
@@ -33,7 +37,25 @@ class ManageApiSite extends Command
         };
     }
 
-    private function createSite(): int
+    /**
+     * Register a site, by the same route the console's own form takes.
+     *
+     * This used to write the row itself, and produced a site that could not be
+     * used: no domain, so the licence had no website to be for and nothing to
+     * check an origin against; no verification code, so it could never be
+     * verified; no platform; and no keys at all, leaving the operator to run a
+     * second command before anything worked.
+     *
+     * Harmless while this was only ever a developer's convenience. It stopped
+     * being harmless the moment registering sites became urgent, because the
+     * command is what somebody reaches for under time pressure, and a
+     * half-made site fails later and somewhere else - as a licence refusal on
+     * the customer's page, not as an error here.
+     *
+     * So both ways in go through the Provisioner now, and there is one
+     * definition of what a registered site is.
+     */
+    private function createSite(Provisioner $provisioner): int
     {
         $slug = (string) $this->argument('name');
 
@@ -41,26 +63,48 @@ class ManageApiSite extends Command
             return $this->abortWith('A site slug is required.');
         }
 
-        if (Site::query()->where('slug', $slug)->exists()) {
-            return $this->abortWith("A site called {$slug} already exists.");
+        try {
+            $result = $provisioner->create(
+                $slug,
+                $slug,
+                $this->origins(),
+                ($this->option('domain') ?: null) === null ? null : (string) $this->option('domain'),
+                ($this->option('platform') ?: null) === null ? null : (string) $this->option('platform'),
+            );
+        } catch (ValidationException $e) {
+            return $this->abortWith(implode(' ', $e->validator->errors()->all()));
         }
 
-        $origins = $this->origins();
+        $site = $result['site'];
 
-        $site = Site::query()->create([
-            'slug' => $slug,
-            'name' => $slug,
-            'allowed_origins' => $origins,
-        ]);
+        $this->info("Registered {$site->slug}.");
 
-        $this->info("Created site {$site->slug}.");
+        if ($site->domain === null) {
+            // The licence is for a website. Without one named, the origin
+            // check has nothing to compare against and verification cannot
+            // start, and neither says so at the point of failure.
+            $this->warn('No domain named, so this licence is not yet for any website. Add one with --domain.');
+        }
 
-        if ($origins === []) {
+        if ($site->allowed_origins === []) {
             // Not a failure, but worth saying plainly: until an origin is
             // listed, no browser can call, and the first symptom is a CORS
             // error that looks like a bug in their page.
             $this->warn('No origins listed yet, so no browser can call this site. Add them with --origins.');
         }
+
+        $this->newLine();
+        $this->info("Publishable key (the page reads with this):");
+        $this->line($result['keys']['publishable']);
+        $this->newLine();
+        $this->info("Secret key (keep this on a server):");
+        $this->line($result['keys']['secret']);
+        $this->newLine();
+
+        // Shown once because only a hash is kept. Saying so here is kinder
+        // than letting somebody discover it when they come back for it.
+        $this->warn('Copy both now - they are stored only as hashes and cannot be shown again.');
+        $this->warn('These expire in a year. A key without an expiry is not a licence.');
 
         return self::SUCCESS;
     }
