@@ -434,6 +434,56 @@ Content keys are `<list>.<field>@<itemId>`, the same `@` suffix the shared
 protocol now uses for a copied item's hand-written keys. One convention for
 "this key, but for that item", arrived at from two directions.
 
+### What the codemod emits, and what it still refuses
+
+Detection is narrow on purpose. A `.map()` counts when its callback parameter
+is a plain identifier and it returns a host element - directly or through a
+`return`. A destructured parameter is refused: the fields are there but the
+item as a whole is not, and the item is what identity comes from. A callback
+returning a component is refused too, because its children are props rather
+than DOM and whatever it renders is tagged where it is written.
+
+```jsx
+<ul data-edit-list="list4b49a53d46">
+  {courses.map((course) => (
+    <li data-edit-item={itemIdentity(course)} key={course.id}>
+      <h3 data-edit={editMarkerFor("list4b49a53d46", "title", course)}>
+        <LiveEditText contentKey={contentKeyFor("list4b49a53d46", "title", course)}
+                      fallback={course.title} />
+      </h3>
+```
+
+Note what is *not* there: `data-edit-item={course.id}`. The key prop is in the
+source and is ignored, every time.
+
+**The whole key is composed in the attribute**, rather than the overlay
+assembling one from an ancestor. That is what lets React lists work with an
+unchanged editor: the overlay goes on knowing only about DOM nodes and keys,
+which is the property that lets one editor serve every adapter.
+
+Two shapes are tagged inside an item, and the second was not in the original
+scope:
+
+- **A field of the item**, `{course.title}`. One level of property only; a
+  nested path invites two different fields to flatten into one name.
+- **Words written into the card**, `<span>Free</span>`. Keyed per item rather
+  than once for the list, because a client is looking at one card - editing
+  the badge on the third course and watching all nine change is not a saving
+  anybody asked for. Without this a card has its title editable and the word
+  beside it not, which is exactly the half-finished feeling the milestone
+  exists to remove.
+
+**A list with nothing editable inside it is not marked at all.** The
+scaffolding exists to hang fields off, so marking a collection the editor can
+offer nothing for is an attribute nobody reads - the same lesson as the mapper
+writing regions no consumer wanted, caught this time before it shipped.
+
+**The single-text-child rule was not relaxed**, which the scope names as the
+plausible wrong turn. `<p>Hello {user.name}</p>` outside a list is still
+untouched. The new rule sits beside it and is safe for the reason the old one
+is not: inside a list the key carries the item's identity, so it does not mean
+something different on every render.
+
 ### Test the whole journey, not the part that is easy to reach
 
 The acceptance steps for this work are the project's own:

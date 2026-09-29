@@ -59,6 +59,18 @@ const hasAttribute = (opening, attribute) =>
 const keyFor = (relativePath, index, text) =>
     'auto:' + createHash('sha256').update(`${relativePath}|${index}|${text}`).digest('hex').slice(0, 12);
 
+/**
+ * A list's key, which every item's content hangs off.
+ *
+ * Built from what is being mapped over rather than from what it renders, so
+ * restyling the card leaves the collection's identity alone. It carries no
+ * `auto:` prefix because it is not a content key and nothing is ever stored
+ * against it directly: keys are `<list>.<field>@<item>`, and this is only the
+ * first part.
+ */
+const listKeyFor = (relativePath, index, over) =>
+    'list' + createHash('sha256').update(`${relativePath}|${index}|${over}`).digest('hex').slice(0, 10);
+
 /** JSX drops leading and trailing whitespace, so only the words are replaced. */
 const trimmedSpan = (node, source) => {
     const raw = source.slice(node.start, node.end);
@@ -153,6 +165,166 @@ const asJsxRenders = (raw) => {
     );
 };
 
+/**
+ * The element a `.map()` callback renders, or null.
+ *
+ * Both shapes people actually write: an arrow returning JSX straight, and a
+ * body with a return in it. Anything else - a callback that branches, or
+ * returns a component rather than a host element - is left alone rather than
+ * guessed at.
+ */
+const renderedBy = (fn) => {
+    if (fn.body?.type === 'JSXElement') {
+        return fn.body;
+    }
+
+    if (fn.body?.type !== 'BlockStatement') {
+        return null;
+    }
+
+    for (const statement of fn.body.body) {
+        if (statement.type === 'ReturnStatement' && statement.argument?.type === 'JSXElement') {
+            return statement.argument;
+        }
+    }
+
+    return null;
+};
+
+/**
+ * A list rendered from data, found in a container's own children.
+ *
+ * This is the thing no other adapter's scanner can see and the reason list
+ * support for React has to start in the codemod: in a rendered document a
+ * repeated item is just more markup, and here it is one element in the source
+ * that becomes many on screen.
+ *
+ * Deliberately narrow. The callback's parameter must be a plain identifier,
+ * because that name is what every key inside the item is written against; a
+ * destructured parameter gives the fields but no way to refer to the item as
+ * a whole, which is what identity is taken from.
+ */
+const mappedListIn = (node) => {
+    for (const child of node.children ?? []) {
+        if (child.type !== 'JSXExpressionContainer' || child.expression?.type !== 'CallExpression') {
+            continue;
+        }
+
+        const call = child.expression;
+        const callee = call.callee;
+
+        if (callee?.type !== 'MemberExpression' || callee.computed || callee.property?.name !== 'map') {
+            continue;
+        }
+
+        const fn = call.arguments?.[0];
+
+        if (fn?.type !== 'ArrowFunctionExpression' && fn?.type !== 'FunctionExpression') {
+            continue;
+        }
+
+        const param = fn.params?.[0];
+
+        if (param?.type !== 'Identifier') {
+            continue;
+        }
+
+        const item = renderedBy(fn);
+
+        if (item === null || !isHostElement(tagNameOf(item.openingElement))) {
+            continue;
+        }
+
+        return { item, param: param.name, over: callee.object };
+    }
+
+    return null;
+};
+
+/**
+ * A field of the mapped item, rendered on its own: `<h3>{course.title}</h3>`.
+ *
+ * This is the second rule the scope calls for, and it sits beside the
+ * single-text-child rule rather than relaxing it. The old rule refuses an
+ * expression for a good reason - a key attached to data changes meaning on
+ * every render - and that reason does not apply here, because inside a list
+ * the key carries the item's identity too. Same caution, different shape.
+ *
+ * One level of property only. `course.meta.title` is left alone: the field
+ * name is what the key is built from, and a nested path invites two different
+ * fields to flatten into one name.
+ */
+const itemFieldIn = (node, param) => {
+    const children = (node.children ?? []).filter(
+        (child) => !(child.type === 'JSXText' && child.value.trim() === '')
+    );
+
+    if (children.length !== 1 || children[0].type !== 'JSXExpressionContainer') {
+        return null;
+    }
+
+    const expression = children[0].expression;
+
+    if (expression?.type !== 'MemberExpression' || expression.computed) {
+        return null;
+    }
+
+    if (expression.object?.type !== 'Identifier' || expression.object.name !== param) {
+        return null;
+    }
+
+    if (expression.property?.type !== 'Identifier') {
+        return null;
+    }
+
+    return {
+        field: expression.property.name,
+        start: children[0].start,
+        end: children[0].end,
+    };
+};
+
+/**
+ * Words written into the card itself, rather than read from the item.
+ *
+ * `<span>Free</span>` inside a mapped card is the same three letters in the
+ * source and a different element on screen for every row. Left untagged, a
+ * catalogue card has its title and its price editable and the word beside
+ * them not, which is the half-finished feeling the whole milestone exists to
+ * remove.
+ *
+ * Keyed per item rather than once for the whole list, because a client is
+ * looking at one card. Editing the badge on the third course and watching it
+ * change on all nine is not a saving anybody asked for.
+ *
+ * The field name is derived from the words, which is safe in a way it would
+ * not be for an item's own data: this text is in the source, so it only moves
+ * when a developer edits the file - the same trade the ordinary rule already
+ * makes, for the same reason.
+ */
+const literalInItem = (node, source, listKey) => {
+    const children = (node.children ?? []).filter(
+        (child) => !(child.type === 'JSXText' && child.value.trim() === '')
+    );
+
+    if (children.length !== 1 || children[0].type !== 'JSXText') {
+        return null;
+    }
+
+    const span = trimmedSpan(children[0], source);
+
+    if (span.text === '') {
+        return null;
+    }
+
+    return {
+        field: 'said' + createHash('sha256').update(`${listKey}|${span.text}`).digest('hex').slice(0, 8),
+        start: span.start,
+        end: span.end,
+        literal: span.rendered,
+    };
+};
+
 const walk = (node, visit) => {
     if (node === null || typeof node !== 'object') {
         return;
@@ -206,8 +378,116 @@ export const transform = (source, { relativePath = 'unknown', force = null } = {
 
     const edits = [];
     const changes = [];
+    const needs = new Set();
     let already = 0;
     let index = 0;
+
+    /*
+     * Elements a list has already spoken for.
+     *
+     * The walk visits a parent before its children, so a container is seen
+     * first and can claim the item it renders and everything inside it. Both
+     * rules would otherwise fire on the same element: a literal inside a card
+     * would get an ordinary key AND an item-scoped one, and the second would
+     * be written over the first.
+     */
+    const claimed = new Set();
+
+    /**
+     * Write the list scaffolding: the collection, the item, and its fields.
+     *
+     * Only ever in a client file. A server component renders once on the
+     * server with no React on the client to re-render it, so an edit could not
+     * reach the page it is standing on - and a list whose rows cannot change
+     * is worse than one that was never offered.
+     */
+    const tagList = (container, { item, param, over }) => {
+        const name = source.slice(over.start, over.end);
+        const listKey = listKeyFor(relativePath, index++, name);
+
+        // Claimed before anything else, so the ordinary rule cannot also fire
+        // on the item or on anything inside it.
+        walk(item, (node) => {
+            if (node.type === 'JSXElement') {
+                claimed.add(node);
+            }
+        });
+
+        if (!isClient) {
+            return;
+        }
+
+        if (!hasAttribute(container.openingElement, 'data-edit-list')) {
+            edits.push({
+                start: container.openingElement.name.end,
+                end: container.openingElement.name.end,
+                text: ` data-edit-list="${listKey}"`,
+            });
+        }
+
+        if (!hasAttribute(item.openingElement, 'data-edit-item')) {
+            // From the item's own data, never from the React key: a key is
+            // routinely the array index and is never promised to survive a
+            // refetch, so content kept against one lands on the wrong row as
+            // soon as the data reorders.
+            needs.add('itemIdentity');
+            edits.push({
+                start: item.openingElement.name.end,
+                end: item.openingElement.name.end,
+                text: ` data-edit-item={itemIdentity(${param})}`,
+            });
+        }
+
+        walk(item, (node) => {
+            if (node.type !== 'JSXElement' || !isHostElement(tagNameOf(node.openingElement))) {
+                return;
+            }
+
+            if (hasAttribute(node.openingElement, 'data-edit')) {
+                already += 1;
+
+                return;
+            }
+
+            const found = itemFieldIn(node, param) ?? literalInItem(node, source, listKey);
+
+            if (found === null) {
+                return;
+            }
+
+            needs.add('editMarkerFor');
+            needs.add('contentKeyFor');
+            needs.add('LiveEditText');
+
+            edits.push({
+                start: node.openingElement.name.end,
+                end: node.openingElement.name.end,
+                text: ` data-edit={editMarkerFor(${JSON.stringify(listKey)}, ${JSON.stringify(found.field)}, ${param})}`,
+            });
+
+            /*
+             * A component, not a hook call. React matches hook calls to slots
+             * by the order they happen, so one call per row breaks every later
+             * hook the moment the list changes length. Each row rendered here
+             * is its own component instance with its own slots.
+             */
+            const fallback = found.literal === undefined
+                ? `{${param}.${found.field}}`
+                : JSON.stringify(found.literal);
+
+            edits.push({
+                start: found.start,
+                end: found.end,
+                text: `<LiveEditText contentKey={contentKeyFor(${JSON.stringify(listKey)}, ${JSON.stringify(found.field)}, ${param})} fallback=${fallback} />`,
+            });
+
+            changes.push({
+                key: `${listKey}.${found.field}`,
+                tag: tagNameOf(node.openingElement),
+                text: found.literal ?? `${param}.${found.field}`,
+            });
+        });
+    };
 
     walk(ast.program, (node) => {
         if (node.type !== 'JSXElement') {
@@ -217,6 +497,18 @@ export const transform = (source, { relativePath = 'unknown', force = null } = {
         const tag = tagNameOf(node.openingElement);
 
         if (!isHostElement(tag)) {
+            return;
+        }
+
+        const list = claimed.has(node) ? null : mappedListIn(node);
+
+        if (list !== null) {
+            tagList(node, list);
+
+            return;
+        }
+
+        if (claimed.has(node)) {
             return;
         }
 
@@ -260,6 +552,7 @@ export const transform = (source, { relativePath = 'unknown', force = null } = {
         });
 
         if (isClient) {
+            needs.add('useContent');
             edits.push({
                 start: span.start,
                 end: span.end,
@@ -275,7 +568,7 @@ export const transform = (source, { relativePath = 'unknown', force = null } = {
     }
 
     if (isClient) {
-        const importEdit = importFor(source, ast);
+        const importEdit = importFor(source, ast, [...needs].sort());
         if (importEdit) {
             edits.push(importEdit);
         }
@@ -294,24 +587,36 @@ export const transform = (source, { relativePath = 'unknown', force = null } = {
     return { code, changes, already, mode: isClient ? 'client' : 'server' };
 };
 
-/** Add useContent to an existing import from the package, or write a new one. */
-const importFor = (source, ast) => {
+/**
+ * Add whatever this file now needs from the package, or write a new import.
+ *
+ * Used to name `useContent` and nothing else, which was true while that was
+ * the only thing the codemod emitted. List work emits four more, and a file
+ * holding an ordinary heading and a list needs a different set from one
+ * holding either alone.
+ */
+const importFor = (source, ast, wanted) => {
+    if (wanted.length === 0) {
+        return null;
+    }
+
     const imports = ast.program.body.filter((node) => node.type === 'ImportDeclaration');
     const existing = imports.find((node) => node.source.value === '@shipfasts/live-edit-react');
 
     if (existing) {
-        const already = existing.specifiers.some((s) => s.imported?.name === 'useContent');
+        const held = new Set((existing.specifiers ?? []).map((s) => s.imported?.name ?? s.local?.name));
+        const missing = wanted.filter((name) => !held.has(name));
 
-        if (already) {
+        if (missing.length === 0) {
             return null;
         }
 
         const last = existing.specifiers[existing.specifiers.length - 1];
 
-        return { start: last.end, end: last.end, text: ', useContent' };
+        return { start: last.end, end: last.end, text: ', ' + missing.join(', ') };
     }
 
-    const line = "import { useContent } from '@shipfasts/live-edit-react';\n";
+    const line = `import { ${wanted.join(', ')} } from '@shipfasts/live-edit-react';\n`;
 
     if (imports.length > 0) {
         const last = imports[imports.length - 1];
