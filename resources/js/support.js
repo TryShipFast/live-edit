@@ -126,6 +126,30 @@ export const displayedValue = ({ editValue, ownText, fullText }) => {
  * photograph". It also meant the string the editor showed was not quite the
  * string the page held, so writing it back could not be exact.
  */
+/*
+ * An element's OWN words: its direct text, never a descendant's.
+ *
+ * Reading through to a single child was tried on 2026-09-29, to reach a
+ * heading whose text sits inside a router link - which is how every React app
+ * writes a card title, and the one shape the list work still cannot tag.
+ *
+ * It cannot be done from the DOM alone, and the case that proves it is
+ * ordinary: a client who CLEARS a sentence leaves `<p><strong>the
+ * phrase</strong></p>`, which is structurally identical to a wrapper whose
+ * words live in its child. Reading through makes the cleared words reappear,
+ * so the editor shows text the page no longer has and the next save writes it
+ * back. A test caught it immediately.
+ *
+ * Both shapes have one element child and whitespace-only text of their own.
+ * Nothing in the markup tells them apart, so any fix has to be told rather
+ * than deduced - which means an attribute written by whatever tagged the
+ * element, and both halves landing together.
+ *
+ * Worth knowing: the applier DOES write through this shape, recursing into a
+ * single childless element. So reading and writing disagree for a pure
+ * wrapper. That is narrow and long-standing, and it is not worth trading a
+ * correct clear for.
+ */
 export const ownTextOf = (element) =>
     element.children.length
         ? [...element.childNodes]

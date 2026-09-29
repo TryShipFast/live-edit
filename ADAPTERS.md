@@ -613,10 +613,37 @@ than intended, which is not the same thing and did not survive the next
 change. A region nobody can key is now claimed and left entirely alone:
 nothing editable is better than everything linked together.
 
-**Still not covered:** words inside a component the card itself renders, such
-as `<h3><Link href={…}>{title}</Link></h3>` in the blog starter. `Link` is a
+**Still not covered, and now known to be harder than it looks:** words inside
+a component the card itself renders, such as
+`<h3><Link href={…}>{title}</Link></h3>` in the blog starter. `Link` is a
 component, so its children are props and there is no host element to mark.
-That is the next real gap and it is narrower than the one just closed.
+
+The obvious fix is to tag the `<h3>` and let the runtime read and write
+through it. Writing already works - the applier recurses into a single
+childless element rather than guessing. **Reading cannot be made to work from
+the DOM alone**, and the case that proves it is ordinary rather than exotic:
+
+```html
+<p><strong>street it stands on</strong></p>
+```
+
+That is a wrapper whose words live in its child. It is *also* exactly what a
+sentence looks like after a client clears it, leaving only the phrase that was
+bold. Read through, and cleared words reappear in the editor and are written
+back on the next save. Tried on 2026-09-29 and reverted within the hour; a
+test caught it immediately.
+
+Both shapes have one element child and whitespace-only text of their own, so
+nothing in the markup separates them. Any fix has to be **told** rather than
+deduced - an attribute written by whatever tagged the element, with both
+halves landing in the same change. Not built, because adding an attribute for
+one narrow shape before its reader exists is the exact habit that produced the
+mapper's unread regions.
+
+Worth recording separately: reading and writing therefore disagree for a pure
+wrapper, including the plain `<a data-edit><span>Book</span></a>` case that
+has nothing to do with React. Long-standing, narrow, and not worth trading a
+correct clear for.
 
 ### Test the whole journey, not the part that is easy to reach
 
