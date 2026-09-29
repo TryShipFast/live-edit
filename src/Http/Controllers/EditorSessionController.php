@@ -4,6 +4,7 @@ namespace ShipFast\LiveEdit\Http\Controllers;
 
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
 use ShipFast\LiveEdit\Support\EditorSession;
 use ShipFast\LiveEdit\Support\Licence;
 
@@ -82,17 +83,63 @@ class EditorSessionController
         }
 
         if (! Licence::configured()) {
-            // Nothing to sign in to. Said plainly, because the alternative is
-            // a redirect to a service this site has never been told about.
-            return response(
-                'This site is not registered for editing yet. Add LIVE_EDIT_SITE and LIVE_EDIT_KEY to its environment.',
-                409
-            );
+            /*
+             * This door belongs to the arrangement where the site keeps its
+             * own content. A site whose words live with us signs in through
+             * the script we serve it, which opens its own door on any page,
+             * so there is nothing here for it and never was.
+             *
+             * Without this check a correctly configured cloud site was told
+             * it "is not registered for editing yet", which is both wrong and
+             * the most alarming thing we could have said to somebody who had
+             * just finished setting it up.
+             */
+            if (filled(config('live-edit.cloud.site')) && filled(config('live-edit.cloud.host'))) {
+                abort(404);
+            }
+
+            /*
+             * Nothing to sign in to - and the browser is told only that.
+             *
+             * This used to answer with "Add LIVE_EDIT_SITE and LIVE_EDIT_KEY
+             * to its environment", on a public URL, to anybody who asked.
+             * Three things wrong with it. It hands a stranger a map of how
+             * this site is wired and an advertisement that it is currently
+             * misconfigured. It is addressed to a developer while being shown
+             * to whoever happens to be visiting, who can do nothing with it.
+             * And it named two variables that have not been the current
+             * spelling for some time, so the one person who COULD act on it
+             * was sent to set the wrong ones.
+             *
+             * The detail goes where a developer will actually find it: the
+             * application's own log.
+             */
+            Log::warning('[live-edit] Editing was requested but this installation has no licence configured. Set LIVE_EDIT_SITE_ID and LIVE_EDIT_APP_KEY, or LIVE_EDIT_CLOUD_HOST and LIVE_EDIT_CLOUD_SITE if the content is kept with the service.');
+
+            return response('Editing is not available on this site.', 409);
         }
 
+        $destination = $this->safeDestination($request);
+
+        /*
+         * Built from the destination we have already vetted, not from the
+         * address as it arrived.
+         *
+         * `?to=https://evil.test` is refused for the local redirect and was
+         * still passed on to the service inside the return address, where it
+         * came back into this page as text. Inert - the scheme is always
+         * ours, the view escapes it, and the service checks a return address
+         * against the site's own origins before honouring one - so three
+         * things had to hold for it to be harmless.
+         *
+         * Sanitise once and use the sanitised value everywhere is cheaper
+         * than keeping three defences correct forever.
+         */
+        $returnTo = url('/live-edit/enter').'?to='.rawurlencode($destination);
+
         return response()->view('live-edit::enter', [
-            'signInUrl' => Licence::signInUrl($request->fullUrl()),
-            'destination' => $this->safeDestination($request),
+            'signInUrl' => Licence::signInUrl($returnTo),
+            'destination' => $destination,
         ])->withHeaders(['Cache-Control' => 'no-store, private']);
     }
 
