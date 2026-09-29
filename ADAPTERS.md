@@ -368,6 +368,72 @@ a second rule beside it for a different shape. Reaching for this one and
 loosening it is the plausible wrong turn, and it produces a worse bug than the
 one being fixed.
 
+### Found while building: the existing text mechanism cannot be reused as-is
+
+The scope above says problem 2 should reuse "what the provider already does
+for ordinary text rather than growing a second mechanism beside it". That
+instruction cannot be followed literally, and the reason is worth recording
+before somebody tries.
+
+The codemod rewrites words to an inline hook call:
+
+```jsx
+<h1>{useContent("auto:abc", "Northfield Studio")}</h1>
+```
+
+Correct for one element rendered once. Illegal inside a `.map()`. React
+matches hook calls to slots **by the order they happen**, so the number of
+calls a component makes has to be the same on every render. One call per row
+means a list that gains or loses a row shifts every later hook onto the wrong
+slot. Not a lint preference: it is the reason the Rules of Hooks exist, and
+the corruption is silent and arbitrary.
+
+So repeated content reads through a **component**, `<LiveEditText>`, rather
+than a hook call. Each row rendered from a `.map()` is its own component
+instance with its own slots, so one hook call inside it is one call however
+many rows there are. It renders no element of its own - it returns the string -
+because a wrapper would change the CSS of every list item on every site using
+it.
+
+This is a second mechanism, which the scope warned against, and it is the
+right one. The thing not to duplicate is the *content* path: `<LiveEditText>`
+is a wrapper over the same `useContent`, reading the same provider state, with
+the same fallback behaviour. Only the call shape differs, because only the
+call shape has to.
+
+**Its prop is `contentKey`, and cannot be `key`.** React takes `key` for
+itself: it is read off the element and never reaches the component, so a value
+passed that way arrives as `undefined` and every row renders its fallback
+forever - which looks exactly like content that failed to load.
+
+### Identity, settled
+
+`itemIdentity()` reads the item's own data, in this order: `id`, `uuid`,
+`uid`, `_id`, `ref`, `sku`, `slug`. A slug is last of the real ones because it
+is stable in practice and editable in principle, where a primary key cannot be
+rewritten by anybody.
+
+Three refusals, each of which is a way real data goes wrong:
+
+- **A field that is not an identity**, even when the name fits. An `id`
+  holding an object stringifies to `[object Object]` for every row: one
+  identity, shared by the whole list.
+- **A list of plain strings.** Tempting, because the string is usually unique.
+  Wrong, because the string is the very thing the client is about to edit, so
+  the first edit changes the identity and orphans itself. An identity derived
+  from content is not an identity.
+- **A list where only some rows have ids, or two share one.** Asked of the
+  array rather than each item, because the answer has to be one thing: a list
+  with holes is not partly editable, it is one whose identities collide as
+  soon as the data changes.
+
+`listIdentity()` returns the reason in words that can be shown to whoever
+installed it, which is the "fallback the customer can see" the scope asks for.
+
+Content keys are `<list>.<field>@<itemId>`, the same `@` suffix the shared
+protocol now uses for a copied item's hand-written keys. One convention for
+"this key, but for that item", arrived at from two directions.
+
 ### Test the whole journey, not the part that is easy to reach
 
 The acceptance steps for this work are the project's own:
