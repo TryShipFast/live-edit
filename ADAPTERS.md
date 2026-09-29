@@ -484,6 +484,53 @@ untouched. The new rule sits beside it and is safe for the reason the old one
 is not: inside a list the key carries the item's identity, so it does not mean
 something different on every render.
 
+### Problems 2 and 3, as they turned out
+
+**Write-back needed no bridge change whatsoever.** A list field's key is an
+ordinary flat string, `list4b49….title@101`, so `set()` and `apply()` carry it
+like any other. The bridge still has exactly five members and knows nothing
+about lists. That is the return on composing the whole key in the attribute,
+and it is the property to protect: the day the overlay needs a special case
+for React lists, this design has gone wrong.
+
+`set()` still answers whether a hook was listening, and for a list field the
+answer is yes, because `<LiveEditText>` registers like anything else. A key
+for a row that is not on the page answers no, exactly as a server-rendered
+element does, so the editor fetches the page again rather than believing an
+edit landed.
+
+**Re-render was smaller than the scope feared.** The codemod writes the
+markers into the JSX, so React emits them on every render and a re-mount
+brings them back with everything else. The provider needs no mechanism to
+restore them. Pinned by a test anyway, because it is true until somebody moves
+an attribute out of the component.
+
+### What is proven, and what is only simulated
+
+Worth separating, because the difference is where the next fault will be.
+
+**Proven by test:** an edit lands on its own row and no other; the editor is
+told the key was handled; a row that is not on the page reports as unhandled;
+identities survive the list being re-derived from scratch **in a different
+order with a new row among them**, which is the failure an identity taken from
+position or from the React key produces; markers come back after a re-mount.
+
+**Not proven:** a real client-side navigation. The test unmounts and mounts
+again with content supplied, which is the right shape for the risk the scope
+names - re-derivation and reordering - and is still not a Next.js router
+moving between routes and fetching the content for a new page. That step needs
+a running app, and the scope is right that it is the one most likely to be
+skipped.
+
+**Not built yet:** add, remove and reorder. These need the developer's own
+array to pass through the adapter before `.map()` runs - something like
+`useLiveEditList(key, courses).map(...)`, a hook called once per component
+rather than once per row, so the Rules of Hooks are not in question. The
+settled rule that a new item copies the one it was added from has a natural
+shape here: clone the source item's object and give it the new id, so
+`itemIdentity()` finds the new identity and every field falls back to the
+copied values.
+
 ### Test the whole journey, not the part that is easy to reach
 
 The acceptance steps for this work are the project's own:
