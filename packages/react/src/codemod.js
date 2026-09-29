@@ -224,18 +224,49 @@ const mappedListIn = (node) => {
         }
 
         const param = fn.params?.[0];
-
-        if (param?.type !== 'Identifier') {
-            continue;
-        }
-
         const item = renderedBy(fn);
 
-        if (item === null || !isHostElement(tagNameOf(item.openingElement))) {
+        if (item === null) {
             continue;
         }
 
-        return { item, param: param.name, over: callee.object };
+        /*
+         * A repeated region we cannot key at all.
+         *
+         * A destructured parameter gives the fields but not the item, and the
+         * item is what identity comes from. The list is refused - but the
+         * elements inside it must be refused too, and that does not happen by
+         * itself: they are ordinary JSX, and the rules outside would tag them
+         * happily with one key for all of them.
+         *
+         * Which is the whole fault. One key across a repeated region means
+         * editing the first card changes every card, silently. A test caught
+         * this the moment one-value elements became taggable; before that the
+         * refusal was accidental rather than intended.
+         *
+         * So the region is claimed and left alone. Nothing editable is worse
+         * than everything linked together.
+         */
+        if (param?.type !== 'Identifier') {
+            return { item, param: null, over: callee.object, keyable: false };
+        }
+
+        /*
+         * A component row, not a host element, is the usual shape on a real
+         * app: the list is in one file and the card is in another. Measured on
+         * the Next.js blog starter, where every list is written this way.
+         *
+         * Its fields cannot be tagged from here - they are props, and their
+         * words live in the other file - so the row is wrapped instead and the
+         * identity travels in context to whatever renders inside it.
+         */
+        return {
+            item,
+            param: param.name,
+            over: callee.object,
+            keyable: true,
+            component: !isHostElement(tagNameOf(item.openingElement)),
+        };
     }
 
     return null;
@@ -325,6 +356,35 @@ const literalInItem = (node, source, listKey) => {
     };
 };
 
+/**
+ * The source of an expression that is a value being read, or null.
+ *
+ * `title` and `post.title` qualify. A call, a ternary, a template or any
+ * arithmetic does not: those compute something, and the thing computed is the
+ * host's logic rather than a value somebody can be offered to edit. Tagging
+ * one would put a key on an answer and then write over the question.
+ *
+ * Kept deliberately shallow, one property deep, for the same reason the list
+ * rule is: a long path invites two different values to read as one name, and
+ * a key nobody can trace back to a field is a key nobody can debug.
+ */
+const plainRead = (expression) => {
+    if (expression?.type === 'Identifier') {
+        return expression.name;
+    }
+
+    if (
+        expression?.type === 'MemberExpression'
+        && !expression.computed
+        && expression.object?.type === 'Identifier'
+        && expression.property?.type === 'Identifier'
+    ) {
+        return `${expression.object.name}.${expression.property.name}`;
+    }
+
+    return null;
+};
+
 const walk = (node, visit) => {
     if (node === null || typeof node !== 'object') {
         return;
@@ -401,7 +461,7 @@ export const transform = (source, { relativePath = 'unknown', force = null } = {
      * reach the page it is standing on - and a list whose rows cannot change
      * is worse than one that was never offered.
      */
-    const tagList = (container, { item, param, over }) => {
+    const tagList = (container, { item, param, over, component, keyable }) => {
         /*
          * A second run sees its own work: the thing being mapped is now
          * `useLiveEditList("list…", courses)` rather than `courses`. Hashing
@@ -432,7 +492,7 @@ export const transform = (source, { relativePath = 'unknown', force = null } = {
         const minted = listKeyFor(relativePath, index++, name);
         const listKey = held ?? minted;
 
-        // Claimed before anything else, so the ordinary rule cannot also fire
+        // Claimed before anything else, so the ordinary rules cannot also fire
         // on the item or on anything inside it.
         walk(item, (node) => {
             if (node.type === 'JSXElement') {
@@ -440,7 +500,9 @@ export const transform = (source, { relativePath = 'unknown', force = null } = {
             }
         });
 
-        if (!isClient) {
+        // A repeated region nobody can key. Claimed and left: one key across
+        // many rows means editing the first changes all of them.
+        if (!keyable || !isClient) {
             return;
         }
 
@@ -468,6 +530,33 @@ export const transform = (source, { relativePath = 'unknown', force = null } = {
                 end: array.end,
                 text: `useLiveEditList(${JSON.stringify(listKey)}, ${name})`,
             });
+        }
+
+        if (component) {
+            /*
+             * Wrapped rather than tagged. The card's own root element is in
+             * another file, so there is nothing here to put an attribute on;
+             * what travels instead is the identity, in context, picked up by
+             * whatever renders inside.
+             *
+             * Already wrapped is left alone, so a second run does not nest
+             * another one.
+             */
+            if (tagNameOf(item.openingElement) !== 'LiveEditItem') {
+                needs.add('LiveEditItem');
+                needs.add('itemIdentity');
+
+                edits.push({
+                    start: item.start,
+                    end: item.start,
+                    text: `<LiveEditItem id={itemIdentity(${param})}>`,
+                });
+                edits.push({ start: item.end, end: item.end, text: '</LiveEditItem>' });
+
+                changes.push({ key: listKey, tag: 'LiveEditItem', text: source.slice(over.start, over.end) });
+            }
+
+            return;
         }
 
         if (!hasAttribute(item.openingElement, 'data-edit-item')) {
@@ -573,7 +662,60 @@ export const transform = (source, { relativePath = 'unknown', force = null } = {
             (child) => !(child.type === 'JSXText' && child.value.trim() === '')
         );
 
-        if (children.length !== 1 || children[0].type !== 'JSXText') {
+        if (children.length !== 1) {
+            return;
+        }
+
+        /*
+         * An element whose whole content is one value: `<h3>{title}</h3>`.
+         *
+         * Refused until now, and the reason was sound but drawn too wide. What
+         * must never be tagged is a sentence *built* from data -
+         * `<p>Hello {user.name}, welcome back</p>` - because a key on that
+         * means something different on every render and half the sentence is
+         * the host's. That case is a mix of children and is still refused
+         * above.
+         *
+         * One value alone is a different thing. It is what a card's title is
+         * on every real React app, arriving as a prop from a list in another
+         * file, and it is the difference between the milestone covering a page
+         * and covering an example. The key is the element's, the value is the
+         * fallback, and inside a row `useContent` composes the row's identity
+         * onto the key so each card is its own.
+         *
+         * An identifier or one property deep, no calls and no arithmetic: a
+         * value being read, not a value being computed.
+         */
+        if (children[0].type === 'JSXExpressionContainer') {
+            const read = plainRead(children[0].expression);
+
+            if (read === null) {
+                return;
+            }
+
+            const key = keyFor(relativePath, index++, read);
+
+            edits.push({
+                start: node.openingElement.name.end,
+                end: node.openingElement.name.end,
+                text: ` data-edit="setting:${key}"`,
+            });
+
+            if (isClient) {
+                needs.add('useContent');
+                edits.push({
+                    start: children[0].start,
+                    end: children[0].end,
+                    text: `{useContent(${JSON.stringify(key)}, ${read})}`,
+                });
+            }
+
+            changes.push({ key, tag, text: read });
+
+            return;
+        }
+
+        if (children[0].type !== 'JSXText') {
             return;
         }
 

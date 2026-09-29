@@ -531,7 +531,7 @@ shape here: clone the source item's object and give it the new id, so
 `itemIdentity()` finds the new identity and every field falls back to the
 copied values.
 
-### Measured on a real app: the common shape is not covered
+### Measured on a real app, then fixed
 
 Run against `kb-next-real`, the Next.js blog starter, on 2026-09-29. The list
 work found **nothing**. Zero `data-edit-list`, on an app whose front page is a
@@ -578,13 +578,45 @@ rendered inside a list:
   does weaken inside an item - the key carries the identity - but the codemod
   cannot tell from `post-preview.tsx` alone that it will ever be in one.
 
-That last point is the real decision, and it is a decision rather than a
-detail: either the developer marks the component (a prop, a wrapper, an
-explicit call), or the tool infers it across files, or prop-driven words in
-cards stay uneditable and the milestone covers less than it appears to.
+**Built, and measured again on the same app: 11 elements tagged and the list
+found.** None of the three options in that sketch turned out to be needed.
 
-Recorded rather than guessed at, because building the wrong one of those three
-is a week.
+The identity is neither passed as a prop nor inferred across files. It is put
+into context around the row and picked up at render:
+
+```jsx
+{useLiveEditList("list1dd…", posts).map((post) => (
+  <LiveEditItem id={itemIdentity(post)}>
+    <PostPreview … />      // another file, knows nothing about lists
+```
+
+`useContent` composes that identity onto its key when there is one. So the
+same `PostPreview` is per-row inside a list and ordinary on its own page - one
+component, two correct behaviours, decided where it is rendered rather than
+where it is written. `LiveEditItem` renders no DOM: a wrapper between a grid
+and its children would break the layout of every site that installed this.
+
+**The expression rule was narrowed, not relaxed.** An element whose whole
+content is one value - `<h3>{title}</h3>` - is now tagged. A sentence *built*
+from data - `<p>Hello {user.name}, welcome back</p>` - is still refused, and
+so is anything computed: a call, a ternary, a template, a deep path. The
+original reason survives intact, because it was only ever about half a
+sentence belonging to the host and a key meaning something different every
+render. One value being read is neither.
+
+**One fault this introduced, caught by a test rather than by thinking.** A
+`.map()` that cannot be keyed - a destructured parameter gives the fields but
+not the item - was refused as a list, and its contents were then tagged by the
+ordinary rules with **one key for every row**. Editing the first card would
+have changed all of them, silently. The refusal had been accidental rather
+than intended, which is not the same thing and did not survive the next
+change. A region nobody can key is now claimed and left entirely alone:
+nothing editable is better than everything linked together.
+
+**Still not covered:** words inside a component the card itself renders, such
+as `<h3><Link href={…}>{title}</Link></h3>` in the blog starter. `Link` is a
+component, so its children are props and there is no host element to mark.
+That is the next real gap and it is narrower than the one just closed.
 
 ### Test the whole journey, not the part that is easy to reach
 

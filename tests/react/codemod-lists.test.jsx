@@ -163,22 +163,52 @@ describe('what it still refuses', () => {
         expect(code).toBe(source);
     });
 
-    it('leaves a lone expression outside a list alone', () => {
-        // Same rule from the other side: `{title}` on its own is still the
-        // host's data when there is no item to key it against.
-        const source = client('        <h1>{page.title}</h1>');
+    it('tags an element whose whole content is one value', () => {
+        /*
+         * Changed deliberately on 2026-09-29, and measured before it was
+         * changed: on the Next.js blog starter every card's words arrive as a
+         * prop, so refusing this meant the milestone covered an example and
+         * not a page.
+         *
+         * The old reason stays intact where it belongs. A sentence BUILT from
+         * data is still refused, because a key on that means something
+         * different every render and half the sentence is the host's. One
+         * value alone is a value being read, and the key is the element's.
+         */
+        const { code, changes } = transform(client('        <h1>{page.title}</h1>'), { relativePath: 'C.jsx' });
 
-        expect(transform(source, { relativePath: 'C.jsx' }).changes).toHaveLength(0);
+        expect(changes).toHaveLength(1);
+        expect(code).toContain('{useContent("auto:');
+        expect(code).toContain('page.title)}');
     });
 
-    it('leaves a destructured callback parameter alone', () => {
-        // The parameter name is what every key inside the item is written
-        // against, and a destructured one gives the fields but no way to refer
-        // to the item as a whole - which is what identity comes from.
+    it('still refuses a value that is computed rather than read', () => {
+        // A call, a ternary or a template is the host's logic. Putting a key
+        // on the answer and then writing over the question is not editing.
+        for (const body of ['<h1>{format(page.title)}</h1>', '<h1>{a ? b : c}</h1>', '<h1>{`a ${b}`}</h1>', '<h1>{a.b.c}</h1>']) {
+            expect(transform(client(`        ${body}`), { relativePath: 'C.jsx' }).changes).toHaveLength(0);
+        }
+    });
+
+    it('leaves everything inside a repeated region it cannot key', () => {
+        /*
+         * A destructured parameter gives the fields but not the item, and the
+         * item is what identity comes from - so the list is refused. The
+         * elements inside it have to be refused too, and that does not happen
+         * by itself: they are ordinary JSX and the rules outside would tag
+         * them happily, with ONE key for every row.
+         *
+         * Which is the whole fault. Editing the first card would change every
+         * card, silently. A test caught this the moment one-value elements
+         * became taggable - before that the refusal was accidental rather
+         * than intended, which is not the same thing and does not survive the
+         * next change.
+         */
         const source = client(`        <ul>
             {courses.map(({ id, title }) => (
                 <li key={id}>
                     <h3>{title}</h3>
+                    <span>Free</span>
                 </li>
             ))}
         </ul>`);
@@ -186,16 +216,27 @@ describe('what it still refuses', () => {
         expect(transform(source, { relativePath: 'C.jsx' }).code).toBe(source);
     });
 
-    it('leaves a map that renders a component alone', () => {
-        // Its children are props, not DOM. Whatever that component renders is
-        // tagged where it is written, not here.
+    it('wraps a component row rather than tagging it', () => {
+        /*
+         * The shape every real app uses: the list in one file, the card in
+         * another. Its fields cannot be tagged from here - they are props -
+         * so the row is wrapped and the identity travels in context to
+         * whatever renders inside it.
+         *
+         * Measured on the Next.js blog starter, where refusing this meant the
+         * list work found nothing at all.
+         */
         const source = client(`        <ul>
             {courses.map((course) => (
                 <CourseCard key={course.id} course={course} />
             ))}
         </ul>`);
 
-        expect(transform(source, { relativePath: 'C.jsx' }).code).toBe(source);
+        const { code } = transform(source, { relativePath: 'C.jsx' });
+
+        expect(code).toContain('<LiveEditItem id={itemIdentity(course)}>');
+        expect(code).toContain('</LiveEditItem>');
+        expect(code).toMatch(/data-edit-list="list[a-f0-9]+"/);
     });
 
     it('leaves a nested property alone', () => {
