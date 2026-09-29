@@ -565,6 +565,31 @@ place. The strip that appears says what is missing and links to the page that
 fixes it, so the failure is at least self-explanatory, but a client discovering
 it on their own site is a worse way to find out than us doing it first.
 
+**Decided 2026-09-29: tokreamsblue is left alone.** The client updates his own
+site and takes the current release when he does. We are not registering it for
+him, and nobody should touch that deployment on his behalf.
+
+The consequence, written down rather than assumed, because the decision and
+the consequence point the same way and it would be easy to read that as
+nothing to do: **his update is the event that turns editing off.** Not a
+separate risk that might arrive later - the same act. A site taking this
+version without a site id and key in its environment is refused, which is the
+whole point of the change.
+
+So whatever else happens, the licence has to be in place before or with that
+rebuild, not after it. Two things are needed and neither is the update: the
+site registered in the console, which is what issues the keys, and
+`LIVE_EDIT_SITE_ID` and `LIVE_EDIT_APP_KEY` set in its environment. Which of
+those is already true is not knowable from outside the console, and the
+register has only ever said "no licence configured", which covers both.
+
+Worth being exact about what "update" means here, since it is easy to picture
+a plugin. **tokreamsblue is Laravel on cPanel, not WordPress.** The engine is
+compiled into the site's own Vite bundle, so taking a new version is a
+rebuild and redeploy of the site - `--with-vendor`, because the engine repo is
+private - rather than anything that can be pressed in an admin screen. That is
+also why this arrives on a day somebody chooses rather than on its own.
+
 ## Settled, not open
 
 Behaviour that looks like a fault, has been looked at, and is deliberately
