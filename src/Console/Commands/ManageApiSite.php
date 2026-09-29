@@ -106,6 +106,31 @@ class ManageApiSite extends Command
         $this->warn('Copy both now - they are stored only as hashes and cannot be shown again.');
         $this->warn('These expire in a year. A key without an expiry is not a licence.');
 
+        /*
+         * What this did not do, said out loud.
+         *
+         * This command registers a licence: which site is asking, what keys
+         * it holds, which addresses may use them. That is the whole of the
+         * question the engine answers, and on a self-hosted install it is the
+         * whole of the job.
+         *
+         * A site managed by the console has a second half that lives there
+         * and cannot live here - an owner, a plan, a timezone, and a record
+         * of who may sign in. A site registered by this command on a console
+         * deployment is correctly licensed and invisible in the sites list,
+         * on no plan, and impossible for its owner to sign in to: they are
+         * sent to a sign-in with no account, on their own site.
+         *
+         * Worth printing every time rather than documenting somewhere. The
+         * command now looks complete enough to be trusted for a job it only
+         * half does, and it is reached for under exactly the time pressure
+         * that stops people checking.
+         */
+        $this->newLine();
+        $this->line('Registered the licence only: the site, its keys and its origins.');
+        $this->line('An owner, a plan and who may sign in belong to the console and are not set here.');
+        $this->line('If this site is managed by a console, register it there instead.');
+
         return self::SUCCESS;
     }
 

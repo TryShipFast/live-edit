@@ -94,6 +94,31 @@ class RegisteringASiteMeansOneThingTest extends TestCase
             ->assertSuccessful();
     }
 
+    public function test_it_says_which_half_of_registering_it_did_not_do(): void
+    {
+        /*
+         * The command registers a licence. A site managed by a console has a
+         * second half that lives there: an owner, a plan, a timezone, and a
+         * record of who may sign in. A site registered here on a console
+         * deployment is correctly licensed and invisible in the sites list,
+         * on no plan, and impossible for its owner to sign in to.
+         *
+         * Printed rather than documented because the command now looks
+         * complete enough to be trusted for a job it only half does - and it
+         * is reached for under the time pressure that stops people checking.
+         * This very mistake was nearly made from a chat message recommending
+         * it for two console-managed sites.
+         */
+        $this->artisan('live-edit:site', [
+            'action' => 'create',
+            'name' => 'half-a-job',
+            '--domain' => 'acme.com',
+        ])
+            ->expectsOutputToContain('licence only')
+            ->expectsOutputToContain('console')
+            ->assertSuccessful();
+    }
+
     public function test_it_refuses_a_slug_the_licence_check_could_not_use(): void
     {
         // The form validates the slug through the Provisioner. The command

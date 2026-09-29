@@ -548,6 +548,25 @@ registered site happens to have today. A field added to one path and not the
 other is exactly the fault this existed to catch, and an inventory test would
 have gone on passing through it.
 
+**A second half stays with the console, deliberately.** Registering a site has
+two parts and only one of them is the engine's. The engine answers "may this
+key touch this site", a question about a request with no owner and no reader
+in it. An owner, a plan, a timezone and the record of who may sign in belong
+to the console, and a command in a package installed on customers' servers
+cannot set them.
+
+So a site registered by the command on a console deployment is correctly
+licensed and invisible in the sites list, on no plan, and impossible for its
+owner to sign in to - they are sent to a sign-in with no account, on their own
+site. The command now prints what it did and did not do, every time.
+
+That is printed rather than documented for a specific reason: making the
+command complete enough to trust is what makes it dangerous. It was
+recommended in conversation the same day for two console-managed sites, on
+the strength of having just been improved, and the recommendation was wrong.
+The fix that removes one trap is exactly the sort of change that sets the
+next one.
+
 Found while working out how to make the registrations below safe to perform,
 rather than by running it.
 
