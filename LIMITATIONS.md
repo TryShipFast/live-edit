@@ -368,8 +368,15 @@ write a `srcset` the page can use. Worth doing when picture-heavy sites show up.
 ---
 
 ### Installs that were never registered will stop editing on upgrade
-**Adapter:** Laravel, and any self-hosted install. **Recorded:** 2026-09-28.
-**Severity:** high on the day somebody upgrades.
+**Adapter:** Laravel, WordPress, and any self-hosted install.
+**Recorded:** 2026-09-28. **Updated:** 2026-09-29.
+**Severity:** high on the day somebody upgrades. **That day has started.**
+
+v0.11.0 is published, so this is live rather than pending. It reaches each
+install the moment that install updates, which for the console is done and for
+tokreamsblue is its next rebuild. WordPress joined the list in the same
+release: the plugin used to permit an unregistered install too, which the
+Laravel side had stopped doing months earlier.
 
 The licence check used to permit anything it could not identify: an install
 naming no site and holding no key was treated as licensed. That is now refused,
