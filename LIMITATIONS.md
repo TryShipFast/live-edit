@@ -50,13 +50,26 @@ than sharing the one that sells the editor's AI features. It is off by
 default and also needs `--ai` on the command line, so it never runs on a
 customer's site.
 
-### The React package is not published anywhere a customer can install from
-**Adapter:** React, Next.js. **Found:** 2026-09-27. **Updated:** 2026-09-27.
+### The React package on npm is behind the source
+**Adapter:** React, Next.js. **Found:** 2026-09-27. **Updated:** 2026-09-29.
 
-The console tells a customer to run `npm install @shipfasts/live-edit-react`.
-That package does not exist on npm: the registry still returns 404, and the
-repo it lives in is private, so `npm install` from git is not open to them
-either. The instruction cannot be followed by anybody outside this machine.
+**Mostly closed.** `@shipfasts/live-edit-react` was published on 2026-09-28
+and the scope exists, so `npm install @shipfasts/live-edit-react` now works
+and the console's instruction can be followed. Any summary still saying the
+package is unpublished or the scope needs creating is reading the 27th.
+
+What remains is smaller and worth keeping honest: **npm has 0.10.1 and the
+source is 0.11.0.** The published code is a hundred lines behind, under a
+version number that claims otherwise, so a customer installing today gets the
+older codemod without being told. One `npm publish` from `packages/react`
+closes it; it needs the second factor, which is why it has not happened here.
+
+The original entry, for the history it records:
+
+The console told a customer to run `npm install @shipfasts/live-edit-react`.
+That package did not exist on npm: the registry returned 404, and the repo it
+lives in is private, so `npm install` from git was not open to them either.
+The instruction could not be followed by anybody outside this machine.
 
 The package itself is now ready to go, and was proved from a consumer's side
 rather than assumed. A packed tarball was installed into a throwaway project
@@ -154,8 +167,13 @@ been released would restore a state the product never had.
 ---
 
 ### A lapsed licence takes a static site's published words off the page
-**Adapter:** plain HTML. **Recorded:** 2026-09-27. **Severity:** high, and it
-is a commercial decision rather than only a bug.
+**Adapter:** plain HTML. **Recorded:** 2026-09-27. **Updated:** 2026-09-29.
+**Severity:** high, and it is a commercial decision rather than only a bug.
+
+**More urgent since 2026-09-29 than when it was written.** This was recorded
+when nothing could take a payment, so no customer could lapse and the fault
+was theoretical. Payment now collects, plans now expire, and the sweep that
+pauses editing runs daily. The path described below is live.
 
 Measured as a clean before and after on the video template, changing nothing
 but the key. With the key good, a visitor with no cookies reads the sentence
