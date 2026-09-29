@@ -2,7 +2,7 @@
   "name": "@shipfasts/live-edit",
   "private": true,
   "type": "module",
-  "description": "Runtime for the shipfasts/live-edit in-place editor.",
+  "description": "Runtime for the ShipFast Live Edit in-place editor.",
   "scripts": {
     "build": "esbuild resources/js/live-edit.js --bundle --minify --format=esm --target=es2020 --outfile=resources/dist/live-edit.js",
     "test": "vitest run",
