@@ -4,6 +4,7 @@ namespace ShipFast\LiveEdit\Http\Middleware;
 
 use Closure;
 use Illuminate\Http\Request;
+use Throwable;
 use Illuminate\Support\Facades\Gate;
 use ShipFast\LiveEdit\Domain\Content\PageAllowance;
 use ShipFast\LiveEdit\Mapper\MarkupScanner;
@@ -191,6 +192,27 @@ class TagsEditableMarkup
         return '/'.trim($request->path(), '/');
     }
 
+    /**
+     * The client's published words, or none.
+     *
+     * This runs for EVERY visitor, not only an editor, because a client's
+     * words have to reach the public. So it is also the single most dangerous
+     * database read in the package: whatever it does, it does to every page
+     * of every site with auto-tagging on.
+     *
+     * It threw, and it took a live site off the internet. learnkasts is an
+     * API-driven frontend whose own pages need no database at all; its
+     * default connection pointed at a SQLite file that had never existed on
+     * that server, harmlessly, for months, because nothing had ever asked it
+     * for anything. This asked, on the first request after install.
+     *
+     * A site with no usable database has no published words, which is exactly
+     * true of every site before anybody publishes one. It then renders the
+     * words already in its templates, which is what it did before this
+     * package arrived. Reported, never swallowed: for a site that genuinely
+     * keeps its words here, this is a fault worth knowing about and never
+     * worth a blank page over.
+     */
     private function publishedSettings(): array
     {
         $model = config('live-edit.setting_model');
@@ -199,10 +221,16 @@ class TagsEditableMarkup
             return [];
         }
 
-        return $model::query()
-            ->pluck('value', 'key')
-            ->map(fn ($value) => (string) $value)
-            ->all();
+        try {
+            return $model::query()
+                ->pluck('value', 'key')
+                ->map(fn ($value) => (string) $value)
+                ->all();
+        } catch (Throwable $e) {
+            report($e);
+
+            return [];
+        }
     }
 
     /**

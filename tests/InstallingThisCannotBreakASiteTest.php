@@ -2,8 +2,11 @@
 
 namespace ShipFast\LiveEdit\Tests;
 
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use ShipFast\LiveEdit\Http\Middleware\TagsEditableMarkup;
 use ShipFast\LiveEdit\Support\PublishedContent;
+use Symfony\Component\HttpFoundation\Response;
 
 /**
  * Installing this package must not be able to take a site down.
@@ -69,5 +72,28 @@ class InstallingThisCannotBreakASiteTest extends TestCase
         // that genuinely do keep their words here.
         $this->assertIsArray(PublishedContent::settings());
         $this->assertNull(PublishedContent::version());
+    }
+
+    public function test_a_visitors_page_still_renders_with_no_database(): void
+    {
+        /*
+         * The exact path that took the site down, and the most dangerous read
+         * in the package: this middleware runs for EVERY visitor, not only an
+         * editor, because a client's published words have to reach the
+         * public. Whatever it does, it does to every page of every site with
+         * auto-tagging switched on.
+         */
+        config()->set('live-edit.auto_tag', true);
+        $this->withNoDatabase();
+
+        $html = '<html lang="en"><body><h1>The words already in the template</h1></body></html>';
+
+        $response = (new TagsEditableMarkup)->handle(
+            Request::create('/', 'GET'),
+            fn (): Response => new Response($html, 200, ['Content-Type' => 'text/html'])
+        );
+
+        $this->assertSame(200, $response->getStatusCode());
+        $this->assertStringContainsString('The words already in the template', (string) $response->getContent());
     }
 }
