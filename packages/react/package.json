@@ -29,7 +29,11 @@
       "types": "./src/index.d.ts",
       "default": "./src/index.js"
     },
-    "./package.json": "./package.json"
+    "./package.json": "./package.json",
+    "./server": {
+      "types": "./src/server.d.ts",
+      "default": "./src/server.js"
+    }
   },
   "bin": {
     "live-edit-codemod": "bin/live-edit-codemod.mjs"

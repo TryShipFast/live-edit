@@ -724,6 +724,13 @@ export const transform = (source, { relativePath = 'unknown', force = null } = {
                     end: children[0].end,
                     text: `{useContent(${JSON.stringify(key)}, ${read})}`,
                 });
+            } else {
+                needs.add('LiveEditText');
+                edits.push({
+                    start: children[0].start,
+                    end: children[0].end,
+                    text: `<LiveEditText contentKey=${JSON.stringify(key)} fallback={${read}} />`,
+                });
             }
 
             changes.push({ key, tag, text: read });
@@ -761,6 +768,17 @@ export const transform = (source, { relativePath = 'unknown', force = null } = {
                 end: span.end,
                 text: `{useContent(${JSON.stringify(key)}, ${JSON.stringify(span.rendered)})}`,
             });
+        } else {
+            needs.add('LiveEditText');
+            edits.push({
+                start: span.start,
+                end: span.end,
+                // The fallback goes in an expression container rather than a
+                // quoted attribute. JSX does not read backslash escapes inside
+                // attribute quotes, so copy holding a quotation mark would be
+                // written back with the escape visible on the page.
+                text: `<LiveEditText contentKey=${JSON.stringify(key)} fallback={${JSON.stringify(span.rendered)}} />`,
+            });
         }
 
         changes.push({ key, tag, text: span.rendered });
@@ -770,15 +788,27 @@ export const transform = (source, { relativePath = 'unknown', force = null } = {
         return { code: source, changes, already, mode: isClient ? 'client' : 'server' };
     }
 
-    if (isClient) {
-        const importEdit = importFor(source, ast, [...needs].sort());
-        if (importEdit) {
-            edits.push(importEdit);
-        }
+    /*
+     * Which half of the package this file needs.
+     *
+     * Server components import from `/server`, which holds the API key and so
+     * must never end up in a client bundle. A separate entry point is what
+     * keeps that from being a matter of discipline: the import a client file
+     * gets cannot reach the key, whatever anybody later edits.
+     */
+    const importEdit = importFor(
+        source,
+        ast,
+        [...needs].sort(),
+        isClient ? '@shipfasts/live-edit-react' : '@shipfasts/live-edit-react/server',
+    );
 
-        if (needsDirective) {
-            edits.push({ start: 0, end: 0, text: "'use client';\n\n" });
-        }
+    if (importEdit) {
+        edits.push(importEdit);
+    }
+
+    if (needsDirective) {
+        edits.push({ start: 0, end: 0, text: "'use client';\n\n" });
     }
 
     // Applied back to front, so an earlier edit cannot move a later one's
@@ -798,13 +828,13 @@ export const transform = (source, { relativePath = 'unknown', force = null } = {
  * holding an ordinary heading and a list needs a different set from one
  * holding either alone.
  */
-const importFor = (source, ast, wanted) => {
+const importFor = (source, ast, wanted, from = '@shipfasts/live-edit-react') => {
     if (wanted.length === 0) {
         return null;
     }
 
     const imports = ast.program.body.filter((node) => node.type === 'ImportDeclaration');
-    const existing = imports.find((node) => node.source.value === '@shipfasts/live-edit-react');
+    const existing = imports.find((node) => node.source.value === from);
 
     if (existing) {
         const held = new Set((existing.specifiers ?? []).map((s) => s.imported?.name ?? s.local?.name));
@@ -819,7 +849,7 @@ const importFor = (source, ast, wanted) => {
         return { start: last.end, end: last.end, text: ', ' + missing.join(', ') };
     }
 
-    const line = `import { ${wanted.join(', ')} } from '@shipfasts/live-edit-react';\n`;
+    const line = `import { ${wanted.join(', ')} } from '${from}';\n`;
 
     if (imports.length > 0) {
         const last = imports[imports.length - 1];

@@ -50,10 +50,19 @@ describe('codemod', () => {
         expect(() => transform(source, { relativePath: 'a.ts' })).not.toThrow();
     });
 
-    it('marks server components without a hook', () => {
-        // A server component renders once, on the server. A hook there would
-        // neither run nor help, so it gets the marker and its edits land on
-        // the next render.
+    it('gives a server component something that actually reads the key', () => {
+        /*
+         * This used to assert the opposite, and the opposite was the bug.
+         *
+         * A server component got its marker and nothing else, on the reasoning
+         * that a hook there would neither run nor help. True, and it left the
+         * marker naming a key that nothing on the server ever looked up. On a
+         * Laravel or WordPress site middleware rewrites the finished HTML and
+         * the edit comes back; a standalone Next application has no such
+         * middleware, so the edit was saved and never seen again. Running the
+         * codemod over a real App Router app is what showed the size of it:
+         * seven server files, one client file, and only the one worked.
+         */
         const source = `export default async function Page() {\n    return <h1>Server rendered</h1>;\n}\n`;
         const { code, changes, mode } = transform(source, { relativePath: 'app/page.js' });
 
@@ -61,7 +70,14 @@ describe('codemod', () => {
         expect(changes).toHaveLength(1);
         expect(code).toContain('data-edit="setting:auto:');
         expect(code).not.toContain('useContent');
-        expect(code).not.toContain('@shipfasts/live-edit-react');
+        expect(code).toContain('<LiveEditText contentKey="auto:');
+        expect(code).toContain('fallback={"Server rendered"}');
+
+        // From /server, which holds the key. A separate entry point is what
+        // stops a client bundle ever being able to reach it.
+        expect(code).toContain("from '@shipfasts/live-edit-react/server'");
+        expect(code).not.toContain("from '@shipfasts/live-edit-react'");
+        expect(code).not.toContain("'use client'");
     });
 
     it('makes a server file a client component when asked to make it live', () => {
