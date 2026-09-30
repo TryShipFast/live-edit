@@ -739,6 +739,27 @@ writes a few bytes to the configured disk, reads them back, deletes them, and
 says which disk it used. Run it on the host rather than reasoning about the
 host.
 
+It earned itself within the hour. Pointed at the bucket, it answered:
+
+    There is no disk called "s3" in this application's filesystems config.
+      Class "League\Flysystem\AwsS3V3\PortableVisibilityConverter" not found
+
+The host had `aws/aws-sdk-php` and not `league/flysystem-aws-s3-v3`, which is
+the adapter Laravel's s3 driver is built on. A configured disk, real
+credentials, a real bucket, and no way to reach it - and nothing anywhere said
+so until something asked.
+
+**A third fault, found while reading the disks rather than by the failure.**
+Laravel configures disks with `throw => false`, and both disks a fresh
+application ships with have it, so a write that cannot be made returns false
+and raises nothing. Unchecked, that false travelled on as a path: an address
+was built from it, the value was saved, and the editor reported success over a
+picture that had never been stored. Of the three possible outcomes that is the
+worst - worse than an error - because the client goes away believing their
+photograph is on their website. A false return is now the failure it always
+was, and the test uses a disk that refuses quietly, because `Storage::fake()`
+always succeeds and could never have caught it.
+
 ---
 
 ### Fixed: a developer who set everything they were given still had a broken editor

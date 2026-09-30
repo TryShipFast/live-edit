@@ -5,6 +5,7 @@ namespace ShipFast\LiveEdit\Domain\Content;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\ValidationException;
+use RuntimeException;
 use ShipFast\LiveEdit\Support\ImageFitter;
 use ShipFast\LiveEdit\Support\SvgSanitiser;
 
@@ -72,7 +73,28 @@ class ImageStore
         // this application again, so anything not said here cannot be said
         // later — a picture without a cache header is re-fetched by every
         // visitor for the life of the site.
-        return Storage::disk($this->disk())->putFile($directory, $file, $this->objectOptions($file->getMimeType()));
+        $path = Storage::disk($this->disk())->putFile($directory, $file, $this->objectOptions($file->getMimeType()));
+
+        /*
+         * A disk configured with 'throw' => false, which is Laravel's default
+         * and both of the disks a fresh application ships with, does not raise
+         * on a failed write. It returns false.
+         *
+         * Unchecked, that false travelled on as a path: a URL was built from
+         * it, the value was saved, and the editor reported success over a
+         * picture that had never been stored. Silence is the worst of the
+         * three possible outcomes here - worse than an error, because the
+         * client believes their photograph is on their website.
+         */
+        if ($path === false || $path === '') {
+            throw new RuntimeException(
+                'The disk "'.$this->disk().'" refused the upload and gave no reason. '
+                .'Disks are configured with throw => false by default, so nothing was raised; '
+                .'run live-edit:check-media on this host.'
+            );
+        }
+
+        return $path;
     }
 
     /**

@@ -10,6 +10,7 @@ use ShipFast\LiveEdit\Domain\Site\Ability;
 use ShipFast\LiveEdit\Domain\Site\Site;
 use ShipFast\LiveEdit\Domain\Site\TokenType;
 use ShipFast\LiveEdit\Mapper\MarkupScanner;
+use ShipFast\LiveEdit\Tests\Fixtures\RefusesEveryWrite;
 use ShipFast\LiveEdit\Tests\Fixtures\RemoteLikeDisk;
 use ShipFast\LiveEdit\Tests\TestCase;
 
@@ -373,6 +374,33 @@ class MediaTest extends TestCase
         // And it says the page is untouched, because the first thing somebody
         // wonders is whether they have half-broken their own site.
         $this->assertStringContainsString('Nothing on the page has changed', (string) $response->json('error.message'));
+    }
+
+    public function test_a_disk_that_fails_quietly_is_not_reported_as_saved(): void
+    {
+        /*
+         * Laravel's disks are configured with throw => false by default, and
+         * both disks a fresh application ships with have it. A failed write
+         * returns false and raises nothing.
+         *
+         * Unchecked, that false travelled on as a path: an address was built
+         * from it, the value was saved, and the editor said the picture was
+         * stored. Of the three possible outcomes that is the worst - worse
+         * than an error - because the client goes away believing their
+         * photograph is on their website.
+         */
+        Storage::fake('quiet');
+        Storage::set('quiet', new RefusesEveryWrite(Storage::disk('quiet')));
+        config()->set('live-edit.disk', 'quiet');
+
+        $response = $this->post($this->url(), [
+            'target' => 'setting:heroImage',
+            'file' => UploadedFile::fake()->image('beach.jpg', 800, 600),
+        ], $this->as($this->session));
+
+        $response->assertStatus(500);
+        $this->assertSame('storage_error', $response->json('error.type'));
+        $this->assertArrayNotHasKey('heroImage', $this->settings(), 'a picture that was never stored was recorded as stored');
     }
 
     public function test_a_description_is_written_in_the_language_it_was_typed_in(): void
