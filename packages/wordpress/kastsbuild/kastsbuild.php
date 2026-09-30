@@ -3,7 +3,7 @@
 /**
  * Plugin Name: ShipFast Live Edit
  * Description: Edit the words and pictures on this site in place, without a dashboard.
- * Version: 0.12.0
+ * Version: 0.12.10
  * Author: ShipFast
  * Author URI: https://tryshipfast.com
  * Requires PHP: 8.1
@@ -69,6 +69,7 @@ require KASTSBUILD_PATH.'includes/Publishing.php';
 require KASTSBUILD_PATH.'includes/Media.php';
 require KASTSBUILD_PATH.'includes/Builder.php';
 require KASTSBUILD_PATH.'includes/Credits.php';
+require KASTSBUILD_PATH.'includes/Updates.php';
 
 add_action('plugins_loaded', function () {
     // Before anything reads or writes them: a plugin updated by copying files
@@ -84,6 +85,7 @@ add_action('plugins_loaded', function () {
     }
 
     Settings::boot();
+    Updates::boot();
     Frontend::boot();
     Publishing::boot();
     Media::boot();

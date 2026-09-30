@@ -9,6 +9,7 @@ use ShipFast\LiveEdit\Http\Api\Middleware\ThrottleApi;
 use ShipFast\LiveEdit\Http\Api\V1\ContentController;
 use ShipFast\LiveEdit\Http\Api\V1\EmbedController;
 use ShipFast\LiveEdit\Http\Api\V1\LicenceController;
+use ShipFast\LiveEdit\Http\Api\V1\PluginController;
 use ShipFast\LiveEdit\Http\Api\V1\MediaController;
 use ShipFast\LiveEdit\Http\Api\V1\SessionController;
 use ShipFast\LiveEdit\Http\Api\V1\SignInController;
@@ -47,6 +48,22 @@ Route::prefix(config('live-edit.api.prefix', 'api/live-edit/v1').'/{site}')
              * content, only the terms the site is already entitled to know.
              */
             Route::get('/licence', [LicenceController::class, 'show'])->name('live-edit.api.licence');
+
+            /*
+             * Where a WordPress install finds out it is out of date.
+             *
+             * A read key, like the licence beside it: the answer is a version
+             * number and an address, and the site asking already has both a
+             * key and the plugin. What the key buys is knowing who is asking,
+             * so an install that has been cut off stops being served.
+             *
+             * Checked by WordPress on its own schedule rather than by a
+             * person, which is the entire point - before this there was no
+             * check at all, and a fix could be released, believed shipped, and
+             * sit unseen on every WordPress site we have.
+             */
+            Route::get('/plugin', [PluginController::class, 'show'])->name('live-edit.api.plugin');
+            Route::get('/plugin/download', [PluginController::class, 'download'])->name('live-edit.api.plugin.download');
 
             /*
              * Whether the caller's editor session is still good.
