@@ -507,10 +507,32 @@ telling them is a worse failure than leaving it stale and saying so. A stale
 translation also keeps being served - flagged is not withdrawn, and a French
 reader is better off with last month's French than with English.
 
-**Still missing:** the editor has no language menu, no way to switch locale
-while editing, and no banner saying six translations need review. The contract
-is there and nothing reads it yet, which is the same shape of gap this entry
-originally described, one layer up.
+**Built, and driven on a real site.** The editor has a language menu in its
+bar, switching applies that language's words over the page without a reload,
+and every save from then on carries it. Verified against learnkasts running
+locally with four languages: English to French to Swahili and back, the words
+changing each time, with the menu and `liveEditLocale` agreeing at the end.
+
+Three things that run of the editor found, none of which a unit test would
+have:
+
+- **`request()` returns the Response, not the body.** Reading `.locales` off
+  it gave undefined, so the menu silently never appeared - the call was made,
+  the answer was right, and nothing happened. The exact shape of failure this
+  register exists to catch.
+- **Switching languages quickly raced.** Two requests in flight need not come
+  back in order, and the slower first answer landing last painted its language
+  over the one just asked for and set `liveEditLocale` to it: the menu said
+  English, the page showed Swahili, and every save would have gone to Swahili.
+  Each switch now takes a number and only the newest may apply anything.
+- **A site's languages came from the installation's config**, which on the
+  service is one list shared by every customer. A site is now asked for its
+  own, falling back to config so self-hosted installs are untouched.
+
+**Still missing:** nothing shows a translator *which* strings are stale while
+they are editing that language - the count is known and announced, but the page
+does not mark the six sentences it refers to. And the console has no screen for
+choosing a site's languages, so they are set by hand today.
 ---
 
 ### A card wrapped in a link, with a link inside it, is a different tree in the browser

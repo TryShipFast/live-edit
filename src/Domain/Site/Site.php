@@ -29,12 +29,49 @@ class Site extends Model
 
     protected $casts = [
         'allowed_origins' => 'array',
+        'locales' => 'array',
         'limits' => 'array',
         'bytes_stored' => 'integer',
         'suspended_at' => 'datetime',
         'last_active_at' => 'datetime',
         'verified_at' => 'datetime',
     ];
+
+    /**
+     * The languages this site is written in, as code => name.
+     *
+     * Its own when it has chosen any, and the installation's config when it
+     * has not. That fallback is what keeps every self-hosted install working
+     * unchanged: one install, one site, one list in a file is the right shape
+     * there, and it is only the service - many customers behind one
+     * installation - where a shared list is wrong.
+     *
+     * @return array<string, string>
+     */
+    public function languages(): array
+    {
+        $own = array_filter((array) ($this->locales ?? []));
+
+        if ($own !== []) {
+            return $own;
+        }
+
+        $configured = (array) config('live-edit.locales', []);
+
+        return $configured === [] ? [$this->writtenIn() => 'English'] : $configured;
+    }
+
+    /** The language the words are written in. Everything else translates it. */
+    public function writtenIn(): string
+    {
+        return (string) ($this->default_locale ?: config('live-edit.default_locale', 'en'));
+    }
+
+    /** Whether this site is worth offering a language menu for at all. */
+    public function speaksMoreThanOne(): bool
+    {
+        return count($this->languages()) > 1;
+    }
 
     /**
      * Whether this site has proved it holds the domain it registered.

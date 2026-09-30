@@ -83,8 +83,8 @@ class Translations
      */
     public static function statusFor(Site $site): array
     {
-        $known = self::declaredLocales();
-        $default = (string) config('live-edit.default_locale', 'en');
+        $known = self::declaredLocales($site);
+        $default = $site->writtenIn();
 
         $rows = SiteSetting::query()->where('site_id', $site->id)->get(['key', 'value', 'translated_from']);
 
@@ -151,9 +151,20 @@ class Translations
         return $counts;
     }
 
-    /** @return array<int, string> */
-    public static function declaredLocales(): array
+    /**
+     * The language codes a site declares.
+     *
+     * Takes the site, because on the service one list per installation would
+     * be one list shared by every customer - a site in English and Swahili
+     * offered French because somebody else runs French. A self-hosted install
+     * has no site to ask in some call paths, and there the config is right.
+     *
+     * @return array<int, string>
+     */
+    public static function declaredLocales(?Site $site = null): array
     {
-        return array_keys((array) config('live-edit.locales', []));
+        return $site === null
+            ? array_keys((array) config('live-edit.locales', []))
+            : array_keys($site->languages());
     }
 }

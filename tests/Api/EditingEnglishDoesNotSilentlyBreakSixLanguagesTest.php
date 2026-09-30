@@ -219,6 +219,76 @@ class EditingEnglishDoesNotSilentlyBreakSixLanguagesTest extends TestCase
             ->assertJsonPath('needing_review.fr', 1);
     }
 
+    public function test_one_site_does_not_borrow_another_customers_languages(): void
+    {
+        /*
+         * The reason a site carries its own list rather than reading the
+         * installation's config.
+         *
+         * On a self-hosted Laravel or WordPress site, one install is one site
+         * and a list in a file is exactly right. On the service, one install
+         * is every customer - so a config list would offer a site in English
+         * and Swahili the French that somebody else's site runs, and no
+         * customer could choose their own languages without us editing a file
+         * for them. The feature could not have shipped to the product it was
+         * built for.
+         */
+        $mine = Site::query()->create([
+            'slug' => 'kenyan-co',
+            'name' => 'Kenyan Co',
+            'allowed_origins' => ['https://kenyan.test'],
+            'locales' => ['en' => 'English', 'sw' => 'Swahili'],
+            'default_locale' => 'en',
+        ]);
+
+        $this->assertSame(['en', 'sw'], Translations::declaredLocales($mine));
+        $this->assertTrue($mine->speaksMoreThanOne());
+
+        // Configured for the installation, and none of this site's business.
+        $this->assertNotContains('fr', Translations::declaredLocales($mine));
+    }
+
+    public function test_a_site_whose_words_are_not_in_english(): void
+    {
+        /*
+         * A site written in French has its French at the canonical key, not
+         * under "fr:". Reading the installation's default instead would store
+         * a site's own words as a translation of themselves, leaving nothing
+         * at the key the page actually reads.
+         */
+        $site = Site::query()->create([
+            'slug' => 'paris-co',
+            'name' => 'Paris Co',
+            'allowed_origins' => ['https://paris.test'],
+            'locales' => ['fr' => 'French', 'en' => 'English'],
+            'default_locale' => 'fr',
+        ]);
+
+        $store = new SiteStore($site);
+        $store->put('homepage.hero.title', 'Apprenez auprès des meilleurs', false);
+        $store->put('en:homepage.hero.title', 'Learn from the best', false);
+
+        // The French is the canonical, so only the English is a translation.
+        $status = Translations::statusFor($site);
+
+        $this->assertCount(1, $status);
+        $this->assertSame('en', $status[0]['locale']);
+
+        $store->put('homepage.hero.title', 'Quelque chose de nouveau', false);
+
+        $this->assertSame(['en' => 1], Translations::needingReview($site));
+    }
+
+    public function test_a_site_that_has_chosen_nothing_uses_the_installations_list(): void
+    {
+        // Every self-hosted install upgrades to this without filling anything
+        // in, and behaves exactly as it did.
+        $site = $this->site();
+
+        $this->assertSame('en', $site->writtenIn());
+        $this->assertArrayHasKey('fr', $site->languages());
+    }
+
     public function test_only_languages_the_site_declares_are_treated_as_languages(): void
     {
         $site = $this->site();

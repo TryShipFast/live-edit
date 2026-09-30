@@ -29,15 +29,18 @@ class ApplyEdit
     {
         $this->policy->assert($key, $value);
 
-        if ($locale !== null && $locale !== '' && ! array_key_exists($locale, config('live-edit.locales', []))) {
-            throw ValidationException::withMessages(['locale' => 'Unknown locale.']);
+        // The site's own languages, not the installation's. On the service
+        // one list would be one list for every customer, so a site would be
+        // refused its own French and offered somebody else's.
+        if ($locale !== null && $locale !== '' && ! array_key_exists($locale, $site->languages())) {
+            throw ValidationException::withMessages(['locale' => 'That language is not one of this site\'s.']);
         }
 
         if (! Meter::allows($site, Meter::WRITE)) {
             throw new OverLimit('This site has reached its limit of saved changes for this month.');
         }
 
-        $stored = $this->policy->localeKey($key, $locale);
+        $stored = $this->policy->localeKey($key, $locale, $site->writtenIn());
         $hold = DraftStore::enabled();
 
         (new SiteStore($site))->put($stored, $value, $hold);

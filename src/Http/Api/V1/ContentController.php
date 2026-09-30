@@ -172,8 +172,13 @@ class ContentController
         $status = Translations::statusFor($site);
 
         return response()->json([
-            'default_locale' => (string) config('live-edit.default_locale', 'en'),
-            'locales' => Translations::declaredLocales(),
+            'default_locale' => $site->writtenIn(),
+            'locales' => Translations::declaredLocales($site),
+            // What each language is called, so a menu can read "French"
+            // rather than "FR". The site already names them in its config;
+            // sending codes and making the browser guess would produce a
+            // different menu on every device.
+            'names' => $site->languages(),
             // Per locale, how many of its translations no longer match their
             // source. The shape a banner and a summary table both read from.
             'needing_review' => Translations::needingReview($site),

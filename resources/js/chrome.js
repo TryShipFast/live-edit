@@ -133,6 +133,25 @@ a.le-mark:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
 .le-page-btn.is-on { background: #fff; color: #0B0C0F; font-weight: 600; }
 .le-page-btn.is-on:hover { background: #fff; }
 
+/* Which language is being edited. A native select, so it works with a
+   keyboard, a screen reader and a phone without any of that being rebuilt
+   here - styled to sit in the bar rather than replaced by something that only
+   looks like a menu. */
+.le-lang {
+  cursor: pointer; flex: none; appearance: none;
+  background: #1B1D22 url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%23fff' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E") no-repeat right 10px center;
+  color: #fff; border: 0; border-radius: 999px;
+  padding: 7px 26px 7px 12px; font-size: 12px; font-weight: 500;
+  font-family: inherit; line-height: 1.2;
+}
+.le-lang:hover { background-color: #2A2C31; }
+.le-lang:disabled { opacity: .5; cursor: progress; }
+.le-lang:focus-visible { outline: 2px solid var(--le-blue); outline-offset: 2px; }
+/* The options themselves are drawn by the operating system, which does not
+   inherit the bar's colours. Naming both keeps a dark menu from rendering as
+   white text on white. */
+.le-lang option { background: #1B1D22; color: #fff; }
+
 /* Publish is the one accent on the view, and it carries how much is waiting.
    A count is the difference between "publish" as a habit and as a decision. */
 .le-publish {
@@ -833,6 +852,22 @@ export function createChrome() {
     pageSwitcher.setAttribute('role', 'group');
     pageSwitcher.setAttribute('aria-label', 'Pages');
 
+    /*
+     * Which language is being edited.
+     *
+     * A select rather than a menu of our own: the list is short, it is a
+     * choice from a fixed set, and a native control is the one thing on this
+     * bar that already works with a keyboard, a screen reader and a phone
+     * without us building any of it three times.
+     *
+     * Hidden on the sites that have one language, which is most of them. A
+     * control offering a choice of one is furniture.
+     */
+    const languagePicker = el('select', 'le-lang');
+    languagePicker.hidden = true;
+    languagePicker.title = 'Which language you are editing';
+    languagePicker.setAttribute('aria-label', 'Language');
+
     const changesButton = el('button', 'le-bar-btn le-when-roomy', 'Changes');
     changesButton.type = 'button';
     changesButton.title = 'Everything you have changed and not published';
@@ -862,6 +897,7 @@ export function createChrome() {
         redoButton,
         el("span", "le-sep"),
         pageSwitcher,
+        languagePicker,
         changesButton,
         previewButton,
         publishButton,
@@ -1076,6 +1112,7 @@ export function createChrome() {
         undoButton,
         redoButton,
         pageSwitcher,
+        languagePicker,
         statusText,
         dot,
         localeSelect,

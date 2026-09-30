@@ -73,14 +73,14 @@ class SiteSnapshot
      */
     public function read(int $number, ?string $locale = null): ?array
     {
-        $locale ??= (string) config('live-edit.default_locale', 'en');
+        $locale ??= $this->store->site->writtenIn();
         $path = $this->path($number, $locale);
         $disk = $this->disk();
 
         if (! $disk->exists($path)) {
             // A locale with no file of its own falls back to the default's,
             // which already carries every untranslated value.
-            $path = $this->path($number, (string) config('live-edit.default_locale', 'en'));
+            $path = $this->path($number, $this->store->site->writtenIn());
 
             if (! $disk->exists($path)) {
                 return null;
@@ -112,7 +112,7 @@ class SiteSnapshot
     {
         $relative = 'sites/'.$this->store->site->slug.'/'.($number === null
             ? 'current.json'
-            : 'v'.$number.'/'.($locale ?? config('live-edit.default_locale', 'en')).'.json');
+            : 'v'.$number.'/'.($locale ?? $this->store->site->writtenIn()).'.json');
 
         return SnapshotUrl::for($relative);
     }
@@ -156,9 +156,9 @@ class SiteSnapshot
     /** @return array<int, string> */
     private function locales(): array
     {
-        $configured = array_keys(config('live-edit.locales', []));
-
-        return $configured === [] ? [(string) config('live-edit.default_locale', 'en')] : $configured;
+        // The site's own, so publishing writes a file per language that site
+        // actually has rather than per language the installation knows about.
+        return array_keys($this->store->site->languages());
     }
 
     /**

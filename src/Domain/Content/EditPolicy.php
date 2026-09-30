@@ -165,9 +165,13 @@ class EditPolicy
     }
 
     /** "fr:heroTitle" for a translation, "heroTitle" for the default locale. */
-    public function localeKey(string $key, ?string $locale): string
+    public function localeKey(string $key, ?string $locale, ?string $default = null): string
     {
-        $default = config('live-edit.default_locale', 'en');
+        // The site's own written-in language when the caller knows it. A
+        // site whose words are in French would otherwise have its French
+        // stored as a translation of itself, under "fr:", with nothing at the
+        // canonical key at all.
+        $default ??= config('live-edit.default_locale', 'en');
 
         return $locale === null || $locale === '' || $locale === $default ? $key : $locale.':'.$key;
     }

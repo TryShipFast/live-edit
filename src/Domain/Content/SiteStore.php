@@ -30,7 +30,7 @@ class SiteStore
      */
     public function published(?string $locale = null): array
     {
-        $default = (string) config('live-edit.default_locale', 'en');
+        $default = $this->site->writtenIn();
         $locale ??= $default;
         $known = $this->locales();
 
@@ -116,9 +116,9 @@ class SiteStore
      */
     protected function whatThisTranslates(string $key): ?string
     {
-        $known = Translations::declaredLocales();
+        $known = Translations::declaredLocales($this->site);
         $locale = Translations::localeOf($key, $known);
-        $default = (string) config('live-edit.default_locale', 'en');
+        $default = $this->site->writtenIn();
 
         if ($locale === null || $locale === $default) {
             return null;
@@ -302,9 +302,10 @@ class SiteStore
     /** @return array<int, string> */
     private function locales(): array
     {
-        $configured = array_keys(config('live-edit.locales', []));
-
-        return $configured === [] ? [(string) config('live-edit.default_locale', 'en')] : $configured;
+        // The site's own, falling back to the installation's config. See
+        // Site::languages() for why one list per installation is right for a
+        // self-hosted site and wrong for the service.
+        return array_keys($this->site->languages());
     }
 
     private function settings()

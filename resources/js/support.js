@@ -250,6 +250,7 @@ export const apiRequestFor = (url, options = {}, api) => {
         '/live-edit/changes': `${base}/${api?.site}/changes`,
         '/live-edit/versions': `${base}/${api?.site}/versions`,
         '/live-edit/content': `${base}/${api?.site}/content`,
+        '/live-edit/translations': `${base}/${api?.site}/translations`,
         '/live-edit/credits': `${base}/${api?.site}/credits`,
         '/live-edit/assist': `${base}/${api?.site}/assist`,
         '/live-edit/photos': `${base}/${api?.site}/photos`,

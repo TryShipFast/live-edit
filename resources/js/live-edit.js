@@ -3931,6 +3931,150 @@ const bootLiveEdit = () => {
 
         drawPages();
 
+        /* \u2500\u2500 Languages \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
+         *
+         * Every save has carried a locale for a long time, and nothing ever
+         * set one. So a site with seven languages could be edited only in its
+         * first, and the other six were reachable by API and by nothing a
+         * person could click.
+         *
+         * Switching does not reload. The page is already marked up and the
+         * keys do not change between languages - only the values do - so the
+         * words are fetched for the new language and applied over the page
+         * that is already there. A reload would lose the editor's session, the
+         * undo stack and the visitor's place on the page, to show the same
+         * markup with different text in it.
+         */
+        const languages = (async () => {
+            const picker = ui.languagePicker;
+
+            if (!picker) return;
+
+            let said;
+
+            try {
+                // request() hands back the Response, not the body. Reading a
+                // field straight off it gives undefined and this silently did
+                // nothing at all - the call was made, the answer was right,
+                // and the menu never appeared.
+                said = await (await request('/live-edit/translations', { method: 'GET' })).json();
+            } catch {
+                // A site whose service is older than this, or unreachable.
+                // Nothing appears, which is the right amount of noise for a
+                // feature nobody asked for on a site with one language.
+                return;
+            }
+
+            const names = said?.locales ?? [];
+            const fallback = said?.default_locale ?? 'en';
+
+            // One language is not a choice. The control stays hidden rather
+            // than offering a menu with a single item in it.
+            if (names.length < 2) return;
+
+            names.forEach((code) => {
+                const option = el('option', null, said?.names?.[code] ?? code.toUpperCase());
+                option.value = code;
+                picker.append(option);
+            });
+
+            const editing = window.liveEditLocale ?? fallback;
+            picker.value = editing;
+            picker.hidden = false;
+
+            /*
+             * Say how many translations have fallen behind the words they
+             * translate, and say it where somebody editing will see it.
+             *
+             * Counted rather than corrected. Changing "the best educators" to
+             * "Africa's leading educators" is a change of meaning, and putting
+             * a machine's French over somebody's reviewed French without
+             * asking is a worse failure than leaving it stale and saying so.
+             */
+            const stale = said?.counts?.stale ?? 0;
+
+            if (stale > 0 && editing === fallback) {
+                const languagesAffected = Object.keys(said?.needing_review ?? {}).length;
+
+                notify(
+                    languagesAffected === 1
+                        ? `1 translation may need updating since the ${fallback.toUpperCase()} changed.`
+                        : `${languagesAffected} languages have translations that may need updating.`
+                );
+            }
+
+            /*
+             * Which switch is the current one.
+             *
+             * Two languages chosen quickly are two requests in flight, and
+             * they do not have to come back in the order they went out. The
+             * slower first answer landing last would paint that language over
+             * the one just asked for and set `liveEditLocale` to it - leaving
+             * the menu saying English, the page showing Swahili, and every
+             * save going to Swahili. Measured on a real page: exactly that.
+             *
+             * So each switch takes a number and only the newest is allowed to
+             * apply anything.
+             */
+            let switchNumber = 0;
+
+            picker.addEventListener('change', async () => {
+                const wanted = picker.value;
+                const mine = ++switchNumber;
+
+                picker.disabled = true;
+
+                try {
+                    const fresh = await (await request(
+                        `/live-edit/content?locale=${encodeURIComponent(wanted)}`,
+                        { method: 'GET' }
+                    )).json();
+
+                    // Overtaken while this was in flight. The newer switch
+                    // owns the page now, and applying these words would undo
+                    // it silently.
+                    if (mine !== switchNumber) {
+                        return;
+                    }
+
+                    // Every save from here carries the new language, which is
+                    // what the API has always read and nothing has ever set.
+                    window.liveEditLocale = wanted;
+
+                    // Loaded on demand, the way this file loads everything
+                    // else from content.js: the guard, the snapshot reader.
+                    // Most visits never switch language and should not carry
+                    // the code that does.
+                    const { applyContent } = await import('./content.js');
+
+                    applyContent(document, fresh?.settings ?? {});
+
+                    notify(
+                        wanted === fallback
+                            ? 'Editing the original.'
+                            : `Editing in ${picker.options[picker.selectedIndex]?.text ?? wanted}. Saves here do not change the original.`
+                    );
+                } catch {
+                    if (mine !== switchNumber) {
+                        return;
+                    }
+
+                    // Put the control back where it was: a picker showing a
+                    // language whose words did not load is a lie about what a
+                    // save is about to change.
+                    picker.value = window.liveEditLocale ?? fallback;
+                    notify('Could not load that language. Nothing has been changed.');
+                } finally {
+                    // Only the newest switch re-enables, or an overtaken one
+                    // would unlock the control while the current fetch is
+                    // still running.
+                    if (mine === switchNumber) {
+                        picker.disabled = false;
+                    }
+                }
+            });
+        })();
+
         /* \u2500\u2500 Undo and redo \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
          *
          * Undo takes back the most recent thing not yet published, which is
