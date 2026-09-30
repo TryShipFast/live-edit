@@ -16,6 +16,31 @@ Toy pages agree with whatever the code already does.
 
 ## Open
 
+### Nothing says which engine the service is actually running
+
+A cloud site is tagged by the console and saves through the console, so for
+every customer who is not self-hosting, **the console's installed engine is the
+product**. A fix released from this repository has not shipped to any of them
+until somebody upgrades that application and deploys it.
+
+On 2026-09-30 the console was running v0.11.0 while this repository stood at
+v0.12.7: eight releases, thirty-eight commits. Two bugs were reported from
+learnkasts.com that morning and both were already fixed here - the icon missing
+from the inline tags, and the picture companion - so the reports read as fixes
+that had not worked. The one genuinely new fault, item keys being refused, was
+found only because the other two were chased first.
+
+Nothing in the product would have said so. The console does not show its engine
+version, the editor does not send one, and a site tagged by an old engine
+carries no mark to say which engine tagged it. The only way to learn it is to
+run `composer show` on the server, which nobody does while a customer is
+waiting.
+
+**Worth building, not built:** the version in the console's own site view, and
+in whatever the editor reports when something fails. A stale engine is the
+likeliest explanation for "this was fixed and it still does not work", and it
+is currently the one thing nobody can see.
+
 ### Fixed: the mapper wrote labels and regions that nothing read
 **Adapter:** all. **Found:** 2026-09-29. **Fixed:** 2026-09-29.
 
