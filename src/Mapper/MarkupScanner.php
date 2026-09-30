@@ -57,8 +57,21 @@ class MarkupScanner
      * ever admits an element whose own words are already editable, and the
      * applier replaces text nodes while leaving child markup alone, so the
      * <code> keeps its tag and its styling.
+     *
+     * svg and img are here for that same reason, and the same bug happened
+     * again without them. "Explore LearnKasts for educators" followed by an
+     * arrow is a call to action on every marketing page ever written, and the
+     * arrow made the words uneditable: the icon itself got a key and could be
+     * swapped, while the sentence beside it could not be touched. A client can
+     * see both and has no way to tell why one answers and the other does not.
+     *
+     * They are not phrasing content in the specification's sense, which is
+     * what this list otherwise follows. They earn their place on the same
+     * practical test as the rest: the applier writes text nodes and leaves
+     * child elements alone, so the icon survives the edit exactly as the
+     * <code> does.
      */
-    protected const INLINE_TAGS = ['b', 'strong', 'i', 'em', 'u', 's', 'small', 'br', 'wbr', 'span', 'a', 'sup', 'sub', 'mark', 'code', 'kbd', 'samp', 'var', 'abbr', 'acronym', 'cite', 'q', 'del', 'ins', 'dfn', 'time', 'data', 'bdi', 'bdo', 'ruby', 'rt', 'rp', 'big', 'tt', 'strike', 'font', 'nobr'];
+    protected const INLINE_TAGS = ['b', 'strong', 'i', 'em', 'u', 's', 'small', 'br', 'wbr', 'span', 'a', 'sup', 'sub', 'mark', 'code', 'kbd', 'samp', 'var', 'abbr', 'acronym', 'cite', 'q', 'del', 'ins', 'dfn', 'time', 'data', 'bdi', 'bdo', 'ruby', 'rt', 'rp', 'big', 'tt', 'strike', 'font', 'nobr', 'svg', 'img', 'picture'];
 
     /** @var array<int, array<string, mixed>> */
     protected array $candidates = [];
@@ -1454,7 +1467,23 @@ class MarkupScanner
             // offering a web address for one of those invites breaking it.
             if ($tag === 'a' && $this->isDestination($child)) {
                 $this->addLink($child);
-                if (! $this->isTextLeaf($child)) {
+
+                /*
+                 * A link that is a text leaf is still descended into when it
+                 * holds something that is not words.
+                 *
+                 * The same rule the text branch below already followed, and
+                 * this one did not. It did not matter while an icon
+                 * disqualified its parent from being a leaf at all; the
+                 * moment an icon stopped doing that, "Learn more →" became an
+                 * editable sentence whose arrow had quietly lost its own key.
+                 * Both or neither: a client can see both and cannot be told
+                 * why one answers.
+                 */
+                if (! $this->isTextLeaf($child)
+                    || $this->hasCounterInside($child)
+                    || $this->hasMediaInside($child)
+                    || $this->hasPhraseInside($child)) {
                     $this->walk($child);
                 }
 
