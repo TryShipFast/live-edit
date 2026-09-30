@@ -10,6 +10,7 @@ use ShipFast\LiveEdit\Domain\Site\Meter;
 use ShipFast\LiveEdit\Domain\Site\OverLimit;
 use ShipFast\LiveEdit\Domain\Site\Site;
 use ShipFast\LiveEdit\Models\EditRevision;
+use ShipFast\LiveEdit\Support\OneAction;
 use ShipFast\LiveEdit\Support\DraftStore;
 
 /**
@@ -50,7 +51,7 @@ class ApplyStyle
         (new SiteStore($site))->putStyle($key, $clean, $hold);
 
         EditRevision::query()->create([
-            'batch' => 'api:'.$site->slug.':'.$token->public_id,
+            'batch' => OneAction::by($site->slug, (string) $token->public_id),
             'action' => 'style',
             'subject' => $key,
             'payload' => ['site' => $site->slug, 'held' => $hold],

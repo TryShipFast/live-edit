@@ -10,6 +10,7 @@ use ShipFast\LiveEdit\Domain\Site\Meter;
 use ShipFast\LiveEdit\Domain\Site\OverLimit;
 use ShipFast\LiveEdit\Domain\Site\Site;
 use ShipFast\LiveEdit\Models\EditRevision;
+use ShipFast\LiveEdit\Support\OneAction;
 use ShipFast\LiveEdit\Support\DraftStore;
 
 /**
@@ -48,7 +49,7 @@ class ApplyEdit
         // Recorded against the key that made the change and the site it
         // belongs to, not a user: a site's own people are not accounts here.
         EditRevision::query()->create([
-            'batch' => 'api:'.$site->slug.':'.$token->public_id,
+            'batch' => OneAction::by($site->slug, (string) $token->public_id),
             'action' => 'setting',
             'subject' => $stored,
             'payload' => ['site' => $site->slug, 'held' => $hold],

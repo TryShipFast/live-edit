@@ -14,6 +14,7 @@ use ShipFast\LiveEdit\Domain\Content\ImageStore;
 use ShipFast\LiveEdit\Domain\Content\StylePolicy;
 use ShipFast\LiveEdit\Models\Draft;
 use ShipFast\LiveEdit\Models\EditRevision;
+use ShipFast\LiveEdit\Support\OneAction;
 use ShipFast\LiveEdit\Models\ElementStyle;
 use ShipFast\LiveEdit\Support\DraftStore;
 
@@ -464,13 +465,11 @@ class LiveEditController extends Controller
 
     protected function remember(string $action, string $subject, ?array $payload): void
     {
-        // Batch scoped to the request, not the controller: route objects cache
+        // Scoped to the request, not the controller: route objects cache
         // controller instances (tests, Octane), which would merge batches.
-        $batch = request()->attributes->get('live-edit-batch');
-        if ($batch === null) {
-            $batch = (string) Str::uuid();
-            request()->attributes->set('live-edit-batch', $batch);
-        }
+        // Shared with the API rather than written twice - the API had its own
+        // idea of a batch and it grouped a client's entire history into one.
+        $batch = OneAction::id();
 
         EditRevision::query()->create([
             'batch' => $batch,
