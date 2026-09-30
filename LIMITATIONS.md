@@ -352,36 +352,43 @@ See the entry below.
 
 ---
 
-### A Laravel site with no database of its own cannot keep content
-**Adapter:** Laravel. **Found:** 2026-09-29. **Severity:** high for a whole
-class of customer.
+### Fixed: a Laravel site with no database of its own could not keep content
+**Adapter:** Laravel. **Found:** 2026-09-29. **Fixed:** 2026-09-30.
 
-An API-driven frontend has no database worth the name. Its data comes from an
-API, its filesystem is a container that is replaced on every deploy, and
-asking its owner to provision a database in order to install an editor is
-asking them to buy infrastructure to use a content tool. They will say no, and
-they will be right.
+**Fixed, and the entry was wrong when it was written.** It said there was "no
+switch to have the service keep it instead" and that nothing wired
+`RemoteContent` together for a Laravel host. There was a switch, and it had
+been there all along: `CloudInstall::script()` has always had two branches,
+and setting a cloud host and site makes a Laravel page serve the same install
+script a static or React site gets. The service holds the words, the browser
+tags and applies them, and the host needs no database at all.
 
-The engine has no answer for this today. A Laravel host always keeps its own
-content, and there is no switch to have the service keep it instead. The
-pieces exist and are proven elsewhere: `RemoteContent` reads published content
-over HTTP and is what static and React sites use, the content API already
-takes writes, and the keys already exist. **Nothing wires them together for a
-Laravel host**, and `RemoteContent` currently has no caller in the engine at
-all.
+```
+LIVE_EDIT_CLOUD_HOST=https://live.tryshipfast.com
+LIVE_EDIT_CLOUD_SITE=your-slug
+```
 
-SQLite is not the answer for these sites and should not be offered as one. On
-a container the file is recreated empty on every deploy, so a client would
-edit their home page, publish it, and lose every word at the next deploy,
-silently.
+Two env lines rather than the week of work this entry predicted. What was
+genuinely missing was that **nobody had ever been told a Laravel app could
+choose it** - the install card taught the database arrangement as the only
+one, and mentioned the other in a footnote headed "No database?", after the
+reader had already been told to run a migration. The console now asks where
+the words should live before giving any instructions, and shows only the
+chosen path.
 
-**To close it:** a content-lives-on-the-service mode for the Laravel adapter.
-Reading through `RemoteContent`, writing through the content API, no
-migrations and no database required. That is the same arrangement the cloud
-product already sells to sites with no backend at all; Laravel is simply not
-allowed to choose it yet.
+**What the switch did not do by itself**, and cost a live site two outages to
+find: the rest of the package went on reading local content tables anyway. An
+API-driven frontend has no such tables and its container filesystem is
+replaced on every deploy, so it answered 500 after every single deployment.
+Guarding each reader was treating the symptom; the site's owner asked the
+right question, which was why a cloud install reads local settings at all.
+`WhereTheWordsLive` now answers that once, and `PublishedContent` and the
+tagging middleware both stop before the database.
 
----
+**Still true and still worth saying to a customer:** SQLite on a container is
+not an answer for these sites. The file is recreated empty on every deploy, so
+a client would edit their home page, publish it, and lose every word the next
+time anybody shipped.
 
 ### Translation is stored and served per locale, and nothing ever sets one
 **Adapter:** all, WordPress measured. **Found:** 2026-09-29. **Severity:** low
