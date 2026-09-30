@@ -57,6 +57,51 @@ class APictureCanActuallyBeStoredTest extends TestCase
             ->assertFailed();
     }
 
+    public function test_a_configured_disk_that_will_not_build_is_not_called_missing(): void
+    {
+        /*
+         * Two quite different faults, and the first version of this command
+         * called both of them the same thing.
+         *
+         * A disk absent from the config is a name to change. A disk that is in
+         * the config and will not build is a missing adapter package, or a
+         * value the driver needs and has not been given - and being told
+         * "there is no disk called s3" while looking at an s3 block in
+         * filesystems.php sends somebody hunting through the wrong file.
+         *
+         * Both happened on the same host within an hour: first the flysystem
+         * adapter was not installed, then the region was empty.
+         */
+        config()->set('filesystems.disks.wonky', ['driver' => 'no-such-driver']);
+        config()->set('live-edit.disk', 'wonky');
+
+        $this->artisan('live-edit:check-media')
+            ->expectsOutputToContain('is configured, and could not be built')
+            ->assertFailed();
+    }
+
+    public function test_it_lists_what_the_disk_reads_without_printing_a_secret(): void
+    {
+        // Which values arrived is the whole question, and two of them are
+        // credentials. Whether they are empty answers it and gives nothing
+        // away.
+        config()->set('filesystems.disks.wonky', [
+            'driver' => 'no-such-driver',
+            'region' => '',
+            'key' => 'AKIAREALLOOKINGKEY',
+            'secret' => 'a-real-looking-secret',
+        ]);
+        config()->set('live-edit.disk', 'wonky');
+
+        // One substring, not two: the assertion is consumed per line written,
+        // and both of these land on the same line.
+        $this->artisan('live-edit:check-media')
+            ->expectsOutputToContain(sprintf('%-28s %s', 'region', '(empty)'))
+            ->doesntExpectOutputToContain('AKIAREALLOOKINGKEY')
+            ->doesntExpectOutputToContain('a-real-looking-secret')
+            ->assertFailed();
+    }
+
     public function test_it_says_which_disk_it_is_talking_about(): void
     {
         // Printed whatever the outcome. Half of diagnosing this is finding out

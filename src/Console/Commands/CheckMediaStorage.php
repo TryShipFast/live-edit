@@ -36,16 +36,53 @@ class CheckMediaStorage extends Command
         $this->line('media url  '.((string) config('live-edit.media_url', '') ?: '(the disk answers for itself)'));
         $this->newLine();
 
+        $defined = config("filesystems.disks.{$disk}");
+
         try {
             $filesystem = Storage::disk($disk);
         } catch (\Throwable $e) {
-            // A disk named here and not defined in the host's filesystems
-            // config. Says which, because "Disk [s3] does not have a
-            // configured driver" read on its own sends people to the wrong
-            // file.
-            $this->error("There is no disk called \"{$disk}\" in this application's filesystems config.");
-            $this->line('  '.$e->getMessage());
-            $this->line('  Set LIVE_EDIT_DISK to one that exists, or define that one.');
+            /*
+             * Two quite different faults, and the first version of this
+             * command called both of them the same thing.
+             *
+             * A disk that is not in the config at all is a typo or a variable
+             * pointing somewhere that does not exist. A disk that IS in the
+             * config and will not build is a missing adapter package or a
+             * setting the driver needs and has not been given - and being told
+             * "there is no disk called s3" while looking at an s3 block in
+             * filesystems.php sends somebody hunting for the wrong thing.
+             * Both were seen within an hour of each other on the same host.
+             */
+            if ($defined === null) {
+                $this->error("There is no disk called \"{$disk}\" in this application's filesystems config.");
+                $this->line('  '.$e->getMessage());
+                $this->line('  Set LIVE_EDIT_DISK to one that exists, or define that one.');
+
+                return self::FAILURE;
+            }
+
+            $this->error("The disk \"{$disk}\" is configured, and could not be built:");
+            $this->newLine();
+            $this->line('  '.trim($e->getMessage()));
+            $this->newLine();
+            $this->line('  The disk exists in config/filesystems.php, so this is not a name to');
+            $this->line('  change. Either its driver package is not installed, or one of the');
+            $this->line('  values it reads from the environment is empty here. What it reads:');
+            $this->newLine();
+
+            foreach ($defined as $setting => $value) {
+                // Never the values: two of them are credentials. Whether each
+                // one arrived is the whole question and gives nothing away.
+                if (in_array($setting, ['key', 'secret', 'token'], true)) {
+                    continue;
+                }
+
+                $this->line(sprintf(
+                    '    %-28s %s',
+                    $setting,
+                    is_scalar($value) && (string) $value !== '' ? (string) $value : '(empty)'
+                ));
+            }
 
             return self::FAILURE;
         }
