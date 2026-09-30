@@ -90,3 +90,7 @@ export interface Bridge {
 }
 
 export declare function readBridge(): Bridge | null;
+
+/** Compose a row's identity onto a key, or leave it alone when the card is not in a list. */
+export declare function contentKeyIn(row: string | null | undefined, key: string): string | null;
+export declare function editMarkerIn(row: string | null | undefined, key: string): string | undefined;

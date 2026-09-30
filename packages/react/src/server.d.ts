@@ -23,3 +23,15 @@ export declare function itemIdentity(item: unknown): string | null;
 export declare function listIdentity(items: unknown[]): { usable: boolean; why: string | null };
 export declare function contentKeyFor(list: string, field: string, item: unknown): string | null;
 export declare function editMarkerFor(list: string, field: string, item: unknown): string | undefined;
+
+/** One editable value, as a server component. `row` is set by the codemod on a card in a list. */
+export declare function LiveEditText(props: {
+    contentKey: string;
+    fallback?: string;
+    locale?: string | null;
+    row?: string | null;
+}): Promise<string>;
+
+/** Compose a row's identity onto a key, or leave it alone when the card is not in a list. */
+export declare function contentKeyIn(row: string | null | undefined, key: string): string | null;
+export declare function editMarkerIn(row: string | null | undefined, key: string): string | undefined;

@@ -672,7 +672,7 @@ measuring the output.
 
 ---
 
-### Mostly fixed: anything inside a .map() was not editable, which on a real page is most of it
+### Fixed: anything inside a .map() was not editable, which on a real page is most of it
 **Adapter:** React, Next.js. **Recorded:** 2026-09-27. **Severity:** high for
 React, because it decides how much of a page a customer can actually change.
 
@@ -701,18 +701,33 @@ and reorder, because the array passes through `useLiveEditList` on its way to
 that passthrough is a hook; the marker that would advertise rearranging is
 deliberately withheld rather than written and left unbacked.
 
-**One shape remains, and it is the ordinary shape of an App Router page:** the
-list in one file, the card in another, both rendered on the server. On the
-client the row's identity travels in React context; there is no context in a
-server component, so it would have to arrive as a prop - which means the
-codemod editing the call site and the component's parameter list in two files,
-in step. Not built.
+**Closed for the App Router shape too, on 2026-09-30.** The list in one file,
+the card in another, both on the server. The identity is handed over as a prop:
+the call site gains `liveEditRow={itemIdentity(post)}`, the card gains a
+`liveEditRow` parameter, and its keys are composed at render from it. Both
+files in step or neither, decided by the command rather than the transform,
+because a file cannot see the other one and wiring a single side is the worst
+of the three outcomes - the list would read as covered while every row still
+shared one key.
 
-What did get built is the tool saying so. A list it cannot reach is reported by
-file and component name with the one-line workaround, instead of being absorbed
-into a count where "no list here" and "a list I passed over" look identical.
-That distinction is the whole reason this entry was worth writing: the original
-measurement said 62 elements tagged, and read as coverage.
+Three states, and the difference between the last two is the work: the prop
+absent means the card is on its own page and its keys are untouched, a string
+means it is a row, and null means a row of a list whose items have no identity
+of their own, where nothing is offered rather than a key twenty rows would
+share. TypeScript props are widened at the same time, parenthesised, since a
+codemod that leaves an application unable to compile is worse than one that
+passed the file over.
+
+**What is still reported rather than wired:** a card whose own child component
+lives in a third file. The identity reaches the card and stops there. Also any
+card the scan cannot resolve to a file it is about to rewrite - from a package,
+or behind an import it cannot follow - which is deliberate: handing the prop to
+a component that does nothing with it would read as coverage.
+
+A list not reached is still reported by file and component name rather than
+absorbed into a count where "no list here" and "a list I passed over" look
+identical. That distinction is the whole reason this entry was worth writing:
+the original measurement said 62 elements tagged, and read as coverage.
 
 ---
 

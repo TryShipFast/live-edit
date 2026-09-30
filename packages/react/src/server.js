@@ -1,5 +1,6 @@
 import * as React from 'react';
 import { createClient } from './client.js';
+import { contentKeyIn } from './keys.js';
 
 /**
  * Reading content on the server, for components that never reach a browser.
@@ -201,11 +202,27 @@ export const liveEditWords = async (locale = null) => {
  * a child needs neither: it awaits its own words wherever it is rendered, in a
  * loop or out in the open, and the function it sits in never changes.
  */
-export const LiveEditText = async ({ contentKey, fallback = '', locale = null }) => {
+export const LiveEditText = async ({ contentKey, fallback = '', locale = null, row }) => {
+    /*
+     * `row` is how a card in its own file learns which row it is. Passing it
+     * is what the `LiveEditItem` wrapper does in the browser, where the
+     * identity travels in context; here there is no context, so the file
+     * holding the `.map()` passes it in and this composes it onto the key.
+     *
+     * Undefined means no list, null means a list whose rows cannot be told
+     * apart - and the second returns the component's own words rather than a
+     * key every row would share.
+     */
+    const composed = contentKeyIn(row, contentKey);
+
+    if (composed === null) {
+        return fallback;
+    }
+
     const words = await liveEditWords(locale);
 
-    return words(contentKey, fallback);
+    return words(composed, fallback);
 };
 
 export { itemIdentity, listIdentity } from './identity.js';
-export { contentKeyFor, editMarkerFor } from './keys.js';
+export { contentKeyFor, editMarkerFor, contentKeyIn, editMarkerIn } from './keys.js';

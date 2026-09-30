@@ -2,7 +2,7 @@ export { LiveEditProvider } from './provider.js';
 export { useContent } from './useContent.js';
 export { LiveEditText } from './text.js';
 export { itemIdentity, listIdentity } from './identity.js';
-export { contentKeyFor, editMarkerFor } from './keys.js';
+export { contentKeyFor, editMarkerFor, contentKeyIn, editMarkerIn } from './keys.js';
 export { useLiveEditList } from './list.js';
 export { LiveEditItem, useItemIdentity } from './item.js';
 export { useLiveEdit } from './context.js';

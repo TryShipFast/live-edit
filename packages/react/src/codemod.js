@@ -427,7 +427,130 @@ const walk = (node, visit) => {
 /**
  * @returns {{code: string, changes: Array<{key: string, tag: string, text: string}>, mode: string}}
  */
-export const transform = (source, { relativePath = 'unknown', force = null, repeated = false } = {}) => {
+/**
+ * The components in this file that are drawn once per row of a list, and how
+ * each one is told which row it is.
+ *
+ * A card cannot know this about itself. `post-preview.tsx` renders a title;
+ * whether that title is one post or one of twenty is decided in whichever file
+ * writes `posts.map(post => <PostPreview/>)`, which on an App Router page is
+ * always somewhere else. So the caller names them, having read the whole
+ * project, and this finds their declarations and works out what to thread in.
+ *
+ * Two shapes, because both are ordinary React:
+ *
+ *     ({ title }) => ...        gains a `liveEditRow` of its own
+ *     (props) => ...            already has somewhere to put it: props.liveEditRow
+ *
+ * Anything else - no parameter at all, a destructured array, a default value
+ * in the way - is left out. A card with no props has nothing that differs per
+ * row, so there is nothing here to key.
+ *
+ * TypeScript needs the annotation widened as well as the pattern. Adding a
+ * property to `({ title }: Props)` and not to `Props` is a build error, and a
+ * codemod that leaves an app that will not compile is worse than one that
+ * passed the file over.
+ */
+const rowCardsIn = (ast, names, source) => {
+    const wanted = new Set(names);
+    const found = [];
+
+    if (wanted.size === 0) {
+        return found;
+    }
+
+    const widen = (param, edits) => {
+        const annotation = param.typeAnnotation?.typeAnnotation;
+
+        if (annotation === undefined || annotation === null) {
+            return;
+        }
+
+        // Parenthesised, because `A | B & C` does not group the way it reads
+        // and a union is exactly what a props type often is.
+        edits.push({ start: annotation.start, end: annotation.start, text: '(' });
+        edits.push({
+            start: annotation.end,
+            end: annotation.end,
+            text: ') & { liveEditRow?: string | null }',
+        });
+    };
+
+    const read = (name, fn) => {
+        const param = fn.params?.[0];
+
+        if (param === undefined) {
+            return;
+        }
+
+        const edits = [];
+
+        if (param.type === 'Identifier') {
+            widen(param, edits);
+
+            found.push({ name, start: fn.start, end: fn.end, row: `${param.name}.liveEditRow`, edits });
+
+            return;
+        }
+
+        if (param.type !== 'ObjectPattern') {
+            return;
+        }
+
+        const properties = param.properties ?? [];
+        const rest = properties.find((property) => property.type === 'RestElement');
+
+        if (properties.some((property) => property.value?.type === 'AssignmentPattern'
+            && property.key?.name === 'liveEditRow')) {
+            // A second run. The prop is already there and the keys must not move.
+            found.push({ name, start: fn.start, end: fn.end, row: 'liveEditRow', edits: [] });
+
+            return;
+        }
+
+        if (properties.some((property) => (property.key?.name ?? property.argument?.name) === 'liveEditRow')) {
+            found.push({ name, start: fn.start, end: fn.end, row: 'liveEditRow', edits: [] });
+
+            return;
+        }
+
+        if (properties.length === 0) {
+            edits.push({ start: param.start + 1, end: param.start + 1, text: ' liveEditRow ' });
+        } else if (rest) {
+            // Before the rest, never after: a property following `...rest` is
+            // a syntax error, not a style choice.
+            edits.push({ start: rest.start, end: rest.start, text: 'liveEditRow, ' });
+        } else {
+            const last = properties[properties.length - 1];
+
+            edits.push({ start: last.end, end: last.end, text: ', liveEditRow' });
+        }
+
+        widen(param, edits);
+
+        found.push({ name, start: fn.start, end: fn.end, row: 'liveEditRow', edits });
+    };
+
+    walk(ast.program, (node) => {
+        if (node.type === 'FunctionDeclaration' && wanted.has(node.id?.name)) {
+            read(node.id.name, node);
+
+            return;
+        }
+
+        if (node.type !== 'VariableDeclarator' || !wanted.has(node.id?.name)) {
+            return;
+        }
+
+        if (node.init?.type === 'ArrowFunctionExpression' || node.init?.type === 'FunctionExpression') {
+            read(node.id.name, node.init);
+        }
+    });
+
+    return found;
+};
+
+export const transform = (source, { relativePath = 'unknown', force = null, repeated = false, serverRows = [], rowCards = [] } = {}) => {
     let ast;
 
     try {
@@ -480,6 +603,35 @@ export const transform = (source, { relativePath = 'unknown', force = null, repe
      * be written over the first.
      */
     const claimed = new Set();
+
+    /*
+     * The cards in this file that are a row of somebody else's list.
+     *
+     * Only ever on the server. On the client the row's identity travels in
+     * context and the card needs nothing passed to it at all, which is why
+     * `LiveEditItem` exists and why none of this applies there.
+     */
+    const cards = isClient ? [] : rowCardsIn(ast, rowCards, source);
+
+    /**
+     * The expression that says which row a node is being drawn for, if any.
+     *
+     * Position, not scope: the walk sees a node without knowing which function
+     * it is inside, and a card's declaration is a range this one either falls
+     * in or does not. Nested cards are not a thing anybody writes, so the
+     * first match is the answer.
+     */
+    const rowAt = (node) => {
+        const card = cards.find((held) => node.start >= held.start && node.end <= held.end);
+
+        if (card === undefined) {
+            return null;
+        }
+
+        card.used = true;
+
+        return card.row;
+    };
 
     /**
      * Write the list scaffolding: the collection, the item, and its fields.
@@ -580,22 +732,51 @@ export const transform = (source, { relativePath = 'unknown', force = null, repe
 
         if (component) {
             /*
-             * A card in another file, rendered on the server, is the one shape
-             * still not covered - and it is the ordinary shape of an App
-             * Router page, so it is reported rather than passed over.
+             * A card in another file, rendered on the server: the ordinary
+             * shape of an App Router page.
              *
              * The client wraps the row and lets identity travel in context.
-             * There is no context in a server component, and no way to put it
-             * there: the identity would have to arrive as a prop, which means
-             * editing the call site here AND the component's own parameter
-             * list in the other file, in step. That is a different piece of
-             * work from this one and it is written down as such.
+             * There is no context in a server component, so the identity is
+             * handed over as a prop instead - which means editing the call
+             * site here AND the component's own parameter list in the other
+             * file, in step. Neither file can see the other, so which cards
+             * are wirable is decided by whatever is scanning the project and
+             * arrives here as `serverRows`.
              */
             if (!isClient) {
-                deferred.push({
-                    tag: tagNameOf(item.openingElement),
-                    why: 'a row rendered by a component in another file, on the server',
-                });
+                const card = tagNameOf(item.openingElement);
+
+                /*
+                 * The identity, handed over as a prop.
+                 *
+                 * Only to a card this run is also rewriting. The name alone is
+                 * not enough - a component from a library, or one this scan
+                 * never saw, would be given a prop it does nothing with, and
+                 * the list would read as wired while every row still shared
+                 * one key. So the caller resolves the import first and names
+                 * only what it is about to change, and anything else is
+                 * reported exactly as before.
+                 */
+                if (!serverRows.includes(card)) {
+                    deferred.push({
+                        tag: card,
+                        why: 'a row rendered by a component in another file, on the server',
+                    });
+
+                    return;
+                }
+
+                if (!hasAttribute(item.openingElement, 'liveEditRow')) {
+                    needs.add('itemIdentity');
+
+                    edits.push({
+                        start: item.openingElement.name.end,
+                        end: item.openingElement.name.end,
+                        text: ` liveEditRow={itemIdentity(${param})}`,
+                    });
+
+                    changes.push({ key: listKey, tag: card, text: source.slice(over.start, over.end) });
+                }
 
                 return;
             }
@@ -777,7 +958,9 @@ export const transform = (source, { relativePath = 'unknown', force = null, repe
              * written into the component are the same words on every row, so
              * one key for them is not a collision, it is the truth.
              */
-            if (read !== null && repeated && !isClient) {
+            const row = read !== null && repeated && !isClient ? rowAt(node) : null;
+
+            if (read !== null && repeated && !isClient && row === null) {
                 deferred.push({
                     tag,
                     why: 'a value that differs per row, in a card rendered on the server, where rows cannot yet be told apart',
@@ -791,6 +974,32 @@ export const transform = (source, { relativePath = 'unknown', force = null, repe
             }
 
             const key = keyFor(relativePath, index++, read);
+
+            /*
+             * In a row card the key and the marker are both composed at render
+             * from the prop, because the row is not known here - this file is
+             * written once and drawn per item. Out in the open the key is a
+             * string, exactly as it was.
+             */
+            if (row !== null) {
+                needs.add('editMarkerIn');
+                needs.add('LiveEditText');
+
+                edits.push({
+                    start: node.openingElement.name.end,
+                    end: node.openingElement.name.end,
+                    text: ` data-edit={editMarkerIn(${row}, ${JSON.stringify(key)})}`,
+                });
+                edits.push({
+                    start: children[0].start,
+                    end: children[0].end,
+                    text: `<LiveEditText contentKey=${JSON.stringify(key)} row={${row}} fallback={${read}} />`,
+                });
+
+                changes.push({ key, tag, text: read });
+
+                return;
+            }
 
             edits.push({
                 start: node.openingElement.name.end,
@@ -864,6 +1073,16 @@ export const transform = (source, { relativePath = 'unknown', force = null, repe
 
         changes.push({ key, tag, text: span.rendered });
     });
+
+    /*
+     * The parameter, added last and only where it is read.
+     *
+     * A card that turned out to hold nothing per-row keeps the signature it
+     * was written with. An unused prop is not harmless here: it is a promise
+     * in the source that this card is keyed by row, which the next person to
+     * read it would believe.
+     */
+    cards.filter((card) => card.used).forEach((card) => edits.push(...card.edits));
 
     if (changes.length === 0) {
         return { code: source, changes, already, deferred, mode: isClient ? 'client' : 'server' };

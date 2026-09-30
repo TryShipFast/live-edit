@@ -267,6 +267,65 @@ const rowComponents = (() => {
     return marked;
 })();
 
+/**
+ * The two halves of a server list, matched up.
+ *
+ * `posts.map(post => <PostPreview/>)` in one file and `PostPreview` in
+ * another, both rendered on the server. On the client the row's identity
+ * travels in React context and neither file needs to know about the other;
+ * there is no context on the server, so the identity has to be handed over as
+ * a prop - which means editing the call site and the card's own parameter list
+ * in step, in two files, or neither.
+ *
+ * Which is why this is here and not in the transform. A file cannot see the
+ * other one, and wiring only one side is the worst of the three outcomes: the
+ * list would read as covered while every row still shared a single key.
+ *
+ * Only where the card resolves to a file this run is about to rewrite. A
+ * component from a library, or one behind an import this cannot follow, is
+ * left alone and reported exactly as it was before.
+ */
+const serverRowPairs = (() => {
+    const callSites = new Map();
+    const cards = new Map();
+
+    if (force === true) {
+        // Everything is being made client-side, where context does this job.
+        return { callSites, cards };
+    }
+
+    const inAMap = /\.map\(\s*\(?[^)]*\)?\s*=>\s*\(?\s*<([A-Z][A-Za-z0-9_]*)/g;
+
+    for (const [file, source] of sources) {
+        if (clientRendered.has(file) && force !== false) {
+            continue;
+        }
+
+        for (const found of source.matchAll(inAMap)) {
+            const target = resolveFrom(file, found[1]);
+
+            // A client card cannot take the prop: the transform gives it a
+            // hook and context instead, and nothing there reads a row.
+            if (target === null || (clientRendered.has(target) && force !== false)) {
+                continue;
+            }
+
+            if (!callSites.has(file)) {
+                callSites.set(file, new Set());
+            }
+
+            if (!cards.has(target)) {
+                cards.set(target, new Set());
+            }
+
+            callSites.get(file).add(found[1]);
+            cards.get(target).add(found[1]);
+        }
+    }
+
+    return { callSites, cards };
+})();
+
 const skipped = [];
 const byMode = { client: 0, server: 0 };
 
@@ -293,6 +352,8 @@ for (const file of files) {
             relativePath: relative,
             force: force ?? (clientRendered.has(file) ? true : null),
             repeated: rowComponents.has(file),
+            serverRows: [...(serverRowPairs.callSites.get(file) ?? [])],
+            rowCards: [...(serverRowPairs.cards.get(file) ?? [])],
         });
     } catch (error) {
         // A file that cannot be parsed is reported, never guessed at.
@@ -350,9 +411,11 @@ if (passedOver.length > 0) {
     if (passedOver.length > 10) {
         console.log(`  … and ${passedOver.length - 10} more`);
     }
-    console.log("\n  A card in its own file needs the row's identity passed to it, and on");
-    console.log('  the server there is no context to carry it. Add \'use client\' to the');
-    console.log('  file holding the list if those rows need their own words today.');
+    console.log("\n  A card in its own file is given the row's identity as a prop, and that");
+    console.log('  needs the card to be one of the files being scanned. These resolved to');
+    console.log('  something outside it - a package, or an import this cannot follow. Add');
+    console.log("  'use client' to the file holding the list if those rows need their own");
+    console.log('  words today.');
 }
 
 if (skipped.length > 0) {

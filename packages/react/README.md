@@ -197,6 +197,37 @@ landing page, 80% on a blog starter. What is left out is genuinely dynamic —
 a sentence built from a constant in code — plus form labels carrying a
 decorative asterisk in a nested span.
 
+### Lists, when the card is in its own file
+
+The ordinary shape of an App Router page: `posts.map(post => <PostPreview/>)`
+in one file, the words in another. The codemod wires both sides, because
+neither file can see the other.
+
+```jsx
+// more-stories.tsx
+<PostPreview liveEditRow={itemIdentity(post)} key={post.slug} title={post.title} />
+
+// post-preview.tsx
+export default function PostPreview({ title, liveEditRow }) {
+    return <h3 data-edit={editMarkerIn(liveEditRow, 'auto:1a2b3c')}>
+        <LiveEditText contentKey="auto:1a2b3c" row={liveEditRow} fallback={title} />
+    </h3>;
+}
+```
+
+The key is the card's own; the row is composed onto it at render. So the same
+component used once on its own page is ordinary content, and used inside a list
+is per-row, decided where it is rendered rather than where it is written. A
+client component needs none of this: the identity travels in React context, and
+`LiveEditItem` puts it there.
+
+Identity comes from the item's own data, never the React key, which is
+routinely an array index and is not promised to survive a refetch.
+
+Two things are reported rather than wired, so they do not read as coverage: a
+card whose own child component lives in a third file, and a card the scan
+cannot resolve to a file it is about to rewrite.
+
 Most App Router projects are almost entirely server components, so by default
 very little is live. `--client` makes the files it touches into client
 components — the directive is added along with the hook, since a hook without
