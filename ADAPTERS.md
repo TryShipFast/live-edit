@@ -694,9 +694,57 @@ The second is the one that matches how Next is actually written, and it is
 also the one that needs the least from the customer: no directive moved, no
 component converted, no rendering strategy changed.
 
-**Not built.** Recorded because picking wrong here is the expensive mistake,
-and because the previous entry's conclusion - that the component boundary was
-the last hard part - was measured on too little of the app.
+**Built, as the second option, in v0.12.8.** Three pieces:
+
+`server.js`, a second entry point. `liveEditWords()` fetches a site's content
+and hands back a lookup; `readContent()` is the same thing unwrapped, for
+seeding the provider the way the README already described without ever
+shipping a way to do it. Separate from the main entry because it holds the API
+key, and an import that cannot appear in a client bundle cannot leak one into
+a client bundle.
+
+`LiveEditText` from `/server` - the same props and the same promise as the
+client component of that name, and async. A component rather than an inline
+`await` for a specific reason: plenty of the text the codemod finds is inside
+a `.map()` callback, and awaiting there would hand React a promise per row.
+Making the enclosing component async instead means deciding which enclosing
+function is the component and which is the callback, and being wrong about
+that breaks the page. An async component as a child needs neither question
+answered - it awaits its own words wherever it is rendered, and the function
+around it never changes.
+
+The codemod's server branch, which now emits that component instead of
+stopping at the marker. The driver already worked out client and server
+correctly, including the transitive case - a file with no directive that
+something client imports - so a file it calls `server` is genuinely not
+reachable from the browser, and importing `/server` into it is safe.
+
+Failures are dropped, deliberately and at every level. No configuration, a
+timeout, a 503, an HTML login page where JSON was expected, a shape nobody
+expected: all of them render the words already written in the component. The
+content service is a third party to somebody's website, and an editing tool
+that can take a customer's site off the internet is worse than no editing
+tool. This project has already learned that on a live site.
+
+One measured detail worth keeping. `React.cache` memoises within a render and
+nowhere else - called three times outside one on React 19.3, it ran three
+times. That is the guarantee rather than a limitation: content held past the
+render that fetched it would be one visitor's page served to the next.
+
+**Still not built: a list in a server component.** `LiveEditItem` puts a row's
+identity into React context, and there is no context in a server component. An
+inline list could compose keys directly, since `itemIdentity(post)` is a plain
+function, but the App Router shape is a list in one file and the card in
+another - and across that boundary the identity has to arrive as a prop, which
+means the codemod editing the call site as well as the component. That is the
+next piece, and it is a bigger one than this was.
+
+**A bookkeeping failure worth recording.** All of this was committed and
+released inside v0.12.8, whose message describes only an unrelated `EditPolicy`
+fix, because the two were staged together with `git add -A` while chasing a
+live incident. The tag stands - the console has already installed it - but
+nothing in the release says the React adapter gained a server half, and without
+this paragraph nobody reading the history would find it.
 
 ### Test the whole journey, not the part that is easy to reach
 
