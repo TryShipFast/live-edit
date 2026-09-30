@@ -101,18 +101,26 @@ return [
     /*
      * Defaults to whatever auto-tagging is set to, and that pairing matters.
      *
-     * These are two switches over one idea — finding the editable parts of a
-     * page, and being willing to STORE what comes back from them — and having
+     * These are two switches over one idea - finding the editable parts of a
+     * page, and being willing to STORE what comes back from them - and having
      * them independent produces a state with no honest use: a page derives a
      * key for every paragraph, the drawer opens on any of them, and every
      * save is refused with "Unknown setting". It looks like a broken product
      * rather than a missing line of config.
      *
+     * Which is exactly what this shipped as. The fallback here was `false`
+     * while auto_tag's was `true`, so an install that set neither - which is
+     * every install, because neither is among the values a customer is given
+     * when they register a site - landed in that state by default. One rule
+     * written down twice, and the two copies disagreed. Measured by reading
+     * the file back with no environment at all: auto_tag true, auto_keys
+     * false. See AutoKeysFollowAutoTaggingTest.
+     *
      * Set it explicitly to part ways: auto_keys on its own is for a theme
      * tagged ahead of time by `live-edit:scan --apply --auto`, which needs
      * the store without the per-request tagging.
      */
-    'auto_keys' => env('LIVE_EDIT_AUTO_KEYS', env('LIVE_EDIT_AUTO_TAG', false)),
+    'auto_keys' => env('LIVE_EDIT_AUTO_KEYS', env('LIVE_EDIT_AUTO_TAG', true)),
 
     // Middleware guarding the live-edit endpoints. Define the `live-edit`
     // Gate (or supply your own middleware) to control who may edit.

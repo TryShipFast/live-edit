@@ -672,6 +672,43 @@ measuring the output.
 
 ---
 
+### Fixed: a developer who set everything they were given still had a broken editor
+**Adapter:** Laravel, and any self-hosted install. **Recorded and fixed:**
+2026-09-30. **Severity:** high, because it looked like the product not working.
+
+Registering a site hands a developer two values: the site id and the key. Put
+both in an environment and the editor should work. It did not.
+
+Two switches sit over one idea - finding the editable parts of a page, and
+being willing to store what comes back from them - and their fallbacks
+disagreed. `auto_tag` fell back to true, `auto_keys` to false. So an install
+setting neither, which is every install, got tagging without the store: a key
+derived for every paragraph, the drawer opening on any of them, and every save
+refused with "Unknown setting".
+
+The config file already described that state, in its own comment, as one with
+"no honest use" that "looks like a broken product rather than a missing line of
+config". Then the line underneath produced it by default. One rule written down
+twice, and the copies drifted - the fourth of that exact shape in a week.
+
+Found by being told, not by a test. The question was why a developer should
+have to set `LIVE_EDIT_AUTO_TAG` at all, and the answer was that they should
+not: it was papering over this.
+
+**Fixed** by making the fallbacks the same value, with a test that reads the
+shipped file back under an emptied environment and fails on the old one. Both
+directions are pinned, and parting them on purpose - a theme tagged ahead of
+time by `live-edit:scan --apply --auto`, which needs the store without the
+per-request tagging - still works by saying so.
+
+**What changes for an existing install:** one that set neither variable now
+accepts `auto:` keys where it refused them. That install was already tagging
+every element and refusing every save, so nothing that worked stops working;
+what changes is that the saves land. An install wanting a curated allowlist and
+nothing else sets `LIVE_EDIT_AUTO_KEYS=false`, which it always could.
+
+---
+
 ### Fixed: anything inside a .map() was not editable, which on a real page is most of it
 **Adapter:** React, Next.js. **Recorded:** 2026-09-27. **Severity:** high for
 React, because it decides how much of a page a customer can actually change.
