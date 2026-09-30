@@ -731,13 +731,56 @@ nowhere else - called three times outside one on React 19.3, it ran three
 times. That is the guarantee rather than a limitation: content held past the
 render that fetched it would be one visitor's page served to the next.
 
-**Still not built: a list in a server component.** `LiveEditItem` puts a row's
-identity into React context, and there is no context in a server component. An
-inline list could compose keys directly, since `itemIdentity(post)` is a plain
-function, but the App Router shape is a list in one file and the card in
-another - and across that boundary the identity has to arrive as a prop, which
-means the codemod editing the call site as well as the component. That is the
-next piece, and it is a bigger one than this was.
+**Proved on a running server, not only in tests.** Next 16.3.6 with Turbopack,
+the package installed as a customer installs it, a stub content service, and
+the page fetched over HTTP:
+
+- the edited words came back in the server-rendered HTML, beside the marker,
+  which is the thing that did not work before any of this
+- one page request made exactly **one** call to the content API, so `cache`
+  does dedupe across a tree within a render, as intended
+- with the content service killed outright the page still answered **200** and
+  rendered the template's own copy
+
+That third one is the guarantee worth having measured rather than asserted. It
+is the difference between a content tool and a single point of failure in front
+of somebody's website.
+
+**A trap for anyone developing against this locally.** `npm install <path>`
+creates a symlink, and Turbopack could not resolve `@shipfasts/live-edit-react/server`
+through one - six module-not-found errors and a 500, while plain `node` resolved
+the identical specifier from the identical directory without complaint. Install
+a packed tarball instead (`npm pack`, then `npm install ./*.tgz`) and it works,
+which is also what a customer gets from the registry. An hour went into reading
+this as a broken export map before the symlink turned out to be the whole of it.
+
+**A list in a server component, half built.** The split runs through the
+middle of it, and the two halves are not equally hard.
+
+Giving each row its own words is `itemIdentity` and `contentKeyFor` - plain
+function calls, which work in a server component exactly as they do in the
+browser. So a list whose rows are host elements written in the same file is now
+keyed per row on the server, and the emitted code is identical to the client's,
+because the client path already went through those same functions.
+
+Rearranging is not. Adding, removing and reordering work by passing the array
+through `useLiveEditList` on its way to `.map()`, and that is a hook. So
+`data-edit-list` is deliberately **withheld** on the server rather than written
+and left unbacked: with it there, the editor would offer add, remove and drag
+on a list where the array never reaches the adapter, the change would go into
+the DOM, the person would be told it saved, and the next render would put it
+back. An absent control is honest; one that does nothing is not.
+
+And a card in its own file is still not reachable. `LiveEditItem` puts the row's
+identity into React context, and there is no context in a server component. The
+identity would have to arrive as a prop, which means the codemod editing the
+call site here and the component's own parameter list in the other file, in
+step. That is the next piece and it is bigger than this was.
+
+What changed meanwhile is that the tool now **says so**. A deferred list is
+reported by file and by component name, with the one-line workaround, instead
+of being absorbed into a count where "no list here" and "a list I passed over"
+look identical. On the real app: one list, named, with the reason.
 
 **A bookkeeping failure worth recording.** All of this was committed and
 released inside v0.12.8, whose message describes only an unrelated `EditPolicy`

@@ -456,6 +456,18 @@ export const transform = (source, { relativePath = 'unknown', force = null } = {
     const changes = [];
     const needs = new Set();
     let already = 0;
+
+    /*
+     * Work this run understood and could not do.
+     *
+     * Separate from `changes`, and reported separately, because the two mean
+     * opposite things to somebody reading the summary. A list that was skipped
+     * looks exactly like a page with no list in it once the counts are added
+     * up, and "11 elements in 7 files" reads as full coverage whether or not
+     * half the page was passed over. Silence about what was left is how a tool
+     * gets trusted for something it never did.
+     */
+    const deferred = [];
     let index = 0;
 
     /*
@@ -518,11 +530,29 @@ export const transform = (source, { relativePath = 'unknown', force = null } = {
 
         // A repeated region nobody can key. Claimed and left: one key across
         // many rows means editing the first changes all of them.
-        if (!keyable || !isClient) {
+        if (!keyable) {
             return;
         }
 
-        if (!hasAttribute(container.openingElement, 'data-edit-list')) {
+        /*
+         * A server list is editable row by row, and is not a list the editor
+         * can rearrange.
+         *
+         * Everything below that gives a row its own words - the identity, the
+         * composed keys - is plain function calls, so it works in a server
+         * component exactly as it does in the browser. Adding, removing and
+         * reordering are not: they work by passing the array through
+         * `useLiveEditList` on its way to `.map()`, and that is a hook.
+         *
+         * So the marker that advertises a rearrangeable list is withheld here
+         * rather than written and left unbacked. Written, the editor would
+         * offer add, remove and drag on a list where the array never passes
+         * through the adapter: the change would go into the DOM, the person
+         * would be told it saved, and the next render would put it back. A
+         * control that does nothing is worse than an absent one, because only
+         * one of the two is a lie.
+         */
+        if (isClient && !hasAttribute(container.openingElement, 'data-edit-list')) {
             edits.push({
                 start: container.openingElement.name.end,
                 end: container.openingElement.name.end,
@@ -530,7 +560,7 @@ export const transform = (source, { relativePath = 'unknown', force = null } = {
             });
         }
 
-        if (!wrapped) {
+        if (isClient && !wrapped) {
             /*
              * The array passes through the adapter on its way to `.map()`, so
              * the client's order, additions and removals are applied to the
@@ -549,6 +579,27 @@ export const transform = (source, { relativePath = 'unknown', force = null } = {
         }
 
         if (component) {
+            /*
+             * A card in another file, rendered on the server, is the one shape
+             * still not covered - and it is the ordinary shape of an App
+             * Router page, so it is reported rather than passed over.
+             *
+             * The client wraps the row and lets identity travel in context.
+             * There is no context in a server component, and no way to put it
+             * there: the identity would have to arrive as a prop, which means
+             * editing the call site here AND the component's own parameter
+             * list in the other file, in step. That is a different piece of
+             * work from this one and it is written down as such.
+             */
+            if (!isClient) {
+                deferred.push({
+                    tag: tagNameOf(item.openingElement),
+                    why: 'a row rendered by a component in another file, on the server',
+                });
+
+                return;
+            }
+
             /*
              * Wrapped rather than tagged. The card's own root element is in
              * another file, so there is nothing here to put an attribute on;
@@ -785,7 +836,7 @@ export const transform = (source, { relativePath = 'unknown', force = null } = {
     });
 
     if (changes.length === 0) {
-        return { code: source, changes, already, mode: isClient ? 'client' : 'server' };
+        return { code: source, changes, already, deferred, mode: isClient ? 'client' : 'server' };
     }
 
     /*
@@ -817,7 +868,7 @@ export const transform = (source, { relativePath = 'unknown', force = null } = {
         .sort((a, b) => b.start - a.start)
         .reduce((carry, edit) => carry.slice(0, edit.start) + edit.text + carry.slice(edit.end), source);
 
-    return { code, changes, already, mode: isClient ? 'client' : 'server' };
+    return { code, changes, already, deferred, mode: isClient ? 'client' : 'server' };
 };
 
 /**

@@ -293,18 +293,34 @@ describe('what it still refuses', () => {
         expect(transform(source, { relativePath: 'C.jsx' }).code).toBe(source);
     });
 
-    it('writes no list markers into a server component', () => {
+    it('keys the rows of a server list, but does not offer to rearrange it', () => {
         /*
-         * A server component renders once on the server with no React on the
-         * client to re-render it, so an edit could not reach the page it is
-         * standing on. A list whose rows cannot change is worse than one never
-         * offered, because the controls appear and do nothing.
+         * This asserted that a server list got nothing at all, and half of
+         * that was wrong. The reasoning was sound for rearranging and not for
+         * the words: adding, removing and reordering go through
+         * `useLiveEditList`, which is a hook and cannot run here, but giving
+         * each row its own keys is `itemIdentity` and `contentKeyFor`, which
+         * are plain function calls and work anywhere.
+         *
+         * Leaving both out meant three cards built from one piece of markup
+         * could not be given three different sets of words on the shape of
+         * page where that is most of the content. So the rows are keyed and
+         * the list marker is still withheld - a control that does nothing is
+         * worse than an absent one, because only one of the two is a lie.
          */
         const source = `export default function C({ courses }) {\n    return (\n${list}\n    );\n}\n`;
         const { code, mode } = transform(source, { relativePath: 'C.jsx' });
 
         expect(mode).toBe('server');
+
+        // Each row its own, from its own data.
+        expect(code).toContain('data-edit-item={itemIdentity(course)}');
+        expect(code).toContain('<LiveEditText contentKey={contentKeyFor(');
+        expect(code).toContain("from '@shipfasts/live-edit-react/server'");
+
+        // Nothing that needs React in the browser.
         expect(code).not.toContain('data-edit-list');
-        expect(code).not.toContain('LiveEditText');
+        expect(code).not.toContain('useLiveEditList');
+        expect(code).not.toContain("'use client'");
     });
 });

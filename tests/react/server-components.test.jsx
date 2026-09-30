@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { configureLiveEdit, contentKeyFor, liveEditWords, readContent } from '../../packages/react/src/server.js';
+import { transform } from '../../packages/react/src/codemod.js';
 
 /**
  * Content on the server, where most of an App Router page actually renders.
@@ -116,5 +117,63 @@ describe('the lookup a server component renders through', () => {
         const key = contentKeyFor('posts', 'title', { id: 101, title: 'Original headline' });
 
         expect(words(key, 'Original headline')).toBe('Edited headline');
+    });
+});
+
+describe('a list rendered on the server', () => {
+    const server = (body) => `export default function Prices({ tiers }) {\n    return (\n        <ul>\n${body}\n        </ul>\n    );\n}\n`;
+
+    it('gives each row its own keys, without a hook anywhere', () => {
+        const { code, mode } = transform(
+            server('            {tiers.map((tier) => (\n                <li>\n                    <h3>{tier.name}</h3>\n                    <p>No credit card required</p>\n                </li>\n            ))}'),
+            { relativePath: 'app/prices.jsx' },
+        );
+
+        expect(mode).toBe('server');
+
+        // Identity from the row's own data, and keys composed from it, so the
+        // three rows built from this one piece of markup hold three sets of
+        // words rather than one shared set.
+        expect(code).toContain('data-edit-item={itemIdentity(tier)}');
+        expect(code).toContain('contentKeyFor(');
+        expect(code).toContain('<LiveEditText');
+
+        // The things a server component cannot have.
+        expect(code).not.toContain('useLiveEditList');
+        expect(code).not.toContain('useContent');
+        expect(code).not.toContain("'use client'");
+        expect(code).toContain("from '@shipfasts/live-edit-react/server'");
+    });
+
+    it('does not advertise a list the editor would be unable to rearrange', () => {
+        /*
+         * Adding, removing and reordering work by passing the array through
+         * useLiveEditList, which is a hook and cannot run here. Writing the
+         * marker anyway would put add and drag controls on a list where the
+         * array never reaches the adapter: the change would go into the DOM,
+         * the person would be told it saved, and the next render would undo
+         * it. An absent control is honest; one that does nothing is not.
+         */
+        const { code } = transform(
+            server('            {tiers.map((tier) => (\n                <li>\n                    <h3>{tier.name}</h3>\n                </li>\n            ))}'),
+            { relativePath: 'app/prices.jsx' },
+        );
+
+        expect(code).not.toContain('data-edit-list');
+    });
+
+    it('reports a row it cannot reach instead of passing over it in silence', () => {
+        // The App Router shape: the list here, the card in another file. On
+        // the client the identity travels in context; there is no context on
+        // the server, so this is the piece still missing - and a summary that
+        // counted it as nothing would read as full coverage.
+        const { deferred, code } = transform(
+            server('            {tiers.map((tier) => (\n                <TierCard tier={tier} />\n            ))}'),
+            { relativePath: 'app/prices.jsx' },
+        );
+
+        expect(deferred).toHaveLength(1);
+        expect(deferred[0].tag).toBe('TierCard');
+        expect(code).not.toContain('LiveEditItem');
     });
 });

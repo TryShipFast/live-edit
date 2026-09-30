@@ -196,6 +196,11 @@ const clientRendered = (() => {
 const skipped = [];
 const byMode = { client: 0, server: 0 };
 
+// Lists this run understood and could not wire. Reported, because the counts
+// alone cannot tell "there was no list here" from "there was one and it was
+// passed over", and only one of those is coverage.
+const passedOver = [];
+
 // Elements that already carry a key, so a second run leaves them alone. That
 // is right — re-keying them would detach every edit a client has made — but
 // saying nothing about it turns "nothing to do" into "0 elements in 0 files",
@@ -221,6 +226,10 @@ for (const file of files) {
     }
 
     alreadyTagged += result.already ?? 0;
+
+    for (const item of result.deferred ?? []) {
+        passedOver.push(`${relative}: <${item.tag}> - ${item.why}`);
+    }
 
     if (result.changes.length === 0) {
         continue;
@@ -258,6 +267,17 @@ if (alreadyTagged > 0) {
         console.log('  tagged file client-side, add \'use client\' to the top of it yourself:');
         console.log('  the hook and the marker are already there and the keys do not move.');
     }
+}
+
+if (passedOver.length > 0) {
+    console.log(`\n${passedOver.length} list${passedOver.length === 1 ? '' : 's'} could not be made editable:`);
+    passedOver.slice(0, 10).forEach((line) => console.log(`  ${line}`));
+    if (passedOver.length > 10) {
+        console.log(`  … and ${passedOver.length - 10} more`);
+    }
+    console.log("\n  A card in its own file needs the row's identity passed to it, and on");
+    console.log('  the server there is no context to carry it. Add \'use client\' to the');
+    console.log('  file holding the list if those rows need their own words today.');
 }
 
 if (skipped.length > 0) {
