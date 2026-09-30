@@ -70,19 +70,38 @@ class CheckMediaStorage extends Command
             $this->line('  values it reads from the environment is empty here. What it reads:');
             $this->newLine();
 
+            /*
+             * Every value the disk reads, including the credentials.
+             *
+             * The first version left the credentials out entirely, which
+             * answered the wrong question. Somebody looking at this is asking
+             * "which of these did not arrive", and the two likeliest answers
+             * were the two being hidden - so the list could say everything
+             * looked fine while the key was empty.
+             *
+             * Shown as "(set)" rather than as themselves. That is the whole of
+             * what is being asked and it gives nothing away.
+             */
+            $secret = ['key', 'secret', 'token', 'password'];
+
             foreach ($defined as $setting => $value) {
-                // Never the values: two of them are credentials. Whether each
-                // one arrived is the whole question and gives nothing away.
-                if (in_array($setting, ['key', 'secret', 'token'], true)) {
-                    continue;
-                }
+                $arrived = is_scalar($value) && (string) $value !== '';
 
                 $this->line(sprintf(
                     '    %-28s %s',
                     $setting,
-                    is_scalar($value) && (string) $value !== '' ? (string) $value : '(empty)'
+                    match (true) {
+                        ! $arrived => '(empty)',
+                        in_array($setting, $secret, true) => '(set)',
+                        default => (string) $value,
+                    }
                 ));
             }
+
+            $this->newLine();
+            $this->line('  Every value this disk reads is above. Anything marked (empty) is not');
+            $this->line('  in this environment, and the SDK reports one missing value at a time,');
+            $this->line('  so fixing the one it named may not be the end of it.');
 
             return self::FAILURE;
         }

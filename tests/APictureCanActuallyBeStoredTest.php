@@ -82,9 +82,14 @@ class APictureCanActuallyBeStoredTest extends TestCase
 
     public function test_it_lists_what_the_disk_reads_without_printing_a_secret(): void
     {
-        // Which values arrived is the whole question, and two of them are
-        // credentials. Whether they are empty answers it and gives nothing
-        // away.
+        /*
+         * Including the credentials, as "(set)".
+         *
+         * Leaving them out answered the wrong question. Somebody reading this
+         * is asking which value did not arrive, and the two likeliest answers
+         * were the two being hidden - so the list could look complete while
+         * the key was empty.
+         */
         config()->set('filesystems.disks.wonky', [
             'driver' => 'no-such-driver',
             'region' => '',
@@ -93,10 +98,12 @@ class APictureCanActuallyBeStoredTest extends TestCase
         ]);
         config()->set('live-edit.disk', 'wonky');
 
-        // One substring, not two: the assertion is consumed per line written,
-        // and both of these land on the same line.
+        // One substring per assertion, not two: each is consumed by the line
+        // that matches it, and several of these land on the same line.
         $this->artisan('live-edit:check-media')
             ->expectsOutputToContain(sprintf('%-28s %s', 'region', '(empty)'))
+            ->expectsOutputToContain(sprintf('%-28s %s', 'key', '(set)'))
+            ->expectsOutputToContain(sprintf('%-28s %s', 'secret', '(set)'))
             ->doesntExpectOutputToContain('AKIAREALLOOKINGKEY')
             ->doesntExpectOutputToContain('a-real-looking-secret')
             ->assertFailed();
