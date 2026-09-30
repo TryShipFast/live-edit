@@ -369,8 +369,23 @@ const literalInItem = (node, source, listKey) => {
  * a key nobody can trace back to a field is a key nobody can debug.
  */
 const plainRead = (expression) => {
+    /*
+     * `children` is never content, and tagging it is destructive.
+     *
+     * It is React's name for a subtree, so `<div>{children}</div>` is a
+     * layout wrapper and `<h1>{children}</h1>` is a slot somebody else fills.
+     * Marked editable, the whole of what they hold becomes a string the
+     * moment anything is stored against that key - which on the Next.js blog
+     * starter meant the page body itself.
+     *
+     * Caught by running the codemod over a real app. Every test for the
+     * one-value rule used `{title}`, and `{children}` looks exactly the same
+     * to a parser.
+     */
+    const SLOT = 'children';
+
     if (expression?.type === 'Identifier') {
-        return expression.name;
+        return expression.name === SLOT ? null : expression.name;
     }
 
     if (
@@ -378,6 +393,7 @@ const plainRead = (expression) => {
         && !expression.computed
         && expression.object?.type === 'Identifier'
         && expression.property?.type === 'Identifier'
+        && expression.property.name !== SLOT
     ) {
         return `${expression.object.name}.${expression.property.name}`;
     }

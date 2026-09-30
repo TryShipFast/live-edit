@@ -645,6 +645,59 @@ wrapper, including the plain `<a data-edit><span>Book</span></a>` case that
 has nothing to do with React. Long-standing, narrow, and not worth trading a
 correct clear for.
 
+### Measured again, further in: the list never engages on App Router
+
+Run properly this time - the package installed into `kb-next-real`, the
+codemod run over `src/` as a developer would, the output read. Two things,
+and the second changes the milestone's scope rather than adding to it.
+
+**A destructive bug, found and fixed.** The one-value rule tagged
+`{children}`. `<div className="min-h-screen">{children}</div>` in the app's
+own layout was marked as editable text, which means anything stored against
+that key replaces the entire page body with a string. Every test for that rule
+used `{title}`, and `{children}` is identical to a parser. It is refused now,
+by name, along with `props.children`.
+
+**And the scope finding.** After that fix the codemod reports:
+
+```
+11 elements in 7 files
+  0 client-side (editable live), 7 server-rendered (edits land on refresh)
+```
+
+One file in seven carries `'use client'`. `more-stories.tsx` - the list -
+is a server component, so `tagList()` claimed its subtree and returned without
+writing anything: no `useLiveEditList`, no `LiveEditItem`, no item keys.
+
+That is correct as written, and it is the problem. `useLiveEditList` and
+`useContent` are hooks, and a server component cannot call one. **So on an App
+Router app, where server components are the default and most of the page,
+everything built for repeated content is inert.** The inline-card shape the
+tests use is not merely the shape of an example rather than an app, as
+recorded above - it is the shape of a *client* component, which is rarer still.
+
+**Three ways out, and the choice is a product decision rather than a detail:**
+
+- **Convert the component.** `--client` already does this. It moves rendering
+  to the browser, which is a real change to somebody's app made on our
+  account, and on a content site it gives up the thing App Router is for.
+- **Apply content on the server.** A server component can await content and
+  render it directly, no hooks involved - which is what `RemoteContent`
+  already does for other adapters and has no caller for. Editing then lands
+  on refresh, which is exactly what the codemod already promises for server
+  files. Identity still has to reach the markup, but `itemIdentity(post)` is
+  a plain function call and works anywhere.
+- **Leave server lists alone and say so.** Honest, and it means the milestone
+  covers the smaller half of a typical App Router page.
+
+The second is the one that matches how Next is actually written, and it is
+also the one that needs the least from the customer: no directive moved, no
+component converted, no rendering strategy changed.
+
+**Not built.** Recorded because picking wrong here is the expensive mistake,
+and because the previous entry's conclusion - that the component boundary was
+the last hard part - was measured on too little of the app.
+
 ### Test the whole journey, not the part that is easy to reach
 
 The acceptance steps for this work are the project's own:

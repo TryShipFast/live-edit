@@ -182,6 +182,25 @@ describe('what it still refuses', () => {
         expect(code).toContain('page.title)}');
     });
 
+    it('never tags children, which is a subtree and not a value', () => {
+        /*
+         * Destructive if it gets through, and it did. `children` is React's
+         * name for a subtree, so `<div>{children}</div>` is a layout wrapper
+         * and `<h1>{children}</h1>` is a slot somebody else fills. Marked
+         * editable, the whole of what they hold becomes a string the moment
+         * anything is stored against that key.
+         *
+         * Caught by running the codemod over the Next.js blog starter, where
+         * it tagged the layout's own <div className="min-h-screen">
+         * {children}</div> - the page body itself. Every test for the
+         * one-value rule used {title}, and {children} looks identical to a
+         * parser.
+         */
+        expect(transform(client('        <div>{children}</div>'), { relativePath: 'C.jsx' }).changes).toHaveLength(0);
+        expect(transform(client('        <h1>{children}</h1>'), { relativePath: 'C.jsx' }).changes).toHaveLength(0);
+        expect(transform(client('        <div>{props.children}</div>'), { relativePath: 'C.jsx' }).changes).toHaveLength(0);
+    });
+
     it('still refuses a value that is computed rather than read', () => {
         // A call, a ternary or a template is the host's logic. Putting a key
         // on the answer and then writing over the question is not editing.
