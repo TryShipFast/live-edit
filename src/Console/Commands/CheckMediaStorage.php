@@ -135,14 +135,21 @@ class CheckMediaStorage extends Command
 
                 $reason = $this->reasonFrom($defined, $path);
 
+                $this->newLine();
+
                 if ($reason !== null) {
-                    $this->newLine();
+                    // What the bucket said, and then nothing else. A guess
+                    // printed underneath a real answer contradicts it: the
+                    // first run of this said "usually permissions" below S3
+                    // explaining, in its own words, that the region was wrong.
                     $this->line('  '.trim($reason));
+                } else {
+                    $this->line('  No reason was given. It is usually permissions: the credentials');
+                    $this->line('  reach the bucket and are not allowed to put an object in it.');
                 }
 
                 $this->newLine();
-                $this->line('  Usually permissions: the credentials reach the bucket and are not');
-                $this->line('  allowed to put an object in it. Nothing was stored either way.');
+                $this->line('  Nothing was stored either way.');
 
                 return self::FAILURE;
             }

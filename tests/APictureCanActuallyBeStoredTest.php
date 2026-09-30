@@ -129,6 +129,26 @@ class APictureCanActuallyBeStoredTest extends TestCase
             ->assertFailed();
     }
 
+    public function test_a_guess_is_not_printed_underneath_a_real_answer(): void
+    {
+        /*
+         * S3 answered, in its own words, that the region was wrong for that
+         * bucket - and the command printed "usually permissions" directly
+         * beneath it. A guess under a real answer contradicts it, and the
+         * reader has to decide which of the two to believe.
+         *
+         * Here there is no config to rebuild from, so nothing can be asked,
+         * and the guess is the honest thing to offer.
+         */
+        Storage::fake('quiet');
+        Storage::set('quiet', new RefusesEveryWrite(Storage::disk('quiet')));
+        config()->set('live-edit.disk', 'quiet');
+
+        $this->artisan('live-edit:check-media')
+            ->expectsOutputToContain('No reason was given')
+            ->assertFailed();
+    }
+
     public function test_it_says_which_disk_it_is_talking_about(): void
     {
         // Printed whatever the outcome. Half of diagnosing this is finding out
