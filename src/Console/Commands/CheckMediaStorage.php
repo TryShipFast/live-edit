@@ -143,6 +143,8 @@ class CheckMediaStorage extends Command
                     // first run of this said "usually permissions" below S3
                     // explaining, in its own words, that the region was wrong.
                     $this->line('  '.trim($reason));
+
+                    $this->whoIsBeingDenied($defined, $reason);
                 } else {
                     $this->line('  No reason was given. It is usually permissions: the credentials');
                     $this->line('  reach the bucket and are not allowed to put an object in it.');
@@ -196,5 +198,51 @@ class CheckMediaStorage extends Command
         // It worked the second time, which is its own answer: whatever failed
         // was not the configuration.
         return null;
+    }
+
+    /**
+     * Which identity the bucket is refusing.
+     *
+     * "Access Denied" does not say who was denied, and the commonest cause of
+     * a policy that looks correct is that it was attached to a different user
+     * from the one whose keys are in this environment. Nobody can see that by
+     * reading either half: the policy looks right, the key looks right, and
+     * they belong to different people.
+     *
+     * So the same credentials are asked who they are. Every identity may call
+     * this - it is not a permission anybody has to grant - and the answer is an
+     * ARN, which is exactly the thing to compare against the policy.
+     */
+    private function whoIsBeingDenied(?array $defined, string $reason): void
+    {
+        if (! str_contains($reason, 'AccessDenied') && ! str_contains($reason, 'Access Denied')) {
+            return;
+        }
+
+        if (($defined['driver'] ?? null) !== 's3' || ! class_exists(\Aws\Sts\StsClient::class)) {
+            return;
+        }
+
+        try {
+            $sts = new \Aws\Sts\StsClient([
+                'version' => 'latest',
+                'region' => $defined['region'] ?? 'us-east-1',
+                'credentials' => [
+                    'key' => $defined['key'] ?? '',
+                    'secret' => $defined['secret'] ?? '',
+                ],
+            ]);
+
+            $who = $sts->getCallerIdentity();
+
+            $this->newLine();
+            $this->line('  These credentials are:');
+            $this->line('    '.(string) $who->get('Arn'));
+            $this->line('  The policy has to be on that identity, and allow s3:PutObject on');
+            $this->line('  arn:aws:s3:::'.($defined['bucket'] ?? '<bucket>').'/'.trim((string) config('live-edit.directory', ''), '/').'/*');
+        } catch (\Throwable $e) {
+            $this->newLine();
+            $this->line('  The credentials could not say who they are: '.$e->getMessage());
+        }
     }
 }
