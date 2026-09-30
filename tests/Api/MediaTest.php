@@ -369,8 +369,12 @@ class MediaTest extends TestCase
         ], $this->as($this->session));
 
         $response->assertStatus(500);
-        $this->assertSame('storage_error', $response->json('error.type'));
-        $this->assertStringContainsString('could not be stored', (string) $response->json('error.message'));
+        $this->assertSame('save_failed', $response->json('error.type'));
+        $this->assertStringContainsString('could not be saved', (string) $response->json('error.message'));
+        // The exception, to the editor who is already trusted to change this
+        // site's content. Without it every occurrence is a hunt through a log
+        // shared by every customer.
+        $this->assertNotEmpty((string) $response->json('error.detail'));
         // And it says the page is untouched, because the first thing somebody
         // wonders is whether they have half-broken their own site.
         $this->assertStringContainsString('Nothing on the page has changed', (string) $response->json('error.message'));
@@ -399,7 +403,7 @@ class MediaTest extends TestCase
         ], $this->as($this->session));
 
         $response->assertStatus(500);
-        $this->assertSame('storage_error', $response->json('error.type'));
+        $this->assertSame('save_failed', $response->json('error.type'));
         $this->assertArrayNotHasKey('heroImage', $this->settings(), 'a picture that was never stored was recorded as stored');
     }
 

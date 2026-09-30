@@ -199,17 +199,36 @@ class MediaController
              */
             report($e);
 
-            Log::error('[live-edit] a picture could not be stored', [
+            Log::error('[live-edit] a picture could not be saved', [
                 'site' => $site->slug ?? null,
                 'key' => $key ?? null,
                 'disk' => config('live-edit.disk'),
                 'reason' => $e->getMessage(),
+                'thrown' => $e::class,
             ]);
 
+            /*
+             * The message says what is known and not what is guessed.
+             *
+             * It said "could not be stored", which named a cause this block
+             * has not established: everything in it can throw, including the
+             * database write and the policy, and a storage failure is only one
+             * of them. Measured the hard way - a write that the bucket was
+             * perfectly happy to take was reported to a client as storage
+             * refusing it, which sent an afternoon into an S3 policy that was
+             * already correct.
+             *
+             * `detail` carries the exception, and it is not a leak: this route
+             * needs a session token with write ability, so the only caller is
+             * somebody already trusted to change that site's content. Without
+             * it, every occurrence is a hunt through a log shared by every
+             * customer - which is exactly how this one was found, slowly.
+             */
             return response()->json([
                 'error' => [
-                    'type' => 'storage_error',
-                    'message' => 'That picture could not be stored. Nothing on the page has changed. Try again, and tell us if it keeps happening.',
+                    'type' => 'save_failed',
+                    'message' => 'That picture could not be saved. Nothing on the page has changed. Try again, and tell us if it keeps happening.',
+                    'detail' => class_basename($e).': '.$e->getMessage(),
                 ],
             ], 500);
         }
