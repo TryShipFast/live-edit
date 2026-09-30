@@ -426,6 +426,73 @@ has no switcher in it, and adding one is the thing this product does not do.
 
 ---
 
+### A card wrapped in a link, with a link inside it, is a different tree in the browser
+**Adapter:** all. **Found:** 2026-09-30 on a live site. **Severity:** high
+where it occurs, and it occurs on catalogue pages, which is where the money is.
+
+Reported as "the mapper detects a link but there is no way to edit the text",
+on the commonest card there is: the whole tile is a link, and inside it are a
+couple of paragraphs and a button that is also a link.
+
+The mapper is not at fault. Given that markup it tags both paragraphs and
+gives the inner link its own text and href keys, which was checked before
+anything else was blamed. The fault is upstream of everybody: **a nested `<a>`
+is invalid HTML**, and the browser does not merely tolerate it, it rebuilds
+the tree.
+
+Author's markup:
+
+```html
+<a class="card"><div><p>Learn to weld</p><div><a>Enrol now</a></div></div></a>
+```
+
+What a browser actually builds, measured in Chrome:
+
+```html
+<a class="card"></a>
+<div>
+  <a class="card"><p>Learn to weld</p></a>
+  <div><a class="card"></a><a href="/enrol">Enrol now</a></div>
+</div>
+```
+
+One anchor becomes **four**. The parser's adoption-agency algorithm splits the
+misnested anchor and repeats it around each block it contained.
+
+**Why that breaks content and not just clicking.** An auto key is a hash of
+where an element sits: tag and sibling index up to the root. PHP's parser
+keeps the anchors nested, so a server-tagged page derives keys from a tree no
+browser will ever have. The browser then computes different keys for the same
+elements. Saves are refused as **"Unknown setting"** for keys the server never
+recorded, and elements are not where anything expects them.
+
+**What was fixed:** the editor now stops the host's own click listeners
+(`stopImmediatePropagation`), because a page using `wire:navigate` navigated
+away while the drawer was opening - true regardless of the nesting, and worth
+fixing on its own.
+
+**What is not fixed, because it cannot be:** we do not control the parser.
+Nothing this package does can make two parsers agree about invalid markup.
+
+**What a site should do instead**, and it is the standard answer rather than
+our invention: do not nest anchors. Make the card a plain container and give
+the link a stretched hit area, which is one CSS rule:
+
+```css
+.card { position: relative }
+.card a.stretched::after { content: ""; position: absolute; inset: 0 }
+```
+
+The card is then one anchor, the words inside it are ordinary elements, and
+every parser agrees about the tree.
+
+**To close it:** the scanner could refuse to tag inside a nested-anchor region
+and say why, rather than tagging a tree the browser will rearrange. That turns
+a silent wrong answer into a visible one, which is the most that can honestly
+be done here.
+
+---
+
 ### Anything inside a .map() is not editable, which on a real page is most of it
 **Adapter:** React, Next.js. **Recorded:** 2026-09-27. **Severity:** high for
 React, because it decides how much of a page a customer can actually change.

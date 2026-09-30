@@ -3548,7 +3548,22 @@ const bootLiveEdit = () => {
                 const target = resolveTarget(event.target);
                 if (!target) return;
                 event.preventDefault();
-                event.stopPropagation();
+                /*
+                 * Immediate, because the host has listeners of its own.
+                 *
+                 * stopPropagation() stops the event reaching other NODES and
+                 * leaves listeners already bound to this one to run anyway.
+                 * Livewire's wire:navigate binds to the document just as this
+                 * does, so a card wrapped in a link navigated away while the
+                 * editor was opening the paragraph inside it - the click was
+                 * cancelled and the page left regardless.
+                 *
+                 * Reported as "you detect the link but there is no way to
+                 * edit the text", which is what it looks like from the
+                 * outside: the words are tagged, the click resolves to them,
+                 * and the page is gone before anybody sees the drawer.
+                 */
+                event.stopImmediatePropagation();
                 openTarget(target);
             },
             true
