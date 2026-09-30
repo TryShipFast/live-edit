@@ -3,6 +3,7 @@
 namespace ShipFast\LiveEdit\Tests;
 
 use Illuminate\Support\Facades\Storage;
+use ShipFast\LiveEdit\Tests\Fixtures\RefusesEveryWrite;
 
 /**
  * Whether this host can store a picture at all, asked before a client asks.
@@ -106,6 +107,25 @@ class APictureCanActuallyBeStoredTest extends TestCase
             ->expectsOutputToContain(sprintf('%-28s %s', 'secret', '(set)'))
             ->doesntExpectOutputToContain('AKIAREALLOOKINGKEY')
             ->doesntExpectOutputToContain('a-real-looking-secret')
+            ->assertFailed();
+    }
+
+    public function test_a_refused_write_is_reported_as_refused(): void
+    {
+        /*
+         * The message this replaced was a guess, and a wrong one. A disk
+         * configured with throw => false returns false from put and null from
+         * get, so the check saw a mismatch and reported "written and could not
+         * be read back" over a write that had never happened - and threw away
+         * whatever the bucket had said about why.
+         */
+        Storage::fake('quiet');
+        Storage::set('quiet', new RefusesEveryWrite(Storage::disk('quiet')));
+        config()->set('live-edit.disk', 'quiet');
+
+        $this->artisan('live-edit:check-media')
+            ->expectsOutputToContain('refused the write')
+            ->doesntExpectOutputToContain('read back unchanged')
             ->assertFailed();
     }
 

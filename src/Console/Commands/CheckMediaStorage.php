@@ -25,6 +25,9 @@ class CheckMediaStorage extends Command
 
     protected $description = 'Write, read back and delete a test file on the disk pictures are stored on';
 
+    /** Written and read back. Any difference is a disk that cannot be trusted with a photograph. */
+    private const CANARY = 'live-edit storage check';
+
     public function handle(): int
     {
         $disk = (string) config('live-edit.disk', 'public');
@@ -107,15 +110,39 @@ class CheckMediaStorage extends Command
         }
 
         try {
-            $filesystem->put($path, 'live-edit storage check');
+            $written = $filesystem->put($path, self::CANARY);
+            $there = $written !== false && $filesystem->exists($path);
+            $same = $there && $filesystem->get($path) === self::CANARY;
 
-            $read = $filesystem->get($path);
+            if (! $same) {
+                /*
+                 * Laravel's disks are configured with throw => false, so a
+                 * refused write returns false and a missing object reads as
+                 * null. The first version of this check inherited exactly the
+                 * silence it exists to break: it said "written and could not
+                 * be read back", which was a guess - nothing had been written,
+                 * and whatever the bucket said was discarded before anybody
+                 * saw it.
+                 *
+                 * So when a step fails, ask again with throw => true and print
+                 * what comes back.
+                 */
+                $this->error(match (true) {
+                    $written === false => 'The disk refused the write.',
+                    ! $there => 'The disk accepted the write and the object is not there.',
+                    default => 'The object was stored and did not read back unchanged.',
+                });
 
-            if ($read !== 'live-edit storage check') {
-                // Written and came back different, or not at all. Rare, and
-                // worth its own sentence: a disk that accepts a write and
-                // loses it is a worse fault than one that refuses.
-                $this->error('The file was written and could not be read back unchanged.');
+                $reason = $this->reasonFrom($defined, $path);
+
+                if ($reason !== null) {
+                    $this->newLine();
+                    $this->line('  '.trim($reason));
+                }
+
+                $this->newLine();
+                $this->line('  Usually permissions: the credentials reach the bucket and are not');
+                $this->line('  allowed to put an object in it. Nothing was stored either way.');
 
                 return self::FAILURE;
             }
@@ -137,5 +164,30 @@ class CheckMediaStorage extends Command
         $this->info('Pictures can be stored, read back and removed on this host.');
 
         return self::SUCCESS;
+    }
+
+    /**
+     * What the disk says when it is allowed to say it.
+     *
+     * The same write, on the same configuration, with throw turned on. Null
+     * when there is nothing to rebuild from - a faked disk in a test, or one
+     * resolved by something other than the config - in which case the sentence
+     * above is all there is, which is still more than there was.
+     */
+    private function reasonFrom(?array $defined, string $path): ?string
+    {
+        if ($defined === null || ($defined['driver'] ?? null) === null) {
+            return null;
+        }
+
+        try {
+            Storage::build(array_merge($defined, ['throw' => true]))->put($path, self::CANARY);
+        } catch (\Throwable $e) {
+            return $e->getMessage();
+        }
+
+        // It worked the second time, which is its own answer: whatever failed
+        // was not the configuration.
+        return null;
     }
 }
