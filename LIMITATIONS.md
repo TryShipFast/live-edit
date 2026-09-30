@@ -16,7 +16,7 @@ Toy pages agree with whatever the code already does.
 
 ## Open
 
-### Nothing says which engine the service is actually running
+### Mostly fixed: nothing said which engine the service was running
 
 A cloud site is tagged by the console and saves through the console, so for
 every customer who is not self-hosting, **the console's installed engine is the
@@ -36,10 +36,29 @@ carries no mark to say which engine tagged it. The only way to learn it is to
 run `composer show` on the server, which nobody does while a customer is
 waiting.
 
-**Worth building, not built:** the version in the console's own site view, and
-in whatever the editor reports when something fails. A stale engine is the
-likeliest explanation for "this was fixed and it still does not work", and it
-is currently the one thing nobody can see.
+**Built in v0.12.10**, though not where this entry first proposed it. The
+content API now answers with the version it is running:
+
+```
+curl -s -H "Authorization: Bearer <a site's publishable key>" \
+  https://live.tryshipfast.com/api/live-edit/v1/<site>/plugin
+```
+
+The publishable key is printed in the page of every site that embeds the
+editor, so anybody can ask from anywhere, with no credentials of ours.
+
+It was added for the WordPress updater and turned out to matter far more
+widely, within the hour. Not knowing production's version had already cost a
+day twice over: once on learnkasts, where two of three reported faults were
+fixes that had shipped and not deployed, and once immediately afterwards, when
+a *local* `vendor/` directory was read as evidence about a *server* and nine
+releases were wrongly described as undeployed. Production had been current all
+along. Neither mistake survives one curl.
+
+**Still not built:** the version on the console's site view, and in whatever
+the editor reports when a save fails. The number is now askable, which was the
+hard part, but a customer reporting a fault still cannot see it and neither can
+anybody reading their report.
 
 ### Fixed: the mapper wrote labels and regions that nothing read
 **Adapter:** all. **Found:** 2026-09-29. **Fixed:** 2026-09-29.
@@ -525,7 +544,7 @@ be done here.
 
 ---
 
-### Anything inside a .map() is not editable, which on a real page is most of it
+### Mostly fixed: anything inside a .map() was not editable, which on a real page is most of it
 **Adapter:** React, Next.js. **Recorded:** 2026-09-27. **Severity:** high for
 React, because it decides how much of a page a customer can actually change.
 
@@ -545,11 +564,27 @@ Laravel and WordPress do not have this problem: their lists are tagged in the
 rendered HTML, where a repeated item is just more markup, and list editing is
 measured working on two adapters.
 
-**To close it:** the list support that already exists for the other adapters
-needs a React equivalent, keyed on the data rather than on the element, so a
-customer can edit the items and not only the headings above them. That is a
-piece of work rather than a patch, and it is the honest reason the React
-column should not be sold as finished just because its critical path is green.
+**Closed for most shapes, across v0.12.0 to v0.12.10.** Keys are composed from
+each row's own identity - `itemIdentity(post)`, never a position and never the
+React `key`, which is routinely an array index and is not promised to survive a
+refetch. Rows in a client component are fully editable, including add, remove
+and reorder, because the array passes through `useLiveEditList` on its way to
+`.map()`. Rows in a server component are editable but not rearrangeable, since
+that passthrough is a hook; the marker that would advertise rearranging is
+deliberately withheld rather than written and left unbacked.
+
+**One shape remains, and it is the ordinary shape of an App Router page:** the
+list in one file, the card in another, both rendered on the server. On the
+client the row's identity travels in React context; there is no context in a
+server component, so it would have to arrive as a prop - which means the
+codemod editing the call site and the component's parameter list in two files,
+in step. Not built.
+
+What did get built is the tool saying so. A list it cannot reach is reported by
+file and component name with the one-line workaround, instead of being absorbed
+into a count where "no list here" and "a list I passed over" look identical.
+That distinction is the whole reason this entry was worth writing: the original
+measurement said 62 elements tagged, and read as coverage.
 
 ---
 
