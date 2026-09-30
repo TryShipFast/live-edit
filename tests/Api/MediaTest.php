@@ -348,6 +348,33 @@ class MediaTest extends TestCase
         $this->assertSame('', $this->settings()['heroImage'] ?? null);
     }
 
+    public function test_a_disk_that_refuses_the_write_is_an_answer_not_a_500(): void
+    {
+        /*
+         * What a client actually saw: a failed request with the body
+         * {"message":"Server Error"}, twice, and nothing to act on. Every
+         * other refusal in this codebase says what happened and this one route
+         * did not - the one route whose work leaves the database and touches a
+         * filesystem, which is where hosts differ most.
+         *
+         * Reported as well as answered, so it still reaches the log. The
+         * message is for the person holding the mouse; the log line is for us.
+         */
+        config()->set('live-edit.disk', 'nowhere-at-all');
+
+        $response = $this->post($this->url(), [
+            'target' => 'setting:heroImage',
+            'file' => UploadedFile::fake()->image('beach.jpg', 800, 600),
+        ], $this->as($this->session));
+
+        $response->assertStatus(500);
+        $this->assertSame('storage_error', $response->json('error.type'));
+        $this->assertStringContainsString('could not be stored', (string) $response->json('error.message'));
+        // And it says the page is untouched, because the first thing somebody
+        // wonders is whether they have half-broken their own site.
+        $this->assertStringContainsString('Nothing on the page has changed', (string) $response->json('error.message'));
+    }
+
     public function test_a_description_is_written_in_the_language_it_was_typed_in(): void
     {
         /*

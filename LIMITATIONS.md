@@ -708,6 +708,39 @@ measuring the output.
 
 ---
 
+### Fixed: replacing a picture answered "Server Error", and the disk could not be changed
+**Adapter:** all, on the service. **Found:** 2026-09-30, by a client on a live
+site. **Severity:** high - it is the editor's second most used action.
+
+Two 500s and a body of `{"message":"Server Error"}`. Nothing else: no reason in
+the response, nothing actionable in a log shared by every customer, and from
+where the client sat it was indistinguishable from the editor being broken.
+
+Two faults behind it, and the second is why the first could not be worked
+around.
+
+**The route had no answer for a storage failure.** It caught the limit and the
+validation and let everything else become an opaque 500 - on the one route
+whose work leaves the database and touches a filesystem, which is exactly where
+hosts differ. It now reports the exception, logs it with the site, the key and
+the disk, and answers with what happened and that nothing on the page changed,
+which is the first thing somebody wonders.
+
+**And the disk was hardcoded.** `'disk' => 'public'`, with no env behind it, so
+a host could not point pictures at a bucket without publishing the whole config
+file. On a platform whose application directory is read-only, or which replaces
+its containers on every deploy, the local disk is not somewhere a client's
+photographs can live - and there was no supported way to say so. Now
+`LIVE_EDIT_DISK`, with `public` still the default because it is right for a
+single-server install and needs an account with nobody.
+
+**And a way to ask before a client does.** `php artisan live-edit:check-media`
+writes a few bytes to the configured disk, reads them back, deletes them, and
+says which disk it used. Run it on the host rather than reasoning about the
+host.
+
+---
+
 ### Fixed: a developer who set everything they were given still had a broken editor
 **Adapter:** Laravel, and any self-hosted install. **Recorded and fixed:**
 2026-09-30. **Severity:** high, because it looked like the product not working.

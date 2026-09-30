@@ -5,6 +5,7 @@ namespace ShipFast\LiveEdit\Http\Api\V1;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\ValidationException;
 use ShipFast\LiveEdit\Application\Api\ApplyEdit;
 use ShipFast\LiveEdit\Application\Api\StoreMedia;
@@ -180,6 +181,37 @@ class MediaController
                     'message' => collect($e->errors())->flatten()->first(),
                 ],
             ], 422);
+        } catch (\Throwable $e) {
+            /*
+             * Anything else: a bucket that refuses the write, credentials that
+             * have moved, a disk that is not configured on this host.
+             *
+             * Reported rather than swallowed - it still reaches the log and
+             * whatever watches it - but turned into an answer rather than an
+             * opaque 500. Everything else in this codebase is careful to say
+             * what went wrong, and this one route was not: somebody replacing
+             * a photograph got a failed request with no message, and from the
+             * outside that is indistinguishable from the editor being broken.
+             *
+             * The site and the key are logged with it, because "media failed"
+             * in a log shared by every customer is not something anybody can
+             * act on.
+             */
+            report($e);
+
+            Log::error('[live-edit] a picture could not be stored', [
+                'site' => $site->slug ?? null,
+                'key' => $key ?? null,
+                'disk' => config('live-edit.disk'),
+                'reason' => $e->getMessage(),
+            ]);
+
+            return response()->json([
+                'error' => [
+                    'type' => 'storage_error',
+                    'message' => 'That picture could not be stored. Nothing on the page has changed. Try again, and tell us if it keeps happening.',
+                ],
+            ], 500);
         }
     }
 

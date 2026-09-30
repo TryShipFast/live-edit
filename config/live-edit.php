@@ -273,8 +273,22 @@ return [
     ],
 
     // Storage for uploaded images.
-    'disk' => 'public',
-    'directory' => 'live-edit',
+    /*
+     * Where uploaded pictures are written.
+     *
+     * Hardcoded until 0.13.5, which meant a host could not point media at a
+     * bucket without publishing this whole file - and on a platform whose
+     * application directory is read-only, or whose containers are replaced on
+     * every deploy, the local disk is not somewhere a customer's photographs
+     * can live. The upload threw, the route had no answer for it, and the
+     * person replacing a picture got "Server Error".
+     *
+     * Any disk in the host's own filesystems config. "public" stays the
+     * default because it is right for a single-server install and needs no
+     * account with anybody.
+     */
+    'disk' => env('LIVE_EDIT_DISK', 'public'),
+    'directory' => env('LIVE_EDIT_MEDIA_DIRECTORY', 'live-edit'),
 
     // Where uploaded images are served from. Point this at a CloudFront
     // distribution in front of the bucket and pictures come from an edge near

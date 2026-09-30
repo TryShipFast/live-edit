@@ -6,6 +6,7 @@ use Illuminate\Contracts\Http\Kernel as HttpKernel;
 use Illuminate\Support\Facades\Blade;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\ServiceProvider;
+use ShipFast\LiveEdit\Console\Commands\CheckMediaStorage;
 use ShipFast\LiveEdit\Console\Commands\ImportTheme;
 use ShipFast\LiveEdit\Console\Commands\ManageApiSite;
 use ShipFast\LiveEdit\Console\Commands\PruneOrphanedUploads;
@@ -151,7 +152,7 @@ class LiveEditServiceProvider extends ServiceProvider
         $this->loadViewsFrom(__DIR__.'/../resources/views', 'live-edit');
 
         if ($this->app->runningInConsole()) {
-            $this->commands([ImportTheme::class, ManageApiSite::class, PruneOrphanedUploads::class, ScanForEditables::class, SendRenewalNotices::class, Versions::class]);
+            $this->commands([CheckMediaStorage::class, ImportTheme::class, ManageApiSite::class, PruneOrphanedUploads::class, ScanForEditables::class, SendRenewalNotices::class, Versions::class]);
 
             $this->publishes([
                 __DIR__.'/../config/live-edit.php' => config_path('live-edit.php'),
