@@ -428,6 +428,29 @@ class MarkupScanner
             if (array_key_exists($key, $overrides) && strtolower($node->tagName) === 'img') {
                 $node->setAttribute('src', $overrides[$key]);
                 $this->clearTheSourcesAround($node);
+
+                /*
+                 * And what the drawer will show when somebody opens it.
+                 *
+                 * `data-edit-preview` was written a moment ago by the tagging
+                 * pass, from the source the theme shipped - and overrides run
+                 * after tagging, so without this it names the picture that has
+                 * just been replaced. A client replaces an image, sees the new
+                 * one on the page, opens the drawer to write its description
+                 * and is shown the old one. It reads as a save that did not
+                 * take, and the natural response is to replace it again.
+                 *
+                 * The browser does the same thing in applyContent. Two
+                 * implementations of one rule is how a self-hosted site and a
+                 * cloud one come to behave differently, so this is the same
+                 * rule written on the other side of the wire rather than a
+                 * second idea about it.
+                 */
+                if ((string) $overrides[$key] !== '') {
+                    $node->setAttribute('data-edit-preview', (string) $overrides[$key]);
+                } else {
+                    $node->removeAttribute('data-edit-preview');
+                }
             }
 
             // The description is stored beside the picture. The browser

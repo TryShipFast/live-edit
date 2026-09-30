@@ -3163,7 +3163,24 @@ const bootLiveEdit = () => {
             const previewImg = document.createElement('img');
             previewImg.alt = '';
             previewImg.className = '';
-            const currentSrc = element.dataset.editPreview;
+            /*
+             * What the page is showing right now, not what it showed when it
+             * was tagged.
+             *
+             * `data-edit-preview` is written by the mapper at tag time and is
+             * the right thing to fall back to - a lazily-loaded image's own
+             * `src` can still be a placeholder when somebody clicks it. But
+             * read alone it goes stale the moment a picture is replaced, and
+             * then the drawer shows the client the picture they have just
+             * got rid of. Reported from a real site: it reads as a save that
+             * did not take, and the natural response is to replace it again.
+             */
+            const showing = isBackground
+                ? currentImageOf(element)
+                : (element.currentSrc || element.getAttribute('src') || '');
+
+            const usable = showing && !showing.startsWith('data:') ? showing : '';
+            const currentSrc = usable || element.dataset.editPreview;
             if (currentSrc) {
                 previewImg.src = currentSrc;
                 preview.append(previewImg);

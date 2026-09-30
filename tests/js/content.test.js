@@ -719,3 +719,50 @@ describe('defending a page the server already baked', () => {
         expect(doc.querySelector('p code').textContent).toBe('wp-config.php');
     });
 });
+
+describe('the drawer must not show a picture that has been replaced', () => {
+    /*
+     * Reported from a real site: replace an image, see the new one on the
+     * page, open the drawer again to write its description, and be shown the
+     * picture you have just got rid of.
+     *
+     * `data-edit-preview` is written by the mapper from the element's source
+     * at the moment the page was tagged, and nothing ever updated it. It reads
+     * as a save that did not take, and the natural response is to replace the
+     * picture again, and again.
+     *
+     * The attribute has a job - a lazily-loaded image's own `src` can be a
+     * placeholder when somebody clicks - so it stays, and is kept in step.
+     */
+    it('moves the preview on when the picture changes', () => {
+        document.body.innerHTML =
+            '<img data-edit-img="setting:auto:abc" data-edit-preview="/theme/old.jpg" src="/theme/old.jpg">';
+
+        applyContent(document, { 'auto:abc': 'https://images.example.com/new.jpg' });
+
+        const img = document.querySelector('img');
+
+        expect(img.getAttribute('src')).toBe('https://images.example.com/new.jpg');
+        expect(img.dataset.editPreview).toBe('https://images.example.com/new.jpg');
+    });
+
+    it('clears it when the picture is removed, rather than leaving a ghost', () => {
+        document.body.innerHTML =
+            '<img data-edit-img="setting:auto:abc" data-edit-preview="/theme/old.jpg" src="/theme/old.jpg">';
+
+        applyContent(document, { 'auto:abc': '' });
+
+        expect(document.querySelector('img').dataset.editPreview).toBeUndefined();
+    });
+
+    it('leaves the tagged preview alone when nothing was stored for that picture', () => {
+        // The ordinary case, and the reason the attribute exists: no edit, so
+        // what the mapper captured is still the truth.
+        document.body.innerHTML =
+            '<img data-edit-img="setting:auto:abc" data-edit-preview="/theme/old.jpg" src="/theme/old.jpg">';
+
+        applyContent(document, { 'auto:other': 'https://images.example.com/new.jpg' });
+
+        expect(document.querySelector('img').dataset.editPreview).toBe('/theme/old.jpg');
+    });
+});

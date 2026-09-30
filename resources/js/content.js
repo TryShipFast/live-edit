@@ -575,6 +575,29 @@ export const applyContent = (root, settings) => {
 
         if (Object.hasOwn(settings, key)) {
             applyValue(element, settings[key]);
+
+            /*
+             * Keep what the drawer shows in step with what the page shows.
+             *
+             * `data-edit-preview` is written by the mapper from the element's
+             * source at the moment the page was tagged, and nothing ever
+             * updated it. So a client replaced a picture, saw the new one on
+             * the page, opened the drawer again to write its description - and
+             * was shown the picture they had just replaced. It reads as a save
+             * that did not take, and the natural response is to replace it
+             * again, and again.
+             *
+             * Reported from a real site. The attribute exists because a
+             * lazily-loaded image's own `src` can be a placeholder at the
+             * moment somebody clicks, so it is still the thing the drawer
+             * reads - it just has to be told when the picture changes.
+             */
+            if (settings[key]) {
+                element.dataset.editPreview = settings[key];
+            } else {
+                delete element.dataset.editPreview;
+            }
+
             applied++;
         }
 
