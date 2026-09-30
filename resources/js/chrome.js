@@ -701,6 +701,23 @@ body.editing [data-edit-bg] {
   border-radius: 3px;
   cursor: pointer;
 }
+/* A sentence whose original has changed since it was translated.
+ *
+ * Marked where it sits, because a count cannot be acted on: told that six
+ * translations need updating, somebody still has to open every string on the
+ * site to find which six. The page already knows where every key is.
+ *
+ * Amber and dashed rather than red and solid: this is not an error and the
+ * translation is not wrong. It was true when it was written and the original
+ * has moved since, which is a thing to look at rather than a thing to fix.
+ * Only ever shown while editing that language - marking them in the original
+ * would be scolding somebody for editing their own words. */
+body.editing [data-live-edit-stale] {
+  outline: 2px dashed rgba(180, 83, 9, .75);
+  outline-offset: 3px;
+  background: rgba(251, 191, 36, .10);
+}
+
 /* The marker means two different things, and one rule used to serve both.
  *
  * A host that writes its own templates lays a panel OVER a picture and marks

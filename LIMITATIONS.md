@@ -537,10 +537,26 @@ have:
   service is one list shared by every customer. A site is now asked for its
   own, falling back to config so self-hosted installs are untouched.
 
-**Still missing:** nothing shows a translator *which* strings are stale while
-they are editing that language - the count is known and announced, but the page
-does not mark the six sentences it refers to. And the console has no screen for
-choosing a site's languages, so they are set by hand today.
+**Closed in v0.13.2.** A translator switching to French now sees the sentences
+that have fallen behind marked where they sit, and the count in the message
+names how many are on this page rather than on the site. A count alone could
+not be acted on: told six translations need updating, somebody still had to
+open every string to find which six.
+
+Marked amber and dashed rather than red and solid, because this is not an
+error - the translation was true when it was written and the original has moved
+since. Shown only while editing that language: marking them in the original
+would be scolding somebody for editing their own words, which is the thing they
+are there to do. Re-read on every switch rather than reused, since a mark that
+is out of date sends a translator to a sentence that is fine.
+
+And the console has a screen for it, so languages are a customer's own choice
+rather than a row somebody edits in the database for them. Codes are validated,
+a bad line is quoted back rather than answered with "invalid input", and the
+language a site writes in is forced to be one of the ones it lists - everything
+else is stored as a translation of it, so a default nobody listed would file a
+site's own words under a language prefix and leave nothing at the key the page
+reads.
 ---
 
 ### Fixed: a card wrapped in a link, with a link inside it, was a different tree in the browser

@@ -4031,6 +4031,46 @@ const bootLiveEdit = () => {
             picker.hidden = false;
 
             /*
+             * Which sentences on this page have fallen behind.
+             *
+             * A count is a start and it is not enough: told "six translations
+             * may need updating", a translator still has to open every string
+             * on the site to find which six. The page already knows where
+             * every key is, so the ones that are stale can simply be marked
+             * where they sit.
+             *
+             * Only while editing that language. Marking them in the original
+             * would be scolding somebody for editing their own words, which is
+             * the thing they are supposed to do.
+             */
+            const markStale = (rows, locale) => {
+                document
+                    .querySelectorAll('[data-live-edit-stale]')
+                    .forEach((element) => element.removeAttribute('data-live-edit-stale'));
+
+                if (locale === fallback) return 0;
+
+                let marked = 0;
+
+                (rows ?? [])
+                    .filter((row) => row.locale === locale && row.current === false)
+                    .forEach((row) => {
+                        document
+                            .querySelectorAll(`[data-edit="setting:${CSS.escape(row.key)}"]`)
+                            .forEach((element) => {
+                                element.setAttribute('data-live-edit-stale', '');
+                                marked++;
+                            });
+                    });
+
+                return marked;
+            };
+
+            let known = said?.stale ?? [];
+
+            markStale(known, editing);
+
+            /*
              * Say how many translations have fallen behind the words they
              * translate, and say it where somebody editing will see it.
              *
@@ -4097,10 +4137,25 @@ const bootLiveEdit = () => {
 
                     applyContent(document, fresh?.settings ?? {});
 
+                    // Read again rather than reusing what was fetched when the
+                    // editor opened: somebody may have changed the original in
+                    // between, and a mark that is out of date is worse than
+                    // none - it sends a translator to a sentence that is fine.
+                    try {
+                        known = (await (await request('/live-edit/translations', { method: 'GET' })).json())?.stale ?? known;
+                    } catch {
+                        // Keep what we had. The words are already applied and
+                        // the marks are a hint, not the point.
+                    }
+
+                    const behind = markStale(known, wanted);
+
                     notify(
                         wanted === fallback
                             ? 'Editing the original.'
-                            : `Editing in ${picker.options[picker.selectedIndex]?.text ?? wanted}. Saves here do not change the original.`
+                            : behind > 0
+                                ? `Editing in ${picker.options[picker.selectedIndex]?.text ?? wanted}. ${behind === 1 ? '1 sentence on this page has' : `${behind} sentences on this page have`} fallen behind the original.`
+                                : `Editing in ${picker.options[picker.selectedIndex]?.text ?? wanted}. Saves here do not change the original.`
                     );
                 } catch {
                     if (mine !== switchNumber) {
