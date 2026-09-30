@@ -535,7 +535,7 @@ does not mark the six sentences it refers to. And the console has no screen for
 choosing a site's languages, so they are set by hand today.
 ---
 
-### A card wrapped in a link, with a link inside it, is a different tree in the browser
+### Fixed: a card wrapped in a link, with a link inside it, was a different tree in the browser
 **Adapter:** all. **Found:** 2026-09-30 on a live site. **Severity:** high
 where it occurs, and it occurs on catalogue pages, which is where the money is.
 
@@ -601,50 +601,51 @@ a silent wrong answer into a visible one, which is the most that can honestly
 be done here.
 
 
-**Revisited 2026-09-30: a correct parser exists, and adopting it would orphan
-every edit on every site.**
+**Fixed 2026-09-30, and the earlier note here was wrong.**
 
-PHP 8.4 ships `\Dom\HTMLDocument`, which implements the HTML5 tree
-construction algorithm properly. Measured on the exact card from this entry:
+PHP 8.4 ships `\Dom\HTMLDocument`, which implements HTML5 tree construction
+properly. Measured on the exact card from this entry, it splits the anchor into
+four exactly as Chrome does, where libxml keeps two nested. (`masterminds/html5`
+was tried first as the portable option and gives libxml's wrong answer, so it
+is no help. It is not a dependency.)
 
-```
-libxml            2 anchors, nested   (a tree no browser ever builds)
-Dom\HTMLDocument  3 anchors, split    (what the browser actually does)
-```
+The markup is now run through that parser and written straight back out before
+anything else touches it. The split is structural, so it survives being handed
+to libxml afterwards, and every type hint, XPath and key rule downstream is
+unchanged. Sites on PHP 8.3 keep exactly today's behaviour rather than getting
+a third one.
 
-So the parser question is settled. `masterminds/html5` was tried first as the
-portable option and gives **the same wrong answer as libxml** - 2 nested
-anchors - so it does not implement the adoption agency algorithm and is no
-help here. It was tested in a scratch directory and is not a dependency.
+**A first pass at this entry said adopting it would re-key every site, and that
+was measured too hastily.** It compared raw parser output, where the HTML5
+parser materialises `<head>`, uppercases tag names and inserts the implied
+`<tbody>`. But `structuralPath()` already lowercases every tag and stops at
+`body`, so two of those three differences were never in a key at all. Measured
+properly, against the rule the keys actually use:
 
-The blocker is not the parser, it is the keys. An auto key is
-`hash(keyPath($node))`, and the two parsers disagree about the path of **every
-element on every page**, not only misnested ones:
+| | paths agree? |
+| --- | --- |
+| an ordinary page | yes |
+| lists and navigation | yes |
+| a table | no - the implied `<tbody>` |
+| the misnested card | no, which is the point |
 
-- the HTML5 parser materialises `<head>`, which libxml does not
-- it reports tag names in uppercase
-- it inserts the implied `<tbody>` that every table has and no author writes
+So the blast radius was one element nobody types. `structuralPath()` now skips
+an implied `<tbody>` - a no-op on libxml, which never builds one - and the two
+parsers agree about tables as well.
 
-Measured on an ordinary page with no misnesting at all: 13 elements under
-libxml, 14 under the HTML5 parser, and not one shared path. Switching would
-therefore re-key every element of every site at once and detach every word any
-client has ever saved. That is not a migration, it is data loss with a release
-note.
+**Proved, rather than assumed, that no key moved:** the released version was
+stashed and the same markup run through both. An ordinary page's eight keys are
+identical, and a table cell keys to `auto:cf4d4f4d751c` either way. Both are
+pinned by tests, because the cheapest wrong move here costs every customer
+their content.
 
-**What it would actually take**, so nobody has to work it out again:
+Two faults of my own on the way, both silent: `LIBXML_NOWARNING` is not a flag
+the HTML5 parser accepts and it rejects it by *throwing*, which a catch turned
+into a normaliser that did nothing at all; and wrapping a whole document in a
+second `<body>` makes the parser resolve the two by pulling the page's content
+up into `<head>`. The second was caught by existing tests, the first only by
+measuring the output.
 
-- make `keyPath()` parser-independent - normalise case, skip implied elements -
-  which is itself a key change and needs the same migration, or
-- store a map from old keys to new and rewrite content once per site, which
-  means every site's stored content has to be migrated in step with the
-  release that changes the parser, or
-- keep both parsers and use the spec one only to decide anchor structure,
-  leaving paths to libxml. Narrowest, ugliest, and the only one that does not
-  move a single existing key.
-
-The third is the one worth doing if this is ever worth doing. It is written
-down rather than built because the fault it fixes affects one markup shape, and
-the cheapest wrong move here costs every customer their content.
 ---
 
 ### Mostly fixed: anything inside a .map() was not editable, which on a real page is most of it

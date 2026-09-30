@@ -165,6 +165,8 @@ class MarkupScanner
 
         $this->fullDocument = (bool) preg_match('/<html[\s>]/i', $html);
 
+        $html = TheTreeABrowserBuilds::from($html);
+
         $this->doc = new DOMDocument;
         libxml_use_internal_errors(true);
         $this->doc->loadHTML('<?xml encoding="UTF-8">'.$html, LIBXML_NOWARNING | LIBXML_NOERROR);
@@ -299,6 +301,8 @@ class MarkupScanner
         }
 
         $this->fullDocument = (bool) preg_match('/<html[\s>]/i', $html);
+        $html = TheTreeABrowserBuilds::from($html);
+
         $this->doc = new DOMDocument;
         libxml_use_internal_errors(true);
         $this->doc->loadHTML('<?xml encoding="UTF-8">'.$html, LIBXML_NOWARNING | LIBXML_NOERROR);
@@ -1122,6 +1126,26 @@ class MarkupScanner
                 break;
             }
             $tag = strtolower($el->tagName);
+
+            /*
+             * A <tbody> nobody wrote is not part of where an element sits.
+             *
+             * Every table has one whether or not its author typed it: a
+             * browser inserts it, and so does any parser that follows the
+             * HTML5 rules, while libxml does not. Counting it would put a
+             * segment in the path on some parsers and not others, so the same
+             * cell in the same table would key two different ways depending on
+             * who read the page - and a site would silently re-key its tables
+             * the day anything about the parsing changed.
+             *
+             * Skipped rather than counted, which is a no-op on the trees
+             * libxml builds (there is no tbody in them to skip) and is what
+             * makes the two agree.
+             */
+            if ($tag === 'tbody' && ! $el->hasAttribute('data-edit-item')) {
+                continue;
+            }
+
             $index = 1;
             for ($sib = $el->previousSibling; $sib !== null; $sib = $sib->previousSibling) {
                 if ($sib instanceof DOMElement && strtolower($sib->tagName) === $tag) {
