@@ -1403,6 +1403,31 @@ const bootLiveEdit = () => {
 
         /* ── History ───────────────────────────────────────────────────
          * What has been published, newest first. */
+        /*
+         * Which engine is answering, said quietly and in one place.
+         *
+         * Not decoration. Twice in one week an hour or more went on a fault
+         * that turned out to be a fix which had shipped and not deployed, and
+         * neither time could anybody looking at the page tell which version
+         * they were looking at. A customer who can read this back turns "it
+         * still does not work" into a question with an answer.
+         *
+         * At the foot of History because that is the panel somebody opens when
+         * they are wondering what is going on, and because a version number in
+         * the toolbar is furniture for the other ninety-nine visits.
+         */
+        const engineLine = () => {
+            const version = window.liveEditApi?.engine;
+
+            if (!version) return null;
+
+            const line = el('p', 'le-hint');
+            line.textContent = `Live Edit ${version}`;
+            line.title = 'Quote this if you report a problem';
+
+            return line;
+        };
+
         const renderHistory = async () => {
             drawerFields.replaceChildren(note('Loading…'));
 
@@ -1421,6 +1446,9 @@ const bootLiveEdit = () => {
 
             if (versions.length === 0) {
                 drawerFields.replaceChildren(note('Nothing published yet. Your first publish will appear here.'));
+
+                const only = engineLine();
+                if (only) drawerFields.append(only);
 
                 return;
             }
@@ -1449,6 +1477,9 @@ const bootLiveEdit = () => {
                 row.append(dot, text);
                 drawerFields.append(row);
             });
+
+            const stamp = engineLine();
+            if (stamp) drawerFields.append(stamp);
         };
 
         const note = (message) => {

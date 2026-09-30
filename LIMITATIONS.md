@@ -55,10 +55,18 @@ a *local* `vendor/` directory was read as evidence about a *server* and nine
 releases were wrongly described as undeployed. Production had been current all
 along. Neither mistake survives one curl.
 
-**Still not built:** the version on the console's site view, and in whatever
-the editor reports when a save fails. The number is now askable, which was the
-hard part, but a customer reporting a fault still cannot see it and neither can
-anybody reading their report.
+**Built in v0.13.1.** Three places, all of them where somebody already is:
+
+- the embed carries it, so it is in the page before anything is fetched
+- the editor prints it at the foot of History, the panel somebody opens when
+  they are wondering what is going on - not the toolbar, which would be
+  furniture on the other ninety-nine visits
+- the console's site view says it, so what a customer reads back and what we
+  read are the same number
+- the licence endpoint returns it, which every install already calls
+
+No secret is given away: the runtime it names is served publicly to every
+visitor of that site.
 
 ### Fixed: the mapper wrote labels and regions that nothing read
 **Adapter:** all. **Found:** 2026-09-29. **Fixed:** 2026-09-29.

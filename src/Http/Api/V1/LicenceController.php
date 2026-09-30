@@ -8,6 +8,7 @@ use ShipFast\LiveEdit\Domain\Site\LocalAddress;
 use ShipFast\LiveEdit\Domain\Site\Site;
 use ShipFast\LiveEdit\Domain\Site\SiteVerification;
 use ShipFast\LiveEdit\Http\Api\ApiContext;
+use ShipFast\LiveEdit\LiveEdit;
 
 /**
  * What a site is entitled to, and whether it is the site that bought it.
@@ -109,6 +110,23 @@ class LicenceController
         };
 
         return response()->json([
+            /*
+             * Which engine answered.
+             *
+             * Put here because every install asks this endpoint already, and
+             * because not knowing it has cost this project a day twice over in
+             * one week. Once on a customer's site, where two of three reported
+             * faults turned out to be fixes that had shipped and not deployed;
+             * and once immediately after, when a local vendor directory was
+             * read as evidence about a server and nine releases were wrongly
+             * called undeployed.
+             *
+             * Neither mistake survives a version anybody can see. It is not a
+             * secret - the runtime it serves is public - and a customer who
+             * can read it back to us turns "it still does not work" into a
+             * question with an answer.
+             */
+            'engine' => LiveEdit::VERSION,
             'licence' => [
                 'site' => $site->slug,
                 'valid' => $site->isActive() && ! $lapsed && $matches !== false,

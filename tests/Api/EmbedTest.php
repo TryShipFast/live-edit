@@ -19,6 +19,29 @@ class EmbedTest extends TestCase
         $app['config']->set('cors.paths', []);
     }
 
+    public function test_the_page_says_which_engine_is_answering_it(): void
+    {
+        /*
+         * Not decoration. Twice in one week an hour or more went on a fault
+         * that turned out to be a fix which had shipped and not been deployed,
+         * and neither time could anybody looking at the page tell which
+         * version they had. A customer who can read this back turns "it still
+         * does not work" into a question with an answer.
+         *
+         * No secret: the runtime it names is served publicly to every visitor.
+         */
+        $site = \ShipFast\LiveEdit\Domain\Site\Site::query()->create([
+            'slug' => 'acme',
+            'name' => 'Acme',
+            'allowed_origins' => ['https://acme.test'],
+        ]);
+
+        $body = $this->get("/s/{$site->slug}.js")->getContent();
+
+        $this->assertStringContainsString('engine', $body);
+        $this->assertStringContainsString(\ShipFast\LiveEdit\LiveEdit::VERSION, $body);
+    }
+
     public function test_the_one_line_a_customer_pastes_serves_javascript(): void
     {
         $response = $this->get('/live-edit/embed.js');

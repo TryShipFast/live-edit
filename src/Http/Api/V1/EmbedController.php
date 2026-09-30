@@ -5,6 +5,7 @@ namespace ShipFast\LiveEdit\Http\Api\V1;
 use ShipFast\LiveEdit\Domain\Site\ApiToken;
 use ShipFast\LiveEdit\Domain\Site\Site;
 use ShipFast\LiveEdit\Domain\Site\TokenType;
+use ShipFast\LiveEdit\LiveEdit;
 use Symfony\Component\HttpFoundation\Response;
 
 /**
@@ -170,6 +171,18 @@ class EmbedController
             // next page view rather than on the customer's next deploy.
             'key' => $key?->public_text,
             'api' => url(config('live-edit.api.prefix', 'api/live-edit/v1')),
+            /*
+             * Which engine is answering this page.
+             *
+             * Carried in the embed rather than fetched, because it costs
+             * nothing here and a request of its own would be weight for a
+             * string. It is in the page so that somebody reporting a fault can
+             * read it back to us: not knowing it has cost this project a day
+             * twice in one week, once chasing fixes that had shipped and not
+             * deployed, and once reading a local directory as evidence about a
+             * server. No secret - the runtime it serves is public.
+             */
+            'engine' => LiveEdit::VERSION,
             'snapshot' => rtrim((string) config('live-edit.snapshot_url', ''), '/') !== ''
                 ? rtrim((string) config('live-edit.snapshot_url', ''), '/').'/sites/'.$site->slug
                 : null,
