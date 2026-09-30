@@ -136,8 +136,53 @@ const projectRoot = (() => {
  * twelve of fifteen files were called server-rendered, and every one of them
  * was in fact rendered in the browser.
  */
+/** Every file being scanned, read once. */
+const sources = new Map(files.map((file) => [file, fs.readFileSync(file, 'utf8')]));
+
+const ENDINGS = ['', '.tsx', '.ts', '.jsx', '.js', '/index.tsx', '/index.ts', '/index.jsx', '/index.js'];
+
+/** Turn an import specifier into one of the files being scanned, if it is one. */
+const resolve = (from, specifier) => {
+    const candidates = [];
+
+    if (specifier.startsWith('.')) {
+        candidates.push(path.resolve(path.dirname(from), specifier));
+    } else if (specifier.startsWith('@/')) {
+        // The alias Next.js scaffolds. Both layouts are tried rather than
+        // reading tsconfig, which would mean parsing JSON with comments.
+        candidates.push(path.join(projectRoot, 'src', specifier.slice(2)));
+        candidates.push(path.join(projectRoot, specifier.slice(2)));
+    } else {
+        return null;
+    }
+
+    for (const candidate of candidates) {
+        for (const ending of ENDINGS) {
+            if (sources.has(candidate + ending)) {
+                return candidate + ending;
+            }
+        }
+    }
+
+    return null;
+};
+
+/** The file a component name was imported from, if it was imported at all. */
+const resolveFrom = (file, name) => {
+    const source = sources.get(file) ?? '';
+
+    for (const line of source.matchAll(/import\s+([^;]+?)\s+from\s*['"]([^'"]+)['"]/g)) {
+        // Matches a default import, a named one, or one among several. The
+        // word boundary keeps "Avatar" from matching "AvatarGroup".
+        if (new RegExp(`\\b${name}\\b`).test(line[1])) {
+            return resolve(file, line[2]);
+        }
+    }
+
+    return null;
+};
+
 const clientRendered = (() => {
-    const sources = new Map(files.map((file) => [file, fs.readFileSync(file, 'utf8')]));
     const marked = new Set();
     const queue = [];
 
@@ -148,34 +193,6 @@ const clientRendered = (() => {
         }
     }
 
-    const ENDINGS = ['', '.tsx', '.ts', '.jsx', '.js', '/index.tsx', '/index.ts', '/index.jsx', '/index.js'];
-
-    /** Turn an import specifier into one of the files being scanned, if it is one. */
-    const resolve = (from, specifier) => {
-        const candidates = [];
-
-        if (specifier.startsWith('.')) {
-            candidates.push(path.resolve(path.dirname(from), specifier));
-        } else if (specifier.startsWith('@/')) {
-            // The alias Next.js scaffolds. Both layouts are tried rather than
-            // reading tsconfig, which would mean parsing JSON with comments.
-            candidates.push(path.join(projectRoot, 'src', specifier.slice(2)));
-            candidates.push(path.join(projectRoot, specifier.slice(2)));
-        } else {
-            return null;
-        }
-
-        for (const candidate of candidates) {
-            for (const ending of ENDINGS) {
-                if (sources.has(candidate + ending)) {
-                    return candidate + ending;
-                }
-            }
-        }
-
-        return null;
-    };
-
     while (queue.length) {
         const file = queue.pop();
         const source = sources.get(file) ?? '';
@@ -184,6 +201,63 @@ const clientRendered = (() => {
             const imported = resolve(file, match[1]);
 
             if (imported && ! marked.has(imported)) {
+                marked.add(imported);
+                queue.push(imported);
+            }
+        }
+    }
+
+    return marked;
+})();
+
+/**
+ * Which files are a row of a list, rendered once per item.
+ *
+ * The question no single file can answer about itself. `avatar.tsx` is a
+ * component that renders a name; whether that name is one person or one per
+ * row is decided in whichever file writes `posts.map(post => <PostPreview/>)`,
+ * and on a real App Router page that is always somewhere else.
+ *
+ * It matters because a key written into a card is one key however many times
+ * the card is drawn. On the client that is fine - the row's identity is
+ * composed on at render, inside `LiveEditItem`. On the server there is no
+ * context to carry it, so one key stays one key. Measured on a real Next app:
+ * three different authors' names carried the identical key, and renaming one
+ * would have renamed all three in a customer's content, silently.
+ *
+ * Seeded with every component used directly as a `.map()` row, then followed
+ * through imports, because a card's own children are drawn once per row too.
+ * Deliberately generous: marking a file that is not really repeated costs one
+ * value staying uneditable, and missing one costs somebody's content.
+ */
+const rowComponents = (() => {
+    const marked = new Set();
+    const queue = [];
+
+    // A component rendered straight inside a .map() callback. Read from the
+    // text rather than the syntax tree: this needs a name to resolve an import
+    // by, not a precise shape, and the callback bodies people write vary far
+    // more than the one line that matters.
+    const inAMap = /\.map\(\s*\(?[^)]*\)?\s*=>\s*\(?\s*<([A-Z][A-Za-z0-9_]*)/g;
+
+    for (const [file, source] of sources) {
+        for (const found of source.matchAll(inAMap)) {
+            const target = resolveFrom(file, found[1]);
+
+            if (target && !marked.has(target)) {
+                marked.add(target);
+                queue.push(target);
+            }
+        }
+    }
+
+    while (queue.length) {
+        const file = queue.pop();
+
+        for (const match of (sources.get(file) ?? '').matchAll(/(?:from|import)\s*['"]([^'"]+)['"]/g)) {
+            const imported = resolve(file, match[1]);
+
+            if (imported && !marked.has(imported)) {
                 marked.add(imported);
                 queue.push(imported);
             }
@@ -218,6 +292,7 @@ for (const file of files) {
         result = transform(source, {
             relativePath: relative,
             force: force ?? (clientRendered.has(file) ? true : null),
+            repeated: rowComponents.has(file),
         });
     } catch (error) {
         // A file that cannot be parsed is reported, never guessed at.

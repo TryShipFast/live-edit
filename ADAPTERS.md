@@ -789,6 +789,59 @@ live incident. The tag stands - the console has already installed it - but
 nothing in the release says the React adapter gained a server half, and without
 this paragraph nobody reading the history would find it.
 
+### The navigate step, run at last - and what it found
+
+Run on 2026-09-30 against a real Next 16.3 app, the package installed as a
+customer installs it, and a stub content service. The script is kept at
+`tests/manual/navigate-check.mjs`; it needs an app running, so it is not in
+the suite.
+
+Six checks pass, and two of them are the point:
+
+- the navigation was **client-side, not a reload**, asserted by setting a
+  marker on `window` before navigating and reading it after. Without that
+  check the whole test passes trivially on a full page load, which is the
+  failure mode of every naive version of it.
+- the edited element **did not revert** to its template copy, and its key
+  **did not move**.
+
+So the fear recorded here - that a client-side navigation re-mounts the tree
+and derives every identity afresh from nothing - does not materialise on the
+server path. A navigation refetches from the server, and the server reads the
+content. Nothing is derived in the browser to be derived differently.
+
+**But running it found something the whole milestone had missed**, and it was
+worse than the thing being tested.
+
+Listing every keyed element on the page showed three different authors' names
+carrying the **identical key**, and two post excerpts carrying another. A key
+written into a card is one key however many times the card is drawn.
+
+On the client that is correct and always has been: the row's identity is
+composed onto the key at render, inside `LiveEditItem`. On the server there is
+no context to carry it, so one key stays one key - and a prop is exactly the
+thing that differs between rows. Renaming one author would have renamed all
+three, silently, in a customer's live content. That is not a missing feature,
+it is content corruption, and shipping the server reader that morning had
+turned it from dormant into live: those keys had previously resolved to
+nothing at all.
+
+It is refused now. The driver works out which files are drawn once per row -
+seeded from components used directly as a `.map()` row, then followed through
+imports, because a card's own children are repeated too - and in those files,
+on the server, a per-row value is left untagged and reported by name. Literal
+text is untouched: words written into a card are the same words on every row,
+so one key for them is not a collision, it is the truth.
+
+On the real app the count drops from 11 elements to 9, the refusals are named,
+and **no key appears twice on the page**. A smaller honest number, which is the
+trade this project keeps choosing and keeps being right to.
+
+The lesson is the one already written two sections down and worth proving
+again: the test that matters was not the one in the acceptance list. Running
+the journey on a real page is what surfaced it, and no amount of staring at
+the list support would have.
+
 ### Test the whole journey, not the part that is easy to reach
 
 The acceptance steps for this work are the project's own:

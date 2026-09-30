@@ -427,7 +427,7 @@ const walk = (node, visit) => {
 /**
  * @returns {{code: string, changes: Array<{key: string, tag: string, text: string}>, mode: string}}
  */
-export const transform = (source, { relativePath = 'unknown', force = null } = {}) => {
+export const transform = (source, { relativePath = 'unknown', force = null, repeated = false } = {}) => {
     let ast;
 
     try {
@@ -755,6 +755,36 @@ export const transform = (source, { relativePath = 'unknown', force = null } = {
          */
         if (children[0].type === 'JSXExpressionContainer') {
             const read = plainRead(children[0].expression);
+
+            /*
+             * A card that is rendered once per row, on the server.
+             *
+             * `useContent` composes the row's identity onto the key when it
+             * runs inside a `LiveEditItem`, so on the client one key written
+             * here becomes one key per row and everything is correct. There is
+             * no context on the server, so the same key stays one key - and a
+             * prop is exactly the thing that differs per row.
+             *
+             * Measured on a real Next app before this guard existed: three
+             * different authors' names carried the identical key, so renaming
+             * one would have renamed all three, silently, in a customer's
+             * content. That is worse than the row not being editable, and it
+             * is the fault this codebase already warns about for lists it can
+             * see - "one key across a repeated region means editing the first
+             * card changes every card".
+             *
+             * Literal text is left alone by this and still tagged. Words
+             * written into the component are the same words on every row, so
+             * one key for them is not a collision, it is the truth.
+             */
+            if (read !== null && repeated && !isClient) {
+                deferred.push({
+                    tag,
+                    why: 'a value that differs per row, in a card rendered on the server, where rows cannot yet be told apart',
+                });
+
+                return;
+            }
 
             if (read === null) {
                 return;

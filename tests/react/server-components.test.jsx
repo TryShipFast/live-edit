@@ -209,3 +209,54 @@ describe('imported into the browser by mistake', () => {
         expect(warn).toHaveBeenCalledTimes(1);
     });
 });
+
+describe('a card that is drawn once per row', () => {
+    /*
+     * The fault this guards against corrupts content rather than merely
+     * failing to offer it, which is why it is refused rather than tolerated.
+     *
+     * A key written into a card is one key however many times the card is
+     * drawn. On the client that is correct: the row's identity is composed
+     * onto it at render, inside LiveEditItem. There is no context on the
+     * server, so one key stays one key - and a prop is exactly the thing that
+     * differs between rows.
+     *
+     * Measured on a real Next app before this existed: three different
+     * authors' names carried the identical key, so renaming one would have
+     * renamed all three, silently, in somebody's live content.
+     */
+    const card = `export function Avatar({ name }) {\n    return <div className="a">{name}</div>;\n}\n`;
+
+    it('refuses a per-row value it cannot tell apart, and says why', () => {
+        const { code, changes, deferred } = transform(card, { relativePath: 'avatar.jsx', repeated: true });
+
+        expect(changes).toHaveLength(0);
+        expect(code).not.toContain('data-edit');
+        expect(deferred).toHaveLength(1);
+        expect(deferred[0].why).toContain('differs per row');
+    });
+
+    it('still tags it when the same card renders in the browser', () => {
+        // There the identity is composed at render, so one key written here
+        // becomes one key per row and nothing collides.
+        const { code } = transform(`'use client';\n${card}`, { relativePath: 'avatar.jsx', repeated: true });
+
+        expect(code).toContain('useContent');
+    });
+
+    it('leaves the words written into the card alone', () => {
+        // Literal text is the same text on every row, so one key for it is
+        // not a collision. It is the truth.
+        const words = `export function Card() {\n    return <a className="m">Read more</a>;\n}\n`;
+        const { code, changes } = transform(words, { relativePath: 'card.jsx', repeated: true });
+
+        expect(changes).toHaveLength(1);
+        expect(code).toContain('<LiveEditText contentKey="auto:');
+    });
+
+    it('tags a per-row value normally when the card is not in a list', () => {
+        const { changes } = transform(card, { relativePath: 'avatar.jsx' });
+
+        expect(changes).toHaveLength(1);
+    });
+});

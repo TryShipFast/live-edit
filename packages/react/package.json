@@ -1,6 +1,6 @@
 {
   "name": "@shipfasts/live-edit-react",
-  "version": "0.12.9",
+  "version": "0.12.11",
   "description": "ShipFast Live Edit for React and Next.js: in-place editing of the static words and assets in your templates.",
   "keywords": [
     "live-edit",
