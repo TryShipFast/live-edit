@@ -240,9 +240,78 @@ class CheckMediaStorage extends Command
             $this->line('    '.(string) $who->get('Arn'));
             $this->line('  The policy has to be on that identity, and allow s3:PutObject on');
             $this->line('  arn:aws:s3:::'.($defined['bucket'] ?? '<bucket>').'/'.trim((string) config('live-edit.directory', ''), '/').'/*');
+
+            $this->whoOwnsTheBucket($defined, (string) $who->get('Account'));
         } catch (\Throwable $e) {
             $this->newLine();
             $this->line('  The credentials could not say who they are: '.$e->getMessage());
         }
+    }
+
+    /**
+     * Whether the bucket is even in the account those credentials belong to.
+     *
+     * The question that no amount of reading an IAM policy answers, and the one
+     * that makes a correct policy still fail. For a bucket in another account,
+     * a permission granted to your own user means nothing: the bucket's own
+     * policy has to name that user as a principal, and until it does every
+     * write is denied with exactly the message a missing permission gives.
+     *
+     * Asked by listing: a bucket in this account appears, one in another
+     * account does not, whatever anybody has been granted on it.
+     *
+     * Not every set of credentials may list buckets, and that is not a fault
+     * worth reporting as one - it is a permission most policies leave out. Then
+     * the answer is "could not tell", which is still better than an assumption.
+     */
+    private function whoOwnsTheBucket(array $defined, string $account): void
+    {
+        $bucket = (string) ($defined['bucket'] ?? '');
+
+        if ($bucket === '' || ! class_exists(\Aws\S3\S3Client::class)) {
+            return;
+        }
+
+        try {
+            $client = new \Aws\S3\S3Client([
+                'version' => 'latest',
+                'region' => $defined['region'] ?? 'us-east-1',
+                'credentials' => [
+                    'key' => $defined['key'] ?? '',
+                    'secret' => $defined['secret'] ?? '',
+                ],
+            ]);
+
+            $names = array_map(
+                fn ($held) => (string) ($held['Name'] ?? ''),
+                (array) $client->listBuckets()->get('Buckets')
+            );
+        } catch (\Throwable $e) {
+            $this->newLine();
+            $this->line('  Whether that bucket is in account '.$account.' could not be checked:');
+            $this->line('    these credentials may not list buckets ('.class_basename($e).').');
+            $this->line('  Confirm by hand: S3 shows only the current account\'s buckets, so if');
+            $this->line('  "'.$bucket.'" is not in that list it belongs to another account, and an');
+            $this->line('  IAM policy on your own user cannot grant access to it.');
+
+            return;
+        }
+
+        $this->newLine();
+
+        if (in_array($bucket, $names, true)) {
+            $this->line('  The bucket "'.$bucket.'" is in account '.$account.', so a policy on the');
+            $this->line('  identity above is the right place for this. What is left is an explicit');
+            $this->line('  Deny, a permissions boundary, or KMS: run IAM\'s policy simulator on');
+            $this->line('  that user with s3:PutObject, which names the statement responsible.');
+
+            return;
+        }
+
+        $this->line('  The bucket "'.$bucket.'" is NOT in account '.$account.'.');
+        $this->line('  That is the whole fault: a permission granted to your own user means');
+        $this->line('  nothing on somebody else\'s bucket. Its own bucket policy has to name');
+        $this->line('  that identity as a principal, and until it does every write is refused');
+        $this->line('  with exactly the message a missing permission gives.');
     }
 }
