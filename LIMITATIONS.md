@@ -996,6 +996,25 @@ place. The strip that appears says what is missing and links to the page that
 fixes it, so the failure is at least self-explanatory, but a client discovering
 it on their own site is a worse way to find out than us doing it first.
 
+**Half of ours is done, 2026-09-30.** The console app now carries `@liveEdit`
+in both of its layouts - `layouts/site` for tryshipfast.com and
+`components/layouts/kastsbuild` for the Live Edit pages - with a test that
+keeps it there, because the line can be dropped in a refactor and no page looks
+any different until somebody tries to edit one. It renders nothing at all until
+a site and key exist, so it ships safely ahead of them.
+
+Worth stating, because the entry above reads as two jobs and is one: those are
+two hostnames on **one** Laravel install, routed by `Route::domain`. The
+licence binds to the domain in `APP_URL`, so one registered site and one pair
+of keys covers both. What is left is not code:
+
+1. Register the site in the console, which is what issues the keys.
+2. Put `LIVE_EDIT_SITE_ID` and `LIVE_EDIT_APP_KEY` in the Laravel Cloud
+   environment. Both are named and explained in `.env.example`.
+
+Neither can be done from outside that console and that dashboard, which is why
+this entry stays open rather than being marked fixed.
+
 **Decided 2026-09-29: tokreamsblue is left alone.** The client updates his own
 site and takes the current release when he does. We are not registering it for
 him, and nobody should touch that deployment on his behalf.
