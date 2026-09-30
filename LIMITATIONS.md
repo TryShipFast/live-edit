@@ -434,7 +434,7 @@ not an answer for these sites. The file is recreated empty on every deploy, so
 a client would edit their home page, publish it, and lose every word the next
 time anybody shipped.
 
-### Translation is stored and served per locale, and nothing ever sets one
+### Partly fixed: translation is stored and served per locale, and nothing ever sets one
 **Adapter:** all, WordPress measured. **Found:** 2026-09-29. **Severity:** low
 today, high the day anybody builds the translation UI.
 
@@ -475,6 +475,42 @@ A visitor gets whichever locale the site asks for, through `data-locale` on
 the script tag or the host's own i18n. A bought template designed monolingual
 has no switcher in it, and adding one is the thing this product does not do.
 
+
+**Updated 2026-09-30.** The half that silently lost content is closed; the half
+that is a user interface is not.
+
+A key is one canonical value with translations hanging off it, not seven
+independent pieces of content, and nothing knew that. Editing the English on a
+site running seven languages left six pages serving translations of the
+sentence that had been replaced - the save worked, the editor reported success,
+and the site looked finished while being wrong in five languages nobody on the
+team reads.
+
+Every translated row now records a fingerprint of the canonical words it was
+written from, so staleness is *derived* by comparison rather than stored. A
+canonical write updates nothing else, there is no cascade to get wrong, and no
+row can disagree with another about what is stale. `GET /{site}/translations`
+answers with what needs review, per language.
+
+**A fingerprint rather than a version number, deliberately.** The obvious
+design counts versions - French translated from 41, English now at 42, so
+French is stale. It is wrong in one ordinary case: somebody edits the English,
+looks at it, and undoes it. The counter has moved to 43 and every translation
+is stale forever, though not one word of what they were translated from has
+changed. A fingerprint has no such state, and undoing the edit makes them
+current again, which is the truth. There is a test for exactly that.
+
+**Nothing is overwritten and nothing offers to be.** Changing "Learn from the
+best educators" to "Learn from Africa's leading educators" is a change of
+meaning, and machine-translating over somebody's reviewed French without
+telling them is a worse failure than leaving it stale and saying so. A stale
+translation also keeps being served - flagged is not withdrawn, and a French
+reader is better off with last month's French than with English.
+
+**Still missing:** the editor has no language menu, no way to switch locale
+while editing, and no banner saying six translations need review. The contract
+is there and nothing reads it yet, which is the same shape of gap this entry
+originally described, one layer up.
 ---
 
 ### A card wrapped in a link, with a link inside it, is a different tree in the browser

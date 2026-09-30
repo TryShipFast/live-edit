@@ -98,8 +98,40 @@ class SiteStore
 
         SiteSetting::query()->updateOrCreate(
             ['site_id' => $this->site->id, 'key' => $key],
-            ['value' => $value]
+            ['value' => $value, 'translated_from' => $this->whatThisTranslates($key)]
         );
+    }
+
+    /**
+     * The fingerprint of the canonical words a translation is being made from.
+     *
+     * Null for a canonical write, which is most of them. Recorded here because
+     * this is the only moment anybody knows: afterwards there is a French row
+     * and an English row and no way to tell whether one was written from the
+     * other or from the sentence that used to be there.
+     *
+     * Read at the moment of writing rather than derived later, and compared
+     * rather than counted - see Translations for why a version number gets
+     * "edit the English and undo it" wrong forever.
+     */
+    protected function whatThisTranslates(string $key): ?string
+    {
+        $known = Translations::declaredLocales();
+        $locale = Translations::localeOf($key, $known);
+        $default = (string) config('live-edit.default_locale', 'en');
+
+        if ($locale === null || $locale === $default) {
+            return null;
+        }
+
+        $canonical = $this->settings()
+            ->where('key', Translations::canonicalKeyOf($key, $known))
+            ->value('value');
+
+        // No canonical stored means the words are still the template's own.
+        // There is nothing here to have gone out of step with, so nothing to
+        // record, and the status reads as current until somebody edits them.
+        return $canonical === null ? null : Translations::fingerprint((string) $canonical);
     }
 
     /**

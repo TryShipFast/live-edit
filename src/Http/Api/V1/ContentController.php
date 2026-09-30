@@ -20,6 +20,7 @@ use ShipFast\LiveEdit\Application\Api\TagMarkup;
 use ShipFast\LiveEdit\Domain\Content\PageAllowance;
 use ShipFast\LiveEdit\Domain\Content\SiteSnapshot;
 use ShipFast\LiveEdit\Domain\Content\SiteStore;
+use ShipFast\LiveEdit\Domain\Content\Translations;
 use ShipFast\LiveEdit\Domain\Credits\Credits;
 use ShipFast\LiveEdit\Domain\Site\Ability;
 use ShipFast\LiveEdit\Domain\Site\Meter;
@@ -150,6 +151,38 @@ class ContentController
         }
 
         return response()->json($result);
+    }
+
+    /**
+     * Which translations have fallen behind the words they translate.
+     *
+     * The answer the editor needs to say "you changed the English, six
+     * translations may need looking at" - and the answer nothing could give
+     * before, which is why editing English on a site with six languages left
+     * six pages quietly saying the old thing.
+     *
+     * Nothing is overwritten and nothing is offered to be. A change of English
+     * is often a change of meaning, and machine-translating over somebody's
+     * reviewed French without asking is a worse failure than leaving it stale
+     * and saying so.
+     */
+    public function translations(Request $request): JsonResponse
+    {
+        $site = ApiContext::site($request);
+        $status = Translations::statusFor($site);
+
+        return response()->json([
+            'default_locale' => (string) config('live-edit.default_locale', 'en'),
+            'locales' => Translations::declaredLocales(),
+            // Per locale, how many of its translations no longer match their
+            // source. The shape a banner and a summary table both read from.
+            'needing_review' => Translations::needingReview($site),
+            'stale' => array_values(array_filter($status, fn ($row) => ! $row['current'])),
+            'counts' => [
+                'translated' => count($status),
+                'stale' => count(array_filter($status, fn ($row) => ! $row['current'])),
+            ],
+        ])->withHeaders(['Cache-Control' => 'no-store, private']);
     }
 
     public function publish(Request $request, PublishSite $publish): JsonResponse

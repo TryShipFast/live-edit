@@ -62,6 +62,15 @@ Route::prefix(config('live-edit.api.prefix', 'api/live-edit/v1').'/{site}')
              * check at all, and a fix could be released, believed shipped, and
              * sit unseen on every WordPress site we have.
              */
+            /*
+             * Which translations have fallen behind their English.
+             *
+             * A read key: the answer is about this site's own content and the
+             * caller already holds it. In the read group because asking
+             * changes nothing - nothing is retranslated, and nothing is
+             * overwritten, here or anywhere.
+             */
+            Route::get('/translations', [ContentController::class, 'translations'])->name('live-edit.api.translations');
             Route::get('/plugin', [PluginController::class, 'show'])->name('live-edit.api.plugin');
             Route::get('/plugin/download', [PluginController::class, 'download'])->name('live-edit.api.plugin.download');
 
