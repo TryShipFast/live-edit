@@ -177,3 +177,35 @@ describe('a list rendered on the server', () => {
         expect(code).not.toContain('LiveEditItem');
     });
 });
+
+describe('imported into the browser by mistake', () => {
+    it('says so, rather than quietly rendering fallbacks forever', async () => {
+        /*
+         * jsdom gives these tests a window, which is exactly the accident
+         * being described - so a fresh copy of the module is loaded here.
+         * The warning is said once per process on purpose, and by this point
+         * in the file it has already been said.
+         */
+        vi.resetModules();
+        const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+        const fresh = await import('../../packages/react/src/server.js');
+        await fresh.readContent();
+
+        expect(warn).toHaveBeenCalledWith(
+            expect.stringContaining('/server was imported into code running in the browser'),
+        );
+    });
+
+    it('says it once and then stops, because a render is a great many calls', async () => {
+        vi.resetModules();
+        const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+        const fresh = await import('../../packages/react/src/server.js');
+        await fresh.readContent();
+        await fresh.readContent();
+        await fresh.readContent();
+
+        expect(warn).toHaveBeenCalledTimes(1);
+    });
+});

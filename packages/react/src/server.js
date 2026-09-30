@@ -40,7 +40,30 @@ export const configureLiveEdit = (options) => {
     configured = options ? { ...options } : null;
 };
 
+let warnedAboutTheBrowser = false;
+
 const settings = () => {
+    /*
+     * Imported into a client bundle by mistake.
+     *
+     * Harmless, and that is the problem. A bundler does not put LIVE_EDIT_KEY
+     * into browser code - Next only exposes NEXT_PUBLIC_ names - so the key
+     * does not leak; the module simply finds nothing configured and every
+     * component renders its fallback. Which looks exactly like content that
+     * has not been written yet, and sends somebody to check their content
+     * service, their key and their network tab before the import.
+     *
+     * Said once, out loud, so the five minutes go on the real cause.
+     */
+    if (typeof window !== 'undefined' && !warnedAboutTheBrowser) {
+        warnedAboutTheBrowser = true;
+        console.warn(
+            '[live-edit] /server was imported into code running in the browser, where it can read no '
+            + 'configuration and every component will render its own words. Use the main entry point '
+            + "and useContent in anything marked 'use client'.",
+        );
+    }
+
     const env = typeof process === 'undefined' ? {} : (process.env ?? {});
 
     const site = configured?.site ?? env.LIVE_EDIT_SITE ?? null;

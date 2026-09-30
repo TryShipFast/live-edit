@@ -73,11 +73,9 @@ server, which in practice means Next.js.
 
 ```jsx
 // app/layout.jsx, a server component
-const { settings } = await fetch(`${apiBase}/${site}/content`, {
-  headers: { Authorization: `Bearer ${publishableKey}` },
-}).then((r) => r.json());
+import { readContent } from '@shipfasts/live-edit-react/server';
 
-return <LiveEditProvider site={site} apiBase={apiBase} publishableKey={key} content={settings}>…
+return <LiveEditProvider site={site} apiBase={apiBase} publishableKey={key} content={await readContent()}>…
 ```
 
 **`sessionKey`** you almost certainly do not need. Somebody signing in is
@@ -86,6 +84,52 @@ a server, so a server component cannot know it and a prop threaded down from
 one is always empty. The provider finds the session itself and waits to be told
 when the runtime has one. Pass this only if your own server mints sessions, as
 below, and already knows who is at the keyboard.
+
+## Server components
+
+Most of an App Router page is server components, and they cannot call hooks. So
+the words they render come from `/server` instead, a separate entry point:
+
+```jsx
+import { LiveEditText, liveEditWords } from '@shipfasts/live-edit-react/server';
+
+// As a component, wherever the words are - including inside a .map().
+<p data-edit="setting:auto:1a2b3c">
+  <LiveEditText contentKey="auto:1a2b3c" fallback="Original words" />
+</p>
+
+// Or as a lookup, if you would rather read them yourself.
+const words = await liveEditWords();
+<h1>{words('auto:1a2b3c', 'Original words')}</h1>
+```
+
+Configure it with three environment variables, read on the server only:
+
+```
+LIVE_EDIT_SITE=acme
+LIVE_EDIT_API_BASE=https://cms.example.com/api/live-edit/v1
+LIVE_EDIT_KEY=your-key
+```
+
+`live-edit-codemod` writes this shape for you in any file it can see is
+server-rendered, and the client shape everywhere else. It works that out from
+the whole project rather than from one file's first line: a component with no
+`'use client'` of its own still renders in the browser if something client
+imports it.
+
+**A separate entry point, deliberately.** This one holds your key, and an
+import that cannot appear in a client bundle cannot leak one into a client
+bundle. Do not import `/server` from a component marked `'use client'`.
+
+**It never throws.** No configuration, a timeout, an error, a login page where
+JSON was expected: every one of them renders the words already written in your
+component. Editing your content must never be able to take your site down.
+
+**Edits appear on the next render**, not as you type - there is no React in the
+browser holding that component's state. Rows of a list are keyed individually,
+so three cards built from one piece of markup hold three sets of words; adding,
+removing and reordering rows need a client component, and the codemod tells you
+which lists those are rather than passing over them quietly.
 
 ## Minting a session
 
