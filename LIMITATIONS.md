@@ -600,6 +600,51 @@ and say why, rather than tagging a tree the browser will rearrange. That turns
 a silent wrong answer into a visible one, which is the most that can honestly
 be done here.
 
+
+**Revisited 2026-09-30: a correct parser exists, and adopting it would orphan
+every edit on every site.**
+
+PHP 8.4 ships `\Dom\HTMLDocument`, which implements the HTML5 tree
+construction algorithm properly. Measured on the exact card from this entry:
+
+```
+libxml            2 anchors, nested   (a tree no browser ever builds)
+Dom\HTMLDocument  3 anchors, split    (what the browser actually does)
+```
+
+So the parser question is settled. `masterminds/html5` was tried first as the
+portable option and gives **the same wrong answer as libxml** - 2 nested
+anchors - so it does not implement the adoption agency algorithm and is no
+help here. It was tested in a scratch directory and is not a dependency.
+
+The blocker is not the parser, it is the keys. An auto key is
+`hash(keyPath($node))`, and the two parsers disagree about the path of **every
+element on every page**, not only misnested ones:
+
+- the HTML5 parser materialises `<head>`, which libxml does not
+- it reports tag names in uppercase
+- it inserts the implied `<tbody>` that every table has and no author writes
+
+Measured on an ordinary page with no misnesting at all: 13 elements under
+libxml, 14 under the HTML5 parser, and not one shared path. Switching would
+therefore re-key every element of every site at once and detach every word any
+client has ever saved. That is not a migration, it is data loss with a release
+note.
+
+**What it would actually take**, so nobody has to work it out again:
+
+- make `keyPath()` parser-independent - normalise case, skip implied elements -
+  which is itself a key change and needs the same migration, or
+- store a map from old keys to new and rewrite content once per site, which
+  means every site's stored content has to be migrated in step with the
+  release that changes the parser, or
+- keep both parsers and use the spec one only to decide anchor structure,
+  leaving paths to libxml. Narrowest, ugliest, and the only one that does not
+  move a single existing key.
+
+The third is the one worth doing if this is ever worth doing. It is written
+down rather than built because the fault it fixes affects one markup shape, and
+the cheapest wrong move here costs every customer their content.
 ---
 
 ### Mostly fixed: anything inside a .map() was not editable, which on a real page is most of it
