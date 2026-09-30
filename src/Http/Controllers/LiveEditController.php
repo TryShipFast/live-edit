@@ -171,6 +171,11 @@ class LiveEditController extends Controller
             'fitHeight' => ['nullable', 'integer', 'min:1', 'max:4000'],
             'alt' => ['nullable', 'string', 'max:300'],
             'imgTitle' => ['nullable', 'string', 'max:300'],
+            // The language the description is being typed in, checked against
+            // the ones this installation declares - the same rule the text
+            // save uses, because a locale nobody declared would file a value
+            // under a prefix no page ever reads.
+            'locale' => ['nullable', 'string', 'in:'.implode(',', array_keys(config('live-edit.locales', [])))],
             'remove' => ['nullable', 'boolean'],
         ]);
 
@@ -205,11 +210,21 @@ class LiveEditController extends Controller
                 $this->writeSetting($key.'Href', '');
             }
 
+            /*
+             * Alt text and the tooltip go in the language they were typed in.
+             *
+             * Only those two. The address, the credit and the link are the
+             * same in every language, and alt text is the one part of a page
+             * whose whole job is to be read aloud - left in English on a
+             * French page it is the accessibility layer untranslated.
+             */
+            $said = $validated['locale'] ?? null;
+
             if ($request->has('alt')) {
-                $this->writeSetting($key.'Alt', $validated['alt'] ?? '');
+                $this->writeSetting($this->localeKey($key.'Alt', $said), $validated['alt'] ?? '');
             }
             if ($request->has('imgTitle')) {
-                $this->writeSetting($key.'Title', $validated['imgTitle'] ?? '');
+                $this->writeSetting($this->localeKey($key.'Title', $said), $validated['imgTitle'] ?? '');
             }
         } else {
             abort_if($removing, 422, 'Delete the item itself to remove this image.');

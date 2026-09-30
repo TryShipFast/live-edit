@@ -442,7 +442,7 @@ not an answer for these sites. The file is recreated empty on every deploy, so
 a client would edit their home page, publish it, and lose every word the next
 time anybody shipped.
 
-### Partly fixed: translation is stored and served per locale, and nothing ever sets one
+### Fixed: translation is stored and served per locale, and nothing ever set one
 **Adapter:** all, WordPress measured. **Found:** 2026-09-29. **Severity:** low
 today, high the day anybody builds the translation UI.
 
@@ -557,6 +557,42 @@ language a site writes in is forced to be one of the ones it lists - everything
 else is stored as a translation of it, so a default nobody listed would file a
 site's own words under a language prefix and leave nothing at the key the page
 reads.
+**Closed 2026-09-30, with the last three breaks in the chain.** The list at
+the top of this entry named them, and all three are now shut:
+
+- **WordPress never asked for a language.** `Frontend` called
+  `Content::forViewer($editing)` with nothing after it, so a French row stored
+  perfectly correctly was never served to anybody. The whole feature worked
+  except being read.
+- **Media saves took no locale.** Alt text and the tooltip were one value
+  shared by every language, which leaves the accessibility layer - the one
+  part of a page whose whole job is to be read aloud - untranslated. They now
+  go in the language they were typed in, on all three adapters, and the editor
+  sends it with the picture.
+- **The editor never sent one with an image.** It does.
+
+Two decisions worth writing down, because both could reasonably have gone the
+other way.
+
+**Only the description is per language.** A picture is the same picture and a
+photographer is the same photographer, so the address, the source list and the
+four credit fields stay canonical: one address to keep current, one credit that
+cannot drift out of step with itself.
+
+**A language is used only when rows exist for it.** WordPress decides the
+language - core, Polylang, WPML, a theme - and this reads what it decided. But
+asking the table for `fr` alone returns only what has been translated, so every
+untranslated element would fall back past the client's own edits and render the
+words the theme shipped with. A half-translated site would have served half of
+somebody else's copy, looking entirely normal. So a language is laid over the
+canonical rather than replacing it, and a monolingual install, which has no row
+in any other language, never takes the path at all. Nothing here can empty a
+page.
+
+Both spellings are tried, `fr-fr` then `fr`, because WordPress says one and a
+site's language list usually says the other, and guessing one means a correct
+translation is never found.
+
 ---
 
 ### Fixed: a card wrapped in a link, with a link inside it, was a different tree in the browser

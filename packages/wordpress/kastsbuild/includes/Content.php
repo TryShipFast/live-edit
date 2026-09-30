@@ -121,7 +121,7 @@ class Content
      */
     public static function published(string $locale = ''): array
     {
-        return self::rows('published', $locale);
+        return self::inThisLanguage('published', $locale);
     }
 
     /**
@@ -131,7 +131,7 @@ class Content
      */
     public static function drafted(string $locale = ''): array
     {
-        return self::rows('draft', $locale);
+        return self::inThisLanguage('draft', $locale);
     }
 
     /**
@@ -531,6 +531,127 @@ class Content
     /**
      * @return array<string, string>
      */
+    /**
+     * One language's words, with the site's own underneath them.
+     *
+     * A key is one canonical value with translations hanging off it, not one
+     * independent piece of content per language. So a page asked for in French
+     * is the site's words with French laid over them, and a sentence nobody
+     * has translated yet renders in the language it was written in.
+     *
+     * Asking the table for locale = 'fr' alone was the obvious thing and the
+     * wrong one: it returns only what has been translated, so every other
+     * element on the page falls back past the client's edits entirely and
+     * shows the words the theme shipped with. A half-translated site would
+     * have served half of somebody else's copy.
+     *
+     * A row that exists and is empty wins, because somebody cleared it on
+     * purpose. Falling back is what a missing row means, and that is the same
+     * rule the service composes by - two implementations of one idea, which is
+     * worth saying out loud given how this week has gone.
+     */
+    private static function inThisLanguage(string $status, string $locale): array
+    {
+        $canonical = self::rows($status, '');
+
+        if ($locale === '') {
+            return $canonical;
+        }
+
+        return self::overlaid($canonical, self::rows($status, $locale));
+    }
+
+    /**
+     * One language's words over the site's own.
+     *
+     * A missing row falls back and an empty one does not: absence is "nobody
+     * has translated this yet", an empty string is "somebody cleared it". The
+     * same rule the service composes by, kept the same on purpose.
+     *
+     * @param  array<string, string>  $canonical
+     * @param  array<string, string>  $translated
+     * @return array<string, string>
+     */
+    public static function overlaid(array $canonical, array $translated): array
+    {
+        return array_merge($canonical, $translated);
+    }
+
+    /**
+     * The spellings of a WordPress locale this table might hold, best first.
+     *
+     * WordPress says "fr_FR"; a site's languages are usually listed as "fr".
+     * Both are tried because a customer may have been given either, and
+     * guessing only one means a correctly stored translation is never found -
+     * which is a silent failure, since the page renders perfectly in the wrong
+     * language.
+     *
+     * @return array<int, string>
+     */
+    public static function spellingsOf(string $wp): array
+    {
+        $wp = trim($wp);
+
+        if ($wp === '') {
+            return [];
+        }
+
+        return array_values(array_unique(array_filter([
+            strtolower(str_replace('_', '-', $wp)),
+            strtolower((string) strtok($wp, '_-')),
+        ])));
+    }
+
+    /**
+     * Which language this request is being rendered in, as this table spells
+     * it, or '' for the site's own.
+     *
+     * Read from WordPress rather than from a setting of ours. Whatever decides
+     * language on that site - core, Polylang, WPML, a theme - has already
+     * decided by the time this runs, and asking anything else would make the
+     * words disagree with the page around them.
+     *
+     * A language is only used when this table actually holds rows for it, and
+     * that rule is what makes this safe to turn on for every existing site.
+     * A monolingual install stores everything under '' and has no row in any
+     * other language, so it never takes this path and nothing about it
+     * changes. Nothing here can empty a page, which is the failure that would
+     * matter.
+     */
+    public static function localeForThisRequest(): string
+    {
+        static $found = null;
+
+        if ($found !== null) {
+            return $found;
+        }
+
+        $wp = function_exists('determine_locale')
+            ? (string) determine_locale()
+            : (function_exists('get_locale') ? (string) get_locale() : '');
+
+        foreach (self::spellingsOf($wp) as $code) {
+            if (self::holdsAnythingIn($code)) {
+                return $found = $code;
+            }
+        }
+
+        return $found = '';
+    }
+
+    /** Whether a single row exists in this language. */
+    private static function holdsAnythingIn(string $locale): bool
+    {
+        global $wpdb;
+
+        self::ensureTables();
+
+        return (bool) $wpdb->get_var($wpdb->prepare(
+            'SELECT 1 FROM '.self::contentTable().' WHERE locale = %s LIMIT 1',
+            $locale
+        ));
+    }
+
     private static function rows(string $status, ?string $locale = ''): array
     {
         global $wpdb;

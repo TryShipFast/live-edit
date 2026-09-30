@@ -115,7 +115,11 @@ class Frontend
             $html,
             self::pagePath(),
             $editing,
-            Content::forViewer($editing),
+            // In the language this page is being rendered in. Left out, a
+            // French row that was stored correctly was never served: the whole
+            // translation chain worked except the end of it, which is the one
+            // part a reader sees.
+            Content::forViewer($editing, Content::localeForThisRequest()),
             Styles::forViewer($editing)
         );
 
@@ -449,7 +453,12 @@ class Frontend
         // whether the words moved.
         $url = (string) ($_SERVER['REQUEST_URI'] ?? '/');
 
-        return self::CACHE_PREFIX.md5(Api::stamp().'|'.$url);
+        // And the language, because a cached page is words as much as markup.
+        // Most multilingual sites put each language on its own address, so the
+        // url usually separates them already - but a site switching by cookie
+        // or by header does not, and there one visitor's French would be
+        // served to the next visitor asking for English.
+        return self::CACHE_PREFIX.md5(Api::stamp().'|'.$url.'|'.Content::localeForThisRequest());
     }
 
     private static function isFeed(): bool

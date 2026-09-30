@@ -348,6 +348,65 @@ class MediaTest extends TestCase
         $this->assertSame('', $this->settings()['heroImage'] ?? null);
     }
 
+    public function test_a_description_is_written_in_the_language_it_was_typed_in(): void
+    {
+        /*
+         * Alt text is the one part of a page whose whole job is to be read
+         * aloud, and it was stored once for every language. A French page read
+         * its description in English to whoever most needed it not to be.
+         *
+         * Only the description. The picture is the same picture in every
+         * language and the photographer is the same photographer, so those
+         * stay at the canonical key - one address to keep current, one credit
+         * that cannot drift out of step with itself.
+         */
+        $this->site->forceFill(['locales' => ['en' => 'English', 'fr' => 'French']])->save();
+
+        $this->post($this->url(), [
+            'target' => 'setting:heroImage',
+            'url' => 'https://images.example.com/beach.jpg',
+            'alt' => 'A beach at dawn',
+            'credit' => 'Photo by Caio Silva',
+        ], $this->as($this->session))->assertOk();
+
+        $this->post($this->url(), [
+            'target' => 'setting:heroImage',
+            'alt' => 'Une plage à l\'aube',
+            'locale' => 'fr',
+        ], $this->as($this->session))->assertOk();
+
+        // Read the way a page is read, per language, rather than by looking
+        // for a key: which row a locale is stored in is this store's business
+        // and a test asserting the spelling would pass while the page served
+        // nothing.
+        $store = new SiteStore($this->site->fresh());
+        $french = $store->published('fr');
+        $english = $store->published('en');
+
+        $this->assertSame('Une plage à l\'aube', $french['heroImageAlt'] ?? null);
+        $this->assertSame('A beach at dawn', $english['heroImageAlt'] ?? null, 'the English description was overwritten by the French');
+
+        // The picture and the photographer are the same in both, from one row
+        // each. One address to keep current, one credit that cannot drift out
+        // of step with itself.
+        $this->assertSame('https://images.example.com/beach.jpg', $french['heroImage'] ?? null);
+        $this->assertSame($english['heroImage'] ?? null, $french['heroImage'] ?? null);
+        $this->assertSame($english['heroImageCredit'] ?? null, $french['heroImageCredit'] ?? null);
+    }
+
+    public function test_a_language_the_site_does_not_speak_is_refused(): void
+    {
+        // The same rule a text save follows. A locale nobody declared files
+        // the value under a prefix no page ever reads, and nothing says so.
+        $this->site->forceFill(['locales' => ['en' => 'English']])->save();
+
+        $this->post($this->url(), [
+            'target' => 'setting:heroImage',
+            'alt' => 'Une plage',
+            'locale' => 'fr',
+        ], $this->as($this->session))->assertStatus(422);
+    }
+
     public function test_the_alt_text_can_be_changed_on_its_own(): void
     {
         // Correcting a description is a real edit, and the picture field being

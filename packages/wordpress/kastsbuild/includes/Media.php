@@ -193,9 +193,27 @@ class Media
             'creditSourceUrl' => 'CreditSourceUrl',
         ];
 
+        /*
+         * Alt text and the tooltip go in the language they were typed in.
+         *
+         * Only those two. A picture is the same picture in every language and
+         * a photographer's name is the same name, so the address, the source
+         * list and the four credit fields stay canonical. Alt text is the one
+         * part of a page whose whole job is to be read aloud, and leaving it
+         * in English on a French page is the accessibility layer left
+         * untranslated.
+         */
+        $said = ['alt', 'imgTitle'];
+        $locale = (string) ($request->get_param('locale') ?? '');
+
         foreach ($beside as $field => $suffix) {
             if (self::sent($request, $field)) {
-                Content::put($key.$suffix, (string) $request->get_param($field), true);
+                Content::put(
+                    $key.$suffix,
+                    (string) $request->get_param($field),
+                    true,
+                    in_array($field, $said, true) ? $locale : ''
+                );
             }
         }
 

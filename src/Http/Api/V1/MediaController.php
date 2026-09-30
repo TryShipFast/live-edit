@@ -47,6 +47,20 @@ class MediaController
             'alt' => ['nullable', 'string', 'max:300'],
             'imgTitle' => ['nullable', 'string', 'max:300'],
             /*
+             * Which language the description is being written in.
+             *
+             * Only the description. A picture is the same picture in every
+             * language and a photographer's name is the same name, so the
+             * address, the source list and the four credit fields stay
+             * canonical; alt text and the tooltip are sentences somebody
+             * wrote, and a French page reading English alt text is the
+             * accessibility layer left untranslated - the one part of the page
+             * whose whole job is to be read aloud.
+             *
+             * Checked against the site's own languages by ApplyEdit, not here.
+             */
+            'locale' => ['nullable', 'string', 'max:10'],
+            /*
              * Who took the picture, kept with the picture.
              *
              * Not decoration and not optional: Unsplash's terms and every
@@ -127,9 +141,21 @@ class MediaController
                     'creditSourceUrl' => 'CreditSourceUrl',
                 ];
 
+                // Alt text and the tooltip are the client's sentences and
+                // belong to the language they were typed in. Everything else
+                // beside a picture is the same in every language.
+                $said = ['alt', 'imgTitle'];
+                $locale = $validated['locale'] ?? null;
+
                 foreach ($beside as $field => $suffix) {
                     if ($request->has($field)) {
-                        $apply($site, $token, $key.$suffix, (string) ($validated[$field] ?? ''));
+                        $apply(
+                            $site,
+                            $token,
+                            $key.$suffix,
+                            (string) ($validated[$field] ?? ''),
+                            in_array($field, $said, true) ? $locale : null
+                        );
                     }
                 }
 

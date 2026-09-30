@@ -1919,6 +1919,11 @@ const bootLiveEdit = () => {
                 }
 
                 const attrInputs = [...drawerFields.querySelectorAll('[data-img-attr]')];
+                    // The language the description is being typed in. Only
+                    // alt text and the tooltip are stored against it - the
+                    // picture and the photographer are the same in every
+                    // language - and the two ends agree about which is which.
+                    if (window.liveEditLocale) formData.append('locale', window.liveEditLocale);
                     if (file) formData.append('file', file);
                     else if (url) formData.append('url', url.startsWith('http') ? url : `https://${url}`);
                     attrInputs.forEach((input) => formData.append(input.dataset.imgAttr, input.value));
