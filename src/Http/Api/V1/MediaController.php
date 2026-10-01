@@ -199,6 +199,31 @@ class MediaController
              */
             report($e);
 
+            /*
+             * Kept where it can be read back by a command.
+             *
+             * The log is the right place for this and not always a reachable
+             * one: on a managed host it means a dashboard, a time range and a
+             * search through every customer's lines. Meanwhile `php artisan`
+             * is right there - it is how this whole afternoon's diagnosis
+             * actually happened - so the last failure is put somewhere a
+             * command can read it. One slot, overwritten, kept a day.
+             */
+            cache()->put('live-edit.last-save-failure', [
+                'at' => now()->toIso8601String(),
+                'site' => $site->slug ?? null,
+                'key' => $key ?? null,
+                'disk' => config('live-edit.disk'),
+                'thrown' => $e::class,
+                'reason' => $e->getMessage(),
+                'where' => collect($e->getTrace())
+                    ->pluck('file')
+                    ->filter(fn ($file) => $file !== null && ! str_contains((string) $file, '/vendor/laravel/'))
+                    ->take(3)
+                    ->values()
+                    ->all(),
+            ], now()->addDay());
+
             Log::error('[live-edit] a picture could not be saved', [
                 'site' => $site->slug ?? null,
                 'key' => $key ?? null,

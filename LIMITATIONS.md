@@ -708,6 +708,47 @@ measuring the output.
 
 ---
 
+### Fixed: every save on a cloud site failed, and SQLite could not see why
+**Adapter:** all, on the service. **Found:** 2026-10-01, by a client on a live
+site. **Severity:** critical - no save of any kind landed.
+
+```
+SQLSTATE[22001]: Data too long for column 'batch'
+batch = api:learnkasts:171df69c8e82f7e2:978c5544-dfb7-4e69-a745-53165d4de37f
+```
+
+Undo on the service needs to know which site and which token an action belonged
+to, so a batch stopped being a uuid and became `api:<site>:<token>:<uuid>`. The
+column stayed `uuid('batch')`, which is char(36). Sixty-eight characters into
+thirty-six, on every write to `edit_revisions` - so not the picture endpoint,
+and not pictures: every save, on every cloud site, text included.
+
+**Why no test caught it, and why no number of tests would have.** SQLite does
+not record a varchar's length. The table it creates says `"batch" varchar not
+null`, with no size anywhere, so everything fits and always will. 752 tests on
+SQLite cannot see this class of fault at all - it is not that the coverage was
+thin.
+
+So the test that now guards it does not ask the database. It reads the length
+out of the migrations, which is where the mistake was, and compares it against
+`OneAction::FITS` - a constant the migration itself uses for the column width,
+so the two cannot drift again. Verified by deleting the migration: it fails and
+names the file and the width.
+
+The register already had an entry about running migrations against MySQL, from
+a deploy that failed twice for this reason. This was the third time, and the
+first two were also found by deploying.
+
+**Three faults wore one message today**, which is worth recording on its own.
+"Server Error" was an uncaught storage exception; then "could not be stored"
+asserted a cause nobody had established, and sent an afternoon into an S3
+policy that was already correct; the actual fault was this column, and it was
+found only once the response carried the exception to the editor who triggered
+it. A diagnostic that guesses is slower than no diagnostic, because it is
+believed.
+
+---
+
 ### Fixed: replacing a picture answered "Server Error", and the disk could not be changed
 **Adapter:** all, on the service. **Found:** 2026-09-30, by a client on a live
 site. **Severity:** high - it is the editor's second most used action.

@@ -407,6 +407,39 @@ class MediaTest extends TestCase
         $this->assertArrayNotHasKey('heroImage', $this->settings(), 'a picture that was never stored was recorded as stored');
     }
 
+    public function test_the_failure_can_be_read_back_by_a_command(): void
+    {
+        /*
+         * Because the log is not always reachable.
+         *
+         * On a managed host reading it means a dashboard, a time range and a
+         * search through every customer's lines - while `php artisan` is right
+         * there, and is how this whole afternoon's diagnosis actually got
+         * done. A diagnostic nobody can reach is not a diagnostic.
+         */
+        config()->set('live-edit.disk', 'nowhere-at-all');
+
+        $this->post($this->url(), [
+            'target' => 'setting:heroImage',
+            'file' => UploadedFile::fake()->image('beach.jpg', 800, 600),
+        ], $this->as($this->session))->assertStatus(500);
+
+        $this->artisan('live-edit:last-failure')
+            ->expectsOutputToContain('heroImage')
+            ->assertSuccessful();
+    }
+
+    public function test_it_says_so_plainly_when_nothing_has_failed(): void
+    {
+        // Rather than printing an empty frame, which reads as a broken
+        // command rather than a quiet one.
+        cache()->forget('live-edit.last-save-failure');
+
+        $this->artisan('live-edit:last-failure')
+            ->expectsOutputToContain('No save has failed')
+            ->assertSuccessful();
+    }
+
     public function test_a_description_is_written_in_the_language_it_was_typed_in(): void
     {
         /*

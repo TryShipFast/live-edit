@@ -40,6 +40,22 @@ final class OneAction
      * under anything that keeps the process alive between requests, which is
      * the failure that is impossible to reproduce locally.
      */
+    /**
+     * How much room the column has, named here so the two cannot drift.
+     *
+     * A batch stopped being a uuid when undo on the service needed to know
+     * which site and which token an action belonged to - and `uuid('batch')`
+     * is char(36), while "api:learnkasts:171df69c8e82f7e2:<uuid>" is 68. Every
+     * save through the API failed on MySQL with 1406 Data too long, and 746
+     * tests passed because SQLite does not record a varchar's length at all,
+     * let alone enforce it.
+     *
+     * 191 because the column is indexed - the weekly digest counts a site's
+     * edits with "batch like api:<slug>:%" - and 191 is the longest utf8mb4
+     * string MySQL will index under the old 767-byte key limit.
+     */
+    public const FITS = 191;
+
     public static function id(): string
     {
         $request = request();
