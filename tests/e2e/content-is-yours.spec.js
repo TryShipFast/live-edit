@@ -57,7 +57,17 @@ const settled = async (page) => {
  * cache policy while believing it is measuring a publish.
  */
 const asANewVisitor = async (browser, key) => {
-    const page = await (await browser.newContext()).newPage();
+    /*
+     * A context made by hand, so the config's own options do not reach it.
+     *
+     * `use` in playwright.config.js applies to the page and context fixtures and
+     * not to browser.newContext(), which takes the defaults. Against a site behind
+     * a development certificate that means the visitor's page cannot load the
+     * runtime at all - and the test reports that a published change never reached
+     * a visitor, which is a fault in the harness wearing the costume of a fault in
+     * the product.
+     */
+    const page = await (await browser.newContext({ ignoreHTTPSErrors: true })).newPage();
     await page.goto('/');
     await settled(page);
     const words = await page.evaluate((k) => document.querySelector(`[data-edit="setting:${k}"]`)?.textContent.trim(), key);

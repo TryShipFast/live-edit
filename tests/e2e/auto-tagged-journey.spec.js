@@ -165,7 +165,17 @@ test('words changed on an untagged host are on the page after a reload', async (
 });
 
 test('a visitor is served none of it', async ({ browser }) => {
-    const context = await browser.newContext();
+    /*
+     * A context made by hand, so the config's own options do not reach it.
+     *
+     * `use` in playwright.config.js applies to the page and context fixtures and
+     * not to browser.newContext(), which takes the defaults. Against a site behind
+     * a development certificate that means the visitor's page cannot load the
+     * runtime at all - and the test reports that a published change never reached
+     * a visitor, which is a fault in the harness wearing the costume of a fault in
+     * the product.
+     */
+    const context = await browser.newContext({ ignoreHTTPSErrors: true });
     const page = await context.newPage();
 
     try {

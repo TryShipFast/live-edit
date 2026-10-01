@@ -14,5 +14,14 @@ export default defineConfig({
     use: {
         baseURL: process.env.BASE_URL ?? 'http://127.0.0.1:8401',
         trace: 'retain-on-failure',
+        /*
+         * Development certificates, which is what these are pointed at.
+         *
+         * Without it every spec here fails at the first API call with "unable
+         * to verify the first certificate" - a dozen red tests that say
+         * nothing about the product. It applies to the request context as well
+         * as the browser, which is where they were actually failing.
+         */
+        ignoreHTTPSErrors: true,
     },
 });

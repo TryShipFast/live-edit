@@ -239,7 +239,17 @@ test('the panel looks like itself, not like the site it is on', async ({ page })
 });
 
 test('a visitor is shown the site and none of the editing', async ({ browser }) => {
-    const visitor = await (await browser.newContext()).newPage();
+    /*
+     * A context made by hand, so the config's own options do not reach it.
+     *
+     * `use` in playwright.config.js applies to the page and context fixtures and
+     * not to browser.newContext(), which takes the defaults. Against a site behind
+     * a development certificate that means the visitor's page cannot load the
+     * runtime at all - and the test reports that a published change never reached
+     * a visitor, which is a fault in the harness wearing the costume of a fault in
+     * the product.
+     */
+    const visitor = await (await browser.newContext({ ignoreHTTPSErrors: true })).newPage();
     await visitor.goto(SITE);
     await settled(visitor);
 

@@ -375,14 +375,54 @@ test('a client can put their own work live, and a visitor sees it', async ({ pag
     if (waiting > 0) {
         await expect(publish, 'work is waiting and there is no way to release it').toBeVisible();
         await expect(publish).toBeEnabled();
-        // Putting work live asks first, as it should.
-        page.once('dialog', (d) => d.accept());
+        /*
+         * Putting work live asks first, as it should - and what it asks with
+         * is a list of what is about to become public, not a confirm box.
+         *
+         * This waited for a window.confirm, which the editor stopped using
+         * when the question changed from "publish 3 changes?" to "publish
+         * these three?". Nobody can answer a number. So the test sat waiting
+         * for a dialog that was never coming, published nothing, and reported
+         * that a client's work never reached a visitor - a stale test wearing
+         * the costume of a broken product.
+         */
         await publish.click();
+        await page.getByRole('button', { name: 'Publish now' }).click();
+
+        /*
+         * Waited for, not timed. A fixed pause raced the publish and the
+         * visitor opened on the previous run's words, which the test read as a
+         * publish that never reached anybody.
+         *
+         * UNRESOLVED, and left failing rather than quietly relaxed. Driven by
+         * hand the same sequence publishes correctly - POST /publish answers
+         * 200, the pending count falls to zero and the new words are in the
+         * published content a moment later - so the product path is covered.
+         * What this cannot do is get there after saving first, and the
+         * difference between the two is not yet understood.
+         *
+         * A test that is failing for a reason nobody has found is worth more
+         * than one adjusted until it passes.
+         */
+        await expect
+            .poll(() => page.evaluate(() => window.liveEditPublishing?.pending ?? -1), { timeout: 20000 })
+            .toBe(0);
+
         await settled(page);
     }
 
     // A visitor, who reads the published files and holds no key at all.
-    const visitor = await (await browser.newContext()).newPage();
+    /*
+     * A context made by hand, so the config's own options do not reach it.
+     *
+     * `use` in playwright.config.js applies to the page and context fixtures and
+     * not to browser.newContext(), which takes the defaults. Against a site behind
+     * a development certificate that means the visitor's page cannot load the
+     * runtime at all - and the test reports that a published change never reached
+     * a visitor, which is a fault in the harness wearing the costume of a fault in
+     * the product.
+     */
+    const visitor = await (await browser.newContext({ ignoreHTTPSErrors: true })).newPage();
     await visitor.goto('/');
     await settled(visitor);
 
@@ -491,7 +531,7 @@ test('the panel looks like itself, not like the site it is on', async ({ page, r
 test('a visitor is shown the published site and none of the editing', async ({ page, browser, request }) => {
     await asEditor(page, request);
 
-    const visitor = await (await browser.newContext()).newPage();
+    const visitor = await (await browser.newContext({ ignoreHTTPSErrors: true })).newPage();
     await visitor.goto('/');
     await settled(visitor);
 
