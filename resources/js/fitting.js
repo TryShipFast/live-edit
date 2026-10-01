@@ -11,10 +11,19 @@
 /** The largest edge either endpoint accepts. */
 const LARGEST = 4000;
 
+/**
+ * What the server multiplies a box by, mirrored from ImageFitter::DENSITY.
+ *
+ * Here only to compare the two measurements in the same units. A box is in CSS
+ * pixels and a picture's own width is in device pixels, so neither number
+ * means anything beside the other until one of them is converted.
+ */
+const DENSITY = 2;
+
 const cap = (n) => Math.min(Math.max(Math.round(n), 1), LARGEST);
 
 /**
- * The size a replacement has to match: the picture that is there now.
+ * The size a replacement has to match: whichever of the two asks for more.
  *
  * The box it sits in was what this measured, and the box is not the picture. A
  * theme ships a hero at 2400 wide and lays it out at 1200; fitting the
@@ -26,6 +35,21 @@ const cap = (n) => Math.min(Math.max(Math.round(n), 1), LARGEST);
  * own width in device pixels, which is exactly what was replaced - and it is
  * marked exact, because a box is in CSS pixels and wants doubling for a retina
  * screen while this does not.
+ *
+ * Which was right about the theme that prompted it and wrong about the one
+ * that found this: taking the picture at its word assumes the picture was the
+ * right size, and a design is perfectly free to stretch a small file across a
+ * large box. A real site shipped a 644px hero under `w-full h-auto` in a
+ * column half again as wide. Measuring the picture held every client upload to
+ * 644px - a 4000px photograph stored at 9KB - where measuring the box had
+ * stored 1152. The feature built to stop a replacement coming out soft was
+ * making it come out softer, and only on the sites that needed it most.
+ *
+ * So the picture is the standard only when it is already carrying its box.
+ * Short on either edge and the box is the honest answer, because the box is
+ * what somebody will actually see the picture filling. Taking the larger is
+ * also what makes this safe to get wrong in either direction: the worst case
+ * is a file bigger than it strictly needed to be, never a visibly soft one.
  *
  * A background has no picture to ask, so there the box is the answer and the
  * right one: a background covers its box, and the box is what it has to cover.
@@ -40,17 +64,29 @@ export const whatIsThereNow = (element) => {
     const naturalWidth = Number(element.naturalWidth ?? 0);
     const naturalHeight = Number(element.naturalHeight ?? 0);
 
-    if (naturalWidth >= 1 && naturalHeight >= 1) {
-        return { width: cap(naturalWidth), height: cap(naturalHeight), exact: true };
-    }
-
     const box = element.getBoundingClientRect?.();
+    const boxed = box && box.width >= 1 && box.height >= 1
+        ? { width: cap(box.width), height: cap(box.height), exact: false }
+        : null;
 
-    if (box && box.width >= 1 && box.height >= 1) {
-        return { width: cap(box.width), height: cap(box.height), exact: false };
+    if (naturalWidth >= 1 && naturalHeight >= 1) {
+        /*
+         * Both edges, not just the width. A box the picture covers across but
+         * falls short down is still a box with a soft picture in it, and
+         * `object-fit: cover` makes that an ordinary arrangement rather than a
+         * strange one.
+         */
+        const coversItsBox = boxed === null
+            || (naturalWidth >= box.width * DENSITY && naturalHeight >= box.height * DENSITY);
+
+        if (coversItsBox) {
+            return { width: cap(naturalWidth), height: cap(naturalHeight), exact: true };
+        }
+
+        return boxed;
     }
 
-    return null;
+    return boxed;
 };
 
 /**

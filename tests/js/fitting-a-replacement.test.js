@@ -40,6 +40,48 @@ describe('what the replacement has to match', () => {
         expect(measured).toEqual({ width: 2400, height: 1600, exact: true });
     });
 
+    it('does not hold a replacement to a picture smaller than its own box', () => {
+        /*
+         * The fault the fix above introduced, found on a real site. A 644px
+         * hero is stretched across a column by `w-full h-auto`: taking the
+         * picture at its word stored every client upload at 644, where
+         * measuring the box stored 1152. A design is free to stretch a small
+         * file, so the picture being there is not evidence it was right.
+         */
+        const measured = whatIsThereNow(animg({
+            naturalWidth: 644,
+            naturalHeight: 852,
+            box: { width: 576, height: 762 },
+        }));
+
+        expect(measured).toEqual({ width: 576, height: 762, exact: false });
+    });
+
+    it('still takes the picture when it is already carrying its box', () => {
+        // The case the measurement was changed for in the first place, which
+        // the line above must not cost: 2400 across a 1200 box is exactly the
+        // two device pixels per CSS pixel the box would have asked for.
+        const measured = whatIsThereNow(animg({
+            naturalWidth: 2400,
+            naturalHeight: 1600,
+            box: { width: 1200, height: 800 },
+        }));
+
+        expect(measured).toEqual({ width: 2400, height: 1600, exact: true });
+    });
+
+    it('counts both edges, not just the width', () => {
+        // Wide enough and short is still a soft picture, and `object-fit:
+        // cover` makes it an ordinary arrangement rather than a strange one.
+        const measured = whatIsThereNow(animg({
+            naturalWidth: 4000,
+            naturalHeight: 500,
+            box: { width: 1000, height: 1000 },
+        }));
+
+        expect(measured).toEqual({ width: 1000, height: 1000, exact: false });
+    });
+
     it('marks it exact, because an image width is already device pixels', () => {
         // The server doubles a box for a retina screen and must not double
         // this. Getting it backwards stores a file twice the weight of the one
