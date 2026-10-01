@@ -2374,16 +2374,53 @@ const bootLiveEdit = () => {
                 box.focus();
             });
 
+            const cost = credits?.costs?.generate_image ?? 5;
+            const balance = credits?.balance ?? 0;
+
             const go = document.createElement('button');
             go.type = 'button';
             go.className = 'le-btn-publish';
             go.style.marginTop = '14px';
-            go.textContent = 'Make a picture · 5 credits';
+            go.textContent = `Make a picture · ${cost} credits`;
 
             const grid = el('div', 'le-grid is-square');
             grid.style.display = 'none';
 
             panel.append(card, box, go, grid);
+
+            /*
+             * What it costs and what is left, before the button is pressed.
+             *
+             * The rewrite buttons disable themselves when the balance is short
+             * and explain it in a title attribute, which is a tooltip on a
+             * disabled control - unreachable by touch, and unread by everybody
+             * else. Here there was not even that: the button looked ready,
+             * pressing it asked the service, the service said no, and what came
+             * back was a line in a grid nobody was looking at. Reported from a
+             * real site as "it just does nothing and says nothing".
+             *
+             * So the price and the balance are on the panel, and when there is
+             * not enough the control says so in words instead of going grey in
+             * silence.
+             */
+            if (balance < cost) {
+                go.disabled = true;
+                go.textContent = `Not enough credits · ${cost} needed`;
+
+                const short = note(
+                    `Making a picture costs ${cost} credits and you have ${balance}. `
+                    + 'Everything else here is free: upload your own, or pick a free photograph.'
+                );
+                short.classList.add('is-short');
+                panel.insertBefore(short, go);
+            } else {
+                const price = el(
+                    'div',
+                    'le-hint',
+                    `${cost} credits a picture · ${balance} left`,
+                );
+                panel.insertBefore(price, go);
+            }
 
             go.addEventListener('click', async () => {
                 const prompt = box.value.trim() || suggestion;
