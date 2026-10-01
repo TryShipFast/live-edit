@@ -1941,6 +1941,15 @@ const bootLiveEdit = () => {
                     formData.append('fitHeight', String(fitTo.height));
                     if (fitTo.exact) formData.append('fitExact', '1');
                 }
+
+                // Which part of it to keep, when somebody chose. Absent, the
+                // middle is taken, which is what every save did before.
+                if (current.crop) {
+                    formData.append('cropX', String(current.crop.x));
+                    formData.append('cropY', String(current.crop.y));
+                    formData.append('cropWidth', String(current.crop.width));
+                    formData.append('cropHeight', String(current.crop.height));
+                }
                 // Who took it, when the picture came from the picker. Sent
                 // with the picture rather than after it, so a failure cannot
                 // leave a photograph on the page with the last one's credit
@@ -3422,12 +3431,158 @@ const bootLiveEdit = () => {
                 drawerFields.prepend(said);
             };
 
+            /**
+             * Choose which part of a picture to keep.
+             *
+             * Automatic fitting takes the middle. That is right most of the
+             * time and wrong in the one way that matters - a face or a product
+             * off to one side is exactly what the middle cuts off - and it is
+             * the only thing about fitting a client ever needs to overrule.
+             *
+             * The rectangle is locked to the shape of the spot, because the
+             * spot's shape is not negotiable: the design decides it, and a free
+             * rectangle would only let somebody choose a shape that then gets
+             * cropped again. What they are choosing is where, not what shape.
+             *
+             * Measured in the file's own pixels on the way out, since the
+             * picture here is scaled to fit a panel and the server has never
+             * seen that panel.
+             *
+             * Resolves to a rectangle, or null for "the whole picture", which
+             * is the same as never having opened this.
+             */
+            const chooseTheCrop = (file, ratio) => new Promise((settle) => {
+                const sheet = ui.modal({
+                    title: 'Which part of the picture?',
+                    subtitle: 'The shape is the spot it has to fill. Drag to choose what stays in it.',
+                });
+
+                const stage = el('div', 'le-crop-stage');
+                stage.style.cssText = 'position:relative;display:inline-block;max-width:100%;line-height:0;touch-action:none;';
+
+                const shot = document.createElement('img');
+                shot.alt = '';
+                shot.style.cssText = 'max-width:100%;max-height:52vh;display:block;';
+                shot.src = URL.createObjectURL(file);
+
+                const frame = el('div', 'le-crop-frame');
+                frame.style.cssText = 'position:absolute;border:2px solid #fff;box-shadow:0 0 0 9999px rgba(0,0,0,.45);cursor:move;';
+
+                stage.append(shot, frame);
+                sheet.body.append(stage);
+
+                const row = el('div', 'le-row');
+                row.style.marginTop = '14px';
+                const use = el('button', 'le-btn-publish', 'Use this part');
+                use.type = 'button';
+                const whole = el('button', 'le-btn-outline', 'Whole picture');
+                whole.type = 'button';
+                row.append(use, whole);
+                sheet.body.append(row);
+
+                // Where the frame sits, in the displayed picture's pixels.
+                let at = { x: 0, y: 0, width: 0, height: 0 };
+
+                const paint = () => {
+                    frame.style.left = `${at.x}px`;
+                    frame.style.top = `${at.y}px`;
+                    frame.style.width = `${at.width}px`;
+                    frame.style.height = `${at.height}px`;
+                };
+
+                const biggestThatFits = () => {
+                    const shown = { width: shot.clientWidth, height: shot.clientHeight };
+                    let width = shown.width;
+                    let height = width / ratio;
+
+                    if (height > shown.height) {
+                        height = shown.height;
+                        width = height * ratio;
+                    }
+
+                    at = {
+                        x: (shown.width - width) / 2,
+                        y: (shown.height - height) / 2,
+                        width,
+                        height,
+                    };
+
+                    paint();
+                };
+
+                shot.addEventListener('load', biggestThatFits);
+
+                // Dragging moves it and never lets it leave the picture: a
+                // rectangle half off the edge is a crop with a transparent
+                // strip down one side, which nobody chose on purpose.
+                let from = null;
+
+                frame.addEventListener('pointerdown', (event) => {
+                    from = { x: event.clientX, y: event.clientY, at: { ...at } };
+                    frame.setPointerCapture(event.pointerId);
+                    event.preventDefault();
+                });
+
+                frame.addEventListener('pointermove', (event) => {
+                    if (!from) return;
+
+                    const limit = (value, max) => Math.max(0, Math.min(value, max));
+
+                    at.x = limit(from.at.x + (event.clientX - from.x), shot.clientWidth - at.width);
+                    at.y = limit(from.at.y + (event.clientY - from.y), shot.clientHeight - at.height);
+                    paint();
+                });
+
+                frame.addEventListener('pointerup', () => { from = null; });
+
+                const finish = (rectangle) => {
+                    URL.revokeObjectURL(shot.src);
+                    sheet.close();
+                    settle(rectangle);
+                };
+
+                use.addEventListener('click', () => {
+                    // Into the file's own pixels. The picture on screen was
+                    // scaled to fit a panel the server has never seen.
+                    const scale = shot.naturalWidth / (shot.clientWidth || 1);
+
+                    finish({
+                        x: Math.max(0, Math.round(at.x * scale)),
+                        y: Math.max(0, Math.round(at.y * scale)),
+                        width: Math.max(1, Math.round(at.width * scale)),
+                        height: Math.max(1, Math.round(at.height * scale)),
+                    });
+                });
+
+                whole.addEventListener('click', () => finish(null));
+            });
+
             const takeChosen = ({ url, file, credit, alt, creditBy, creditUrl, creditSource, creditSourceUrl }) => {
+                // A crop belongs to the picture it was drawn on. Cleared
+                // first, so one chosen for the last picture cannot be sent
+                // with this one.
+                current.crop = null;
+
                 if (file) {
                     const transfer = new DataTransfer();
                     transfer.items.add(file);
                     fileWrap.querySelector('input[type=file]').files = transfer.files;
                     showPreview(URL.createObjectURL(file));
+
+                    /*
+                     * Only for a file we are going to store.
+                     *
+                     * A pasted address and a free photograph are pointed at
+                     * rather than kept, so there is nothing of ours to cut -
+                     * and a crop tool that silently does nothing is worse than
+                     * one that was never offered.
+                     */
+                    const spot = whatIsThereNow(current.element);
+
+                    if (spot) {
+                        void chooseTheCrop(file, spot.width / spot.height)
+                            .then((rectangle) => { current.crop = rectangle; });
+                    }
                 } else if (url) {
                     urlInput.value = url;
                     showPreview(url);

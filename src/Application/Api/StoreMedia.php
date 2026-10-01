@@ -24,7 +24,7 @@ class StoreMedia
     /**
      * @return array{url: string, path: string}
      */
-    public function __invoke(Site $site, UploadedFile $file, ?int $fitWidth = null, ?int $fitHeight = null, bool $fitExact = false): array
+    public function __invoke(Site $site, UploadedFile $file, ?int $fitWidth = null, ?int $fitHeight = null, bool $fitExact = false, ?array $crop = null): array
     {
         // Into this site's own folder. Random names already make a collision
         // impossible; separate folders make a customer's files identifiable,
@@ -37,7 +37,7 @@ class StoreMedia
             throw new OverLimit('This site has reached its storage limit.');
         }
 
-        $path = $this->images->store($file, $fitWidth, $fitHeight, (new SiteStore($site))->mediaDirectory(), $fitExact);
+        $path = $this->images->store($file, $fitWidth, $fitHeight, (new SiteStore($site))->mediaDirectory(), $fitExact, $crop);
 
         Meter::record($site, Meter::UPLOAD, $bytes);
 

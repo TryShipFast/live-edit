@@ -172,6 +172,11 @@ class LiveEditController extends Controller
             // Whether those are the picture being replaced or the box it sits
             // in. Only one of the two wants doubling for a retina screen.
             'fitExact' => ['nullable', 'boolean'],
+            // The part of the picture to keep, in the file's own pixels.
+            'cropX' => ['nullable', 'integer', 'min:0', 'max:20000'],
+            'cropY' => ['nullable', 'integer', 'min:0', 'max:20000'],
+            'cropWidth' => ['nullable', 'integer', 'min:1', 'max:20000'],
+            'cropHeight' => ['nullable', 'integer', 'min:1', 'max:20000'],
             'alt' => ['nullable', 'string', 'max:300'],
             'imgTitle' => ['nullable', 'string', 'max:300'],
             // The language the description is being typed in, checked against
@@ -289,6 +294,14 @@ class LiveEditController extends Controller
             (int) $request->input('fitHeight', 0) ?: null,
             null,
             $request->boolean('fitExact'),
+            $request->filled('cropWidth') && $request->filled('cropHeight')
+                ? [
+                    'x' => (int) $request->input('cropX', 0),
+                    'y' => (int) $request->input('cropY', 0),
+                    'width' => (int) $request->input('cropWidth'),
+                    'height' => (int) $request->input('cropHeight'),
+                ]
+                : null,
         );
     }
 

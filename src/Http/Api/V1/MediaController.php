@@ -93,6 +93,19 @@ class MediaController
              * the size of the one it replaced.
              */
             'fitExact' => ['nullable', 'boolean'],
+            /*
+             * The part of the picture to keep, in the file's own pixels.
+             *
+             * Automatic fitting takes the middle, which is right most of the
+             * time and wrong in the way that matters: a face or a product off
+             * to one side is exactly what the middle cuts off. These four say
+             * where to cut instead, and nothing else about the fitting
+             * changes - the shape is still the spot's.
+             */
+            'cropX' => ['nullable', 'integer', 'min:0', 'max:20000'],
+            'cropY' => ['nullable', 'integer', 'min:0', 'max:20000'],
+            'cropWidth' => ['nullable', 'integer', 'min:1', 'max:20000'],
+            'cropHeight' => ['nullable', 'integer', 'min:1', 'max:20000'],
         ]);
 
         try {
@@ -106,7 +119,15 @@ class MediaController
                     $request->file('file'),
                     $validated['fitWidth'] ?? null,
                     $validated['fitHeight'] ?? null,
-                    (bool) ($validated['fitExact'] ?? false)
+                    (bool) ($validated['fitExact'] ?? false),
+                    isset($validated['cropWidth'], $validated['cropHeight'])
+                        ? [
+                            'x' => (int) ($validated['cropX'] ?? 0),
+                            'y' => (int) ($validated['cropY'] ?? 0),
+                            'width' => (int) $validated['cropWidth'],
+                            'height' => (int) $validated['cropHeight'],
+                        ]
+                        : null
                 )
                 : null;
 

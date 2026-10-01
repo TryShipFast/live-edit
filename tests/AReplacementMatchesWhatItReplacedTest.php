@@ -84,6 +84,70 @@ class AReplacementMatchesWhatItReplacedTest extends TestCase
         unlink($path);
     }
 
+    public function test_a_chosen_rectangle_is_kept_instead_of_the_middle(): void
+    {
+        /*
+         * The one thing automatic fitting gets wrong, and the only reason to
+         * build a crop tool at all: the middle is right most of the time and
+         * cuts the subject the rest of it.
+         *
+         * Proved by the pixels. A picture with a red stripe down the left and
+         * black everywhere else, cropped to the left: what comes out is red.
+         * Without the rectangle the middle is taken and it is black.
+         */
+        $path = $this->stripedOnTheLeft(1200, 600);
+
+        ImageFitter::fit($path, 200, 200, true, ['x' => 0, 'y' => 0, 'width' => 300, 'height' => 300]);
+
+        $this->assertSame([200, 200], array_slice((array) getimagesize($path), 0, 2));
+        $this->assertSame('ff0000', $this->colourAt($path, 100, 100), 'the chosen part was not what was kept');
+
+        unlink($path);
+    }
+
+    public function test_without_a_rectangle_the_middle_is_still_taken(): void
+    {
+        // The default has to stay the default: a client who never opens the
+        // crop tool gets exactly what they got before.
+        $path = $this->stripedOnTheLeft(1200, 600);
+
+        ImageFitter::fit($path, 200, 200, true);
+
+        $this->assertSame('000000', $this->colourAt($path, 100, 100));
+
+        unlink($path);
+    }
+
+    public function test_a_rectangle_past_the_edge_is_nudged_back_inside(): void
+    {
+        /*
+         * Clamped rather than refused. The numbers are measured in a browser
+         * from an image scaled to fit a panel, so a rectangle ending a pixel
+         * past the edge is rounding - and refusing a crop at save time, after
+         * somebody has carefully framed it, is the worse answer.
+         */
+        $path = $this->stripedOnTheLeft(400, 400);
+
+        $this->assertTrue(
+            ImageFitter::fit($path, 100, 100, true, ['x' => 350, 'y' => 350, 'width' => 400, 'height' => 400])
+        );
+        $this->assertSame([100, 100], array_slice((array) getimagesize($path), 0, 2));
+
+        unlink($path);
+    }
+
+    public function test_a_nonsense_rectangle_puts_the_middle_back(): void
+    {
+        // Zero width is not a crop anybody drew. Falling back beats failing.
+        $path = $this->stripedOnTheLeft(1200, 600);
+
+        ImageFitter::fit($path, 200, 200, true, ['x' => 0, 'y' => 0, 'width' => 0, 'height' => 0]);
+
+        $this->assertSame('000000', $this->colourAt($path, 100, 100));
+
+        unlink($path);
+    }
+
     public function test_the_shape_of_the_spot_is_what_decides_the_crop(): void
     {
         // A wide photograph into a square spot is cropped to the square rather
@@ -96,5 +160,27 @@ class AReplacementMatchesWhatItReplacedTest extends TestCase
         $this->assertSame([800, 800], array_slice((array) getimagesize($path), 0, 2));
 
         unlink($path);
+    }
+
+    /** Red down the left third, black elsewhere, so a crop can be seen. */
+    private function stripedOnTheLeft(int $width, int $height): string
+    {
+        $path = tempnam(sys_get_temp_dir(), 'crop').'.png';
+        $image = imagecreatetruecolor($width, $height);
+        imagefill($image, 0, 0, imagecolorallocate($image, 0, 0, 0));
+        imagefilledrectangle($image, 0, 0, (int) ($width / 3), $height, imagecolorallocate($image, 255, 0, 0));
+        imagepng($image, $path);
+        imagedestroy($image);
+
+        return $path;
+    }
+
+    private function colourAt(string $path, int $x, int $y): string
+    {
+        $image = imagecreatefrompng($path);
+        $at = imagecolorat($image, $x, $y);
+        imagedestroy($image);
+
+        return sprintf('%02x%02x%02x', ($at >> 16) & 0xFF, ($at >> 8) & 0xFF, $at & 0xFF);
     }
 }

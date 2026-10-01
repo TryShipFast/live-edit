@@ -39,7 +39,14 @@ class ImageFitter
      * Returns false when the file is not an image type we can process, in
      * which case the original is left untouched rather than corrupted.
      */
-    public static function fit(string $path, int $width, int $height, bool $exact = false): bool
+    /**
+     * @param  array{x: int, y: int, width: int, height: int}|null  $crop
+     *   The part of the picture to keep, in the source file's own pixels.
+     *   Null takes the middle, which is right until it is not: a face or a
+     *   product off to one side is exactly what the middle cuts off, and that
+     *   single failure is the whole reason a client ever wants a crop tool.
+     */
+    public static function fit(string $path, int $width, int $height, bool $exact = false, ?array $crop = null): bool
     {
         if (! extension_loaded('gd') || ! is_file($path)) {
             return false;
@@ -65,7 +72,20 @@ class ImageFitter
          * would store a file twice the size of the one it replaced - which is
          * the opposite of fitting what was there.
          */
-        $density = $exact ? 1.0 : self::density($width, $height, $sourceWidth, $sourceHeight);
+        $chosen = self::chosen($crop, $sourceWidth, $sourceHeight);
+
+        /*
+         * Density is judged against the part being kept, not the whole file.
+         *
+         * A 6000px photograph cropped to a 400px corner has 400px to give,
+         * and asking for twice the box from it would upscale that corner -
+         * which density() exists to refuse. Measuring the crop is what keeps
+         * that refusal true once a client is choosing the crop themselves.
+         */
+        $density = $exact
+            ? 1.0
+            : self::density($width, $height, $chosen === null ? $sourceWidth : $chosen['width'], $chosen === null ? $sourceHeight : $chosen['height']);
+
         $width = (int) min(round($width * $density), self::MAX_EDGE);
         $height = (int) min(round($height * $density), self::MAX_EDGE);
 
@@ -74,12 +94,18 @@ class ImageFitter
             return false;
         }
 
-        // Scale so the image covers the box, then take the middle of it.
-        $scale = max($width / $sourceWidth, $height / $sourceHeight);
-        $cropWidth = (int) round($width / $scale);
-        $cropHeight = (int) round($height / $scale);
-        $cropX = (int) round(($sourceWidth - $cropWidth) / 2);
-        $cropY = (int) round(($sourceHeight - $cropHeight) / 2);
+        if ($chosen !== null) {
+            // Exactly what was chosen, scaled to the spot. The shape is the
+            // spot's because the rectangle was drawn in the spot's shape.
+            ['x' => $cropX, 'y' => $cropY, 'width' => $cropWidth, 'height' => $cropHeight] = $chosen;
+        } else {
+            // Scale so the image covers the box, then take the middle of it.
+            $scale = max($width / $sourceWidth, $height / $sourceHeight);
+            $cropWidth = (int) round($width / $scale);
+            $cropHeight = (int) round($height / $scale);
+            $cropX = (int) round(($sourceWidth - $cropWidth) / 2);
+            $cropY = (int) round(($sourceHeight - $cropHeight) / 2);
+        }
 
         $target = imagecreatetruecolor($width, $height);
         // Keep transparency for formats that have it.
@@ -140,5 +166,40 @@ class ImageFitter
             IMAGETYPE_WEBP => function_exists('imagewebp') ? @imagewebp($image, $path, 86) : false,
             default => false,
         };
+    }
+
+    /**
+     * A chosen rectangle, forced inside the picture it was chosen from.
+     *
+     * Clamped rather than refused. The numbers are measured in a browser from
+     * an image that may have been scaled to fit a panel, so a rectangle that
+     * ends a pixel or two past the edge is rounding rather than an attack -
+     * and a crop refused at save time, after somebody has carefully framed it,
+     * is a worse answer than one nudged back inside.
+     *
+     * Null when there is nothing usable, which puts the middle back.
+     *
+     * @param  array{x?: int, y?: int, width?: int, height?: int}|null  $crop
+     * @return array{x: int, y: int, width: int, height: int}|null
+     */
+    protected static function chosen(?array $crop, int $sourceWidth, int $sourceHeight): ?array
+    {
+        if ($crop === null) {
+            return null;
+        }
+
+        $x = max(0, min((int) ($crop['x'] ?? 0), $sourceWidth - 1));
+        $y = max(0, min((int) ($crop['y'] ?? 0), $sourceHeight - 1));
+        $width = (int) ($crop['width'] ?? 0);
+        $height = (int) ($crop['height'] ?? 0);
+
+        if ($width < 1 || $height < 1) {
+            return null;
+        }
+
+        $width = min($width, $sourceWidth - $x);
+        $height = min($height, $sourceHeight - $y);
+
+        return $width < 1 || $height < 1 ? null : compact('x', 'y', 'width', 'height');
     }
 }
