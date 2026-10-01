@@ -879,6 +879,41 @@ export const transform = (source, { relativePath = 'unknown', force = null, repe
         const tag = tagNameOf(node.openingElement);
 
         if (!isHostElement(tag)) {
+            /*
+             * A component rendered by a card that is itself a row.
+             *
+             * One hop further than the list. `more-stories` passes the row to
+             * `PostPreview`, and `PostPreview` renders `<PostTitle>` from a
+             * third file - which is drawn once per row too, and knew nothing
+             * about it. Its words took one key across every card.
+             *
+             * The row travels on as a prop, exactly as it arrived. Nothing
+             * here decides which components are row cards: that is a question
+             * about the whole project, so the caller answers it and the names
+             * arrive as `serverRows`.
+             *
+             * Not inside a list in this same file - `tagList` already handed
+             * the identity over there, from the item rather than from a prop,
+             * and claiming is what keeps the two rules off the same element.
+             */
+            if (isClient || claimed.has(node) || !serverRows.includes(tag)) {
+                return;
+            }
+
+            const carried = rowAt(node);
+
+            if (carried === null || hasAttribute(node.openingElement, 'liveEditRow')) {
+                return;
+            }
+
+            edits.push({
+                start: node.openingElement.name.end,
+                end: node.openingElement.name.end,
+                text: ` liveEditRow={${carried}}`,
+            });
+
+            changes.push({ key: 'liveEditRow', tag, text: carried });
+
             return;
         }
 

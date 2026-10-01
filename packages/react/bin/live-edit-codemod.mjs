@@ -296,30 +296,80 @@ const serverRowPairs = (() => {
 
     const inAMap = /\.map\(\s*\(?[^)]*\)?\s*=>\s*\(?\s*<([A-Z][A-Za-z0-9_]*)/g;
 
+    // Any component element at all, for the hops after the first.
+    const anyComponent = /<([A-Z][A-Za-z0-9_]*)/g;
+
+    const serverSide = (file) => !(clientRendered.has(file) && force !== false);
+
+    /** The caller renders this component, and this run is about to rewrite it. */
+    const pair = (file, name) => {
+        const target = resolveFrom(file, name);
+
+        // A client card cannot take the prop: the transform gives it a hook
+        // and context instead, and nothing there reads a row.
+        if (target === null || target === file || !serverSide(target)) {
+            return null;
+        }
+
+        if (!callSites.has(file)) {
+            callSites.set(file, new Set());
+        }
+
+        if (!cards.has(target)) {
+            cards.set(target, new Set());
+        }
+
+        callSites.get(file).add(name);
+        cards.get(target).add(name);
+
+        return target;
+    };
+
+    const queue = [];
+
     for (const [file, source] of sources) {
-        if (clientRendered.has(file) && force !== false) {
+        if (!serverSide(file)) {
             continue;
         }
 
         for (const found of source.matchAll(inAMap)) {
-            const target = resolveFrom(file, found[1]);
+            const target = pair(file, found[1]);
 
-            // A client card cannot take the prop: the transform gives it a
-            // hook and context instead, and nothing there reads a row.
-            if (target === null || (clientRendered.has(target) && force !== false)) {
-                continue;
+            if (target !== null) {
+                queue.push(target);
             }
+        }
+    }
 
-            if (!callSites.has(file)) {
-                callSites.set(file, new Set());
+    /*
+     * And onwards, because a card's own children are drawn once per row too.
+     *
+     * `more-stories` maps over posts and renders `PostPreview`; `PostPreview`
+     * renders `PostTitle` from a third file, which is drawn once per row and
+     * knew nothing about it - so its words took one key across every card.
+     * The row has to travel the whole way down, not just to the first file.
+     *
+     * Every component a row card renders, not only the ones in a `.map()`:
+     * being inside something drawn per row is what makes a thing per row, and
+     * there is no second map to look for.
+     */
+    const walked = new Set();
+
+    while (queue.length) {
+        const file = queue.pop();
+
+        if (walked.has(file)) {
+            continue;
+        }
+
+        walked.add(file);
+
+        for (const found of (sources.get(file) ?? '').matchAll(anyComponent)) {
+            const target = pair(file, found[1]);
+
+            if (target !== null) {
+                queue.push(target);
             }
-
-            if (!cards.has(target)) {
-                cards.set(target, new Set());
-            }
-
-            callSites.get(file).add(found[1]);
-            cards.get(target).add(found[1]);
         }
     }
 

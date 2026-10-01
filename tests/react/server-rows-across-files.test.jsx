@@ -100,6 +100,73 @@ describe('the codemod wiring both files', () => {
         expect(deferred[0].tag).toBe('PostPreview');
     });
 
+    it('carries the row on to a component the card itself renders', () => {
+        /*
+         * One hop further than the list, and the shape this milestone had
+         * left. `more-stories` passes the row to `PostPreview`, `PostPreview`
+         * renders `PostTitle` from a third file - drawn once per row too, and
+         * knowing nothing about it, so its words took one key across every
+         * card.
+         *
+         * The row travels on as a prop, exactly as it arrived. Which
+         * components can take it is a question about the whole project, so the
+         * command answers it and the names arrive here.
+         */
+        const card = `import PostTitle from './post-title';
+
+export default function PostPreview({ title }) {
+    return <article><PostTitle title={title} /></article>;
+}
+`;
+
+        const { code } = transform(card, {
+            relativePath: 'app/post-preview.tsx',
+            repeated: true,
+            rowCards: ['PostPreview'],
+            serverRows: ['PostTitle'],
+        });
+
+        expect(code).toContain('<PostTitle liveEditRow={liveEditRow}');
+    });
+
+    it('does not hand the row to a component it is not rewriting', () => {
+        // A date picker from a package would be given a prop it does nothing
+        // with, and the row would stop there silently rather than visibly.
+        const card = `import Avatar from 'some-package';
+
+export default function PostPreview({ title }) {
+    return <article><Avatar name={title} /></article>;
+}
+`;
+
+        const { code } = transform(card, {
+            relativePath: 'app/post-preview.tsx',
+            repeated: true,
+            rowCards: ['PostPreview'],
+            serverRows: [],
+        });
+
+        expect(code).not.toContain('liveEditRow={liveEditRow}');
+    });
+
+    it('leaves a component alone when it is not inside a row at all', () => {
+        // The same card on its own page renders the same children, and they
+        // are not rows of anything. Nothing to carry, so nothing is added.
+        const page = `import PostTitle from './post-title';
+
+export default function Page() {
+    return <article><PostTitle title="Hello" /></article>;
+}
+`;
+
+        const { code } = transform(page, {
+            relativePath: 'app/page.tsx',
+            serverRows: ['PostTitle'],
+        });
+
+        expect(code).not.toContain('liveEditRow');
+    });
+
     it('is the same file twice, so an upgrade does not move anybody keys', () => {
         const list = listFile().code;
         const card = cardFile().code;

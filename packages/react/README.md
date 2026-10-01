@@ -224,9 +224,13 @@ client component needs none of this: the identity travels in React context, and
 Identity comes from the item's own data, never the React key, which is
 routinely an array index and is not promised to survive a refetch.
 
-Two things are reported rather than wired, so they do not read as coverage: a
-card whose own child component lives in a third file, and a card the scan
-cannot resolve to a file it is about to rewrite.
+The row travels as far as the chain goes. A card that renders another component
+from a third file hands it on, because being inside something drawn per row is
+what makes a thing per row.
+
+One thing is reported rather than wired, so it does not read as coverage: a card
+the scan cannot resolve to a file it is about to rewrite - from a package, or
+behind an import it cannot follow.
 
 Most App Router projects are almost entirely server components, so by default
 very little is live. `--client` makes the files it touches into client

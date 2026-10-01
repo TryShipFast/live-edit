@@ -886,11 +886,21 @@ share. TypeScript props are widened at the same time, parenthesised, since a
 codemod that leaves an application unable to compile is worse than one that
 passed the file over.
 
-**What is still reported rather than wired:** a card whose own child component
-lives in a third file. The identity reaches the card and stops there. Also any
-card the scan cannot resolve to a file it is about to rewrite - from a package,
-or behind an import it cannot follow - which is deliberate: handing the prop to
-a component that does nothing with it would read as coverage.
+**Closed the rest of the way on 2026-10-01.** The row no longer stops at the
+card. Every component a row card renders is a row too - being inside something
+drawn per row is what makes a thing per row - so the prop is handed on at each
+hop, through as many files as the chain has. Measured on three: `more-stories`
+maps over posts and renders `PostPreview`, which renders `PostTitle` from a
+third file, and that file's heading now composes the row onto its key.
+
+Followed by rendering rather than by looking for a second `.map()`, because
+there is no second map. A card's children are drawn once per row whether or not
+anybody wrote a loop around them.
+
+**What is still reported rather than wired:** any card the scan cannot resolve
+to a file it is about to rewrite - from a package, or behind an import it
+cannot follow. Deliberate: handing the prop to a component that does nothing
+with it would read as coverage while every row still shared one key.
 
 A list not reached is still reported by file and component name rather than
 absorbed into a count where "no list here" and "a list I passed over" look
