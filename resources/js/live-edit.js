@@ -1,4 +1,5 @@
 import { createChrome } from './chrome.js';
+import { biggestThatFits, inSourcePixels, movedWithin, whatIsThereNow } from './fitting.js';
 import { confirm as confirmChange, expectChange, takeExpected } from './verify.js';
 import { apiRequestFor, attributeOf, classListWith, declaredStyleProps, displayedValue, iconNamesIn, isJsonResponse, orderedIcons, ownTextOf, parseEditKey, requestInit } from './support.js';
 
@@ -1030,50 +1031,6 @@ const bootLiveEdit = () => {
          * true, with the technical one kept in the console for whoever is
          * actually debugging.
          */
-        /**
-         * The size a replacement has to match: the picture that is there now.
-         *
-         * The box it sits in was what this measured, and the box is not the
-         * picture. A theme ships a hero at 2400 wide and lays it out at 1200;
-         * fitting the replacement to 1200 stores half the file the design was
-         * built on, and the client sees their own photograph come out softer
-         * than the stock one it replaced. On the page that is the whole
-         * product: a picture that drops into the design as though it had been
-         * made for it.
-         *
-         * So an <img> is asked what it is actually showing. naturalWidth is
-         * the file's own width in device pixels, which is exactly "what was
-         * replaced" - and it is marked exact, because a box is in CSS pixels
-         * and wants doubling for a retina screen while this does not.
-         *
-         * A background has no picture to ask, so there the box is still the
-         * answer and still the right one: a background covers its box, and the
-         * box is the thing it has to cover.
-         */
-        const whatIsThereNow = (element) => {
-            if (!element) return null;
-
-            // 4000 is the largest the endpoints accept. Clamped here rather
-            // than refused there, because a theme with a 6000px hero is not a
-            // mistake anybody made.
-            const cap = (n) => Math.min(Math.max(Math.round(n), 1), 4000);
-
-            const naturalWidth = Number(element.naturalWidth ?? 0);
-            const naturalHeight = Number(element.naturalHeight ?? 0);
-
-            if (naturalWidth >= 1 && naturalHeight >= 1) {
-                return { width: cap(naturalWidth), height: cap(naturalHeight), exact: true };
-            }
-
-            const box = element.getBoundingClientRect?.();
-
-            if (box && box.width >= 1 && box.height >= 1) {
-                return { width: cap(box.width), height: cap(box.height), exact: false };
-            }
-
-            return null;
-        };
-
         const plainly = (error, what) => {
             console.warn(`[live-edit] ${what}:`, error);
 
@@ -3490,27 +3447,12 @@ const bootLiveEdit = () => {
                     frame.style.height = `${at.height}px`;
                 };
 
-                const biggestThatFits = () => {
-                    const shown = { width: shot.clientWidth, height: shot.clientHeight };
-                    let width = shown.width;
-                    let height = width / ratio;
-
-                    if (height > shown.height) {
-                        height = shown.height;
-                        width = height * ratio;
-                    }
-
-                    at = {
-                        x: (shown.width - width) / 2,
-                        y: (shown.height - height) / 2,
-                        width,
-                        height,
-                    };
-
+                const startCentred = () => {
+                    at = biggestThatFits({ width: shot.clientWidth, height: shot.clientHeight }, ratio);
                     paint();
                 };
 
-                shot.addEventListener('load', biggestThatFits);
+                shot.addEventListener('load', startCentred);
 
                 // Dragging moves it and never lets it leave the picture: a
                 // rectangle half off the edge is a crop with a transparent
@@ -3526,10 +3468,11 @@ const bootLiveEdit = () => {
                 frame.addEventListener('pointermove', (event) => {
                     if (!from) return;
 
-                    const limit = (value, max) => Math.max(0, Math.min(value, max));
-
-                    at.x = limit(from.at.x + (event.clientX - from.x), shot.clientWidth - at.width);
-                    at.y = limit(from.at.y + (event.clientY - from.y), shot.clientHeight - at.height);
+                    at = movedWithin(
+                        from.at,
+                        { x: event.clientX - from.x, y: event.clientY - from.y },
+                        { width: shot.clientWidth, height: shot.clientHeight },
+                    );
                     paint();
                 });
 
@@ -3544,14 +3487,7 @@ const bootLiveEdit = () => {
                 use.addEventListener('click', () => {
                     // Into the file's own pixels. The picture on screen was
                     // scaled to fit a panel the server has never seen.
-                    const scale = shot.naturalWidth / (shot.clientWidth || 1);
-
-                    finish({
-                        x: Math.max(0, Math.round(at.x * scale)),
-                        y: Math.max(0, Math.round(at.y * scale)),
-                        width: Math.max(1, Math.round(at.width * scale)),
-                        height: Math.max(1, Math.round(at.height * scale)),
-                    });
+                    finish(inSourcePixels(at, shot.clientWidth, shot.naturalWidth));
                 });
 
                 whole.addEventListener('click', () => finish(null));

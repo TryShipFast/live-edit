@@ -41,6 +41,7 @@ class EmbedController
         'live-edit.js' => 'live-edit.js',
         'chrome.js' => 'chrome.js',
         'support.js' => 'support.js',
+        'fitting.js' => 'fitting.js',
         'svg.js' => 'svg.js',
         'verify.js' => 'verify.js',
         // The built bundle, resolved to resources/dist rather than to a
