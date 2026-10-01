@@ -36,7 +36,7 @@ class ImageStore
      *
      * @throws ValidationException
      */
-    public function store(UploadedFile $file, ?int $fitWidth = null, ?int $fitHeight = null, ?string $directory = null): string
+    public function store(UploadedFile $file, ?int $fitWidth = null, ?int $fitHeight = null, ?string $directory = null, bool $fitExact = false): string
     {
         $extension = strtolower($file->getClientOriginalExtension() ?: $file->guessExtension() ?: '');
 
@@ -65,7 +65,7 @@ class ImageStore
 
         // Before storing, while there is still a real file to work on.
         if ($fitWidth !== null && $fitHeight !== null && $fitWidth > 0 && $fitHeight > 0) {
-            ImageFitter::fit($file->getRealPath(), $fitWidth, $fitHeight);
+            ImageFitter::fit($file->getRealPath(), $fitWidth, $fitHeight, $fitExact);
         }
 
         // Stored with the headers a CDN needs, at the moment it is written.

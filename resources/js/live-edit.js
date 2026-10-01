@@ -1030,6 +1030,50 @@ const bootLiveEdit = () => {
          * true, with the technical one kept in the console for whoever is
          * actually debugging.
          */
+        /**
+         * The size a replacement has to match: the picture that is there now.
+         *
+         * The box it sits in was what this measured, and the box is not the
+         * picture. A theme ships a hero at 2400 wide and lays it out at 1200;
+         * fitting the replacement to 1200 stores half the file the design was
+         * built on, and the client sees their own photograph come out softer
+         * than the stock one it replaced. On the page that is the whole
+         * product: a picture that drops into the design as though it had been
+         * made for it.
+         *
+         * So an <img> is asked what it is actually showing. naturalWidth is
+         * the file's own width in device pixels, which is exactly "what was
+         * replaced" - and it is marked exact, because a box is in CSS pixels
+         * and wants doubling for a retina screen while this does not.
+         *
+         * A background has no picture to ask, so there the box is still the
+         * answer and still the right one: a background covers its box, and the
+         * box is the thing it has to cover.
+         */
+        const whatIsThereNow = (element) => {
+            if (!element) return null;
+
+            // 4000 is the largest the endpoints accept. Clamped here rather
+            // than refused there, because a theme with a 6000px hero is not a
+            // mistake anybody made.
+            const cap = (n) => Math.min(Math.max(Math.round(n), 1), 4000);
+
+            const naturalWidth = Number(element.naturalWidth ?? 0);
+            const naturalHeight = Number(element.naturalHeight ?? 0);
+
+            if (naturalWidth >= 1 && naturalHeight >= 1) {
+                return { width: cap(naturalWidth), height: cap(naturalHeight), exact: true };
+            }
+
+            const box = element.getBoundingClientRect?.();
+
+            if (box && box.width >= 1 && box.height >= 1) {
+                return { width: cap(box.width), height: cap(box.height), exact: false };
+            }
+
+            return null;
+        };
+
         const plainly = (error, what) => {
             console.warn(`[live-edit] ${what}:`, error);
 
@@ -1889,12 +1933,13 @@ const bootLiveEdit = () => {
                     formData.append('target', current.target);
                     const file = drawerFields.querySelector('input[type=file]').files[0];
                     const url = drawerFields.querySelector('input[type=url]').value.trim();
-                    // The size the theme designed this image to occupy: the
-                // replacement is fitted to it so the layout still holds.
-                const box = current.element?.getBoundingClientRect?.();
-                if (box && box.width >= 1 && box.height >= 1) {
-                    formData.append('fitWidth', String(Math.round(box.width)));
-                    formData.append('fitHeight', String(Math.round(box.height)));
+                    // What the replacement has to match, measured from the
+                // picture being replaced where that is knowable.
+                const fitTo = whatIsThereNow(current.element);
+                if (fitTo) {
+                    formData.append('fitWidth', String(fitTo.width));
+                    formData.append('fitHeight', String(fitTo.height));
+                    if (fitTo.exact) formData.append('fitExact', '1');
                 }
                 // Who took it, when the picture came from the picker. Sent
                 // with the picture rather than after it, so a failure cannot

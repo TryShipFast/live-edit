@@ -169,6 +169,9 @@ class LiveEditController extends Controller
             'url' => ['nullable', 'url:http,https', 'max:2000'],
             'fitWidth' => ['nullable', 'integer', 'min:1', 'max:4000'],
             'fitHeight' => ['nullable', 'integer', 'min:1', 'max:4000'],
+            // Whether those are the picture being replaced or the box it sits
+            // in. Only one of the two wants doubling for a retina screen.
+            'fitExact' => ['nullable', 'boolean'],
             'alt' => ['nullable', 'string', 'max:300'],
             'imgTitle' => ['nullable', 'string', 'max:300'],
             // The language the description is being typed in, checked against
@@ -284,6 +287,8 @@ class LiveEditController extends Controller
             $request->file('file'),
             (int) $request->input('fitWidth', 0) ?: null,
             (int) $request->input('fitHeight', 0) ?: null,
+            null,
+            $request->boolean('fitExact'),
         );
     }
 

@@ -85,6 +85,14 @@ class MediaController
             // the section it sits in.
             'fitWidth' => ['nullable', 'integer', 'min:1', 'max:4000'],
             'fitHeight' => ['nullable', 'integer', 'min:1', 'max:4000'],
+            /*
+             * Whether those two are the picture being replaced or the box it
+             * sits in. An image's own width is already in device pixels and a
+             * box is in CSS pixels, so only one of them wants doubling for a
+             * retina screen - and getting that backwards stores a file twice
+             * the size of the one it replaced.
+             */
+            'fitExact' => ['nullable', 'boolean'],
         ]);
 
         try {
@@ -93,7 +101,13 @@ class MediaController
             $key = $this->settingKey($validated['target'] ?? null);
 
             $uploaded = $request->hasFile('file')
-                ? $store($site, $request->file('file'), $validated['fitWidth'] ?? null, $validated['fitHeight'] ?? null)
+                ? $store(
+                    $site,
+                    $request->file('file'),
+                    $validated['fitWidth'] ?? null,
+                    $validated['fitHeight'] ?? null,
+                    (bool) ($validated['fitExact'] ?? false)
+                )
                 : null;
 
             if ($key === null) {

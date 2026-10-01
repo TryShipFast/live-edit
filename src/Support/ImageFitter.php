@@ -39,7 +39,7 @@ class ImageFitter
      * Returns false when the file is not an image type we can process, in
      * which case the original is left untouched rather than corrupted.
      */
-    public static function fit(string $path, int $width, int $height): bool
+    public static function fit(string $path, int $width, int $height, bool $exact = false): bool
     {
         if (! extension_loaded('gd') || ! is_file($path)) {
             return false;
@@ -55,7 +55,17 @@ class ImageFitter
 
         [$sourceWidth, $sourceHeight] = $info;
 
-        $density = self::density($width, $height, $sourceWidth, $sourceHeight);
+        /*
+         * `$exact` means the caller measured the picture being replaced rather
+         * than the box it sits in.
+         *
+         * The density multiplier exists because a box is measured in the
+         * browser in CSS pixels and most screens draw two device pixels for
+         * each. An image's own width is already device pixels, so doubling it
+         * would store a file twice the size of the one it replaced - which is
+         * the opposite of fitting what was there.
+         */
+        $density = $exact ? 1.0 : self::density($width, $height, $sourceWidth, $sourceHeight);
         $width = (int) min(round($width * $density), self::MAX_EDGE);
         $height = (int) min(round($height * $density), self::MAX_EDGE);
 
