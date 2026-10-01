@@ -2,6 +2,7 @@
 
 use Illuminate\Routing\Middleware\SubstituteBindings;
 use Illuminate\Support\Facades\Route;
+use ShipFast\LiveEdit\Http\Api\Middleware\AnswersJsonAlways;
 use ShipFast\LiveEdit\Http\Api\Middleware\AuthenticateApiToken;
 use ShipFast\LiveEdit\Http\Api\Middleware\AuthenticateProvisioner;
 use ShipFast\LiveEdit\Http\Api\Middleware\EnforceCors;
@@ -30,6 +31,16 @@ use ShipFast\LiveEdit\Http\Middleware\RecoversAnExpiredSignIn;
  * again after, keyed by the key itself.
  */
 Route::prefix(config('live-edit.api.prefix', 'api/live-edit/v1').'/{site}')
+    /*
+     * Never a redirect, whatever the caller asked for.
+     *
+     * A failed validation redirects unless the request said it wanted JSON,
+     * and on a browser API the fetch then follows that redirect to a page with
+     * no CORS headers - so the client is told its origin is not allowed when
+     * the real answer was a field it got wrong. Reported from a live site
+     * exactly that way, and the origin was allowed all along.
+     */
+    ->middleware([AnswersJsonAlways::class])
     ->group(function () {
         Route::options('/{any?}', fn () => response()->noContent())->where('any', '.*');
 

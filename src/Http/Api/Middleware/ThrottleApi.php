@@ -29,7 +29,16 @@ class ThrottleApi
 
     public function handle(Request $request, Closure $next, string $bucket = 'read'): Response
     {
-        $limits = config("live-edit.api.throttle.{$bucket}", config('live-edit.api.throttle.read'));
+        /*
+         * An empty array rather than null when neither is configured.
+         *
+         * A host that publishes this config and trims the throttle block got a
+         * TypeError on every API request - a 500 on reading content, because a
+         * rate limit was missing. No limit should mean no limit, not a dead
+         * API, and the package's own default always has one so this is only
+         * ever somebody else's edited config.
+         */
+        $limits = config("live-edit.api.throttle.{$bucket}", config('live-edit.api.throttle.read')) ?? [];
         $identity = $this->identity($request);
 
         foreach (['burst', 'sustained'] as $window) {
