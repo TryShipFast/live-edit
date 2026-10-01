@@ -2404,16 +2404,54 @@ const bootLiveEdit = () => {
              * silence.
              */
             if (balance < cost) {
-                go.disabled = true;
-                go.textContent = `Not enough credits · ${cost} needed`;
+                /*
+                 * No prompt box, no disabled button, no suggestion to write a
+                 * description of a picture that cannot be made.
+                 *
+                 * The first version of this put the price on the panel and
+                 * greyed the button out, which is still a tab that invites
+                 * somebody to compose something and then refuses. If the
+                 * answer to "can I do this" is no, the useful thing is the way
+                 * to make it yes - and the two things that cost nothing, so
+                 * the tab is not a dead end for somebody who is not going to
+                 * buy anything today.
+                 */
+                card.remove();
+                box.remove();
+                go.remove();
 
-                const short = note(
-                    `Making a picture costs ${cost} credits and you have ${balance}. `
-                    + 'Everything else here is free: upload your own, or pick a free photograph.'
+                panel.append(
+                    el('div', 'le-section-heading', 'Making pictures costs credits'),
+                    el(
+                        'div',
+                        'le-hint',
+                        `A picture costs ${cost} credits. You have ${balance}.`,
+                    ),
                 );
-                short.classList.add('is-short');
-                panel.insertBefore(short, go);
-            } else {
+
+                const where = window.liveEditEditor?.console ?? null;
+
+                if (where) {
+                    const buy = el('button', 'le-btn-publish', 'Buy credits');
+                    buy.type = 'button';
+                    buy.style.marginTop = '14px';
+                    buy.addEventListener('click', () => {
+                        // Their account, in its own tab: whatever they were
+                        // editing is still here when they come back.
+                        window.open(`${where.replace(/\/$/, '')}/billing`, '_blank', 'noopener');
+                    });
+                    panel.append(buy);
+                }
+
+                panel.append(note(
+                    'Uploading your own picture and the free photo library cost nothing, '
+                    + 'and they are the other two tabs here.'
+                ));
+
+                return;
+            }
+
+            {
                 const price = el(
                     'div',
                     'le-hint',
@@ -3364,6 +3402,26 @@ const bootLiveEdit = () => {
              */
             const ways = el('div', 'le-ways');
 
+            /**
+             * Mark the drawer as holding a picture that has not been saved.
+             *
+             * One line, above the fields, removed when the drawer moves on.
+             * It exists because the preview is convincing: the page shows the
+             * new picture the moment it is chosen, and without a word saying
+             * otherwise that is indistinguishable from having saved it.
+             */
+            const staged = () => {
+                drawerFields.querySelectorAll('.le-staged').forEach((held) => held.remove());
+
+                const said = el(
+                    'div',
+                    'le-hint le-staged',
+                    'This is a preview. Press Save changes to keep it.',
+                );
+
+                drawerFields.prepend(said);
+            };
+
             const takeChosen = ({ url, file, credit, alt, creditBy, creditUrl, creditSource, creditSourceUrl }) => {
                 if (file) {
                     const transfer = new DataTransfer();
@@ -3403,6 +3461,21 @@ const bootLiveEdit = () => {
                 current.creditFor = current.target;
 
                 showCredit(current.credit);
+
+                /*
+                 * Said out loud, because the page has just changed.
+                 *
+                 * Choosing a picture repaints the element so somebody can see
+                 * what they picked - and a page that changes in front of you
+                 * reads as a change that happened. It has not: the picture is
+                 * sitting in this drawer's fields and goes nowhere until Save
+                 * is pressed, which is the same rule every other edit follows.
+                 *
+                 * Reported from a real site as the editor applying a picture
+                 * immediately. Nothing was applied. Nothing said so either,
+                 * which is the part that was wrong.
+                 */
+                staged();
 
                 ui.saveButton.click();
             };
@@ -3705,6 +3778,18 @@ const bootLiveEdit = () => {
         );
 
         document.addEventListener('keydown', (event) => {
+            /*
+             * Not through an open picker.
+             *
+             * Escape dismisses whatever is on top, and the picker is a modal
+             * over the drawer. This closed both: the picture somebody had just
+             * chosen was staged in the drawer's own fields, so closing it threw
+             * the choice away - and the page still showed the preview, which
+             * made it look as though the change had been applied rather than
+             * lost.
+             */
+            if (event.key === 'Escape' && ui.shadow.querySelector('.le-scrim')) return;
+
             if (event.key === 'Escape' && drawer.classList.contains('is-open')) closeDrawer();
             if (!document.body.classList.contains('editing')) return;
             if (event.key !== 'Enter' && event.key !== ' ') return;
