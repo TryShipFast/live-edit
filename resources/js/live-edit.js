@@ -3568,7 +3568,21 @@ const bootLiveEdit = () => {
                  */
                 staged();
 
-                ui.saveButton.click();
+                /*
+                 * And nothing else. This used to end with `ui.saveButton.click()`.
+                 *
+                 * Choosing a picture saved it, closed the drawer and put it on
+                 * the page, which is not how any other edit in this product
+                 * behaves - words are typed, looked at, and saved when the
+                 * person is ready. Reported from a real site as "it auto
+                 * closes the drawer and affects the change immediately", and
+                 * reading the code twice I claimed it only staged, because I
+                 * stopped reading one line short of the click.
+                 *
+                 * It also made the crop impossible: choosing a file opens the
+                 * crop panel and the save went out before anybody had drawn a
+                 * rectangle, so the crop was never sent at all.
+                 */
             };
 
             // One button, and the choosing happens in the one place it is

@@ -708,6 +708,49 @@ measuring the output.
 
 ---
 
+### Fixed: choosing a picture saved it, which no other edit in the product does
+**Adapter:** all. **Reported:** 2026-10-01, from a live site. **Severity:**
+high, and it silently disabled the crop.
+
+Reported as "if i replace an image, it auto closes the drawer and affects the
+change immediately". Read the code and said twice that it only staged. It does
+not: `takeChosen` ends with `ui.saveButton.click()`, one line past where I
+stopped reading both times.
+
+Found by driving a browser, which is the only thing that was ever going to
+settle it. The stack from a wrapped `fetch` named the caller in one line:
+
+    at save      (live-edit.js:1930)
+    at takeChosen (live-edit.js:3320)
+    at chosen     (live-edit.js:2107)
+    at onFile     (live-edit.js:2141)
+
+Words are typed, looked at, and saved when the person is ready. A picture was
+chosen and gone, with the drawer shut behind it.
+
+It also made the crop impossible. Choosing a file opens the crop panel, and the
+save went out before anybody had drawn a rectangle, so a crop was never sent -
+a feature that could not work in the arrangement it shipped in.
+
+**Fixed** by removing the click. The picture stays in the drawer's own fields,
+the page shows it as a preview, and a line says so: "This is a preview. Press
+Save changes to keep it."
+
+**Covered by a browser test now**, not by reading: the panel opens, the frame
+moves with a drag, the staged line appears, the save carries the crop, the
+stored file is the size of the picture it replaced, and a visitor holding
+nothing sees it once it is published. `tests/e2e/choosing-the-crop.spec.js`,
+pointed at any site running the editor.
+
+**Three things the run found that no unit test could**, all of them local
+rather than product faults, and all of them things a customer could hit:
+`public/storage` pointing at a different project entirely, so every stored
+picture 404d; `APP_URL` naming a host the console is not served on, so stored
+addresses were unfetchable; and a fixture using `auto:` keys that are not hex,
+which the policy refuses by design.
+
+---
+
 ### Fixed: every save on a cloud site failed, and SQLite could not see why
 **Adapter:** all, on the service. **Found:** 2026-10-01, by a client on a live
 site. **Severity:** critical - no save of any kind landed.
