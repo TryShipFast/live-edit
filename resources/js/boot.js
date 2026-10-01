@@ -58,6 +58,49 @@
         return import(base + file);
     };
 
+    /*
+     * Which kind of nothing happened, because the two look identical in a
+     * console and have opposite causes.
+     *
+     * A fetch that never reaches a server rejects with "Failed to fetch" and
+     * the browser prints a CORS complaint beside it - and that is also exactly
+     * what an ad blocker, a privacy extension or a corporate proxy produces
+     * when it drops a cross-origin request. Chased one of those for an
+     * afternoon: the service was answering 200 with the right header to curl
+     * and to a clean browser, while the console said the origin was blocked.
+     *
+     * A server that refused says so with a status, and every fetch in this
+     * runtime throws that status by number. So: no status means nothing
+     * answered, and the next place to look is this browser rather than the
+     * allowlist.
+     */
+    var messageOf = function (error) {
+        if (error && error.message) {
+            return String(error.message);
+        }
+
+        /*
+         * A rejection with nothing in it prints as "undefined", which reads
+         * as a bug in this line rather than as what it is. Saying so plainly
+         * at least tells whoever is looking that there was nothing to say.
+         */
+        if (error === null || error === undefined) {
+            return 'nothing was thrown to describe it';
+        }
+
+        return String(error);
+    };
+
+    var answeredWithAStatus = function (said) {
+        return /answered \d{3}/.test(said);
+    };
+
+    /* Said wherever nothing answered, because the advice is the same every time. */
+    var LOOK_AT_THE_BROWSER = '. The browser reports this as a CORS error whatever the'
+        + ' cause, and the commonest cause is something in this browser dropping the'
+        + ' request - an ad blocker, a privacy extension, a proxy. Try a window with'
+        + ' extensions off before looking at the allowlist.';
+
     /**
      * Do nothing to this page until it has finished loading itself.
      *
@@ -175,7 +218,15 @@
                 return editing ? m.ensureBackgroundsAreFound(tagging) : m.autoTag(tagging);
             })
             .catch(function (error) {
-                console.warn('[live-edit] could not tag this page:', error.message);
+                // Told apart rather than reported as one thing; see the note
+                // beside answeredWithAStatus.
+                var said = messageOf(error);
+
+                console.warn(
+                    answeredWithAStatus(said)
+                        ? '[live-edit] could not tag this page: ' + said
+                        : '[live-edit] nothing answered the tagging request: ' + said + LOOK_AT_THE_BROWSER
+                );
             });
 
         return ready
@@ -188,7 +239,21 @@
                 }
             });
     }).catch(function (error) {
-        // The page is the point; the editor is not.
-        console.warn('[live-edit] editor unavailable:', error.message);
+        /*
+         * The page is the point; the editor is not.
+         *
+         * Told apart the same way, because this is the catch a blocked runtime
+         * actually lands in - every file after the first is fetched from the
+         * same origin as the tagging call, so whatever dropped one drops these
+         * too, and this was the line a customer read first. It also said
+         * "undefined" for anything thrown that was not an Error.
+         */
+        var said = messageOf(error);
+
+        console.warn(
+            answeredWithAStatus(said)
+                ? '[live-edit] editor unavailable: ' + said
+                : '[live-edit] editor unavailable, and nothing answered: ' + said + LOOK_AT_THE_BROWSER
+        );
     });
 })();
