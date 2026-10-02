@@ -128,11 +128,29 @@
         return /answered \d{3}/.test(said);
     };
 
-    /* Said wherever nothing answered, because the advice is the same every time. */
+    /*
+     * Said wherever nothing answered, because the advice is the same every time.
+     *
+     * It used to name one cause: something in this browser dropping the
+     * request. That was too sure of itself. A service answering 503 without
+     * CORS headers - which is what an error page generated above the
+     * application does - reaches the page as exactly the same "Failed to
+     * fetch", and the browser will not show the status to script on another
+     * origin.
+     *
+     * Found by reading the network panel on a real site while this message
+     * was on screen: the tagging request had answered 503, and roughly one
+     * request in six was failing that way. Somebody following this would have
+     * spent the afternoon disabling extensions.
+     *
+     * So it offers both, in the order worth trying, and neither as a verdict.
+     */
     var LOOK_AT_THE_BROWSER = '. The browser reports this as a CORS error whatever the'
-        + ' cause, and the commonest cause is something in this browser dropping the'
-        + ' request - an ad blocker, a privacy extension, a proxy. Try a window with'
-        + ' extensions off before looking at the allowlist.';
+        + ' cause, and it will not show you the status of a failed cross-origin request.'
+        + ' Two things do this: something in this browser dropping it - an ad blocker, a'
+        + ' privacy extension, a proxy - or the service answering with an error that'
+        + ' carries no CORS headers. The network panel shows which: a status means the'
+        + ' service answered, and nothing at all means it never arrived.';
 
     /**
      * Do nothing to this page until it has finished loading itself.

@@ -24,12 +24,17 @@ const diagnosis = () => {
     const source = readFileSync(path.resolve('resources/js/boot.js'), 'utf8');
 
     const opens = source.indexOf('var messageOf = function');
-    const closes = source.indexOf("allowlist.';", opens);
+    // To the end of the advice declaration, found by its name rather than by
+    // its wording - the wording is the thing most likely to change, and
+    // pinning it made a reworded message look like a renamed one.
+    const advice = source.indexOf('var LOOK_AT_THE_BROWSER', opens);
+    const closes = source.indexOf("';", source.indexOf('arrived', advice));
 
     expect(opens, 'messageOf has moved or been renamed in boot.js').toBeGreaterThan(-1);
-    expect(closes, 'the advice string has moved or been renamed in boot.js').toBeGreaterThan(-1);
+    expect(advice, 'the advice string has moved or been renamed in boot.js').toBeGreaterThan(-1);
+    expect(closes, 'the advice declaration does not end where expected').toBeGreaterThan(-1);
 
-    const declarations = source.slice(opens, closes + "allowlist.';".length);
+    const declarations = source.slice(opens, closes + 2);
 
     return new Function(
         declarations
@@ -60,12 +65,20 @@ describe('which kind of nothing happened', () => {
         expect(answeredWithAStatus('answered in 12 ms')).toBe(false);
     });
 
-    it('sends somebody to their own browser first when nothing answered', () => {
-        // The whole point. The allowlist is the expensive place to look and
-        // the usual answer is an extension.
+    it('offers both causes rather than naming one', () => {
+        /*
+         * It used to say the cause was something in this browser. Read on a
+         * real site while the service was answering 503 to roughly one
+         * request in six - an error page generated above the application
+         * carries no CORS headers, so it reaches the page as the same "Failed
+         * to fetch" and the status is hidden from script on another origin.
+         *
+         * Anybody following the old wording would have spent an afternoon
+         * disabling extensions while the service was the thing failing.
+         */
         expect(LOOK_AT_THE_BROWSER).toContain('ad blocker');
-        expect(LOOK_AT_THE_BROWSER).toContain('extensions off');
-        expect(LOOK_AT_THE_BROWSER).toContain('before looking at the allowlist');
+        expect(LOOK_AT_THE_BROWSER).toContain('no CORS headers');
+        expect(LOOK_AT_THE_BROWSER).toContain('network panel');
     });
 
     it('says what was thrown even when it was not an Error', () => {
