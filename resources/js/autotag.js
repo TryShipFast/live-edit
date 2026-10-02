@@ -12,6 +12,7 @@
  */
 
 import { masked } from './every-render.js';
+import { retrying } from './support.js';
 
 const CACHE_PREFIX = 'kb_tags_';
 
@@ -401,17 +402,51 @@ export const autoTag = async ({ base, site, key, page }, doc = document) => {
         return applyTags(doc, known);
     }
 
-    const response = await fetch(`${String(base).replace(/\/$/, '')}/${site}/tag`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', Accept: 'application/json', Authorization: `Bearer ${key}` },
-        body: JSON.stringify({ html, page: page ?? doc.location?.pathname ?? '' }),
+    /*
+     * Asked again, because once is not an answer.
+     *
+     * A page that fails to tag is a page with nothing editable on it: no
+     * outlines, no panel, nothing to click. The words are all still there and
+     * the site is fine, so to the person it reads as the product having
+     * quietly stopped working - and reloading fixes it, which is the most
+     * confusing possible behaviour.
+     *
+     * Measured against a live site: roughly one tagging request in six came
+     * back 503, reproducible from curl, so nothing about any one browser. The
+     * applier beside this has retried its fetches since it was written; this
+     * one never did, and it is the request that decides whether there is
+     * anything to edit at all.
+     *
+     * The same policy as everywhere else: a dropped connection, a server
+     * error, a rate limit and a gateway timeout are asked again, and a 401 or
+     * a 404 is not - a wrong key does not improve by being tried three times,
+     * and hammering a rejected one is how a site gets itself throttled.
+     *
+     * The body is built once rather than per attempt, since it is a third of a
+     * megabyte of markup and rebuilding it two more times to send the same
+     * bytes would be its own small cruelty.
+     */
+    const body = JSON.stringify({ html, page: page ?? doc.location?.pathname ?? '' });
+
+    const { elements } = await retrying(async () => {
+        const response = await fetch(`${String(base).replace(/\/$/, '')}/${site}/tag`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', Accept: 'application/json', Authorization: `Bearer ${key}` },
+            body,
+        });
+
+        if (!response.ok) {
+            const refused = new Error(`Tagging answered ${response.status}`);
+            // Carried so the retry policy can tell a server falling over from
+            // a key being refused. Without it every failure looks alike and
+            // either all of them are retried or none are.
+            refused.status = response.status;
+
+            throw refused;
+        }
+
+        return response.json();
     });
-
-    if (!response.ok) {
-        throw new Error(`Tagging answered ${response.status}`);
-    }
-
-    const { elements } = await response.json();
     remember(id, elements);
 
     return applyTags(doc, elements);
