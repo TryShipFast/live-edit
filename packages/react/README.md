@@ -57,11 +57,19 @@ than it looks: the component still renders its own copy with no provider, no
 network and no content at all. Adding this cannot leave a page blank, and
 removing it later leaves working code behind.
 
-## The two optional props
+## The props
 
-Three are required: `site`, `apiBase` and `publishableKey`. The others have
-defaults that are right for most applications, and one of them used to appear
-in this example in a way that implied it was needed. It is not.
+`site` and `apiBase` are required. Everything else has a default that is right
+for most applications.
+
+`publishableKey` is optional, and the types say so. It is what the provider
+reads content with, so leaving it out is only sensible when you pass `content`
+yourself from the server — which, on a Next App Router app, you probably do.
+Without either, the provider has nothing to show but your template's own copy,
+which is the correct outcome and not an error.
+
+This section used to open by calling it required, while the types marked it
+optional. The types were right.
 
 **`content`** is the client's words, fetched on your server so they are already
 in the HTML that arrives. Leave it out and the provider fetches them itself on
@@ -133,8 +141,29 @@ which lists those are rather than passing over them quietly.
 
 ## Minting a session
 
-Never put a secret key in a browser — it is refused if you try. Your server
-decides who may edit, because your users are not ours:
+Your server decides who may edit, because your users are not ours.
+
+### Which key is which
+
+The prefix tells you, and it is the only thing that does:
+
+| prefix | what it is | where it may go |
+| --- | --- | --- |
+| `kbp_` | publishable | the browser. Everything it can read is already public. |
+| `kbs_` | secret | your server only. It can mint sessions and publish. |
+| `kbe_` | session | minted by your server, short-lived, held by one person's browser. |
+
+A `kbp_` key is the one that belongs in `NEXT_PUBLIC_…`. A `kbs_` key never
+is, and the name of that variable is the test: if a bundler would inline it,
+it is the wrong key.
+
+This used to say a secret key is "refused if you try" to use one in a browser.
+That was not accurate and is worth correcting plainly, because somebody
+deciding whether the key in their hand is the safe one deserves better than
+reassurance. What the service actually enforces is the origin allowlist and
+what each key is allowed to do — not where it was sent from. A secret key used
+from an allowed origin would work, which is exactly why it must not be there.
+Keeping it off the page is a rule you hold, not one held for you.
 
 ```js
 // app/api/live-edit-session/route.js
@@ -269,6 +298,81 @@ not reloaded: scroll position, open menus and whatever the visitor was doing
 stay as they were. An element inside a server component is not, so the page is
 fetched again instead. Pass `onRefresh={() => router.refresh()}` in Next and
 that happens without a full navigation.
+
+## The shape a Next App Router install actually takes
+
+Two files, because one cannot work. The docs say to fetch content on the
+server and to pass `onRefresh={() => router.refresh()}`, and both are right —
+but `await readContent()` needs a server component and `useRouter` needs
+`'use client'`, so they cannot be the same file. Every App Router install
+therefore writes this wrapper, and it was left for each of them to work out.
+
+The layout stays a server component and fetches the words, so they are in the
+HTML that arrives:
+
+```jsx
+// app/layout.tsx  — server component
+import { readContent } from '@shipfasts/live-edit-react/server';
+import LiveEditProviderWrapper from './live-edit-provider';
+
+export default async function RootLayout({ children }) {
+  const content = await readContent();
+
+  return (
+    <html lang="en">
+      <body>
+        <LiveEditProviderWrapper
+          site={process.env.NEXT_PUBLIC_LIVE_EDIT_SITE}
+          apiBase={process.env.NEXT_PUBLIC_LIVE_EDIT_API_BASE}
+          publishableKey={process.env.NEXT_PUBLIC_LIVE_EDIT_KEY}
+          content={content}
+        >
+          {children}
+        </LiveEditProviderWrapper>
+        <script src="https://live.tryshipfast.com/s/your-site.js" defer />
+      </body>
+    </html>
+  );
+}
+```
+
+The wrapper is the client half, and exists only to hold the hook:
+
+```jsx
+// app/live-edit-provider.tsx
+'use client';
+
+import { useRouter } from 'next/navigation';
+import { LiveEditProvider, type ContentMap } from '@shipfasts/live-edit-react';
+
+export default function LiveEditProviderWrapper({
+  site, apiBase, publishableKey, content, children,
+}: {
+  site: string;
+  apiBase: string;
+  publishableKey: string;
+  content: ContentMap;
+  children: React.ReactNode;
+}) {
+  const router = useRouter();
+
+  return (
+    <LiveEditProvider
+      site={site}
+      apiBase={apiBase}
+      publishableKey={publishableKey}
+      content={content}
+      onRefresh={() => router.refresh()}
+    >
+      {children}
+    </LiveEditProvider>
+  );
+}
+```
+
+In Next, `next/script` with `strategy="afterInteractive"` is the usual way to
+add that tag; see the note below about what that costs on a development
+server.
 
 ## Getting in, the first time
 
