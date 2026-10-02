@@ -11,6 +11,7 @@ use ShipFast\LiveEdit\Domain\Content\SiteStore;
 use ShipFast\LiveEdit\Domain\Site\Site;
 use ShipFast\LiveEdit\LiveEdit;
 use ShipFast\LiveEdit\Mapper\MarkupScanner;
+use ShipFast\LiveEdit\Support\WhatChangesEveryRender;
 
 /**
  * Tagging a page that was never prepared, from the page itself.
@@ -86,28 +87,7 @@ class TagMarkup
      */
     private function cacheKey(Site $site, string $html, string $page): string
     {
-        $stable = preg_replace(
-            [
-                // Laravel's token, in the meta tag and on Livewire's script.
-                '/(<meta[^>]+name=["\']csrf-token["\'][^>]+content=["\'])[^"\']*/i',
-                '/(\sdata-csrf=["\'])[^"\']*/i',
-                /*
-                 * Livewire's per-render state: its serialised snapshot, its
-                 * effects, and the id it stamps on the component wrapper. The
-                 * id is the one that is easy to miss - it is twenty
-                 * characters of fresh randomness on every single render, and
-                 * with the other two masked it was still the thing defeating
-                 * the key.
-                 */
-                '/(\swire:snapshot=["\'])[^"\']*/i',
-                '/(\swire:effects=["\'])[^"\']*/i',
-                '/(\swire:id=["\'])[^"\']*/i',
-                // The hidden field the same token is posted in.
-                '/(name=["\']_token["\'][^>]+value=["\'])[^"\']*/i',
-            ],
-            '$1',
-            $html
-        ) ?? $html;
+        $stable = WhatChangesEveryRender::masked($html);
 
         return 'live-edit:tag:'.hash('sha256', implode("\0", [
             LiveEdit::VERSION,

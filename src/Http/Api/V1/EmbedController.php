@@ -43,6 +43,7 @@ class EmbedController
         'support.js' => 'support.js',
         'fitting.js' => 'fitting.js',
         'only-what-changed.js' => 'only-what-changed.js',
+        'every-render.js' => 'every-render.js',
         'svg.js' => 'svg.js',
         'verify.js' => 'verify.js',
         // The built bundle, resolved to resources/dist rather than to a

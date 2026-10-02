@@ -11,6 +11,8 @@
  * scanner stays on the server, which is where the work worth paying for is.
  */
 
+import { masked } from './every-render.js';
+
 const CACHE_PREFIX = 'kb_tags_';
 
 /** Cheap, stable, and enough to notice a page that has changed. */
@@ -379,7 +381,20 @@ export const autoTag = async ({ base, site, key, page }, doc = document) => {
     }
 
     const html = doc.documentElement.outerHTML;
-    const id = CACHE_PREFIX + fingerprint(html);
+    /*
+     * Fingerprinted past what changes on every render.
+     *
+     * Taken of the markup as rendered, this was a new value on every single
+     * load - a fresh CSRF token and a fresh Livewire snapshot are enough - so
+     * nothing stored here was ever found again, and a third of a megabyte went
+     * to the service on every page view to be told what it had already been
+     * told. Measured on a real site: 290KB up, 235KB back, and between one and
+     * two seconds before the page's own words could be applied.
+     *
+     * The markup still goes as it is. Only the name this is remembered under
+     * is taken past the parts that could not have changed the answer.
+     */
+    const id = CACHE_PREFIX + fingerprint(masked(html));
     const known = cached(id);
 
     if (known) {
