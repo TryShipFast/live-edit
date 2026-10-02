@@ -336,6 +336,44 @@ export const attributeOf = (element, attribute, datasetKey) => {
 };
 
 /**
+ * Whether a stored value is a picture rather than something to read.
+ *
+ * The list of pending changes renders every value as text, which for a picture
+ * is a hundred-character address truncated to seventy. A customer asked how to
+ * undo replacing a picture and the honest answer was that the row was there,
+ * it just could not be recognised - two unreadable URLs, one struck through.
+ *
+ * Asked of the value rather than guessed from the key, because keys are
+ * `auto:4d90041f39e2` and say nothing. The page is the better authority when
+ * the element is on it and the caller checks that first; this is for a change
+ * made on a page somebody has since navigated away from, where the value is
+ * all that is left.
+ *
+ * Extensions are not enough on their own: stored pictures are served from a
+ * media path with a generated name and often no extension at all, and a data
+ * URI has neither. So three ways, any of which is good enough.
+ */
+export const looksLikeAPicture = (value) => {
+    const said = String(value ?? '').trim();
+
+    if (said === '') {
+        return false;
+    }
+
+    if (/^data:image\//i.test(said)) {
+        return true;
+    }
+
+    // A path this runtime itself stores pictures under.
+    if (/\/live-edit\/(sites|media)\//i.test(said)) {
+        return true;
+    }
+
+    // An ordinary picture address, ignoring any query string hung off it.
+    return /\.(jpe?g|png|gif|webp|avif|svg)(\?|#|$)/i.test(said);
+};
+
+/**
  * Ask again, because the first answer was probably not the real one.
  *
  * A single failed request shows the theme's own words for that page view. To

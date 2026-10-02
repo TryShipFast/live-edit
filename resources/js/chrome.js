@@ -271,6 +271,18 @@ a.le-mark:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
 .le-change-before { font-size: 13px; color: #9A9DA5; text-decoration: line-through; margin: 0; }
 .le-change-after { font-size: 14px; font-weight: 500; color: #2A2C31; margin: 0; }
 .le-change-when { font-size: 12px; color: #9A9DA5; margin: 2px 0 0; }
+/* A replaced picture, shown rather than described. Two addresses truncated to
+   seventy characters told somebody nothing about which row to revert. */
+.le-change-pictures { display: flex; gap: 12px; align-items: flex-start; margin-top: 6px; }
+/* Sized by the picture rather than by the row: one frame on its own, which is
+   the commonest case, stretched across the drawer and left most of it grey. */
+.le-change-shot { margin: 0; flex: 0 1 auto; min-width: 0; }
+.le-change-shot figcaption { font-size: 11px; text-transform: uppercase; letter-spacing: .04em; color: #9A9DA5; margin-bottom: 4px; }
+/* Contained rather than cropped: which picture it is matters here, and the
+   shape is part of recognising it. */
+.le-change-shot img { display: block; height: 72px; width: auto; max-width: 100%; object-fit: contain; border-radius: 6px; background: #F4F5F7; }
+.le-change-shot.is-before img { opacity: .55; }
+.le-change-missing { display: block; font-size: 12px; color: #9A9DA5; word-break: break-all; }
 .le-version { display: flex; gap: 12px; align-items: flex-start; padding-bottom: 14px; }
 .le-version-dot { width: 8px; height: 8px; margin-top: 6px; border-radius: 999px; background: #DADCE0; flex: none; }
 .le-version-dot.is-latest { background: var(--le-ink); }

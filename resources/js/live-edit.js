@@ -2,7 +2,7 @@ import { createChrome } from './chrome.js';
 import { biggestThatFits, inSourcePixels, movedWithin, whatIsThereNow } from './fitting.js';
 import { attrsWorthSending, creditWorthSending } from './only-what-changed.js';
 import { confirm as confirmChange, expectChange, takeExpected } from './verify.js';
-import { apiRequestFor, attributeOf, classListWith, declaredStyleProps, displayedValue, iconNamesIn, isJsonResponse, orderedIcons, ownTextOf, parseEditKey, requestInit } from './support.js';
+import { apiRequestFor, attributeOf, classListWith, declaredStyleProps, displayedValue, iconNamesIn, isJsonResponse, looksLikeAPicture, orderedIcons, ownTextOf, parseEditKey, requestInit } from './support.js';
 
 /**
  * Start only once the host page has finished loading.
@@ -1342,6 +1342,14 @@ const bootLiveEdit = () => {
                 head.append(label, revert);
                 row.append(head);
 
+                if (isAPictureChange(change)) {
+                    row.append(picturesChanged(change));
+
+                    drawerFields.append(row);
+
+                    return;
+                }
+
                 // The old words struck through, the new ones under them. A
                 // change you cannot read is a change you cannot check.
                 if (change.before) {
@@ -1366,6 +1374,103 @@ const bootLiveEdit = () => {
             return text.length > 70 ? `${text.slice(0, 70)}…` : text;
         };
 
+        /*
+         * Whether this row is about a picture.
+         *
+         * The page first, because it is the authority: an element tagged
+         * data-edit-img against this key is a picture whatever its value looks
+         * like. The value is the fallback for a change made on a page somebody
+         * has since navigated away from, which is exactly when this panel is
+         * most useful.
+         */
+        const isAPictureChange = (change) => {
+            if (change.kind === 'style') {
+                return false;
+            }
+
+            if (document.querySelector(`[data-edit-img="setting:${CSS.escape(change.key)}"]`)) {
+                return true;
+            }
+
+            return looksLikeAPicture(change.after) || looksLikeAPicture(change.before);
+        };
+
+        /**
+         * The two pictures, shown rather than described.
+         *
+         * A customer asked how to undo replacing a picture. The row was
+         * already there and already revertible - it just could not be
+         * recognised, because both values were hundred-character addresses
+         * truncated to seventy with one of them struck through. Nothing about
+         * reverting needed building; it needed showing.
+         *
+         * Old beside new rather than above it, because that is the comparison
+         * somebody is making, and a picture is wide.
+         */
+        const picturesChanged = (change) => {
+            const pair = document.createElement('div');
+            pair.className = 'le-change-pictures';
+
+            const shot = (url, label, className) => {
+                const figure = document.createElement('figure');
+                figure.className = className;
+
+                const caption = document.createElement('figcaption');
+                caption.textContent = label;
+                figure.append(caption);
+
+                if (looksLikeAPicture(url)) {
+                    const img = document.createElement('img');
+                    img.src = url;
+                    img.alt = '';
+                    img.loading = 'lazy';
+                    // A picture that will not load must not leave an empty
+                    // frame somebody reads as "this is what it looks like now".
+                    img.addEventListener('error', () => {
+                        img.remove();
+                        const gone = document.createElement('span');
+                        gone.className = 'le-change-missing';
+                        gone.textContent = 'Cannot be shown';
+                        figure.append(gone);
+                    }, { once: true });
+                    figure.append(img);
+
+                    return figure;
+                }
+
+                const none = document.createElement('span');
+                none.className = 'le-change-missing';
+                // An image setting cleared, or one that never had a value -
+                // "Removed" rather than a blank square.
+                none.textContent = String(url ?? '').trim() === '' ? 'No picture' : trim(url);
+                figure.append(none);
+
+                return figure;
+            };
+
+            /*
+             * "Was" only where there is something to show for it.
+             *
+             * The commonest replacement has no before at all: the picture it
+             * replaced was the theme's own, which was never stored, so the
+             * store has nothing to hand back. The element's data-edit-preview
+             * is no help either - the applier keeps it in step with what the
+             * page is showing, so by now it is the new picture.
+             *
+             * So one frame, captioned "Now" rather than "Added". Added is what
+             * the store did and not what the person did: they replaced a
+             * picture they could see, and being told they added one reads as
+             * the panel describing somebody else's change.
+             */
+            if (change.before) {
+                pair.append(shot(change.before, 'Was', 'le-change-shot is-before'));
+            }
+
+            pair.append(shot(change.after, 'Now', 'le-change-shot is-after'));
+
+            return pair;
+        };
+
         /* What to call a change in the list.
            The element's own words where the page still has them, because that
            is what somebody remembers changing — not auto:9de57a6dba8b. */
@@ -1376,7 +1481,11 @@ const bootLiveEdit = () => {
 
             if (onPage) return describeElement(onPage);
 
-            return change.kind === 'style' ? 'Styling' : 'Text';
+            if (change.kind === 'style') return 'Styling';
+
+            // Named for what it is. "Text" over two thumbnails is the panel
+            // contradicting itself on the one row somebody came here to find.
+            return isAPictureChange(change) ? 'Picture' : 'Text';
         };
 
         const revertChange = async (change, button) => {
