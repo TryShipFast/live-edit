@@ -299,6 +299,22 @@ return [
     // The largest upload accepted, in kilobytes.
     'max_upload_kb' => (int) env('LIVE_EDIT_MAX_UPLOAD_KB', 8192),
 
+    /*
+     * How long a tagged page is remembered, in seconds. Zero turns it off.
+     *
+     * Tagging is the slowest thing on the path to a page's own words - 1.8s of
+     * server time, measured against a real site - and every visitor to a page
+     * was paying it to compute the identical answer. It depends on the markup
+     * and nothing else: no session, no visitor, no clock.
+     *
+     * A day rather than forever because the key cannot see everything that
+     * ought to invalidate it. The engine version is in there, so a scanner
+     * improvement is safe; a site whose template changes under the same URL
+     * corrects itself within a day at worst, and immediately in the ordinary
+     * case, since different markup is a different key.
+     */
+    'tag_cache_seconds' => (int) env('LIVE_EDIT_TAG_CACHE_SECONDS', 86400),
+
     // Invoked after every successful write (e.g. to bust a content cache).
     // 'after_save' => [App\Support\SiteContent::class, 'flush'],
     'after_save' => null,
