@@ -54,6 +54,19 @@ const FRESH_EVERY_TIME = [
      * not list.
      */
     [/(=["'])lofi-[0-9a-z-]*/gi, '$1'],
+    /*
+     * The inline hide a framework writes when it toggles something.
+     *
+     * Alpine stamps exactly this onto an x-show element as it initialises, so
+     * whether it is present depends on whether the host page's own JavaScript
+     * has run yet - a race with the moment this is measured. Two views of one
+     * page produced two different keys depending on which won it, which is a
+     * cache that works most of the time: the least useful kind.
+     *
+     * Only a style attribute that is nothing but a hide. A hidden element is
+     * tagged exactly as a shown one is.
+     */
+    [/(\sstyle=["'])display:\s*none;?(?=["'])/gi, '$1'],
 ];
 
 export const masked = (html) => FRESH_EVERY_TIME.reduce(

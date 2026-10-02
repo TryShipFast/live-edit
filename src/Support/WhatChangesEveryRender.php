@@ -73,6 +73,22 @@ final class WhatChangesEveryRender
          * nothing that is not Flux's own naming is touched.
          */
         '/(=["\'])lofi-[0-9a-z-]*/i',
+        /*
+         * The inline hide that a framework writes when it toggles something.
+         *
+         * Alpine stamps exactly this onto an x-show element the moment it
+         * initialises, so whether it is there depends on whether the host
+         * page's own JavaScript has run yet - and that is a race with the
+         * moment this is measured. Two views of one page produced two keys
+         * depending on which won, which is a cache that works most of the
+         * time, the least useful kind.
+         *
+         * Only a style attribute that is nothing but a hide. An authored
+         * style of any substance is untouched, and a hidden element is tagged
+         * exactly as a shown one is - position and signature do not depend on
+         * whether somebody can see it.
+         */
+        '/(\sstyle=["\'])display:\s*none;?(?=["\'])/i',
     ];
 
     public static function masked(string $html): string

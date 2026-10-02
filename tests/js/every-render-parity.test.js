@@ -83,6 +83,32 @@ describe('what changes on every render', () => {
         expect(server(page('Our work'))).not.toBe(server(page('What we do')));
     });
 
+    it('agrees about a framework hiding something after the page loaded', () => {
+        /*
+         * Alpine writes exactly this onto an x-show element as it starts, so
+         * whether it is present depends on a race with the host page's own
+         * JavaScript. Two views of one real page produced two keys depending
+         * on which won - a cache that works most of the time.
+         */
+        const html = '<div x-show="showTrialModal" style="display: none;"><p>Trial</p></div>';
+
+        const { php, js } = both(html);
+
+        expect(js).toBe(php);
+        expect(js).toBe('<div x-show="showTrialModal" style=""><p>Trial</p></div>');
+    });
+
+    it('agrees that a real inline style is left alone', () => {
+        // The guard on the line above: only a style that is nothing but a
+        // hide. Anything authored stays, because it is part of the page.
+        const html = '<div style="display: none; color: red"><p>Words</p></div>';
+
+        const { php, js } = both(html);
+
+        expect(js).toBe(php);
+        expect(js).toBe(html);
+    });
+
     it('agrees about markup that has none of it', () => {
         // The ordinary static page this product exists for: a folder of HTML
         // with no framework in it at all. Nothing to mask, nothing changed.
