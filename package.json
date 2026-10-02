@@ -8,17 +8,20 @@
     "test": "vitest run",
     "test:e2e": "playwright test",
     "test:journey": "playwright test tests/e2e/drawer-journey.spec.js tests/e2e/content-is-yours.spec.js",
-    "test:journey:blade": "playwright test tests/e2e/blade-journey.spec.js"
+    "test:journey:blade": "playwright test tests/e2e/blade-journey.spec.js",
+    "test:types": "tsc --noEmit -p packages/react/types-check"
   },
   "devDependencies": {
     "@babel/parser": "^7.29.9",
     "@playwright/test": "^1.63.0",
     "@testing-library/dom": "^10.4.2",
     "@testing-library/react": "^16.3.3",
+    "@types/react": "^18.3.31",
     "happy-dom": "^15.11.7",
     "jsdom": "^24.1.3",
     "react": "^19.3.0",
     "react-dom": "^19.3.0",
+    "typescript": "^5.9.3",
     "vitest": "^2.1.8"
   }
 }

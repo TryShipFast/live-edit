@@ -1,0 +1,31 @@
+{
+    "//": [
+        "Compiled against the declarations this package ships, as a consumer would.",
+        "",
+        "strict and noImplicitAny are not a preference here - they are what every",
+        "project made by create-next-app turns on, and they are what turned a",
+        "non-generic useLiveEditList into forty-five errors in somebody's build.",
+        "",
+        "React 18's types on purpose, because that is what a current Next app",
+        "installs and it is the stricter case: 18 only accepts ReactElement from",
+        "something used in JSX, where 19 would take a string. Checking against 19",
+        "alone would pass a package that breaks for most people."
+    ],
+    "compilerOptions": {
+        "strict": true,
+        "noImplicitAny": true,
+        "noEmit": true,
+        "jsx": "react-jsx",
+        "module": "esnext",
+        "moduleResolution": "bundler",
+        "target": "es2022",
+        "lib": ["es2022", "dom"],
+        "skipLibCheck": true,
+        "baseUrl": ".",
+        "paths": {
+            "@shipfasts/live-edit-react": ["../src/index.d.ts"],
+            "@shipfasts/live-edit-react/server": ["../src/server.d.ts"]
+        }
+    },
+    "include": ["*.tsx"]
+}

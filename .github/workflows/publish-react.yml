@@ -70,7 +70,24 @@ jobs:
           npm ci --ignore-scripts
           npx vitest run \
             tests/react \
-            tests/js/codemod-renders-what-jsx-rendered.test.js
+            tests/js/codemod-renders-what-jsx-rendered.test.js \
+            tests/js/the-types-describe-what-ships.test.js \
+            tests/js/the-codemod-leaves-the-right-files-alone.test.js
+
+      # The declarations, compiled the way a customer compiles them.
+      #
+      # Everything above is JavaScript, and a JavaScript suite cannot see a
+      # type. index.d.ts described two of the ten symbols its own entry point
+      # exports and shipped; a customer's build broke on code our codemod had
+      # just written for them, 167 errors across 19 files.
+      #
+      # The fixture is generated output rather than sample usage, and it
+      # imports from BOTH entry points - because the fix after that described
+      # index.d.ts, left server.d.ts alone, and shipped again. A check that
+      # imported only from the client entry would have gone green on it, which
+      # is exactly what the test written alongside that fix did.
+      - name: Check the types a consumer would compile against
+        run: npm run test:types
 
       # Refuse to publish a version that does not match the tag. A tag saying
       # v0.11.0 that ships 0.10.0 is worse than a failed release: the registry
