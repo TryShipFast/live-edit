@@ -207,7 +207,9 @@ export const ensureBackgroundsAreFound = async (config, doc = document) => {
     // one slide at a time - neither is in the markup the scanner was sent, and
     // until this the only thing that could bring us back was a picture.
     watchForLateContent(doc, () => {
-        autoTag(config, doc).catch((error) => {
+        // Told why, so the guard inside does not answer "already prepared,
+        // nothing to do" about a menu that has just built itself.
+        autoTag(config, doc, { because: 'new content' }).catch((error) => {
             console.warn('[live-edit] could not tag what just appeared:', error.message);
         });
     });
@@ -462,7 +464,7 @@ export const watchForLateBackgrounds = (doc = document, onFound = () => {}) => {
  * Asked once per version of a page: the answer is kept against a fingerprint
  * of the markup, so a redeploy asks again and an unchanged page does not.
  */
-export const autoTag = async ({ base, site, key, page }, doc = document) => {
+export const autoTag = async ({ base, site, key, page }, doc = document, { because = null } = {}) => {
     // Already prepared — by the CLI, by a framework, or by whoever sold it.
     const prepared = doc.querySelector('[data-edit], [data-edit-img]') !== null;
 
@@ -486,7 +488,22 @@ export const autoTag = async ({ base, site, key, page }, doc = document) => {
     // counting finds would say nothing had changed.
     const unanswered = () => doc.querySelector('[data-kb-bg]:not([data-edit-bg])') !== null;
 
-    if (prepared && !unanswered()) {
+    /*
+     * `because` is somebody saying the page is not what it was.
+     *
+     * The guard below asks one question - is there a picture we have written
+     * down and not yet keyed - and answers "nothing to do" for everything
+     * else. That was right while the only thing that could arrive late was a
+     * background. It is wrong the moment words can: a mega menu built when it
+     * opens, a testimonial that exists one slide at a time.
+     *
+     * Measured on a live site. The menu items were genuinely absent from the
+     * DOM at tagging time, the watcher noticed them arriving and asked, and
+     * this line sent it away - the page was already prepared and no background
+     * had appeared, so there was "nothing to do" while three new links sat
+     * there uneditable.
+     */
+    if (prepared && !unanswered() && because === null) {
         return 0;
     }
 

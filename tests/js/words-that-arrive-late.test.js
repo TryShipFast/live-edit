@@ -125,3 +125,39 @@ describe('words that arrive late', () => {
         expect(onFound.mock.calls.length).toBeLessThanOrEqual(10);
     }, 30000);
 });
+
+describe('asking again once the words are there', () => {
+    it('does not answer "already prepared" about a menu that just appeared', async () => {
+        /*
+         * The guard inside autoTag asks one question - is there a picture we
+         * have written down and not yet keyed - and says "nothing to do" for
+         * everything else. Right while a background was the only thing that
+         * could arrive late; wrong the moment words can.
+         *
+         * Measured on a live site: the menu items were genuinely absent at
+         * tagging time, the watcher noticed them arrive and asked, and this
+         * guard sent it away while three new links sat there uneditable.
+         */
+        const { autoTag } = await import('../../resources/js/autotag.js');
+
+        document.body.innerHTML = '<p data-edit="setting:auto:known">Already prepared</p>'
+            + '<nav><a>Playlist Promotion</a></nav>';
+
+        const fetch = vi.fn().mockResolvedValue({
+            ok: true,
+            status: 200,
+            json: async () => ({ elements: [] }),
+        });
+        vi.stubGlobal('fetch', fetch);
+
+        // Without a reason: the page looks prepared, so nothing is asked.
+        await autoTag({ base: 'https://x/api', site: 'acme', key: 'kbp_x', page: '/' }, document);
+        expect(fetch).not.toHaveBeenCalled();
+
+        // With one: the page has changed, and it asks.
+        await autoTag({ base: 'https://x/api', site: 'acme', key: 'kbp_x', page: '/' }, document, { because: 'new content' });
+        expect(fetch).toHaveBeenCalledTimes(1);
+
+        vi.unstubAllGlobals();
+    });
+});
