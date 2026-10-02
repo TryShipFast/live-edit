@@ -2,7 +2,7 @@ import { createChrome } from './chrome.js';
 import { biggestThatFits, inSourcePixels, movedWithin, whatIsThereNow } from './fitting.js';
 import { attrsWorthSending, creditWorthSending } from './only-what-changed.js';
 import { confirm as confirmChange, expectChange, takeExpected } from './verify.js';
-import { apiRequestFor, attributeOf, backgroundImageOf, classListWith, declaredStyleProps, displayedValue, iconNamesIn, isJsonResponse, looksLikeAPicture, orderedIcons, ownTextOf, parseEditKey, requestInit, stylePropsFor } from './support.js';
+import { apiRequestFor, attributeOf, backgroundImageOf, classListWith, declaredStyleProps, displayedValue, iconNamesIn, isJsonResponse, looksLikeAPicture, orderedIcons, ownTextOf, parseEditKey, requestInit, stylePropsFor, interactiveTarget, nameOfControl } from './support.js';
 
 /**
  * Start only once the host page has finished loading.
@@ -2966,9 +2966,6 @@ const bootLiveEdit = () => {
             }, 0);
         };
 
-        /** Controls that reveal something rather than navigate somewhere. */
-        const interactiveTarget = (element) =>
-            element.closest?.('a[href^="#"], [aria-controls], [aria-expanded], [data-toggle], [role="button"]') ?? null;
         /** Editing swallows the click, so offer the trip explicitly. */
         const appendVisitLink = (element) => {
             // A control that reveals something gets a way to run itself, so the
@@ -2980,7 +2977,8 @@ const bootLiveEdit = () => {
                 const open = document.createElement('button');
                 open.type = 'button';
                 open.className = 'le-chip-btn';
-                open.textContent = 'Open this menu';
+                const said = nameOfControl(control);
+                open.textContent = said === '' ? 'Run this control' : `Press “${said}”`;
                 open.title = 'Runs the control so you can edit what it reveals';
                 open.addEventListener('click', () => {
                     closeDrawer(true);

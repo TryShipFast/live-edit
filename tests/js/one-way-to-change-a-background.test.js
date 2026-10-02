@@ -29,7 +29,7 @@ const EVERY_PROP = ['background', 'backgroundImage', 'textColor', 'fontSize', 'p
 describe('one way to change a background', () => {
     it('does not offer the style control on a section that has its own editor', () => {
         // The reported case.
-        const section = element('<section data-edit-bg="setting:auto:3e5b1b7e"></section>');
+        const section = element('<section data-edit-bg="setting:auto:3e5b1b7e" data-background="/hero.jpg"></section>');
 
         expect(stylePropsFor(section, EVERY_PROP)).not.toContain('backgroundImage');
     });
@@ -40,15 +40,28 @@ describe('one way to change a background', () => {
          * Style section away from a section that still needs its padding and
          * its background colour.
          */
-        const section = element('<section data-edit-bg="setting:auto:3e5b1b7e"></section>');
+        const section = element('<section data-edit-bg="setting:auto:3e5b1b7e" data-background="/hero.jpg"></section>');
 
         expect(stylePropsFor(section, EVERY_PROP))
             .toEqual(['background', 'paddingX', 'paddingY', 'radius', 'hidden']);
     });
 
-    it('still offers it on a section with no background of its own', () => {
-        // Here it is not a duplicate - it is the only way in.
-        const section = element('<section></section>');
+    it('does not offer to replace a background that is not there', () => {
+        /*
+         * Reported looking at a Group on a real page: the heading BACKGROUND
+         * IMAGE, a Replace background button, and under it the words "No image
+         * set". A panel that asks about things that do not exist is a panel
+         * somebody stops reading.
+         */
+        const group = element('<div><p>5+</p><p>Artists on the platform</p></div>');
+
+        expect(stylePropsFor(group, EVERY_PROP)).not.toContain('backgroundImage');
+    });
+
+    it('offers it on a picture nothing else is already changing', () => {
+        // A background that exists and was never keyed: here the style control
+        // is not a duplicate, it is the only way in.
+        const section = element('<section data-background="/hero.jpg"></section>');
 
         expect(stylePropsFor(section, EVERY_PROP)).toContain('backgroundImage');
     });

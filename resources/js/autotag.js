@@ -309,6 +309,9 @@ export const watchForLateContent = (doc = document, onFound = () => {}) => {
      */
     const MOST_ASKS = 10;
 
+    /** What a scanner has already put a name to. */
+    const KEYED = '[data-edit], [data-edit-img], [data-edit-bg]';
+
     let asks = 0;
     let pending = null;
 
@@ -337,12 +340,65 @@ export const watchForLateContent = (doc = document, onFound = () => {}) => {
         );
     };
 
+    /** Did this node carry content the scanner had already named? */
+    const wasKeyed = (node) => node?.nodeType === 1
+        && Boolean(node.matches?.(KEYED) || node.querySelector?.(KEYED));
+
+    /**
+     * Content that replaced content, as against content that merely arrived.
+     *
+     * A testimonial slider renders one testimonial and swaps the others into
+     * the same node, so each of them is offered the same position - and a name
+     * taken from position hands all five one key. Editing the second does not
+     * sit beside the first, it overwrites it.
+     *
+     * The scanner cannot see this: at render time the other four do not exist.
+     * This can. Keyed content leaving a parent and different content arriving
+     * in its place is exactly what a slide change looks like, and the mark
+     * tells the scanner to name what arrived by what it holds instead.
+     *
+     * Counted across the whole batch rather than per record, because React
+     * takes the old node out and puts the new one in as two separate steps on
+     * the same parent.
+     */
+    const markSwaps = (records) => {
+        const lost = new Set();
+        const gained = new Map();
+
+        for (const record of records) {
+            if ([...record.removedNodes].some(wasKeyed)) {
+                lost.add(record.target);
+            }
+
+            const arrived = [...record.addedNodes].filter((node) => node.nodeType === 1);
+
+            if (arrived.length > 0) {
+                gained.set(record.target, (gained.get(record.target) ?? []).concat(arrived));
+            }
+        }
+
+        for (const [parent, arrived] of gained) {
+            if (!lost.has(parent)) {
+                continue;
+            }
+
+            for (const node of arrived) {
+                node.setAttribute('data-kb-swaps', '1');
+            }
+        }
+    };
+
     const observer = new view.MutationObserver((records) => {
         if (asks >= MOST_ASKS) {
             observer.disconnect();
 
             return;
         }
+
+        // Before the settle rather than after it: the nodes have to carry the
+        // mark by the time the markup is posted, and a later burst may well
+        // have moved on to a different slide by then.
+        markSwaps(records);
 
         const anythingNew = records.some((record) => [...record.addedNodes].some(worthAsking));
 

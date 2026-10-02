@@ -472,6 +472,63 @@ export const backgroundImageOf = (element, view = null) => {
 };
 
 /**
+ * Controls that reveal something rather than navigate somewhere.
+ *
+ * Editing swallows every click - it has to, or clicking a heading inside a
+ * card would follow the card's link instead of opening the heading. The cost
+ * is that whatever a control would have revealed can never be reached, so the
+ * panel offers to run the control explicitly.
+ *
+ * This used to list only the ways a menu announces itself: aria-controls,
+ * aria-expanded, data-toggle, role=button. A testimonial slider announces
+ * nothing - it is a plain <button aria-label="Next testimonial"> - so no offer
+ * was made, the click was eaten, and four of the five testimonials could not
+ * be brought on screen at all, let alone edited. Reported as "it can't detect
+ * testimonials on slides", and detection was never the problem.
+ *
+ * A plain button almost always acts on the page it is in. The exception is one
+ * that submits a form, which does not reveal anything - it posts somebody's
+ * half-filled sign-in and leaves.
+ */
+export const interactiveTarget = (element) => {
+    const control = element?.closest?.(
+        'a[href^="#"], [aria-controls], [aria-expanded], [data-toggle], [role="button"], [role="tab"], summary, button'
+    ) ?? null;
+
+    if (!control) {
+        return null;
+    }
+
+    if (control.tagName === 'BUTTON' && control.form) {
+        const kind = (control.getAttribute('type') || 'submit').toLowerCase();
+
+        if (kind !== 'button') {
+            return null;
+        }
+    }
+
+    return control;
+};
+
+/**
+ * What to call the button that runs a control.
+ *
+ * "Open this menu" over a carousel arrow is a small lie, and somebody who
+ * cannot predict what a button does does not press it. The control already
+ * says what it is, for the same reason a screen reader needs it to.
+ */
+export const nameOfControl = (control) => {
+    const said = (
+        control?.getAttribute?.('aria-label')
+        || control?.getAttribute?.('title')
+        || control?.textContent
+        || ''
+    ).trim().replace(/\s+/g, ' ');
+
+    return said === '' || said.length > 32 ? '' : said;
+};
+
+/**
  * Which style controls suit the thing that was clicked.
  *
  * A heading does not need padding and a corner radius; a section does not need
@@ -493,21 +550,28 @@ export const stylePropsFor = (element, declared) => {
     }
 
     /*
-     * One way to change a background, not two.
+     * Replace background, offered about a background that is there.
      *
-     * A section keyed for its background gets a Background image editor of its
-     * own at the top of the panel, with a preview, a credit and a Remove.
-     * Offering backgroundImage down in Style as well put two "Replace
-     * background" buttons in one panel - seen on a real sign-in page - and
-     * they are not the same button: the style one writes an !important
-     * override that outranks whatever the editor above stores. Use the top
-     * control after the style one and the picture does not change, with
-     * nothing on screen saying why.
+     * Two faults, one control. On a section keyed for its background the panel
+     * already carries a Background image editor of its own - preview, credit,
+     * Remove - so this was a second "Replace background" button in the same
+     * panel, and not the same button either: this one writes an !important
+     * override that outranks whatever the editor above stores. Use them in
+     * that order and the picture does not change, with nothing on screen
+     * saying why.
      *
-     * The style control stays for everything else, where it is the only way to
-     * put a background on an element that has none.
+     * And on a group with no background at all it offered to replace nothing,
+     * under the heading BACKGROUND IMAGE, above the words "No image set". A
+     * panel that asks about things that do not exist is a panel somebody stops
+     * reading.
+     *
+     * So: only where there is a picture to change, and only where nothing
+     * better is already changing it.
      */
-    if (element.hasAttribute?.('data-edit-bg')) {
+    const hasOne = backgroundImageOf(element) !== '';
+    const ownEditor = element.hasAttribute?.('data-edit-bg') === true;
+
+    if (!hasOne || ownEditor) {
         allowed = allowed.filter((name) => name !== 'backgroundImage');
     }
 

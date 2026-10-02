@@ -695,6 +695,33 @@ class MarkupScanner
             }
         }
 
+        /*
+         * Content that took another's place. A carousel, a tab panel, a step.
+         *
+         * Measured on a real testimonial slider: the markup a server renders
+         * holds ONE testimonial, because the others live in a variable and are
+         * swapped into the same node when somebody presses Next. So every
+         * testimonial is offered this same position, and a position-based name
+         * hands all five of them one key. The second one edited does not sit
+         * beside the first - it overwrites it, and then shows up under
+         * whichever slide happens to be on screen.
+         *
+         * The scanner cannot see this from the markup: at render time the
+         * other four do not exist. The runtime can, and says so - it watches
+         * keyed content leave a parent and different content arrive in its
+         * place, and marks what arrived.
+         *
+         * Named by what it holds instead, which is the same answer already
+         * used for a footer repeated across pages, and safe for the same
+         * reason: a tagged document always holds the theme's words, so the
+         * name does not move when a client rewrites them.
+         */
+        for ($el = $node; $el instanceof DOMElement; $el = $el->parentNode) {
+            if ($el->hasAttribute('data-kb-swaps')) {
+                return $scope.'swap:'.$this->signatureFor($node, 'swap');
+            }
+        }
+
         // Otherwise anchor to the nearest landmark. A template's ids are
         // landmarks (#banner, #footer), so a developer editing one part of the
         // document cannot shift keys in another part and orphan the content
