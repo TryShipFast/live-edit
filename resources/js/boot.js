@@ -275,6 +275,30 @@
                 );
             });
 
+        /*
+         * Say, to a developer, that this is working and waiting for a door.
+         *
+         * A visitor with no session sees the published words and no editor,
+         * which is correct and is also indistinguishable from a broken
+         * install. An afternoon went on one that was working the whole time:
+         * every file loaded, eleven hundred elements tagged, not one error,
+         * and nothing on the page or in the console to say so.
+         *
+         * Only on a local address. Somebody looking at localhost is installing
+         * this and has the console open; a visitor to a real site is not, and
+         * owes nothing to our diagnostics. The same reasoning as the version
+         * on the page - a thing that cannot be asked will be guessed at.
+         */
+        if (!editing && /^(localhost|127\.0\.0\.1|\[::1\])$|\.(test|localhost)$/i.test(window.location.hostname)) {
+            ready.then(function () {
+                console.info(
+                    '[live-edit] running, and nobody is signed in - so there is no toolbar, which is'
+                    + ' correct. Open this page with ?kb-enter=1 to sign in and edit.'
+                    + ' Engine ' + (tag.dataset.engine || 'unknown') + ', site "' + config.site + '".'
+                );
+            });
+        }
+
         return ready
             .then(function () { return load('content.js'); })
             .then(function () {

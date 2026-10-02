@@ -270,6 +270,43 @@ stay as they were. An element inside a server component is not, so the page is
 fetched again instead. Pass `onRefresh={() => router.refresh()}` in Next and
 that happens without a full navigation.
 
+## Getting in, the first time
+
+Load the site and you will see nothing. That is correct, and it is the single
+most confusing thing about installing this, so it is written down here rather
+than left to be worked out: a visitor gets the published words and no editor.
+There is no toolbar to look for and nothing to click.
+
+To edit, arrive through the door:
+
+```
+https://your-site.test/?kb-enter=1
+```
+
+That sends you to the console to sign in and returns you to the page you were
+on with a session, and the toolbar appears. Two things have to be true: the
+address is one the site's origins allow, and your account is allowed to edit
+that site in the console.
+
+A whole install checked over an afternoon turned out to be working the entire
+time — every module loaded, eleven hundred elements tagged, not one error
+anywhere — and looked like a failure only because nobody had opened that door.
+
+### It can be slow in development, and that is not it failing
+
+In a Next app this is usually mounted with `strategy="afterInteractive"`, which
+means the tag is injected only once React has hydrated. On a development server
+hydration is slow, so the page can sit for the better part of ten seconds
+before anything is tagged — measured at 8.5s on a real app, which is long
+enough for anybody to conclude it is broken and start changing things.
+
+Before changing anything, build it: `npm run build && npm start`. Hydration is
+far quicker and the wait usually disappears. If it does not, move the tag to
+`strategy="beforeInteractive"` in the root layout.
+
+The console tells you which it is. The runtime says what it is waiting for when
+it is running on a local address, so check there before unpicking the wiring.
+
 ## Licence and support
 
 Proprietary. The source is published so you can read and audit what runs inside

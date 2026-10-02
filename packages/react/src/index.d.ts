@@ -94,3 +94,105 @@ export declare function readBridge(): Bridge | null;
 /** Compose a row's identity onto a key, or leave it alone when the card is not in a list. */
 export declare function contentKeyIn(row: string | null | undefined, key: string): string | null;
 export declare function editMarkerIn(row: string | null | undefined, key: string): string | undefined;
+
+/*
+ * Everything the codemod writes.
+ *
+ * These eight were exported from index.js and declared nowhere, which is worse
+ * than having no types at all: the package looks typed, so a consumer's build
+ * trusts it and then fails on the generated code. Reported from a real app as
+ * 167 errors immediately after running the codemod, every one of them in this
+ * file rather than in the JavaScript it describes.
+ *
+ * The lesson is the one this codebase keeps relearning - two descriptions of
+ * one thing, and only one of them maintained. There is a test beside this now
+ * that reads the exports out of index.js and fails when a name is missing
+ * here, because remembering was never going to be enough.
+ */
+
+export interface LiveEditTextProps {
+    /**
+     * Null is a real answer, not an oversight: contentKeyFor() returns null
+     * for a row with no identity of its own, and the codemod feeds its result
+     * straight in. Typed as string alone, every generated list fails to build.
+     */
+    contentKey: string | null;
+    /**
+     * Whatever the design had there. A number as often as a string - a stat, a
+     * price, a count - so typing this string-only broke cards that were doing
+     * nothing unusual.
+     */
+    fallback?: string | number;
+}
+
+/*
+ * Declared as returning an element though it returns a string.
+ *
+ * It genuinely returns the string - rendering a wrapper would change the CSS
+ * of every list item on every site using it, which is why it is written that
+ * way. But @types/react 18, which is what a current Next app installs, only
+ * accepts ReactElement | null from something used in JSX, and the codemod
+ * writes `<LiveEditText … />`. Declaring the honest return type makes the
+ * honest usage fail to compile.
+ *
+ * Written down rather than quietly fudged: when this package drops React 18
+ * this should become ReactNode, which is what React 19's types already allow.
+ */
+export declare function LiveEditText(props: LiveEditTextProps): ReactElement;
+
+/**
+ * The stored order for a list, applied to the developer's array.
+ *
+ * Generic because the codemod rewrites `cards.map(card => …)` into
+ * `useLiveEditList(key, cards).map(card => …)`. A non-generic signature makes
+ * every one of those callbacks an implicit any, so a project with
+ * noImplicitAny - which is every project created by `create-next-app` - fails
+ * to build on code our own tool wrote.
+ *
+ * Hands the array straight back when nothing has been reordered, so a list
+ * nobody has touched renders exactly as written.
+ */
+export declare function useLiveEditList<T>(listKey: string, items: readonly T[]): T[];
+
+/** The row being rendered, or null out in the open. */
+export declare function useItemIdentity(): string | null;
+
+export interface LiveEditItemProps {
+    /** The row's identity, from itemIdentity(). Null where it has none. */
+    id?: string | null;
+    children?: ReactNode;
+}
+
+/** Marks what is inside as belonging to one row. Renders no DOM of its own. */
+export declare function LiveEditItem(props: LiveEditItemProps): ReactElement;
+
+/**
+ * A row's own identity, or null.
+ *
+ * Null is the honest answer for an item with nothing stable to key on, and is
+ * never a position or a hash of the content about to be edited - an identity
+ * derived from content changes on the first edit and orphans it.
+ */
+export declare function itemIdentity(item: unknown): string | null;
+
+export interface ListIdentity {
+    /** False when any row lacks an identity, or two rows share one. */
+    editable: boolean;
+    /** Why not, in words, or null when it is. */
+    reason: string | null;
+    identities: string[];
+}
+
+/** Whether a list can be keyed at all, decided for the whole list at once. */
+export declare function listIdentity(items: readonly unknown[]): ListIdentity;
+
+/** The key for one field of one row, or null when the row has no identity. */
+export declare function contentKeyFor(list: string, field: string, item: unknown): string | null;
+
+/**
+ * What goes in `data-edit`, or undefined.
+ *
+ * Undefined rather than null: React omits an attribute that is undefined, so a
+ * row with no identity renders as ordinary markup with no editing marker.
+ */
+export declare function editMarkerFor(list: string, field: string, item: unknown): string | undefined;
