@@ -24,9 +24,9 @@ import { describe, expect, it } from 'vitest';
 const read = (file) => readFileSync(path.resolve('packages/react/src', file), 'utf8');
 
 /** Every name index.js re-exports, however it spells the re-export. */
-const exported = () => {
+const exported = (file) => {
     const names = new Set();
-    const source = read('index.js');
+    const source = read(file);
 
     for (const [, inside] of source.matchAll(/export\s*\{([^}]+)\}/g)) {
         for (const part of inside.split(',')) {
@@ -43,9 +43,9 @@ const exported = () => {
 };
 
 /** Every value name index.d.ts declares. Types and interfaces are not values. */
-const declared = () => {
+const declared = (file) => {
     const names = new Set();
-    const source = read('index.d.ts');
+    const source = read(file);
 
     for (const [, name] of source.matchAll(/export\s+declare\s+(?:function|const|class)\s+([A-Za-z0-9_$]+)/g)) {
         names.add(name);
@@ -54,20 +54,50 @@ const declared = () => {
     return names;
 };
 
-describe('the types describe what ships', () => {
-    it('declares every symbol the entry point exports', () => {
-        const missing = [...exported()].filter((name) => !declared().has(name));
+/*
+ * Both entry points, because checking one was how this got through twice.
+ *
+ * The first fix repaired index.d.ts and left server.d.ts with the old narrow
+ * shape, and this test - written against index only - went green on a package
+ * that was still broken. 51 errors survived the release, every one of them in
+ * a file importing from /server.
+ *
+ * It is the entry point that matters most, not least: without --client the
+ * codemod emits server components, so an App Router install imports from here
+ * for most of its pages.
+ */
+const ENTRIES = [
+    { js: 'index.js', types: 'index.d.ts' },
+    { js: 'server.js', types: 'server.d.ts' },
+];
 
-        expect(missing, `index.js exports these and index.d.ts does not declare them: ${missing.join(', ')}`)
+describe('the types describe what ships', () => {
+    it.each(ENTRIES)('declares every symbol $js exports', ({ js, types }) => {
+        const missing = [...exported(js)].filter((name) => !declared(types).has(name));
+
+        expect(missing, `${js} exports these and ${types} does not declare them: ${missing.join(', ')}`)
             .toEqual([]);
     });
 
-    it('found the exports at all, so an empty comparison cannot pass', () => {
+    it.each(ENTRIES)('found the exports in $js at all, so an empty comparison cannot pass', ({ js, types }) => {
         // The failure this guards: a regex that stops matching turns the test
         // above into "nothing is missing from nothing", which passes forever
         // and means nothing.
-        expect(exported().size).toBeGreaterThanOrEqual(10);
-        expect(declared().size).toBeGreaterThanOrEqual(10);
+        expect(exported(js).size).toBeGreaterThanOrEqual(6);
+        expect(declared(types).size).toBeGreaterThanOrEqual(6);
+    });
+
+    it.each(ENTRIES)('lets $js take the keys the codemod feeds it', ({ types }) => {
+        /*
+         * Stated for both, because one of them having it right is exactly the
+         * state that shipped: contentKeyFor() returns string | null and the
+         * codemod passes its result straight in, and a fallback is a number
+         * as often as a string.
+         */
+        const source = read(types);
+
+        expect(source).toMatch(/contentKey:\s*string \| null/);
+        expect(source).toMatch(/fallback\?:\s*string \| number/);
     });
 
     it('keeps useLiveEditList generic, because the codemod maps over its result', () => {
@@ -80,16 +110,4 @@ describe('the types describe what ships', () => {
         expect(read('index.d.ts')).toMatch(/useLiveEditList<T>\s*\(\s*listKey:\s*string,\s*items:\s*readonly T\[\]\s*\):\s*T\[\]/);
     });
 
-    it('lets LiveEditText take what the codemod actually passes it', () => {
-        /*
-         * contentKeyFor() returns string | null for a row with no identity of
-         * its own, and the codemod feeds its result straight in. Fallbacks are
-         * numbers as often as strings - a stat, a price, a count. Typed
-         * narrowly, those two accounted for roughly 49 of the 167.
-         */
-        const types = read('index.d.ts');
-
-        expect(types).toMatch(/contentKey:\s*string \| null/);
-        expect(types).toMatch(/fallback\?:\s*string \| number/);
-    });
 });
