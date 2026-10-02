@@ -2,7 +2,7 @@ import { createChrome } from './chrome.js';
 import { biggestThatFits, inSourcePixels, movedWithin, whatIsThereNow } from './fitting.js';
 import { attrsWorthSending, creditWorthSending } from './only-what-changed.js';
 import { confirm as confirmChange, expectChange, takeExpected } from './verify.js';
-import { apiRequestFor, attributeOf, backgroundImageOf, classListWith, declaredStyleProps, displayedValue, iconNamesIn, isJsonResponse, looksLikeAPicture, orderedIcons, ownTextOf, parseEditKey, requestInit } from './support.js';
+import { apiRequestFor, attributeOf, backgroundImageOf, classListWith, declaredStyleProps, displayedValue, iconNamesIn, isJsonResponse, looksLikeAPicture, orderedIcons, ownTextOf, parseEditKey, requestInit, stylePropsFor } from './support.js';
 
 /**
  * Start only once the host page has finished loading.
@@ -399,26 +399,6 @@ const bootLiveEdit = () => {
             if (tag === 'SECTION' || tag === 'MAIN' || tag === 'ARTICLE') return 'Section';
             const rect = element.getBoundingClientRect();
             return rect.width > window.innerWidth * 0.6 && rect.height > 180 ? 'Section' : 'Group';
-        };
-
-        /**
-         * A heading does not need padding and corner radius; a section does not
-         * need a font size. Show only what suits the thing that was clicked.
-         */
-        const stylePropsFor = (element, declared) => {
-            const tag = element.tagName;
-            let allowed;
-            if (tag === 'IMG') {
-                allowed = ['radius', 'hidden'];
-            } else if (tag === 'A' || tag === 'BUTTON') {
-                allowed = ['background', 'textColor', 'fontSize', 'radius', 'hidden'];
-            } else if (/^(H[1-6]|P|SPAN|LI|BLOCKQUOTE|FIGCAPTION|DT|DD|TD|TH|CAPTION|CITE|Q|LABEL|STRONG|EM)$/.test(tag)) {
-                allowed = ['textColor', 'fontSize', 'hidden'];
-            } else {
-                allowed = ['background', 'backgroundImage', 'paddingY', 'paddingX', 'radius', 'hidden'];
-            }
-
-            return declared.filter((name) => allowed.includes(name.trim()));
         };
 
         /** A styled file picker: click or drop, with the chosen name echoed back. */

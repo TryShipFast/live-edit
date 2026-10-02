@@ -470,3 +470,46 @@ export const backgroundImageOf = (element, view = null) => {
 
     return recorded.startsWith('data:') ? '' : recorded;
 };
+
+/**
+ * Which style controls suit the thing that was clicked.
+ *
+ * A heading does not need padding and a corner radius; a section does not need
+ * a font size. A panel offering every property to every element is a panel
+ * nobody reads.
+ */
+export const stylePropsFor = (element, declared) => {
+    const tag = element.tagName;
+    let allowed;
+
+    if (tag === 'IMG') {
+        allowed = ['radius', 'hidden'];
+    } else if (tag === 'A' || tag === 'BUTTON') {
+        allowed = ['background', 'textColor', 'fontSize', 'radius', 'hidden'];
+    } else if (/^(H[1-6]|P|SPAN|LI|BLOCKQUOTE|FIGCAPTION|DT|DD|TD|TH|CAPTION|CITE|Q|LABEL|STRONG|EM)$/.test(tag)) {
+        allowed = ['textColor', 'fontSize', 'hidden'];
+    } else {
+        allowed = ['background', 'backgroundImage', 'paddingY', 'paddingX', 'radius', 'hidden'];
+    }
+
+    /*
+     * One way to change a background, not two.
+     *
+     * A section keyed for its background gets a Background image editor of its
+     * own at the top of the panel, with a preview, a credit and a Remove.
+     * Offering backgroundImage down in Style as well put two "Replace
+     * background" buttons in one panel - seen on a real sign-in page - and
+     * they are not the same button: the style one writes an !important
+     * override that outranks whatever the editor above stores. Use the top
+     * control after the style one and the picture does not change, with
+     * nothing on screen saying why.
+     *
+     * The style control stays for everything else, where it is the only way to
+     * put a background on an element that has none.
+     */
+    if (element.hasAttribute?.('data-edit-bg')) {
+        allowed = allowed.filter((name) => name !== 'backgroundImage');
+    }
+
+    return declared.filter((name) => allowed.includes(name.trim()));
+};
