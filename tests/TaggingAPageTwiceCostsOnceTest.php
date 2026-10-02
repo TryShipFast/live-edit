@@ -170,6 +170,28 @@ class TaggingAPageTwiceCostsOnceTest extends TestCase
         $this->assertSame(1, KeyMap::query()->where('site_id', $this->site->id)->count());
     }
 
+    public function test_a_cache_that_cannot_answer_is_only_a_cache_miss(): void
+    {
+        /*
+         * The risk this guards is the whole feature failing closed. The cache
+         * belongs to the host, not to us, and the commonest Laravel driver is
+         * a database table - which a deploy does not create, because
+         * migrations do not run themselves. A store that throws has to cost a
+         * page its speed, never its editor.
+         */
+        $expected = $this->tag($this->page('AAAAAAAAAAAAAAAA'));
+
+        Cache::swap(new class extends \Illuminate\Support\Facades\Cache
+        {
+            public function __call($method, $arguments)
+            {
+                throw new \RuntimeException('no such table: cache');
+            }
+        });
+
+        $this->assertSame($expected['count'], $this->tag($this->page('AAAAAAAAAAAAAAAA'))['count']);
+    }
+
     /**
      * The cache key the code chose, found rather than guessed.
      *

@@ -109,7 +109,18 @@ class TagMarkup
         $key = $kept > 0 ? $this->cacheKey($site, $html, $page) : null;
 
         if ($key !== null) {
-            $held = Cache::get($key);
+            /*
+             * Asking must not be able to fail the request.
+             *
+             * This runs on a cache the host configured, not one we chose, and
+             * the commonest driver in a Laravel application is a database
+             * table. Migrations do not run themselves on a deploy - it says so
+             * in our own deployment notes - so a table that is not there yet
+             * would turn tagging from slow into broken, for every site at
+             * once, the moment this released. A cache that cannot answer is a
+             * cache miss.
+             */
+            $held = rescue(fn () => Cache::get($key), null, false);
 
             if (is_string($held)) {
                 /*
