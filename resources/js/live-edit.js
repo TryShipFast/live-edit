@@ -2,7 +2,7 @@ import { createChrome } from './chrome.js';
 import { biggestThatFits, inSourcePixels, movedWithin, whatIsThereNow } from './fitting.js';
 import { attrsWorthSending, creditWorthSending } from './only-what-changed.js';
 import { confirm as confirmChange, expectChange, takeExpected } from './verify.js';
-import { apiRequestFor, attributeOf, classListWith, declaredStyleProps, displayedValue, iconNamesIn, isJsonResponse, looksLikeAPicture, orderedIcons, ownTextOf, parseEditKey, requestInit } from './support.js';
+import { apiRequestFor, attributeOf, backgroundImageOf, classListWith, declaredStyleProps, displayedValue, iconNamesIn, isJsonResponse, looksLikeAPicture, orderedIcons, ownTextOf, parseEditKey, requestInit } from './support.js';
 
 /**
  * Start only once the host page has finished loading.
@@ -490,14 +490,7 @@ const bootLiveEdit = () => {
         };
 
         /** The image an element is actually showing right now, theme or override. */
-        const currentImageOf = (element) => {
-            if (!element) return '';
-            const attr = element.dataset.background || element.dataset.bg || element.dataset.backgroundImage;
-            if (attr) return attr;
-            const computed = getComputedStyle(element).backgroundImage || '';
-            const match = computed.match(/url\((['"]?)(.*?)\1\)/);
-            return match && !match[2].startsWith('data:') ? match[2] : '';
-        };
+        const currentImageOf = (element) => backgroundImageOf(element);
 
         const STYLE_LABELS = {
             background: 'Background colour',

@@ -423,3 +423,50 @@ export const retrying = async (attempt, { tries = 3, waits = [200, 500], sleep =
 
     throw last;
 };
+
+/**
+ * The picture an element is showing as its background, or was.
+ *
+ * Three sources, in the order they deserve to be believed.
+ *
+ * An author's own attribute first - data-background and its spellings are a
+ * builder saying outright what the picture is, and it does not go stale.
+ *
+ * Then what the browser is drawing now, which is the only way to see a
+ * background that lives in a stylesheet.
+ *
+ * Then what we wrote down when we last looked. That last one is the fix: a
+ * builder applies a background when a section arrives and takes it away again
+ * when it leaves, so asking the computed style later is not the same question
+ * as asking it then. The panel asked late, got "none", and told somebody "No
+ * image set" about a section they could plainly see had a picture - reported
+ * exactly that way, as discovering the background and never showing it.
+ *
+ * A data: URI is not a picture anybody replaces, and it is megabytes of markup
+ * if it is sent anywhere, so it is not offered as one.
+ */
+export const backgroundImageOf = (element, view = null) => {
+    if (!element) {
+        return '';
+    }
+
+    const declared = element.dataset?.background
+        || element.dataset?.bg
+        || element.dataset?.backgroundImage;
+
+    if (declared) {
+        return declared;
+    }
+
+    const styles = view ?? element.ownerDocument?.defaultView ?? (typeof window === 'undefined' ? null : window);
+    const computed = styles?.getComputedStyle ? (styles.getComputedStyle(element).backgroundImage || '') : '';
+    const match = computed.match(/url\((['"]?)(.*?)\1\)/);
+
+    if (match && !match[2].startsWith('data:')) {
+        return match[2];
+    }
+
+    const recorded = element.dataset?.kbBg || '';
+
+    return recorded.startsWith('data:') ? '' : recorded;
+};
