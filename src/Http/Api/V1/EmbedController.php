@@ -144,6 +144,58 @@ class EmbedController
     }
 
     /**
+     * The runtime a visitor is certainly going to need, asked for at once.
+     *
+     * What this removes is a staircase. This script is fetched, and its only
+     * job is to add a tag for the next one; that one is fetched, and only then
+     * does the browser learn the names of the modules; each of those is
+     * fetched, and only then does anything ask for the words. Measured against
+     * a real site at 100ms of latency, the four files arrived one after
+     * another - 16.9s, 17.4s, 17.4s, 18.8s - with every address known from the
+     * first moment. A customer reads that as the page loading slowly before
+     * the editor appears, because that is exactly what it is.
+     *
+     * Named here rather than in boot.js, which also hints them, because here
+     * is one round trip earlier: the modules are fetched alongside the script
+     * that imports them instead of after it. The hints in boot.js still earn
+     * their place for a host that embeds embed.js directly and never asks for
+     * this file.
+     *
+     * A hint, not a load. Nothing changes what order anything runs in, and a
+     * browser that ignores these is exactly as correct as it was before.
+     *
+     * The editor is deliberately absent. This file cannot know whether the
+     * person arriving may edit, and a visitor who will never see the editor
+     * should not pay to fetch it - which is the arrangement the whole runtime
+     * is shaped around.
+     */
+    private const WANTED_BY_EVERY_VISITOR = ['autotag.js', 'content.js', 'support.js', 'session.js', 'svg.js'];
+
+    private static function hints(): string
+    {
+        $base = url('live-edit/assets/'.self::assetVersion()).'/';
+
+        $links = array_map(
+            fn (string $file) => sprintf(
+                "h(%s,'modulepreload');",
+                json_encode($base.$file, JSON_UNESCAPED_SLASHES)
+            ),
+            self::WANTED_BY_EVERY_VISITOR
+        );
+
+        /*
+         * crossorigin on every one of them, because the runtime is served from
+         * this service rather than from the customer's own domain. A hint
+         * whose mode does not match the request that follows is not shared
+         * with it: the file is fetched twice and the hint has made the page
+         * slower rather than faster.
+         */
+        return "var h=function(u,r){var l=document.createElement('link');l.rel=r;l.href=u;"
+            ."l.crossOrigin='anonymous';document.head.appendChild(l);};"
+            .implode('', $links);
+    }
+
+    /**
      * A site's own one-line install.
      *
      *   <script src="https://cms.example.com/s/acme.js" defer></script>
@@ -191,7 +243,8 @@ class EmbedController
         ];
 
         return $this->script(sprintf(
-            "(function(){var s=document.createElement('script');s.src=%s;%s s.defer=true;document.head.appendChild(s);})();",
+            "(function(){%svar s=document.createElement('script');s.src=%s;%s s.defer=true;document.head.appendChild(s);})();",
+            self::hints(),
             json_encode(url('live-edit/embed.js').'?v='.self::assetVersion()),
             implode(' ', array_map(
                 fn ($k, $v) => sprintf('s.dataset[%s]=%s;', json_encode($k), json_encode((string) $v)),

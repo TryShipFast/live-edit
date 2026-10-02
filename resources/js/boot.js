@@ -242,8 +242,8 @@
          * this script exists to protect.
          */
         warm(editing
-            ? ['autotag.js', 'content.js', 'support.js', 'session.js', 'live-edit.js', 'chrome.js']
-            : ['autotag.js', 'content.js', 'support.js', 'session.js']);
+            ? ['autotag.js', 'content.js', 'support.js', 'session.js', 'svg.js', 'live-edit.js', 'chrome.js']
+            : ['autotag.js', 'content.js', 'support.js', 'session.js', 'svg.js']);
 
         var ready = load('autotag.js')
             .then(function (m) {
