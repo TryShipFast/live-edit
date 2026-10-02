@@ -35,6 +35,23 @@ class TagMarkup
     public const MAX_BYTES = 2_000_000;
 
     /**
+     * Whether the last answer came from the cache, for somebody to read.
+     *
+     * Not decoration, and not for the runtime - nothing in the browser does
+     * anything with this. It exists because the guard that makes a broken
+     * cache safe also makes a broken cache invisible: a store that throws, a
+     * table that was never migrated, or a per-instance driver behind several
+     * app servers all look exactly like a cache that is working and simply
+     * being asked about a new page every time.
+     *
+     * That blindness cost this project a day once already, which is why the
+     * engine says its own version on the page. The same reasoning applies to
+     * anything whose failure mode is "quietly does nothing": if it cannot be
+     * asked, it will be believed, and believing it is how an afternoon goes.
+     */
+    public bool $remembered = false;
+
+    /**
      * How long an answer is kept. Nil turns the cache off entirely.
      */
     private function keptFor(): int
@@ -105,6 +122,8 @@ class TagMarkup
      */
     public function __invoke(Site $site, string $html, string $page = ''): array
     {
+        $this->remembered = false;
+
         $kept = $this->keptFor();
         $key = $kept > 0 ? $this->cacheKey($site, $html, $page) : null;
 
@@ -136,6 +155,8 @@ class TagMarkup
                 $answer = rescue(fn () => json_decode(gzuncompress($held), true, 512, JSON_THROW_ON_ERROR), null, false);
 
                 if (is_array($answer) && isset($answer['elements'])) {
+                    $this->remembered = true;
+
                     return $answer;
                 }
             }

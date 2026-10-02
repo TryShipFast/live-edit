@@ -192,6 +192,23 @@ class TaggingAPageTwiceCostsOnceTest extends TestCase
         $this->assertSame($expected['count'], $this->tag($this->page('AAAAAAAAAAAAAAAA'))['count']);
     }
 
+    public function test_the_answer_says_whether_it_was_remembered(): void
+    {
+        /*
+         * So a slow page can be asked why, from anywhere, with curl. Without
+         * this the cache failing and the cache being irrelevant are the same
+         * observation - which is exactly the position I was in after the first
+         * deploy of it, holding three timings that could not tell me which.
+         */
+        $tag = app(TagMarkup::class);
+
+        $tag($this->site, $this->page('AAAAAAAAAAAAAAAA'), '/');
+        $this->assertFalse($tag->remembered, 'the first answer cannot have been remembered');
+
+        $tag($this->site, $this->page('BBBBBBBBBBBBBBBB'), '/');
+        $this->assertTrue($tag->remembered, 'a second render of the same page was worked out again');
+    }
+
     /**
      * The cache key the code chose, found rather than guessed.
      *

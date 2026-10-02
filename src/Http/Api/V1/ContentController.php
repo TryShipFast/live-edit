@@ -297,6 +297,21 @@ class ContentController
             // The answer depends on markup the caller sent, so only they can
             // usefully keep it — and they do, against a hash of that markup.
             'Cache-Control' => 'private, max-age=600',
+            /*
+             * Whether this answer was remembered or worked out, said out loud.
+             *
+             * Nothing in the browser reads this. It is here because the guard
+             * that makes a broken cache safe also makes it invisible: a store
+             * that throws, a table nobody migrated, and a per-instance driver
+             * behind several app servers all look identical from outside —
+             * and identical to a cache that is working perfectly.
+             *
+             * Deployed without it once and could not tell, from any number of
+             * measurements, whether a page was slow because the cache was
+             * missing or because the time was never in the cache's reach. One
+             * header answers that from anywhere, with curl, forever.
+             */
+            'X-Live-Edit-Tag' => $tag->remembered ? 'remembered' : 'worked-out',
         ]);
     }
 
