@@ -99,7 +99,7 @@ class SignInController
             return response()->json([
                 'error' => [
                     'type' => 'sign_in_failed',
-                    'message' => 'That address and password do not match an editor of this site.',
+                    'message' => self::refusal($site),
                 ],
             ], 422)->withHeaders(['Cache-Control' => 'no-store, private']);
         }
@@ -169,6 +169,38 @@ class SignInController
      * a way in only where somebody has already been given one, which is the
      * same rule every other route in follows.
      */
+    /**
+     * One refusal, for every reason somebody can be refused.
+     *
+     * The same words whether the address is unknown, known but not an editor
+     * of this site, or right with the wrong password. That is deliberate and
+     * stays: told apart, this becomes a way to ask which of an agency's staff
+     * are real, and which other agencies a person works for - by trying one
+     * address against a stranger's domain and reading the difference.
+     *
+     * What it should not also be is unactionable, and it was. Somebody
+     * finishing an install is usually the site's owner, the likeliest cause is
+     * a grant that was never made, and the message sent them to check their
+     * password - the one thing that was fine. Reported from a real install
+     * that had everything right except a row in a table, where it cost an
+     * afternoon and a round of guessing at passwords.
+     *
+     * So it says nothing new about this attempt and names what to go and look
+     * at. The distinction it draws is the one nobody expects: an account on
+     * the console and an editor of a site are different things with the same
+     * address, and the console password does not open this door.
+     *
+     * The site is named because the caller already supplied it in the URL.
+     * Nothing here varies with what was typed.
+     */
+    private static function refusal(Site $site): string
+    {
+        return 'That address and password do not match an editor of '.$site->name.'. '
+            .'An account on the console is not the same as being an editor of a site: '
+            .'check that this address is listed as an editor of this site, and that it '
+            .'has been given an editing password.';
+    }
+
     private function whoIsAlreadySignedIn(Request $request, Site $site): ?Editor
     {
         $user = $request->user();
@@ -251,7 +283,7 @@ class SignInController
         if ($result === null) {
             return back()
                 ->withInput($request->only('email'))
-                ->with('live-edit.sign-in.error', 'That address and password do not match an editor of this site.');
+                ->with('live-edit.sign-in.error', self::refusal($site));
         }
 
         return $this->handBack($validated['return_to'], $result['token']);
