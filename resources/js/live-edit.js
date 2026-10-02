@@ -1967,6 +1967,38 @@ const bootLiveEdit = () => {
             };
             try {
                 if (current.kind === 'setting') {
+                    /*
+                     * Nothing typed, nothing written.
+                     *
+                     * The field is filled from the page, so pressing Save
+                     * after only reading a panel used to store that value as
+                     * a change. Harmless-looking on an ordinary sentence, and
+                     * alarming on a heading whose words are broken up by
+                     * inline markup: the value is the element's own text, so
+                     * a word living inside a span is not in it, and the change
+                     * reads as a deletion of a word nobody touched.
+                     *
+                     * Reported from a real site as "opening the editor staged
+                     * deleting a word from the hero". Driven in a browser
+                     * afterwards, nothing stages itself - signing in, entering
+                     * edit mode and opening the drawer all leave the list
+                     * empty. It is this press, on a field nobody changed.
+                     *
+                     * Compared against what the panel opened holding rather
+                     * than against what is stored, because they are different
+                     * questions: the store's guard already refuses a value it
+                     * already holds, and this refuses one the person never
+                     * meant to send.
+                     */
+                    const typed = current.value ?? drawerFields.querySelector('textarea, input[name=icon]')?.value ?? '';
+
+                    if (typeof current.openedWith === 'string' && typed === current.openedWith) {
+                        restoreButton();
+                        closeDrawer();
+
+                        return;
+                    }
+
                     await request('/live-edit/setting', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
@@ -2770,6 +2802,21 @@ const bootLiveEdit = () => {
                     fullText: element.textContent,
                 });
                 const text = richSetting ? raw.trim() : raw.replace(/\s+/g, ' ').trim();
+                /*
+                 * What the panel opened holding.
+                 *
+                 * Remembered so that pressing Save without having typed can
+                 * write nothing. The field is filled from the page, so leaving
+                 * it alone and pressing Save - an ordinary thing to do after
+                 * reading a panel - used to stage a change nobody made. On an
+                 * element whose words are broken up by inline markup that
+                 * change reads as a deletion, because the value here is the
+                 * element's own text and the words inside a span are not in
+                 * it. Reported as "opening the editor staged deleting a word
+                 * from the hero", and the reporter was right about everything
+                 * except which click did it.
+                 */
+                current.openedWith = text;
                 // A setting can say its value is an icon name rather than
                 // words. The picker already exists for a record's icon field;
                 // this lets a plain setting reach it, so an icon that is part
@@ -2779,6 +2826,35 @@ const bootLiveEdit = () => {
                 drawerFields.append(asIcon
                     ? fieldInput('icon', 'Icon', element.dataset.editValue ?? '', 1, false)
                     : fieldInput('value', 'Text', text, 6, richSetting));
+
+                /*
+                 * Say why a word on the page is not in the box.
+                 *
+                 * A heading like "Get Your Music <span>Heard</span> by the
+                 * People Who Matter" offers "Get Your Music by the People Who
+                 * Matter", because the value is the element's own text and
+                 * Heard lives inside a span. Without a word of explanation
+                 * that reads as the editor having lost it - and the person
+                 * reasonably concludes that saving would delete it.
+                 *
+                 * It would not: both appliers write across the element's own
+                 * runs and leave child elements alone, so the span, its colour
+                 * and the drawing inside it survive. That is worth saying out
+                 * loud at the moment somebody is looking at the gap.
+                 */
+                if (!asIcon && !richSetting) {
+                    const ownRuns = [...element.childNodes].filter((node) => node.nodeType === 3);
+                    const splitByMarkup = element.children.length > 0
+                        && ownRuns.some((node) => node.textContent.trim() !== '');
+
+                    if (splitByMarkup) {
+                        const note = document.createElement('p');
+                        note.className = 'le-hint';
+                        note.textContent = 'Some words here sit inside their own formatting and are edited separately.'
+                            + ' Changing this box rewrites only the words around them, and leaves them as they are.';
+                        drawerFields.append(note);
+                    }
+                }
 
                 // Offered under the words it would rewrite, and only for
                 // words: there is nothing to say about an icon.
