@@ -203,6 +203,15 @@ export const ensureBackgroundsAreFound = async (config, doc = document) => {
         });
     });
 
+    // And words. A mega menu built when it opens, a testimonial that exists
+    // one slide at a time - neither is in the markup the scanner was sent, and
+    // until this the only thing that could bring us back was a picture.
+    watchForLateContent(doc, () => {
+        autoTag(config, doc).catch((error) => {
+            console.warn('[live-edit] could not tag what just appeared:', error.message);
+        });
+    });
+
     return applied;
 };
 
@@ -254,6 +263,106 @@ export const refreshBackgrounds = async (config, doc = document) => {
  * scroll down a long page crosses many sections, and re-tagging once per
  * section would be one request per section.
  */
+/**
+ * Words that were not on the page when it was tagged.
+ *
+ * The gap this closes, reported from a real site: a mega menu whose items are
+ * built when it opens, and testimonials that exist one slide at a time. Both
+ * are ordinary ways to build a website and neither is visible to a scanner
+ * reading the markup that was sent - so the parent links were editable and
+ * nothing inside the menu was, and whichever testimonial happened to be
+ * showing at page load was the only one anybody could change.
+ *
+ * There was already a watcher for backgrounds that arrive late, and it is the
+ * right shape: ask again when the page has changed. It only ever asked about
+ * pictures, so a menu full of new words went unnoticed - refreshBackgrounds
+ * returns early unless a NEW BACKGROUND turned up.
+ *
+ * Only while somebody is editing. A visitor gains nothing from a page that
+ * re-tags itself, and would pay for every one of these requests.
+ *
+ * Three guards, because a page that re-tags on every mutation is worse than
+ * one that misses a menu:
+ *
+ *   - it waits for the page to settle, so a carousel mid-animation is one ask
+ *     rather than thirty;
+ *   - it asks only when something added actually holds words or a picture
+ *     that is not already marked, so a class flipping on a wrapper is free;
+ *   - it stops after a while. A page that rebuilds itself forever - a ticker,
+ *     a live feed - must not spend somebody's afternoon posting its own markup
+ *     back to us.
+ */
+export const watchForLateContent = (doc = document, onFound = () => {}) => {
+    const view = doc.defaultView ?? window;
+
+    if (!view?.MutationObserver) {
+        return null;
+    }
+
+    /*
+     * Enough for a menu, a few slides and a modal, and not enough to matter if
+     * a page turns out to rebuild itself forever. Each ask is the page's own
+     * markup going back over the wire - a third of a megabyte on a real site -
+     * so this is a budget rather than a formality.
+     */
+    const MOST_ASKS = 10;
+
+    let asks = 0;
+    let pending = null;
+
+    /** Does this subtree hold anything worth asking about, and not already marked? */
+    const worthAsking = (node) => {
+        if (!node || node.nodeType !== 1) {
+            return false;
+        }
+
+        if (node.matches?.('[data-edit], [data-edit-img], [data-style]')) {
+            return false;
+        }
+
+        const words = (node.textContent ?? '').trim();
+
+        if (words !== '' && !node.querySelector?.('[data-edit]')) {
+            return true;
+        }
+
+        // The node itself as well as anything under it: a picture that arrives
+        // on its own is added as the <img>, not as a wrapper around one, and
+        // looking only at descendants missed exactly that.
+        return Boolean(
+            node.matches?.('img:not([data-edit-img])')
+            || node.querySelector?.('img:not([data-edit-img])')
+        );
+    };
+
+    const observer = new view.MutationObserver((records) => {
+        if (asks >= MOST_ASKS) {
+            observer.disconnect();
+
+            return;
+        }
+
+        const anythingNew = records.some((record) => [...record.addedNodes].some(worthAsking));
+
+        if (!anythingNew || pending) {
+            return;
+        }
+
+        // After the page has settled rather than during. A menu opening is a
+        // burst of mutations, and asking on the first one asks about half a
+        // menu.
+        pending = view.setTimeout(() => {
+            pending = null;
+            asks += 1;
+            onFound();
+        }, 600);
+    });
+
+    observer.observe(doc.body ?? doc.documentElement, { childList: true, subtree: true });
+
+    return observer;
+};
+
 export const watchForLateBackgrounds = (doc = document, onFound = () => {}) => {
     const view = doc.defaultView ?? window;
 
