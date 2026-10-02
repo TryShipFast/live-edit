@@ -277,4 +277,28 @@ describe('what a visitor sees, applied by the server and by the browser', () => 
         expect(fromServer.firstElementChild.tagName.toLowerCase()).toBe('svg');
         expect(fromBrowser.textContent).toBe(fromServer.textContent);
     });
+
+    it('keeps the space beside the markup in both halves', () => {
+        /*
+         * Found on a live site, in the hero, after an ordinary edit: "Get Your
+         * Music Heardby the People Who Matter". The span, its colour and the
+         * drawing inside it all survived; the space in front of "by" did not,
+         * and both halves lost it the same way.
+         *
+         * The second run begins with a space because an element sits before
+         * it. The editor collapses whitespace for display, so the value coming
+         * back carries one space at that junction where the markup had two -
+         * read as a deletion, the run is replaced and its leading space goes.
+         */
+        const html = '<h1 data-edit="setting:hero">Get Your Music <span>Heard<svg></svg></span> by the People Who Matter</h1>';
+        const edit = { hero: 'Get Your Music by the People Who Matter Today' };
+
+        const fromServer = asDocument(server(html, edit).html).querySelector('h1');
+        const fromBrowser = browser(html, edit).querySelector('h1');
+
+        expect(fromBrowser.textContent).toBe('Get Your Music Heard by the People Who Matter Today');
+        expect(fromServer.textContent).toBe(fromBrowser.textContent);
+        expect(fromBrowser.querySelector('svg')).not.toBeNull();
+        expect(fromServer.querySelector('svg')).not.toBeNull();
+    });
 });

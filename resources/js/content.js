@@ -289,7 +289,39 @@ const applyWords = (element, value, keepRuns = false) => {
 
         placed = true;
 
-        return text.slice(0, from - runStart) + replacement + text.slice(to - runStart);
+        const head = text.slice(0, from - runStart);
+        const tail = text.slice(to - runStart);
+
+        /*
+         * A run's edge whitespace belongs to the layout, not to the sentence.
+         *
+         * " by the People Who Matter" begins with a space because an element
+         * sits before it. The panel shows the words with their whitespace
+         * collapsed - themes are full of tabs and newlines - so the value that
+         * comes back has one space at that junction where the markup had two,
+         * one on each side. The diff then reads that as a deletion, replaces
+         * the whole run, and the space in front of it goes.
+         *
+         * Seen on a live site as "Get Your Music Heardby the People Who
+         * Matter": the span, its colour and the drawing inside it all survived
+         * exactly as intended, and the space in front of "by" did not. Every
+         * fixture I had compared which elements survived, and none of them
+         * compared the spacing.
+         *
+         * So a boundary space that was there before is put back. Only at an
+         * edge, and only when the new words do not bring their own: rewording
+         * the clause is the person's business, and the gap between their words
+         * and the designer's markup is not.
+         */
+        const keptHead = head === '' && /^\s/.test(text) && !/^\s/.test(replacement)
+            ? text.match(/^\s+/)[0]
+            : '';
+
+        const keptTail = tail === '' && /\s$/.test(text) && !/\s$/.test(replacement)
+            ? text.match(/\s+$/)[0]
+            : '';
+
+        return head + keptHead + replacement + keptTail + tail;
     });
 
     if (placed) {

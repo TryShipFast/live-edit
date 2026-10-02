@@ -1673,7 +1673,41 @@ class MarkupScanner
             }
 
             $placed = true;
-            $next[] = substr($text, 0, $from - $runStart).$replacement.substr($text, $to - $runStart);
+
+            $head = substr($text, 0, $from - $runStart);
+            $tail = substr($text, $to - $runStart);
+
+            /*
+             * A run's edge whitespace belongs to the layout, not the sentence.
+             *
+             * " by the People Who Matter" begins with a space because an
+             * element sits before it. The editor shows the words with their
+             * whitespace collapsed - themes are full of tabs and newlines - so
+             * the value coming back has one space at that junction where the
+             * markup had two, one either side. Read as a deletion, the whole
+             * run is replaced and the space in front of "by" goes with it.
+             *
+             * Seen on a live site as "Get Your Music Heardby the People Who
+             * Matter", in the hero, after an ordinary edit. The span, its
+             * colour and the drawing inside it all survived exactly as
+             * intended; only the spacing did not, and nothing was comparing
+             * spacing.
+             *
+             * Mirrored in resources/js/content.js, and both are driven by the
+             * parity test - this is applied twice, once before a page is sent
+             * and once in a page nobody server-renders, and the two halves
+             * disagreeing silently is the fault this codebase has paid for
+             * most often.
+             */
+            $keptHead = $head === '' && preg_match('/^\s/', $text) && ! preg_match('/^\s/', $replacement)
+                ? (preg_match('/^\s+/', $text, $m) ? $m[0] : '')
+                : '';
+
+            $keptTail = $tail === '' && preg_match('/\s$/', $text) && ! preg_match('/\s$/', $replacement)
+                ? (preg_match('/\s+$/', $text, $m) ? $m[0] : '')
+                : '';
+
+            $next[] = $head.$keptHead.$replacement.$keptTail.$tail;
         }
 
         if ($placed) {
