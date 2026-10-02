@@ -361,13 +361,45 @@ export const watchForLateContent = (doc = document, onFound = () => {}) => {
      * takes the old node out and puts the new one in as two separate steps on
      * the same parent.
      */
+    const wordsOf = (node) => (node.textContent ?? '').replace(/\s+/g, ' ').trim();
+
+    /*
+     * What the page was showing before anybody touched it.
+     *
+     * The first slide is the one the server rendered, so the scanner named it
+     * by position and anything already saved against it is filed under that
+     * name. Press Next and then Previous and it comes back - and marking it on
+     * the way back would rename it, so an edit made to it would be stored
+     * under a name the next page load never derives. It would save, show, and
+     * be gone on reload, which is the failure that is hardest to report.
+     *
+     * A node that leaves without the mark is one of these originals. One that
+     * leaves carrying the mark was swapped in earlier and is named by content
+     * already, so it keeps being named that way when it returns.
+     */
+    const originals = new WeakMap();
+
+    const rememberOriginal = (parent, node) => {
+        const held = originals.get(parent) ?? new Set();
+        held.add(wordsOf(node));
+        originals.set(parent, held);
+    };
+
     const markSwaps = (records) => {
         const lost = new Set();
         const gained = new Map();
 
         for (const record of records) {
-            if ([...record.removedNodes].some(wasKeyed)) {
+            for (const node of record.removedNodes) {
+                if (!wasKeyed(node)) {
+                    continue;
+                }
+
                 lost.add(record.target);
+
+                if (!node.hasAttribute?.('data-kb-swaps')) {
+                    rememberOriginal(record.target, node);
+                }
             }
 
             const arrived = [...record.addedNodes].filter((node) => node.nodeType === 1);
@@ -382,7 +414,13 @@ export const watchForLateContent = (doc = document, onFound = () => {}) => {
                 continue;
             }
 
+            const wasHereFirst = originals.get(parent) ?? new Set();
+
             for (const node of arrived) {
+                if (wasHereFirst.has(wordsOf(node))) {
+                    continue;
+                }
+
                 node.setAttribute('data-kb-swaps', '1');
             }
         }

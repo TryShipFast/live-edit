@@ -68,6 +68,20 @@ describe('reaching a slide at all', () => {
 
         expect(nameOfControl(document.querySelector('div'))).toBe('');
     });
+
+    it('shortens a question rather than giving up on naming it', () => {
+        /*
+         * Seen on a real FAQ: "Who can become a curator on NewBanger?" is 38
+         * characters, so the chip fell back to "Run this control" over the one
+         * button that opens the answer somebody is trying to edit. Three
+         * quarters of the question says more than that does.
+         */
+        document.body.innerHTML = '<button aria-expanded="false">Who can become a curator on NewBanger?</button>';
+        const said = nameOfControl(document.querySelector('button'));
+
+        expect(said).toBe('Who can become a curator on New…');
+        expect(said.length).toBeLessThanOrEqual(32);
+    });
 });
 
 describe('content that took another\'s place', () => {
@@ -131,6 +145,42 @@ describe('content that took another\'s place', () => {
         await settle();
 
         expect(arrived.hasAttribute('data-kb-swaps')).toBe(false);
+    });
+
+    it('leaves the slide that was there first alone when it comes back', async () => {
+        /*
+         * Press Next, then Previous. The first slide is the one the server
+         * rendered, so it was named by position and anything already saved
+         * against it is filed under that name. Marking it on the way back
+         * renames it - and then an edit made to it is stored under a name no
+         * page load ever derives again. It saves, it shows, and it is gone on
+         * reload, which is the hardest kind of fault for somebody to report.
+         *
+         * Caught measuring the fix on the live page: slide one went out as
+         * 86ee3457c4e9 and came back as 5b6ebfeb0ab2.
+         */
+        const stage = slider();
+        watchForLateContent(document, () => {});
+        const first = stage.querySelector('p');
+        const firstWords = first.textContent;
+
+        first.remove();
+        const second = document.createElement('p');
+        second.textContent = 'I have tried other promotion services and got nothing';
+        stage.append(second);
+
+        await settle();
+        expect(second.getAttribute('data-kb-swaps')).toBe('1');
+
+        // Previous: the original returns, as the site re-renders it.
+        second.remove();
+        const back = document.createElement('p');
+        back.textContent = firstWords;
+        stage.append(back);
+
+        await settle();
+
+        expect(back.hasAttribute('data-kb-swaps')).toBe(false);
     });
 
     it('still asks to be tagged once it has marked the swap', async () => {

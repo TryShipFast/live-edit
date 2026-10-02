@@ -523,9 +523,21 @@ export const nameOfControl = (control) => {
         || control?.getAttribute?.('title')
         || control?.textContent
         || ''
-    ).trim().replace(/\s+/g, ' ');
+    ).replace(/\s+/g, ' ').trim();
 
-    return said === '' || said.length > 32 ? '' : said;
+    /*
+     * Past this it is prose, not a label - a role=button on a whole card
+     * carries the card. Quoting it back is worse than saying nothing.
+     */
+    if (said === '' || said.length > 80) {
+        return '';
+    }
+
+    // An FAQ question is a sentence and still the best name this control has.
+    // Shortened rather than discarded: "Run this control" over the one that
+    // opens the answer somebody is looking for says less than three quarters
+    // of the question does.
+    return said.length > 32 ? `${said.slice(0, 31).trimEnd()}…` : said;
 };
 
 /**
