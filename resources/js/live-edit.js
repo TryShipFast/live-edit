@@ -1,5 +1,6 @@
 import { createChrome } from './chrome.js';
 import { biggestThatFits, inSourcePixels, movedWithin, whatIsThereNow } from './fitting.js';
+import { attrsWorthSending, creditWorthSending } from './only-what-changed.js';
 import { confirm as confirmChange, expectChange, takeExpected } from './verify.js';
 import { apiRequestFor, attributeOf, classListWith, declaredStyleProps, displayedValue, iconNamesIn, isJsonResponse, orderedIcons, ownTextOf, parseEditKey, requestInit } from './support.js';
 
@@ -1926,10 +1927,15 @@ const bootLiveEdit = () => {
                 const carryingAPicture = file !== undefined || (url !== '' && url !== undefined);
 
                 if (current.credit && current.creditFor === current.target && carryingAPicture) {
-                    Object.entries(current.credit).forEach(([field, said]) => formData.append(field, said));
+                    creditWorthSending(current.credit)
+                        .forEach(([field, said]) => formData.append(field, said));
                 }
 
                 const attrInputs = [...drawerFields.querySelectorAll('[data-img-attr]')];
+                // The description and the tooltip, only where they were
+                // touched; see only-what-changed.js for why the store cannot
+                // work this out for itself.
+                const changedAttrs = attrsWorthSending(attrInputs);
                     // The language the description is being typed in. Only
                     // alt text and the tooltip are stored against it - the
                     // picture and the photographer are the same in every
@@ -1937,10 +1943,15 @@ const bootLiveEdit = () => {
                     if (window.liveEditLocale) formData.append('locale', window.liveEditLocale);
                     if (file) formData.append('file', file);
                     else if (url) formData.append('url', url.startsWith('http') ? url : `https://${url}`);
-                    attrInputs.forEach((input) => formData.append(input.dataset.imgAttr, input.value));
-                    if (!file && !url && attrInputs.length === 0) {
+                    changedAttrs.forEach((input) => formData.append(input.dataset.imgAttr, input.value));
+                    if (!file && !url && changedAttrs.length === 0) {
                         restoreButton();
-                        notify('Choose a file from your computer or paste an image URL first.');
+                        // Told apart, because they are different situations:
+                        // a panel nobody typed in, and a panel with nowhere
+                        // to type.
+                        notify(attrInputs.length > 0
+                            ? 'Nothing has changed yet. Choose a picture, or edit the description.'
+                            : 'Choose a file from your computer or paste an image URL first.');
                         return;
                     }
                     await request('/live-edit/image', { method: 'POST', body: formData });
@@ -3344,6 +3355,9 @@ const bootLiveEdit = () => {
                 input.type = 'text';
                 input.dataset.imgAttr = name;
                 input.value = value ?? '';
+                // What it said when the panel opened, so saving can tell a
+                // field somebody typed in from one they only looked at.
+                input.dataset.imgAttrWas = value ?? '';
                 input.className = 'le-input';
                 w.append(input);
                 if (hint) {

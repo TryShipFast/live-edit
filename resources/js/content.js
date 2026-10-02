@@ -46,11 +46,104 @@ const PREFIX = 'setting:';
  * caller can put the original back and re-apply, so the preview is computed
  * from what the page said rather than from what the last keystroke left.
  */
+/**
+ * Swap a picture so it reads as a change rather than as a glitch.
+ *
+ * The page paints the picture in its own markup, then this applies the stored
+ * one, so for a moment a visitor sees the old photograph and then the new one.
+ * A customer reported it as "it loads old image then new one, especially when
+ * you just replaced it" - which is exactly when the two differ most, and
+ * exactly when somebody is looking.
+ *
+ * The source is still set in the same breath, because a save is checked by
+ * reading this attribute straight afterwards and a deferred swap would be
+ * reported as the page refusing to update. What is deferred is only the
+ * opacity, so the browser cross-fades between two frames it already has.
+ *
+ * Only where a picture was already showing something else. On a first paint
+ * there is nothing to fade from, and fading in from nothing would invent a
+ * flicker on every page load to hide one that was not there.
+ */
+const swapPicture = (element, value) => {
+    const showing = element.currentSrc || element.getAttribute('src') || '';
+    const same = showing !== '' && new URL(showing, document.baseURI).href
+        === new URL(value, document.baseURI).href;
+
+    if (same) {
+        return;
+    }
+
+    const wasShowing = showing !== '' && element.complete;
+
+    element.setAttribute('src', value);
+
+    if (!wasShowing) {
+        return;
+    }
+
+    element.style.transition = 'opacity 120ms ease-out';
+    element.style.opacity = '0';
+
+    const settle = () => {
+        element.style.opacity = '1';
+        // Left behind, the inline transition would apply to anything the
+        // theme later does with this element's opacity.
+        setTimeout(() => {
+            element.style.removeProperty('transition');
+            element.style.removeProperty('opacity');
+        }, 160);
+    };
+
+    // decode() rather than the load event: it resolves when the frame is ready
+    // to paint, which is the moment the fade should end. Either way it settles
+    // - a picture stuck invisible because its file 404s is the worst outcome
+    // here, and far worse than the flash this replaces.
+    if (element.decode) {
+        element.decode().then(settle, settle);
+
+        return;
+    }
+
+    element.addEventListener('load', settle, { once: true });
+    element.addEventListener('error', settle, { once: true });
+};
+
+/**
+ * Ask the browser for the pictures that are about to be applied.
+ *
+ * The gap this closes: the stored picture is not requested until its source is
+ * set, so the fade above would be waiting on a network round trip. Warming
+ * them as soon as the content arrives means the file is usually decoded by the
+ * time anything is swapped, and the change is one frame rather than a wait.
+ */
+const warmPictures = (root, settings) => {
+    for (const element of root.querySelectorAll('[data-edit-img]')) {
+        const key = (element.getAttribute('data-edit-img') ?? '').replace(/^setting:/, '');
+        const value = settings[key];
+
+        if (typeof value !== 'string' || value === '') {
+            continue;
+        }
+
+        const showing = element.currentSrc || element.getAttribute('src') || '';
+
+        if (showing !== '' && new URL(showing, document.baseURI).href === new URL(value, document.baseURI).href) {
+            continue;
+        }
+
+        // An Image rather than <link rel=preload>: it needs no cleanup, warms
+        // the same cache, and cannot be left in the head of somebody's page.
+        const warm = new Image();
+        warm.decoding = 'async';
+        warm.src = value;
+    }
+};
+
 export const applyValue = (element, value, { keepRuns = false } = {}) => {
     const tag = element.tagName?.toLowerCase();
 
     if (tag === 'img') {
-        element.setAttribute('src', value);
+        swapPicture(element, value);
         clearTheSourcesAround(element);
 
         return;
@@ -546,6 +639,10 @@ export const applyContent = (root, settings) => {
     // Lists first: an item moved or added changes what everything below has
     // to land on.
     applyOrder(root, settings);
+
+    // Before anything is applied, so the files are in flight while the words
+    // are being written into the page.
+    warmPictures(root, settings);
 
     for (const element of root.querySelectorAll('[data-edit]')) {
         const declared = element.getAttribute('data-edit') ?? '';

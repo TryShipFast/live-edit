@@ -59,6 +59,39 @@
     };
 
     /*
+     * Ask for the rest of the runtime now, rather than one file at a time.
+     *
+     * What this replaces: a chain. This script is fetched, it imports the
+     * tagger, the tagger finishes and then the applier is fetched, and only
+     * then does anything ask the service for the words. Each step waits for
+     * the one before it even though every address is known from the start, so
+     * a visitor on a slow connection spends several round trips looking at the
+     * page's own untouched content - which is the part a customer sees as "it
+     * loads slowly before the widget loads".
+     *
+     * A hint rather than a load: the browser fetches these into the module
+     * cache and the imports below resolve against it. Nothing here changes the
+     * order anything runs in, so a hint that fails costs only the hint.
+     *
+     * crossorigin because the runtime is served from the service rather than
+     * from the customer's own domain, and a preload whose mode does not match
+     * the import that follows is fetched twice rather than once.
+     */
+    var warm = function (files) {
+        if (!document.head || !document.createElement('link').relList?.supports?.('modulepreload')) {
+            return;
+        }
+
+        files.forEach(function (file) {
+            var hint = document.createElement('link');
+            hint.rel = 'modulepreload';
+            hint.href = base + file;
+            hint.crossOrigin = 'anonymous';
+            document.head.appendChild(hint);
+        });
+    };
+
+    /*
      * Which kind of nothing happened, because the two look identical in a
      * console and have opposite causes.
      *
@@ -198,6 +231,19 @@
         // returns immediately when there is nothing new to ask about.
         var tagging = { base: config.api, site: config.site, key: token || config.key };
         var editing = token || /[?&]edit(=1)?(&|$)/.test(window.location.search);
+
+        /*
+         * Everything this page is certainly going to need, asked for at once.
+         *
+         * support.js and session.js are imported by the two below rather than
+         * here, so they are the files the chain used to discover last. The
+         * editor is named only for somebody editing: a visitor who will never
+         * see it should not pay to fetch it, which is the whole arrangement
+         * this script exists to protect.
+         */
+        warm(editing
+            ? ['autotag.js', 'content.js', 'support.js', 'session.js', 'live-edit.js', 'chrome.js']
+            : ['autotag.js', 'content.js', 'support.js', 'session.js']);
 
         var ready = load('autotag.js')
             .then(function (m) {

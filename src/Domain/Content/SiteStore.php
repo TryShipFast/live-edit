@@ -84,9 +84,61 @@ class SiteStore
         return $this->drafts()->count();
     }
 
+    /**
+     * Whether writing this would change nothing, so nothing should be recorded.
+     *
+     * A drawer submits every field it holds, and most of them are the values
+     * that were already there. One picture replaced wrote nine rows: the
+     * picture, the description it already had, five empty credit fields, an
+     * empty tooltip and an empty set of style props. The customer then read
+     * "9 changes" on the publish button for one replaced picture, every row
+     * went into the version history, and every row was metered as a write
+     * against their month.
+     *
+     * Guarded here rather than in the editor because the editor is one of four
+     * clients. WordPress, React and a folder of static files all reach this
+     * same method, and a fix in a drawer is a fix for whoever happens to be
+     * using that drawer.
+     *
+     * The third case is the one worth spelling out: a draft that would return
+     * a value to what is already published is not a change, it is the undoing
+     * of one, so the draft goes rather than being rewritten. Otherwise typing
+     * a word, thinking better of it and typing the old one back leaves a
+     * pending change that publishes nothing.
+     */
+    protected function wouldChangeNothing(string $key, string $value): bool
+    {
+        $published = $this->settings()->where('key', $key)->value('value');
+
+        $draft = $this->drafts()
+            ->where('kind', 'setting')
+            ->where('subject', $key)
+            ->first();
+
+        if ($draft !== null) {
+            if ((string) ($draft->payload['value'] ?? '') === $value) {
+                return true;
+            }
+
+            if ($published !== null && (string) $published === $value) {
+                $draft->delete();
+
+                return true;
+            }
+
+            return false;
+        }
+
+        return $published !== null && (string) $published === $value;
+    }
+
     /** Write a value, held back as a draft when the site publishes deliberately. */
     public function put(string $key, string $value, bool $hold): void
     {
+        if ($this->wouldChangeNothing($key, $value)) {
+            return;
+        }
+
         if ($hold) {
             Draft::query()->updateOrCreate(
                 ['site_id' => $this->site->id, 'kind' => 'setting', 'subject' => $key],
@@ -146,6 +198,21 @@ class SiteStore
      */
     public function putStyle(string $key, array $props, bool $hold): void
     {
+        /*
+         * Nothing to clear and nothing to set is not a change.
+         *
+         * Every picture saved wrote `{"props":[]}` against the element's style
+         * key, because the drawer collects its style fields whether or not the
+         * panel has any. An empty set still has to be writable where a style
+         * is stored - that is how "put it back to the theme's own" is said -
+         * so this only stands aside when there is no style here to remove.
+         */
+        if ($props === []
+            && $this->styles()->where('key', $key)->doesntExist()
+            && $this->drafts()->where('kind', 'style')->where('subject', $key)->doesntExist()) {
+            return;
+        }
+
         if ($hold) {
             Draft::query()->updateOrCreate(
                 ['site_id' => $this->site->id, 'kind' => 'style', 'subject' => $key],

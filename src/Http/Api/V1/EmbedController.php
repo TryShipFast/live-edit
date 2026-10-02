@@ -42,6 +42,7 @@ class EmbedController
         'chrome.js' => 'chrome.js',
         'support.js' => 'support.js',
         'fitting.js' => 'fitting.js',
+        'only-what-changed.js' => 'only-what-changed.js',
         'svg.js' => 'svg.js',
         'verify.js' => 'verify.js',
         // The built bundle, resolved to resources/dist rather than to a
