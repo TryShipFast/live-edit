@@ -2,7 +2,7 @@ import { createChrome } from './chrome.js';
 import { biggestThatFits, inSourcePixels, movedWithin, whatIsThereNow } from './fitting.js';
 import { attrsWorthSending, creditWorthSending } from './only-what-changed.js';
 import { confirm as confirmChange, expectChange, takeExpected } from './verify.js';
-import { apiRequestFor, attributeOf, backgroundImageOf, classListWith, declaredStyleProps, displayedValue, iconNamesIn, isJsonResponse, looksLikeAPicture, orderedIcons, ownTextOf, parseEditKey, requestInit, stylePropsFor, interactiveTarget, nameOfControl } from './support.js';
+import { apiRequestFor, attributeOf, backgroundImageOf, classListWith, declaredStyleProps, displayedValue, iconNamesIn, isJsonResponse, looksLikeAPicture, orderedIcons, ownTextOf, parseEditKey, requestInit, stylePropsFor, interactiveTarget, nameOfControl, givesUpAfter, ranOutOfTime, WAITS_AT_MOST } from './support.js';
 
 /**
  * Start only once the host page has finished loading.
@@ -1796,9 +1796,33 @@ const bootLiveEdit = () => {
             // this application does not serve.
             const api = window.liveEditApi;
             const mapped = api ? apiRequestFor(url, options, api) : null;
-            const response = mapped
-                ? await fetch(mapped.url, mapped.init)
-                : await fetch(url, requestInit(csrf, options));
+            const init = mapped ? mapped.init : requestInit(csrf, options);
+            // Never without one. A request that hangs leaves the button saying
+            // "Saving…" for as long as the tab is open, which reads as work in
+            // progress and is nothing of the kind.
+            // A photograph going up a hotel connection is not a hang, so the
+            // limit follows what is being sent rather than being one number
+            // for a sentence and a six-megabyte upload alike.
+            const carryingAFile = typeof FormData !== 'undefined' && init.body instanceof FormData;
+            const withATimeLimit = {
+                ...init,
+                signal: init.signal ?? givesUpAfter(carryingAFile ? WAITS_AT_MOST * 4 : WAITS_AT_MOST),
+            };
+
+            let response;
+
+            try {
+                response = await fetch(mapped ? mapped.url : url, withATimeLimit);
+            } catch (error) {
+                if (!ranOutOfTime(error)) {
+                    throw error;
+                }
+
+                // Said as a state rather than as a verdict: the save may well
+                // have reached the server, and telling somebody it failed
+                // invites them to do it twice.
+                throw new Error('That is taking too long. Your change is still here — check your connection and press Save again.');
+            }
             if (response.status === 419 || response.status === 401) {
                 // The key is dead. Left in storage it would put the page back
                 // into editing mode on reload, where every save fails the same
@@ -2099,6 +2123,17 @@ const bootLiveEdit = () => {
             } catch (error) {
                 restoreButton();
                 notify(error.message);
+            } finally {
+                /*
+                 * Whatever happened. The timeout above covers the request, and
+                 * this covers everything else in here - a throw between two
+                 * awaits, a builder that never answers, a bug added later.
+                 *
+                 * The rule being kept is that the button describes the state
+                 * it is actually in. "Saving…" that outlives the save is worse
+                 * than an error, because an error can be acted on.
+                 */
+                restoreButton();
             }
         };
 

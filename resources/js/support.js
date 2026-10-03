@@ -30,6 +30,41 @@ export const parseEditKey = (value) => {
  * Accept header out with it. Without Accept, Laravel answers a validation
  * failure with a redirect to a page rather than a 422.
  */
+/**
+ * How long a save is allowed to hang before it is called a failure.
+ *
+ * fetch waits forever by default, and forever is not a state a person can act
+ * on. Seen on a live site: the button said "Saving…" and went on saying it,
+ * with the drawer open and the work still in it. Nothing had failed, so no
+ * message was shown; nothing had succeeded either. The only way out was a
+ * reload, which is the one action guaranteed to lose the change.
+ *
+ * Long enough to cover a slow connection carrying a photograph, short enough
+ * that somebody is not left looking at a lie.
+ */
+export const WAITS_AT_MOST = 30000;
+
+export const givesUpAfter = (ms = WAITS_AT_MOST) => {
+    if (typeof AbortSignal !== 'undefined' && typeof AbortSignal.timeout === 'function') {
+        return AbortSignal.timeout(ms);
+    }
+
+    // Safari before 16 and Firefox before 100. Older still has no AbortController
+    // at all, and a request with no timeout is what we had before this.
+    if (typeof AbortController === 'undefined') {
+        return undefined;
+    }
+
+    const controller = new AbortController();
+    setTimeout(() => controller.abort(), ms);
+
+    return controller.signal;
+};
+
+/** Whether a thrown error is this timeout rather than something the server said. */
+export const ranOutOfTime = (error) =>
+    error?.name === 'TimeoutError' || error?.name === 'AbortError';
+
 export const requestInit = (csrf, options = {}) => ({
     ...options,
     headers: {
