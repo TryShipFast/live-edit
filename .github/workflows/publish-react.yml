@@ -47,10 +47,30 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # Deliberately WITHOUT registry-url.
+      #
+      # That option writes an .npmrc containing
+      #
+      #   //registry.npmjs.org/:_authToken=${NODE_AUTH_TOKEN}
+      #   always-auth=true
+      #
+      # and with no NODE_AUTH_TOKEN set - which is the whole point of trusted
+      # publishing - npm believes it already holds a credential, sends an empty
+      # one, and never attempts the OIDC exchange at all. The registry answers
+      # 404 rather than 401, because it will not admit a scoped package exists
+      # to somebody it cannot identify. So the log shows a missing package and
+      # the cause is an empty token.
+      #
+      # Four releases failed this way and were published by hand instead, which
+      # is exactly the thing this workflow exists to stop. The giveaway is the
+      # line "npm warn Unknown user config always-auth" in a run that has no
+      # OIDC request anywhere in it.
+      #
+      # registry.npmjs.org is npm's default, so nothing is lost by leaving it
+      # out.
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-          registry-url: 'https://registry.npmjs.org'
 
       # Trusted publishing needs a recent npm. The one bundled with Node 22 is
       # older than the feature, and the failure it gives is about
@@ -58,6 +78,15 @@ jobs:
       # in the wrong place.
       - name: Use an npm that understands trusted publishing
         run: npm install -g npm@latest
+
+      # Belt and braces, and a readable failure if either comes back. An
+      # .npmrc naming a token is the one thing that silently disables OIDC, and
+      # it can arrive from a runner image or an action as easily as from here.
+      - name: Make sure nothing is pretending to hold a credential
+        run: |
+          rm -f ~/.npmrc .npmrc
+          echo "npm $(npm --version)"
+          npm config list
 
       # Only the tests that cover what is being published, and only the ones
       # that need nothing but Node. tests/js as a whole does not qualify: some
