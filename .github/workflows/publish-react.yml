@@ -88,6 +88,25 @@ jobs:
           echo "npm $(npm --version)"
           npm config list
 
+      # Which half is missing, in one line.
+      #
+      # When this fails there are exactly two causes and they are indis-
+      # tinguishable from the publish error alone: GitHub never offered an
+      # identity (id-token: write absent, so there is nothing to exchange), or
+      # npm never asked for one (no trusted publisher on the package, so there
+      # is nothing to exchange it for). Both end as "you are not logged in".
+      #
+      # The value is a credential, so only its presence is printed.
+      - name: Say whether GitHub offered an identity at all
+        run: |
+          if [ -n "$ACTIONS_ID_TOKEN_REQUEST_URL" ]; then
+            echo "GitHub offered an identity. If the publish still fails for auth, the"
+            echo "package has no trusted publisher record - it is the npmjs.com side."
+          else
+            echo "GitHub offered NO identity. id-token: write is missing or not in"
+            echo "effect - it is this file, not npmjs.com."
+          fi
+
       # Only the tests that cover what is being published, and only the ones
       # that need nothing but Node. tests/js as a whole does not qualify: some
       # of it drives the PHP applier through a subprocess to prove the browser
