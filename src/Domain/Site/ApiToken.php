@@ -69,8 +69,15 @@ class ApiToken extends Model
      */
     public function mayEditLocked(): bool
     {
+        /*
+         * Nobody behind it. Either the site asking about itself - the
+         * publishable key in every page, a secret key on a server - or a
+         * session minted by a host that knows who its user is when we cannot.
+         * The host says so at mint time, and true is what every session minted
+         * before that existed meant.
+         */
         if ($this->editor_id === null) {
-            return true;
+            return (bool) ($this->may_edit_locked ?? true);
         }
 
         $allowed = $this->editor

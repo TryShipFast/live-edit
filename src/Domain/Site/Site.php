@@ -211,7 +211,7 @@ class Site extends Model
      * @param  array<int, Ability>|null  $abilities
      * @return array{0: ApiToken, 1: string}
      */
-    public function issueToken(TokenType $type, string $name, ?array $abilities = null, ?\DateTimeInterface $expiresAt = null, ?int $editorId = null): array
+    public function issueToken(TokenType $type, string $name, ?array $abilities = null, ?\DateTimeInterface $expiresAt = null, ?int $editorId = null, bool $mayEditLocked = true): array
     {
         $value = TokenValue::generate($type);
 
@@ -220,6 +220,10 @@ class Site extends Model
             // Only a session has a person behind it; the site's own keys
             // belong to the site.
             'editor_id' => $editorId,
+            // Only meaningful when nobody is behind it. A session a host mints
+            // knows which of ITS users is at the keyboard; we never can, so it
+            // says here and we believe it.
+            'may_edit_locked' => $mayEditLocked,
             'type' => $type->value,
             'name' => $name,
             'secret_hash' => $value->hash(),

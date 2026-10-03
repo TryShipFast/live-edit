@@ -100,6 +100,9 @@ class Session
         }
 
         $user = wp_get_current_user();
+        // The person is part of the cache key already; what they may reach
+        // has to be too, or an administrator's session would be handed to an
+        // editor who happened to share a cache entry.
         $key = 'kastsbuild_session_'.$user->ID;
         $cached = get_transient($key);
 
@@ -107,8 +110,30 @@ class Session
             return $cached['token'];
         }
 
+        /*
+         * Whether this person may edit the parts the theme's author locked.
+         *
+         * Said at the moment of minting because that is the only moment
+         * anybody knows. The session that comes back has nobody behind it -
+         * that is the whole point of minting, that WordPress knows which of
+         * its users this is and the service never can - so a lock waiting to
+         * be told later is a lock that never binds here.
+         *
+         * Decided by a capability rather than a role, the way the rest of this
+         * plugin asks. Somebody who may edit the theme is the person who put
+         * data-live-lock there; anybody else is who it was put there for.
+         * Filterable, because a site with its own idea of who the developer is
+         * should not have to agree with ours.
+         */
+        $mayEditLocked = (bool) apply_filters(
+            'kastsbuild_may_edit_locked_regions',
+            current_user_can('edit_theme_options'),
+            $user
+        );
+
         $response = Api::post('/sessions', (string) Settings::get('secret_key'), [
             'label' => $user->display_name ?: $user->user_login,
+            'may_edit_locked' => $mayEditLocked,
         ]);
 
         $token = $response['token'] ?? null;

@@ -172,7 +172,23 @@ class TagsEditableMarkup
          * a different key than the one it was saved under.
          */
         if (! str_contains($html, 'data-edit')) {
-            $tagged = (new MarkupScanner)->apply(
+            /*
+             * Who this page is being prepared for, asked the way this install
+             * asks everything else.
+             *
+             * A self-hosted application owns its own roles - that is what the
+             * live-edit gate is - so the second question is asked the same
+             * way. An application that has never heard of the gate gets true,
+             * which is what it meant before locking existed and keeps every
+             * install that upgrades working exactly as it did.
+             *
+             * This path runs the scanner itself rather than asking the
+             * service, so without this the lock was simply absent here: the
+             * markup said data-live-lock and nothing read it.
+             */
+            $mayEditLocked = ! Gate::has('live-edit-locked') || Gate::allows('live-edit-locked');
+
+            $tagged = (new MarkupScanner)->asAnInvitedEditor(! $mayEditLocked)->apply(
                 $html,
                 ['text', 'image', 'link', 'icon'],
                 true,

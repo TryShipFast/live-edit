@@ -14,9 +14,29 @@ class SessionController
     {
         $validated = $request->validate([
             'label' => ['nullable', 'string', 'max:100'],
+            /*
+             * Whether this person may edit what the site's author locked.
+             *
+             * Asked of the host because only the host can answer it. A session
+             * minted here has nobody behind it - that is the entire reason
+             * minting exists, that WordPress knows which of its users is at
+             * the keyboard and we have no way to - so a lock that waited for
+             * us to recognise somebody would never bind on the platform most
+             * likely to want it.
+             *
+             * Absent means true, which is what every session minted before
+             * this existed meant, and keeps an old plugin working against a
+             * new service.
+             */
+            'may_edit_locked' => ['nullable', 'boolean'],
         ]);
 
-        $session = $issue(ApiContext::site($request), $validated['label'] ?? null);
+        $session = $issue(
+            ApiContext::site($request),
+            $validated['label'] ?? null,
+            null,
+            (bool) ($validated['may_edit_locked'] ?? true)
+        );
 
         // Never cached, anywhere, by anyone. This response is a credential.
         return response()->json($session)->withHeaders([

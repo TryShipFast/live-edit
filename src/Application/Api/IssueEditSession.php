@@ -22,7 +22,13 @@ class IssueEditSession
     /**
      * @return array{token: string, expires_at: string, site: string}
      */
-    public function __invoke(Site $site, ?string $label = null, ?int $ttlSeconds = null): array
+    /**
+     * @param  bool  $mayEditLocked  Whether this person may edit the regions
+     *                               the site's author marked data-live-lock.
+     *                               The host decides: they know which of their
+     *                               users this is and we have no way to.
+     */
+    public function __invoke(Site $site, ?string $label = null, ?int $ttlSeconds = null, bool $mayEditLocked = true): array
     {
         $ttl = $ttlSeconds ?? (int) config('live-edit.api.session_ttl', 1800);
         $expiresAt = now()->addSeconds(max(60, $ttl));
@@ -45,6 +51,8 @@ class IssueEditSession
             // Ability::Mint exists to prevent.
             [Ability::Read, Ability::Write, Ability::Publish],
             $expiresAt,
+            null,
+            $mayEditLocked,
         );
 
         $this->forgetExpired($site);
