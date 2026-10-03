@@ -459,6 +459,38 @@ choice, not a trap — every call this package makes carries a timeout, and
 `readContent()` never rejects: a content service that is slow, down, or not set
 up yet leaves the words already written in your components on the page.
 
+## Which half a fix lands in, and why this package rarely moves
+
+Worth knowing before reading a diff and concluding nothing was done, which has
+happened twice.
+
+This package is an adapter. It wires a React app to the service and it never
+carries the runtime - there is a test in the engine whose whole job is to fail
+if it ever starts to. So the two halves move at completely different rates:
+
+| what changed | how it reaches you | shows in this package? |
+| --- | --- | --- |
+| the scanner, both appliers, the editor panel, the preview | served by the service, automatically | **no** |
+| this package: provider, hooks, types, codemod | `npm install` | yes |
+| the WordPress plugin | plugin update | no |
+
+So an engine release can fix the thing you reported - a word that could not be
+edited, a heading that lost its spacing, a panel that showed the wrong value -
+while `git diff` on this package shows nothing at all. That is not a release
+that forgot your bug. It is a fix that was never going to live here.
+
+**To see which engine you are on**, from anywhere, with the publishable key
+that is already in your page:
+
+```
+curl -s -H "Authorization: Bearer <your publishable key>" \
+  https://live.tryshipfast.com/api/live-edit/v1/<your site>/plugin
+```
+
+It answers with the version the service is running. If that number has moved
+since you last looked, the fix you are waiting for may already be live - reload
+the page rather than reinstalling anything.
+
 ## Licence and support
 
 Proprietary. The source is published so you can read and audit what runs inside
