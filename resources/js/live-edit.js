@@ -2,7 +2,7 @@ import { createChrome } from './chrome.js';
 import { biggestThatFits, inSourcePixels, movedWithin, whatIsThereNow } from './fitting.js';
 import { attrsWorthSending, creditWorthSending } from './only-what-changed.js';
 import { confirm as confirmChange, expectChange, takeExpected } from './verify.js';
-import { apiRequestFor, attributeOf, backgroundImageOf, classListWith, declaredStyleProps, displayedValue, iconNamesIn, isJsonResponse, looksLikeAPicture, orderedIcons, ownTextOf, parseEditKey, requestInit, stylePropsFor, interactiveTarget, nameOfControl, givesUpAfter, ranOutOfTime, WAITS_AT_MOST, wordsEditedElsewhere } from './support.js';
+import { apiRequestFor, attributeOf, backgroundImageOf, classListWith, declaredStyleProps, displayedValue, iconNamesIn, isJsonResponse, looksLikeAPicture, orderedIcons, ownTextOf, parseEditKey, requestInit, stylePropsFor, interactiveTarget, nameOfControl, givesUpAfter, ranOutOfTime, WAITS_AT_MOST, wordsEditedElsewhere, PUTS_BACK, worthReverting } from './support.js';
 
 /**
  * Start only once the host page has finished loading.
@@ -761,9 +761,33 @@ const bootLiveEdit = () => {
             const props = collectStyleProps();
             const key = current.styleKey;
             let css = styleCssFor(key, props);
-            const reverts = { background: 'background', textColor: 'color', fontSize: 'font-size', radius: 'border-radius', backgroundImage: 'background-image' };
+            const reverts = PUTS_BACK;
+
+            /*
+             * Only undo what was actually set.
+             *
+             * A revert exists to take a property BACK to the design, and the
+             * design is already where a property nobody ever touched is. Sent
+             * for an untouched one it does the opposite of its name: it is
+             * `revert-layer !important`, so it rolls the value back past the
+             * site's own utility layer and throws that away too.
+             *
+             * Reported with steps, which is the only reason this was found:
+             * click the hero, type a full stop, watch the hero. Every
+             * keystroke in the drawer re-runs this, TEXT COLOUR sits on "use
+             * default" and is therefore empty, and so every keystroke emitted
+             *
+             *     [data-style="s…"]{ color: revert-layer !important }
+             *
+             * which discarded Tailwind's text-white and left white words on a
+             * near-black hero. Unreadable, on the element somebody was in the
+             * middle of editing, with the words still perfectly safe
+             * underneath - and nothing about it in any save.
+             */
+            const stored = (window.liveEditStyles ?? {})[key] ?? {};
+
             for (const [prop, value] of Object.entries(props)) {
-                if (value) continue;
+                if (!worthReverting(prop, value, stored)) continue;
                 if (prop === 'hidden') css += `body.editing [data-style="${key}"]{opacity:1 !important}`;
                 if (reverts[prop]) css += `[data-style="${key}"]{${reverts[prop]}:revert-layer !important}`;
                 if (prop === 'paddingY') css += `[data-style="${key}"]{padding-top:revert-layer !important;padding-bottom:revert-layer !important}section[data-style="${key}"]>div{padding-top:revert-layer !important;padding-bottom:revert-layer !important}`;

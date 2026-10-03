@@ -506,6 +506,50 @@ export const backgroundImageOf = (element, view = null) => {
     return recorded.startsWith('data:') ? '' : recorded;
 };
 
+/** Which CSS property each style control puts back when it is cleared. */
+export const PUTS_BACK = {
+    background: 'background',
+    textColor: 'color',
+    fontSize: 'font-size',
+    radius: 'border-radius',
+    backgroundImage: 'background-image',
+};
+
+/**
+ * Whether clearing this property should write a revert at all.
+ *
+ * A revert exists to take a property BACK to the design, and a property nobody
+ * ever set is already there. Sent anyway it does the opposite of its name: the
+ * rule is `revert-layer !important`, so it rolls the value back past the
+ * site's own utility layer and throws that away too.
+ *
+ * Reported with steps, which is the only reason it was found: click the hero
+ * text, add a full stop in the drawer, watch the hero. Every keystroke re-runs
+ * the preview, TEXT COLOUR sits on "use default" and is therefore empty, and
+ * so every keystroke emitted
+ *
+ *     [data-style="s…"]{ color: revert-layer !important }
+ *
+ * which discarded Tailwind's text-white and left the heading near-black on a
+ * dark hero. Unreadable, on the element being edited, while the words
+ * underneath were perfectly safe and no save was ever involved.
+ *
+ * Undo what was set; leave everything else alone.
+ */
+export const worthReverting = (prop, value, stored = {}) => {
+    if (value) {
+        return false;
+    }
+
+    // Hidden is ours either way: it is drawn only while editing, so there is
+    // no host styling underneath it to protect.
+    if (prop === 'hidden') {
+        return true;
+    }
+
+    return Boolean(stored[prop]);
+};
+
 /**
  * The words in this element that are edited somewhere else, named.
  *
