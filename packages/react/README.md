@@ -411,6 +411,54 @@ far quicker and the wait usually disappears. If it does not, move the tag to
 The console tells you which it is. The runtime says what it is waiting for when
 it is running on a local address, so check there before unpicking the wiring.
 
+### A published edit, and the HTML a crawler sees
+
+Worth reading once, because the failure it describes reports nothing anywhere.
+
+If a page renders statically, `readContent()` runs at **build time** and its
+answer is baked into the HTML. Publish an edit afterwards and the server HTML
+does not move. Measured on a Next 16 install:
+
+```
+publish -> rebuild with a warm .next -> still the old words
+publish -> rm -rf .next && rebuild   -> the new ones
+```
+
+An incremental build does not pick content up. Content is not a source file, so
+nothing marks the prerender stale — and a host that keeps `.next` between
+deploys (the default for the Next plugin on Netlify, among others) can serve
+the old copy indefinitely.
+
+Visitors are mostly spared. The overlay applies published content after
+hydration, so a person sees current copy, with a repaint. **Crawlers and first
+paint do not get that**, and they are who marketing copy is written for.
+
+So this package asks the service to be considered stale after a minute:
+
+```js
+// what readContent() sends, unless you say otherwise
+{ next: { revalidate: 60 } }
+```
+
+In the App Router a route's revalidation period is the lowest of its fetches',
+so this gives every page that reads content incremental regeneration **without
+a line added to any of them** — which matters when a codemod has just made
+twenty-seven routes editable and the twenty-eighth would have been forgotten.
+Static rendering is kept and the HTML is at most a minute behind.
+
+To choose differently:
+
+```js
+await readContent({ revalidate: 300 });   // five minutes
+await readContent({ revalidate: false }); // never stored; renders per request
+await readContent({ cache: 'force-cache' });
+```
+
+`revalidate: false` puts a fetch back on the request path. That is a supported
+choice, not a trap — every call this package makes carries a timeout, and
+`readContent()` never rejects: a content service that is slow, down, or not set
+up yet leaves the words already written in your components on the page.
+
 ## Licence and support
 
 Proprietary. The source is published so you can read and audit what runs inside

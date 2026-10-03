@@ -75,6 +75,61 @@ const settings = () => {
 };
 
 /**
+ * Content is baked at build time and nothing ever invalidates it.
+ *
+ * Measured on a real Next 16 install, and the measurement is worth keeping
+ * because the fault is invisible from either end. The marketing pages build as
+ * static, so this call runs once at build and its answer is baked into the
+ * HTML. Publish an edit afterwards and:
+ *
+ *   publish -> rebuild with a warm .next -> still the old words
+ *   publish -> rm -rf .next && rebuild   -> the new ones
+ *
+ * An incremental build does not pick content up, because content is not a
+ * source file and nothing marks the prerender stale. Under a host that caches
+ * .next between deploys - which is the default for the Next plugin on Netlify,
+ * and the install this was found on - a published edit may never reach the
+ * server HTML at all.
+ *
+ * Visitors are mostly spared: the overlay applies published content after
+ * hydration, so a person sees current copy with a repaint. Crawlers and first
+ * paint do not get that, and they are the audience marketing copy is written
+ * for.
+ *
+ * So this is said outright rather than inherited - the framework's default is
+ * not stable across its own major versions anyway, cached in 14 and not in 15.
+ *
+ * A minute, by default. In the App Router a route's revalidation is the lowest
+ * of its fetches', so naming it here gives every page that reads content
+ * incremental regeneration without a line being added to any of them. Static
+ * rendering is kept, the server HTML is at most a minute behind, and the
+ * person who pressed Publish still sees their edit immediately because the
+ * overlay does not wait for it.
+ *
+ * `revalidate: false` or `cache: 'no-store'` for a site that would rather pay
+ * per-request rendering and have the HTML exact. That reintroduces a fetch on
+ * the request path, which is why the call underneath this one has a timeout:
+ * a content service is a third party to somebody's website and must never be
+ * able to hold their page open.
+ */
+const EVERY_MINUTE = 60;
+
+const howOftenToAsk = ({ revalidate, cache = null } = {}) => {
+    if (cache) {
+        return { cache };
+    }
+
+    // Asked for outright: never store it, render per request.
+    if (revalidate === false) {
+        return { cache: 'no-store' };
+    }
+
+    // `next` is ignored by any runtime that is not Next, which is the point:
+    // this package does not depend on the framework it is most used with.
+    return { next: { revalidate: revalidate ?? EVERY_MINUTE } };
+};
+
+/**
  * Fetch a site's content. Resolves to a plain object of key to value.
  *
  * Never rejects, and that is the important part rather than a convenience.
@@ -99,7 +154,10 @@ export const readContent = async (options = {}) => {
             key: where.key ?? where.publishableKey,
         });
 
-        const payload = await client.read(options.locale ?? configured?.locale ?? null);
+        const payload = await client.read(
+            options.locale ?? configured?.locale ?? null,
+            howOftenToAsk(options)
+        );
 
         // `settings` is the same field the provider reads, and reading the
         // same one is the point: the server and the browser must agree about

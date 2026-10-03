@@ -6,6 +6,18 @@ export interface ServerOptions {
     key?: string;
     publishableKey?: string;
     locale?: string | null;
+
+    /**
+     * Seconds to keep a page's content before asking again.
+     *
+     * Omitted, content is never stored, so a published edit shows on the next
+     * request and the page renders per request. Naming a number keeps static
+     * rendering and makes an edit take up to that long to appear.
+     */
+    revalidate?: number | false;
+
+    /** The fetch cache mode outright, when neither default suits. */
+    cache?: 'no-store' | 'force-cache' | 'default' | 'reload' | 'no-cache';
 }
 
 /** Point the server reader at a site, instead of using the environment. */
