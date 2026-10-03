@@ -507,6 +507,28 @@ export const backgroundImageOf = (element, view = null) => {
 };
 
 /**
+ * The words in this element that are edited somewhere else, named.
+ *
+ * A heading whose middle is a coloured span opens with that span's words cut
+ * out of the box - "Get Your Music  by the People Who Matter", gap and all,
+ * measured on a live hero. The panel said only that "some words" were edited
+ * separately, which does not tell anybody which, or where they went.
+ *
+ * So somebody does the obvious thing and types the missing word back, and the
+ * page then reads "Get Your Music Heard Heard by the People Who Matter". The
+ * save is not at fault: writing the box back leaves child elements alone,
+ * exactly as intended, so the word the span already held is still there.
+ *
+ * Naming them removes the reason to retype anything. Long ones are shortened,
+ * because this goes in a hint and a hint is not a place to reprint a sentence.
+ */
+export const wordsEditedElsewhere = (element, longest = 24) =>
+    [...(element?.children ?? [])]
+        .map((child) => (child.textContent ?? '').replace(/\s+/g, ' ').trim())
+        .filter((words) => words !== '')
+        .map((words) => (words.length > longest ? `${words.slice(0, longest - 1).trimEnd()}…` : words));
+
+/**
  * Controls that reveal something rather than navigate somewhere.
  *
  * Editing swallows every click - it has to, or clicking a heading inside a

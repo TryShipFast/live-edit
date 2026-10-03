@@ -2,7 +2,7 @@ import { createChrome } from './chrome.js';
 import { biggestThatFits, inSourcePixels, movedWithin, whatIsThereNow } from './fitting.js';
 import { attrsWorthSending, creditWorthSending } from './only-what-changed.js';
 import { confirm as confirmChange, expectChange, takeExpected } from './verify.js';
-import { apiRequestFor, attributeOf, backgroundImageOf, classListWith, declaredStyleProps, displayedValue, iconNamesIn, isJsonResponse, looksLikeAPicture, orderedIcons, ownTextOf, parseEditKey, requestInit, stylePropsFor, interactiveTarget, nameOfControl, givesUpAfter, ranOutOfTime, WAITS_AT_MOST } from './support.js';
+import { apiRequestFor, attributeOf, backgroundImageOf, classListWith, declaredStyleProps, displayedValue, iconNamesIn, isJsonResponse, looksLikeAPicture, orderedIcons, ownTextOf, parseEditKey, requestInit, stylePropsFor, interactiveTarget, nameOfControl, givesUpAfter, ranOutOfTime, WAITS_AT_MOST, wordsEditedElsewhere } from './support.js';
 
 /**
  * Start only once the host page has finished loading.
@@ -2856,10 +2856,36 @@ const bootLiveEdit = () => {
                         && ownRuns.some((node) => node.textContent.trim() !== '');
 
                     if (splitByMarkup) {
+                        /*
+                         * Which words, by name.
+                         *
+                         * This used to say only that "some words" were edited
+                         * elsewhere, and the box above it showed the sentence
+                         * with those words cut out of it - a hero reading
+                         * "Get Your Music  by the People Who Matter", gap and
+                         * all, measured on a real site.
+                         *
+                         * Somebody looking at that does the obvious thing and
+                         * types the missing word back, and the page then says
+                         * "Get Your Music Heard Heard by the People Who
+                         * Matter". The save was never the fault: writing this
+                         * box back leaves the span alone, correctly, so the
+                         * word it already held is still there. The panel
+                         * simply never said where it went.
+                         *
+                         * Naming them costs one line and removes the reason to
+                         * retype anything.
+                         */
+                        const elsewhere = wordsEditedElsewhere(element).map((words) => `“${words}”`);
+
                         const note = document.createElement('p');
                         note.className = 'le-hint';
-                        note.textContent = 'Some words here sit inside their own formatting and are edited separately.'
-                            + ' Changing this box rewrites only the words around them, and leaves them as they are.';
+                        note.textContent = elsewhere.length > 0
+                            ? `${elsewhere.join(', ')} ${elsewhere.length === 1 ? 'sits' : 'sit'} inside their own formatting`
+                                + ' and stay on the page — click the words themselves to change them.'
+                                + ' This box rewrites only what is around them, so there is no need to type them again.'
+                            : 'Some words here sit inside their own formatting and are edited separately.'
+                                + ' Changing this box rewrites only the words around them, and leaves them as they are.';
                         drawerFields.append(note);
                     }
                 }
