@@ -40,6 +40,23 @@ class MarkupScanner
      * thing, so without naming these it would never look inside a sentence at
      * all and the bold words stayed unreachable.
      */
+    /**
+     * Whether the person this scan is for may edit what the author locked.
+     *
+     * True by default, so every existing caller - the export, the WordPress
+     * pass, a command, a page tagged for nobody in particular - behaves
+     * exactly as it did. Only a scan made on somebody's behalf narrows it.
+     */
+    protected bool $mayEditLocked = true;
+
+    /** Scan for somebody who may not touch the parts the author locked. */
+    public function asAnInvitedEditor(bool $narrowed = true): static
+    {
+        $this->mayEditLocked = ! $narrowed;
+
+        return $this;
+    }
+
     protected const PHRASE_TAGS = ['strong', 'b', 'em', 'i', 'mark', 'small', 'code', 'u',
         // And a span, which is how every accent word on the modern web is
         // written: <h1>Get Your Music <span class="text-primary">Heard</span>
@@ -1042,6 +1059,23 @@ class MarkupScanner
                 continue;
             }
 
+            /*
+             * Breaking a nav does not need its words.
+             *
+             * A list id is what lets somebody add, delete and reorder its
+             * items, which is the most structural edit this product offers -
+             * and a navigation is exactly the list a developer locks. This
+             * pass walks the document flat, so refusing the container here is
+             * the only place it can be refused.
+             *
+             * Found by a test asserting the nav was untouched, which caught
+             * the links inside it still carrying data-edit-item while every
+             * other marker had correctly been withheld.
+             */
+            if ($this->insideChrome($container)) {
+                continue;
+            }
+
             // Named the way everything else is named, rather than by its
             // position in the whole document.
             //
@@ -1459,12 +1493,43 @@ class MarkupScanner
     protected function insideChrome(DOMElement $element): bool
     {
         for ($node = $element; $node instanceof DOMElement; $node = $node->parentNode) {
-            if ($this->isChrome($node)) {
+            if ($this->isChrome($node) || $this->isLockedAway($node)) {
                 return true;
             }
         }
 
         return false;
+    }
+
+    /**
+     * The developer's half of the site, marked in the markup.
+     *
+     * data-no-edit already exists and says "this is not the site" - a toolbar,
+     * a debug bar, somebody else's furniture. This says something different and
+     * more useful: this IS the site, it is content, and it is not the client's
+     * to change. A nav, a footer, a pricing table, a legal line.
+     *
+     * In the markup rather than in a dashboard, for the same reason an edit
+     * survives a redeploy: the page's author is the one who knows, it is
+     * reviewable in a pull request, and it cannot drift out of step with a
+     * setting somebody changed in a browser eight months ago. It is the rule
+     * the scanner already follows for x-text - the author saying out loud that
+     * something is not ours - applied to the one case where the author is
+     * protecting the client from themselves.
+     *
+     * Who is holding the session decides whether it binds. A developer sees
+     * everything; somebody they invited sees what is left. That is what stops
+     * guardrails and coverage pulling against each other: widening what CAN be
+     * edited no longer widens what a client can break.
+     */
+    protected function isLockedAway(DOMElement $element): bool
+    {
+        if ($this->mayEditLocked) {
+            return false;
+        }
+
+        return $element->hasAttribute('data-live-lock')
+            || $element->hasAttribute('data-live-edit-lock');
     }
 
     protected function walk(DOMNode $node): void
@@ -1480,7 +1545,7 @@ class MarkupScanner
                 continue;
             }
 
-            if ($this->isChrome($child)) {
+            if ($this->isChrome($child) || $this->isLockedAway($child)) {
                 continue;
             }
 

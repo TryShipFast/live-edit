@@ -85,7 +85,7 @@ class TagMarkup
      * decides the answer. A release that improves it must not be served last
      * release's tags out of a cache that cannot know the difference.
      */
-    private function cacheKey(Site $site, string $html, string $page): string
+    private function cacheKey(Site $site, string $html, string $page, bool $mayEditLocked): string
     {
         $stable = WhatChangesEveryRender::masked($html);
 
@@ -93,6 +93,11 @@ class TagMarkup
             LiveEdit::VERSION,
             (string) $site->id,
             $page,
+            // Two people asking about the same page get different answers,
+            // so they must not be handed each other's. Without this the
+            // first developer to open a page would cache the unlocked
+            // version and every client after them would be served it.
+            $mayEditLocked ? 'all' : 'invited',
             hash('sha256', $stable),
         ]));
     }
@@ -100,12 +105,18 @@ class TagMarkup
     /**
      * @return array{elements: array<int, array<string, mixed>>, count: int}
      */
-    public function __invoke(Site $site, string $html, string $page = ''): array
+    /**
+     * @param  bool  $mayEditLocked  Whether the person asking may touch what
+     *                               the page's author marked data-live-lock.
+     *                               Part of the cache key, because two people
+     *                               must not be handed each other's answer.
+     */
+    public function __invoke(Site $site, string $html, string $page = '', bool $mayEditLocked = true): array
     {
         $this->remembered = false;
 
         $kept = $this->keptFor();
-        $key = $kept > 0 ? $this->cacheKey($site, $html, $page) : null;
+        $key = $kept > 0 ? $this->cacheKey($site, $html, $page, $mayEditLocked) : null;
 
         if ($key !== null) {
             /*
@@ -142,7 +153,8 @@ class TagMarkup
             }
         }
 
-        $tagged = (new MarkupScanner)->apply($html, ['text', 'image', 'link', 'icon'], true, null, $page)['html'] ?? '';
+        $tagged = (new MarkupScanner)->asAnInvitedEditor(! $mayEditLocked)
+            ->apply($html, ['text', 'image', 'link', 'icon'], true, null, $page)['html'] ?? '';
 
         if ($tagged === '') {
             return ['elements' => [], 'count' => 0];

@@ -55,6 +55,34 @@ class ApiToken extends Model
             && ($this->expires_at === null || $this->expires_at->isFuture());
     }
 
+    /**
+     * Whether the person behind this key may edit what the author locked.
+     *
+     * A key with nobody behind it - the publishable one in every page, a
+     * secret one on a server - is the site asking about itself, and gets the
+     * whole site. Only a session has a person, and only a person can have been
+     * invited rather than own the place.
+     *
+     * Defaults to true wherever it is not recorded, which is the answer that
+     * cannot lock somebody out of their own site because of a column nobody
+     * migrated.
+     */
+    public function mayEditLocked(): bool
+    {
+        if ($this->editor_id === null) {
+            return true;
+        }
+
+        $allowed = $this->editor
+            ?->sites()
+            ->where('live_edit_sites.id', $this->site_id)
+            ->first()
+            ?->pivot
+            ?->may_edit_locked;
+
+        return $allowed === null ? true : (bool) $allowed;
+    }
+
     public function can(Ability $ability): bool
     {
         return Ability::grantedIn($this->abilities ?? [], $ability);

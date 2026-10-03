@@ -289,7 +289,22 @@ class ContentController
         ]);
 
         $site = ApiContext::site($request);
-        $result = $tag($site, $validated['html'], $validated['page'] ?? '');
+
+        /*
+         * Whose page this is being prepared for.
+         *
+         * A developer sees the whole site; somebody they invited sees what is
+         * left after data-live-lock. Asked here rather than inside the scanner
+         * because this is the only layer that knows who is holding the
+         * session - and a page tagged for nobody in particular, which is every
+         * visitor, is tagged in full exactly as before.
+         */
+        $result = $tag(
+            $site,
+            $validated['html'],
+            $validated['page'] ?? '',
+            ApiContext::token($request)->mayEditLocked()
+        );
 
         Meter::record($site, Meter::TAG);
 

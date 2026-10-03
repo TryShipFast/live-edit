@@ -43,7 +43,7 @@ class Editor extends Model
     public function sites(): BelongsToMany
     {
         return $this->belongsToMany(Site::class, 'live_edit_editor_site', 'editor_id', 'site_id')
-            ->withPivot(['may_publish', 'last_seen_at'])
+            ->withPivot(['may_publish', 'may_edit_locked', 'last_seen_at'])
             ->withTimestamps();
     }
 
