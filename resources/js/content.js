@@ -1107,7 +1107,14 @@ const start = async () => {
             // static page has no layout, so the Publish button simply never
             // appeared and the drafts had nowhere to go.
             if (typeof payload.pending === 'number' && payload.styleProps) {
-                window.liveEditPublishing = { ...(window.liveEditPublishing ?? {}), pending: payload.pending };
+                window.liveEditPublishing = {
+                    ...(window.liveEditPublishing ?? {}),
+                    pending: payload.pending,
+                    // Which version is actually out there. Carried because
+                    // "published" with no number is a claim, and with one it
+                    // is something somebody can check.
+                    version: payload.version ?? null,
+                };
             }
 
             applied = applyContent(document, payload.settings ?? {});

@@ -663,6 +663,28 @@ select.le-input {
   box-shadow: 0 30px 80px -30px rgba(11,12,15,.45);
 }
 
+/* The page as a visitor is being served it, at full width. Same idea as the
+   phone frame and the same reason: loaded again rather than redrawn, because
+   what is published is fetched with a different key and cannot be faked by
+   hiding things. */
+.le-whole {
+  position: fixed; inset: 0; z-index: 2147483003; background: #fff;
+}
+.le-whole iframe { width: 100%; height: 100%; border: 0; display: block; }
+
+.le-back-sep {
+  width: 1px; align-self: stretch; margin: 4px 4px;
+  background: rgba(255,255,255,.18);
+}
+
+.le-back-note {
+  font-size: 12px; color: rgba(255,255,255,.62);
+  padding: 0 10px 0 4px; white-space: nowrap; align-self: center;
+}
+
+/* So nobody mistakes one for the other at a glance. */
+.le-back.is-live { outline: 2px solid #4ADE80; outline-offset: 2px; }
+
 /* ---- what is about to go live ---- */
 .le-review { display: flex; flex-direction: column; gap: 2px; }
 .le-review-row { padding: 11px 0; border-bottom: 1px solid var(--le-line-soft, #EEEFF1); }

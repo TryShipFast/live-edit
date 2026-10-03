@@ -4320,41 +4320,109 @@ const bootLiveEdit = () => {
                 const pill = document.createElement('div');
                 pill.className = 'le-back';
 
-                let phone = null;
+                let frame = null;
+                let onAPhone = false;
+                let asAVisitor = false;
 
-                const showPhone = (on) => {
-                    if (on && !phone) {
-                        phone = document.createElement('div');
-                        phone.className = 'le-phone';
-                        const frame = document.createElement('iframe');
-                        const url = new URL(window.location.href);
-                        // So the editor does not boot a second time inside
-                        // its own preview.
-                        url.searchParams.set('live-edit', 'off');
-                        frame.src = url.toString();
-                        frame.title = 'This page on a phone';
-                        phone.append(frame);
-                        ui.shadow.append(phone);
-                    } else if (!on && phone) {
-                        phone.remove();
-                        phone = null;
+                /*
+                 * One frame, told two things: how wide, and whose words.
+                 *
+                 * Desktop-and-drafts is the only combination that needs no
+                 * frame at all, because that is this page with the chrome
+                 * hidden. Everything else is the page loaded again, which is
+                 * the only way to be sure of what it says: a width is read
+                 * from the window rather than from a box drawn inside it, and
+                 * published content is fetched with a different key.
+                 */
+                const render = () => {
+                    const wanted = onAPhone || asAVisitor;
+
+                    if (!wanted) {
+                        frame?.remove();
+                        frame = null;
+
+                        return;
                     }
+
+                    const url = new URL(window.location.href);
+                    /*
+                     * "off" keeps the editor from booting a second time inside
+                     * its own preview. "published" does that and one thing
+                     * more: it has the page ask for content the way a stranger
+                     * does, so what comes back is what is actually being
+                     * served right now.
+                     */
+                    url.searchParams.set('live-edit', asAVisitor ? 'published' : 'off');
+
+                    frame?.remove();
+                    frame = document.createElement('div');
+                    frame.className = onAPhone ? 'le-phone' : 'le-whole';
+
+                    const page = document.createElement('iframe');
+                    page.src = url.toString();
+                    page.title = asAVisitor
+                        ? 'This page as a visitor is being served it'
+                        : 'This page on a phone';
+                    frame.append(page);
+                    ui.shadow.append(frame);
                 };
 
-                const widths = [['Desktop', false], ['Phone', true]];
-                const buttons = widths.map(([label, wantsPhone]) => {
+                const group = (choices, onPick) => choices.map(([label, value, hint]) => {
                     const button = el('button', 'le-back-btn', label);
                     button.type = 'button';
+                    if (hint) button.title = hint;
                     button.addEventListener('click', () => {
-                        buttons.forEach((other) => other.classList.remove('is-on'));
+                        choices.buttons.forEach((other) => other.classList.remove('is-on'));
                         button.classList.add('is-on');
-                        showPhone(wantsPhone);
+                        onPick(value);
+                        render();
                     });
                     pill.append(button);
 
                     return button;
                 });
-                buttons[0].classList.add('is-on');
+
+                const widths = [['Desktop', false], ['Phone', true]];
+                widths.buttons = group(widths, (value) => {
+                    onAPhone = value;
+                });
+                widths.buttons[0].classList.add('is-on');
+
+                pill.append(el('span', 'le-back-sep'));
+
+                /*
+                 * The question Preview never answered.
+                 *
+                 * Preview shows what a page WILL look like. Nothing showed
+                 * what it looks like now, and an editor who had published
+                 * something had no way to confirm it beyond loading their own
+                 * site signed out - which two separate people did, in the same
+                 * week, rather than trust the product.
+                 */
+                const whose = [
+                    ['Your drafts', false, 'The page with your unpublished work applied'],
+                    ["What's live", true, 'The page exactly as a visitor is being served it right now'],
+                ];
+                whose.buttons = group(whose, (value) => {
+                    asAVisitor = value;
+                    pill.classList.toggle('is-live', value);
+                });
+                whose.buttons[0].classList.add('is-on');
+
+                /*
+                 * Named, because "published" without a number is a claim and
+                 * with one is a fact somebody can check against the Changes
+                 * list. A site that has published nothing says so rather than
+                 * showing a zero nobody can interpret.
+                 */
+                const standing = el(
+                    'span',
+                    'le-back-note',
+                    publishing.version
+                        ? `Published version ${publishing.version}`
+                        : 'Nothing published yet'
+                );
+                pill.append(standing);
 
                 if (publishing.previewUrl) {
                     const share = el('button', 'le-back-btn', 'Copy a link to this');
@@ -4376,7 +4444,8 @@ const bootLiveEdit = () => {
                 const back = el('button', 'le-back-btn', 'Back to editing');
                 back.type = 'button';
                 back.addEventListener('click', () => {
-                    showPhone(false);
+                    frame?.remove();
+                    frame = null;
                     pill.remove();
                     document.removeEventListener('keydown', onKey, true);
                     ui.toolbar.style.display = '';
@@ -4886,7 +4955,12 @@ const startLiveEdit = (() => {
         // The phone preview loads this same page in a frame, and an editor
         // booting inside its own preview draws a second toolbar over a page
         // nobody can reach to press it.
-        if (new URLSearchParams(window.location.search).get('live-edit') === 'off') return;
+        //
+        // "published" is the same instruction with a reason of its own: that
+        // frame is showing the page as a visitor is being served it, and a
+        // visitor has no editor.
+        const how = new URLSearchParams(window.location.search).get('live-edit');
+        if (how === 'off' || how === 'published') return;
 
         started = true;
         bootLiveEdit();

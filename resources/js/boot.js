@@ -227,9 +227,31 @@
             return;
         }
 
-        window.liveEditContent = session.contentConfigFor(config, token);
+        /*
+         * Asking to be treated as a stranger.
+         *
+         * An editor is shown their own unpublished work everywhere, which is
+         * right, and leaves them with no way to see the page a visitor is
+         * being served right now. Preview answers "what will this look like",
+         * never "what is out there". The only way to check was to sign out, or
+         * open a private window and remember the address.
+         *
+         * Reported from two directions in the same week - as a missing view by
+         * somebody installing the product, and as a worry by somebody who had
+         * published and wanted to be sure. Both had resorted to loading the
+         * site signed-out to find out.
+         *
+         * So the token is set aside for this one page load: published files,
+         * publishable key, snapshot and all. It is the same call made for
+         * somebody with no session, which matters more than it looks - there
+         * is no second path to keep honest, so this cannot drift into showing
+         * something no visitor would get.
+         */
+        var asAVisitor = /[?&]live-edit=published(&|$)/.test(window.location.search);
 
-        if (token) {
+        window.liveEditContent = session.contentConfigFor(config, asAVisitor ? null : token);
+
+        if (token && !asAVisitor) {
             window.liveEditApi.token = token;
 
             // Said out loud, because a React provider cannot be handed this:
@@ -247,8 +269,10 @@
         // server still has its backgrounds to find, because those live in a
         // stylesheet and the server was reading markup. autoTag decides — it
         // returns immediately when there is nothing new to ask about.
-        var tagging = { base: config.api, site: config.site, key: token || config.key };
-        var editing = token || /[?&]edit(=1)?(&|$)/.test(window.location.search);
+        var tagging = { base: config.api, site: config.site, key: (asAVisitor ? null : token) || config.key };
+        // Nothing is edited on a page being shown as a visitor sees it, so the
+        // editor is not fetched for it either.
+        var editing = !asAVisitor && (token || /[?&]edit(=1)?(&|$)/.test(window.location.search));
 
         /*
          * Everything this page is certainly going to need, asked for at once.
