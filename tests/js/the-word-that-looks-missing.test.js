@@ -58,6 +58,23 @@ describe('the word that looks missing', () => {
 
         expect(wordsEditedElsewhere(heading)).toEqual([]);
     });
+
+    it('says nothing on the accent word itself, which only holds a drawing', () => {
+        /*
+         * Caught in the panel on the live hero, one release after the fix
+         * above shipped. The span IS split by markup - it has a child - and
+         * that child is the hand-drawn underline. So somebody editing the word
+         * "Heard" was told that some of their words were kept elsewhere, when
+         * none of them were and there was nothing to go and click.
+         *
+         * A warning about a thing that is not there costs more than silence:
+         * it is read, acted on, found to be false, and the next one is not
+         * believed either. Having nothing to name is the signal to say nothing.
+         */
+        const accent = hero('<span class="text-primary">Heard<svg height="6"><path d="M0 3"/></svg></span>');
+
+        expect(wordsEditedElsewhere(accent)).toEqual([]);
+    });
 });
 
 describe('what the save actually does to that hero', () => {

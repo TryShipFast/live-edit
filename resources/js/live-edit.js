@@ -2851,11 +2851,24 @@ const bootLiveEdit = () => {
                  * loud at the moment somebody is looking at the gap.
                  */
                 if (!asIcon && !richSetting) {
-                    const ownRuns = [...element.childNodes].filter((node) => node.nodeType === 3);
-                    const splitByMarkup = element.children.length > 0
-                        && ownRuns.some((node) => node.textContent.trim() !== '');
+                    /*
+                     * Said only when there is something to say.
+                     *
+                     * Split by markup is not the same question as "are any
+                     * words kept elsewhere". Seen on the live hero, on the
+                     * accent word itself: <span>Heard<svg/></span> is split by
+                     * markup - it has a child - and the child is a drawing. So
+                     * the panel told somebody editing the word "Heard" that
+                     * some of their words were edited separately, when none of
+                     * them were and there was nothing to go and click.
+                     *
+                     * A warning about a thing that is not there costs more
+                     * than silence: it is read, acted on, found to be false,
+                     * and then the next one is not believed either.
+                     */
+                    const elsewhere = wordsEditedElsewhere(element).map((words) => `“${words}”`);
 
-                    if (splitByMarkup) {
+                    if (elsewhere.length > 0) {
                         /*
                          * Which words, by name.
                          *
@@ -2876,16 +2889,12 @@ const bootLiveEdit = () => {
                          * Naming them costs one line and removes the reason to
                          * retype anything.
                          */
-                        const elsewhere = wordsEditedElsewhere(element).map((words) => `“${words}”`);
-
                         const note = document.createElement('p');
                         note.className = 'le-hint';
-                        note.textContent = elsewhere.length > 0
-                            ? `${elsewhere.join(', ')} ${elsewhere.length === 1 ? 'sits' : 'sit'} inside their own formatting`
-                                + ' and stay on the page — click the words themselves to change them.'
-                                + ' This box rewrites only what is around them, so there is no need to type them again.'
-                            : 'Some words here sit inside their own formatting and are edited separately.'
-                                + ' Changing this box rewrites only the words around them, and leaves them as they are.';
+                        note.textContent = `${elsewhere.join(', ')} `
+                            + `${elsewhere.length === 1 ? 'sits' : 'sit'} inside their own formatting`
+                            + ' and stay on the page — click the words themselves to change them.'
+                            + ' This box rewrites only what is around them, so there is no need to type them again.';
                         drawerFields.append(note);
                     }
                 }
