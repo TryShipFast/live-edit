@@ -40,7 +40,26 @@ class MarkupScanner
      * thing, so without naming these it would never look inside a sentence at
      * all and the bold words stayed unreachable.
      */
-    protected const PHRASE_TAGS = ['strong', 'b', 'em', 'i', 'mark', 'small', 'code', 'u'];
+    protected const PHRASE_TAGS = ['strong', 'b', 'em', 'i', 'mark', 'small', 'code', 'u',
+        // And a span, which is how every accent word on the modern web is
+        // written: <h1>Get Your Music <span class="text-primary">Heard</span>
+        // by the People Who Matter</h1>.
+        //
+        // Measured on a live hero, and the result was the worst of the three
+        // possible answers. The word was not in the heading's own text, which
+        // is what keeps an edit there from swallowing it. It was not keyed
+        // itself, because the walk stops at the first editable thing and a
+        // span was not named here. So it was not destroyed, not duplicated,
+        // simply unreachable - and the panel showed the sentence with a gap
+        // where it used to be.
+        //
+        // Safe for the reason the emphasis tags above are safe, which is now
+        // checked on both appliers rather than asserted: each writes into its
+        // own run of text and leaves child elements alone, so a heading and
+        // the accent inside it can be edited independently without either
+        // destroying the other.
+        'span', 'a',
+    ];
 
     /**
      * Inline tags that don't disqualify an element from being a text leaf.
