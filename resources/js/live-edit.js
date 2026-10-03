@@ -904,11 +904,81 @@ const bootLiveEdit = () => {
             }
         };
 
-        const switchToNode = (node) => {
-            if (current?.dirty && !window.confirm('Discard unsaved changes?')) return;
+        /**
+         * Ask before throwing somebody's typing away, without freezing the page.
+         *
+         * This was `window.confirm`, which is a native dialog - and a native
+         * dialog stops everything: the page behind it, this editor, and any
+         * script waiting on either. Hit while saving was already failing, it
+         * reads as the product having locked up, and the only way to find out
+         * otherwise is to answer a question you did not expect. Reported in
+         * exactly those terms: "save changes doesn't work... until a pop ask
+         * until you discard the changes".
+         *
+         * The editor has had its own dialog for publishing since the beginning,
+         * which draws inside the overlay and blocks nothing. There was no
+         * reason for this one question to be different.
+         *
+         * Dismissing it any other way - the ×, the scrim, Escape - means keep
+         * editing, because that is the answer that cannot lose work.
+         */
+        const askBeforeLosingIt = () => new Promise((resolve) => {
+            const sheet = ui.modal({
+                title: 'Discard what you typed?',
+                subtitle: 'Your changes to this element have not been saved.',
+                size: 'is-narrow',
+            });
+
+            let answered = false;
+            const answer = (discard) => {
+                if (answered) return;
+                answered = true;
+                sheet.close();
+                resolve(discard);
+            };
+
+            const keep = el('button', 'le-btn-outline', 'Keep editing');
+            keep.type = 'button';
+            keep.addEventListener('click', () => answer(false));
+
+            const drop = el('button', 'le-btn-danger', 'Discard');
+            drop.type = 'button';
+            drop.addEventListener('click', () => answer(true));
+
+            sheet.foot.hidden = false;
+            sheet.foot.append(keep, drop);
+            keep.focus();
+
+            // The three ways out the dialog offers of its own accord. Each one
+            // is somebody declining to answer, and declining must not discard.
+            sheet.card.querySelector('.le-close')?.addEventListener('click', () => answer(false));
+            sheet.card.parentElement?.addEventListener('mousedown', (event) => {
+                if (event.target === sheet.card.parentElement) answer(false);
+            });
+            document.addEventListener('keydown', function onEscape(event) {
+                if (event.key !== 'Escape') return;
+                document.removeEventListener('keydown', onEscape, true);
+                answer(false);
+            }, true);
+        });
+
+        /** Run something, once it is safe to lose what is in the drawer. */
+        const onceItIsSafe = (go) => {
+            if (!current?.dirty) {
+                go();
+
+                return;
+            }
+
+            askBeforeLosingIt().then((discard) => {
+                if (discard) go();
+            });
+        };
+
+        const switchToNode = (node) => onceItIsSafe(() => {
             clearStylePreview();
             openNode(node);
-        };
+        });
 
         /**
          * Where the drawer was before this, so "back" means something.
@@ -1008,9 +1078,13 @@ const bootLiveEdit = () => {
         Object.entries(drawerTabs).forEach(([name, tab]) => {
             tab.addEventListener('click', () => {
                 // Moving away from a half-typed edit would lose it silently.
-                if (name !== 'Edit' && current?.dirty && !window.confirm('Discard unsaved changes?')) return;
+                if (name === 'Edit') {
+                    showTab(name);
 
-                showTab(name);
+                    return;
+                }
+
+                onceItIsSafe(() => showTab(name));
 
                 if (!drawer.classList.contains('is-open')) openDrawer();
             });
@@ -1665,7 +1739,21 @@ const bootLiveEdit = () => {
             }
         };
         const closeDrawer = (force = false) => {
-            if (!force && current?.dirty && !window.confirm('Discard unsaved changes?')) return;
+            /*
+             * Asked, then closed - rather than closed if the answer comes back
+             * in time. The dialog is drawn rather than native now, so there is
+             * no blocking answer to wait for and this returns while the
+             * question is still on screen. Everything after it has to happen
+             * on the way back.
+             */
+            if (!force && current?.dirty) {
+                askBeforeLosingIt().then((discard) => {
+                    if (discard) closeDrawer(true);
+                });
+
+                return;
+            }
+
             current?.restore?.();
             clearStylePreview();
             drawer.classList.remove('is-open');
