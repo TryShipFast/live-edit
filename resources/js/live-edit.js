@@ -2,7 +2,7 @@ import { createChrome } from './chrome.js';
 import { biggestThatFits, inSourcePixels, movedWithin, whatIsThereNow } from './fitting.js';
 import { attrsWorthSending, creditWorthSending } from './only-what-changed.js';
 import { confirm as confirmChange, expectChange, takeExpected } from './verify.js';
-import { apiRequestFor, attributeOf, backgroundImageOf, classListWith, declaredStyleProps, displayedValue, iconNamesIn, isJsonResponse, looksLikeAPicture, orderedIcons, ownTextOf, parseEditKey, requestInit, stylePropsFor, interactiveTarget, nameOfControl, givesUpAfter, ranOutOfTime, WAITS_AT_MOST, wordsEditedElsewhere, PUTS_BACK, worthReverting } from './support.js';
+import { apiRequestFor, attributeOf, backgroundImageOf, classListWith, declaredStyleProps, displayedValue, iconNamesIn, isJsonResponse, looksLikeAPicture, orderedIcons, ownTextOf, parseEditKey, requestInit, stylePropsFor, interactiveTarget, nameOfControl, givesUpAfter, ranOutOfTime, WAITS_AT_MOST, wordsEditedElsewhere, PUTS_BACK, worthReverting, shownWords } from './support.js';
 
 /**
  * Start only once the host page has finished loading.
@@ -2871,7 +2871,7 @@ const bootLiveEdit = () => {
                     ownText: ownTextOf(element),
                     fullText: element.textContent,
                 });
-                const text = richSetting ? raw.trim() : raw.replace(/\s+/g, ' ').trim();
+                const text = richSetting ? raw.trim() : shownWords(element, raw);
                 /*
                  * What the panel opened holding.
                  *

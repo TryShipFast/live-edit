@@ -506,6 +506,44 @@ export const backgroundImageOf = (element, view = null) => {
     return recorded.startsWith('data:') ? '' : recorded;
 };
 
+/**
+ * The words as the panel should show them, without merging across a gap.
+ *
+ * Theme markup is full of tabs and newlines, so what the panel shows has
+ * always been collapsed to single spaces. That is right inside a run of text
+ * and wrong across the boundary between two, because the gap between runs is
+ * where an inline element sits - and collapsing it loses the space that keeps
+ * the words apart from it.
+ *
+ * Measured on a live hero, written the way React writes one:
+ *
+ *   text    "Get Your Music"
+ *   comment " "
+ *   text    " "                  <- the {" "} separator
+ *   span    Heard
+ *   text    " "                  <- the {" "} separator
+ *   comment " "
+ *   text    "by the People Who Matter"
+ *
+ * Four runs, and the panel showed their join with one space in the middle
+ * instead of two. So the applier compared that against the page, correctly
+ * concluded a space had been deleted, and deleted it - from the separator run.
+ * The hero then read "Get Your Music Heardby the People Who Matter" the moment
+ * anybody typed a character.
+ *
+ * Collapsed run by run instead, which leaves the gaps exactly as they were and
+ * still tidies the tabs a theme leaves inside a sentence.
+ */
+export const shownWords = (element, raw) => {
+    const runs = [...(element?.childNodes ?? [])].filter((node) => node.nodeType === 3);
+
+    if (runs.length < 2) {
+        return String(raw ?? '').replace(/\s+/g, ' ').trim();
+    }
+
+    return runs.map((node) => (node.nodeValue ?? '').replace(/\s+/g, ' ')).join('').trim();
+};
+
 /** Which CSS property each style control puts back when it is cleared. */
 export const PUTS_BACK = {
     background: 'background',
