@@ -1334,7 +1334,7 @@ const bootLiveEdit = () => {
 
                 const after = document.createElement('p');
                 after.className = 'le-change-after';
-                after.textContent = trim(change.after) || '(empty)';
+                after.textContent = readsOnThePageAs(change) || '(empty)';
                 row.append(after);
 
                 drawerFields.append(row);
@@ -1447,10 +1447,12 @@ const bootLiveEdit = () => {
         /* What to call a change in the list.
            The element's own words where the page still has them, because that
            is what somebody remembers changing — not auto:9de57a6dba8b. */
+        const elementForChange = (change) => document.querySelector(
+            `[data-edit="setting:${CSS.escape(change.key)}"], [data-edit-img="setting:${CSS.escape(change.key)}"], [data-style="${CSS.escape(change.key)}"]`
+        );
+
         const labelForChange = (change) => {
-            const onPage = document.querySelector(
-                `[data-edit="setting:${CSS.escape(change.key)}"], [data-edit-img="setting:${CSS.escape(change.key)}"], [data-style="${CSS.escape(change.key)}"]`
-            );
+            const onPage = elementForChange(change);
 
             if (onPage) return describeElement(onPage);
 
@@ -1459,6 +1461,42 @@ const bootLiveEdit = () => {
             // Named for what it is. "Text" over two thumbnails is the panel
             // contradicting itself on the one row somebody came here to find.
             return isAPictureChange(change) ? 'Picture' : 'Text';
+        };
+
+        /**
+         * What the page will say, rather than what is stored against the key.
+         *
+         * These are not the same thing for an element whose words are broken
+         * up by markup, and the difference is alarming. A hero written as
+         *
+         *     Get Your Music <span>Heard</span> by the People Who Matter
+         *
+         * stores "Get Your Music  by the People Who Matter" - correctly, that
+         * is the element's own text and the span keeps its own - and the list
+         * printed that back, so the row read as though somebody had deleted a
+         * word from the hero.
+         *
+         * Reported from a real install as destructive data loss and chased as
+         * one. Nothing was lost: with that change staged, the page still reads
+         * "Get Your Music Heard by the People Who Matter", checked on screen.
+         * The row was the only thing wrong, and a review list that frightens
+         * somebody about a change that is fine is worse than no list - it is
+         * the list they were meant to trust before pressing Publish.
+         *
+         * So where the element is on the page and keeps words of its own in
+         * its children, the row shows the sentence a visitor will read.
+         */
+        const readsOnThePageAs = (change) => {
+            const stored = trim(change.after);
+            const onPage = elementForChange(change);
+
+            if (!onPage || change.kind === 'style' || isAPictureChange(change)) {
+                return stored;
+            }
+
+            const kept = wordsEditedElsewhere(onPage);
+
+            return kept.length > 0 ? trim(onPage.textContent) || stored : stored;
         };
 
         const revertChange = async (change, button) => {
@@ -4258,7 +4296,7 @@ const bootLiveEdit = () => {
                             // somebody checked before pressing Publish and the
                             // list they publish are recognisably the same one.
                             el('div', 'le-review-what', labelForChange(change)),
-                            el('div', 'le-review-to', trim(change.after) || '(empty)'),
+                            el('div', 'le-review-to', readsOnThePageAs(change) || '(empty)'),
                         );
                         list.append(row);
                     });
