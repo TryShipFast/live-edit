@@ -341,15 +341,33 @@
             });
         }
 
+        /*
+         * The editor does not wait for the tagging to come back.
+         *
+         * It used to, and the cost of that was total: this chain loaded the
+         * editor only once tagging had settled, and tagging had no limit on
+         * it. Measured on a live install - the request sat pending for over
+         * twenty seconds while the same request from curl answered in one -
+         * and for that whole time the page had no toolbar, nothing outlined
+         * and nothing clickable. Reported, reasonably, as the editor being
+         * broken.
+         *
+         * Nothing about drawing the editor needs the tagging to have finished.
+         * A page that arrives already tagged by a server has nothing to wait
+         * for in the first place, and a page being tagged late gets its
+         * elements when they arrive - the editor picks up what appears,
+         * because it has to anyway for menus and slides that build themselves.
+         *
+         * So the order is: show somebody their editor, then fill the page in
+         * behind it. The worst case becomes an editor with fewer things
+         * editable for a moment, which somebody can see and understand,
+         * instead of a blank bar that never comes.
+         */
+        var editorReady = editing ? load('live-edit.js') : Promise.resolve();
+
         return ready
             .then(function () { return load('content.js'); })
-            .then(function () {
-                // The editor itself, only for somebody who is actually
-                // editing, which is almost nobody.
-                if (editing) {
-                    return load('live-edit.js');
-                }
-            });
+            .then(function () { return editorReady; });
     }).catch(function (error) {
         /*
          * The page is the point; the editor is not.

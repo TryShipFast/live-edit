@@ -12,7 +12,7 @@
  */
 
 import { masked } from './every-render.js';
-import { retrying } from './support.js';
+import { givesUpAfter, retrying } from './support.js';
 
 const CACHE_PREFIX = 'kb_tags_';
 
@@ -653,6 +653,22 @@ export const autoTag = async ({ base, site, key, page }, doc = document, { becau
             method: 'POST',
             headers: { 'Content-Type': 'application/json', Accept: 'application/json', Authorization: `Bearer ${key}` },
             body,
+            /*
+             * A limit, because the alternative is not "slow" - it is nothing,
+             * for as long as the tab is open.
+             *
+             * Measured on a live install: this request sat pending for over
+             * twenty seconds while the identical request from curl answered in
+             * one. Everything downstream waits on it, so the page had no
+             * editor at all - no toolbar, nothing outlined, nothing clickable.
+             * It reads exactly like the product being broken, and the console
+             * says nothing because nothing has failed yet.
+             *
+             * Generous, because this is a third of a megabyte of markup going
+             * up and a full scan coming back, and cutting a slow-but-working
+             * tag short would trade a rare hang for a common failure.
+             */
+            signal: givesUpAfter(20000),
         });
 
         if (!response.ok) {

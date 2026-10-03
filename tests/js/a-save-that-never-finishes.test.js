@@ -86,3 +86,33 @@ describe('a save that never finishes', () => {
         }
     });
 });
+
+describe('the tagging request that never answers', () => {
+    it('carries a limit, because everything else waits on it', async () => {
+        /*
+         * Measured on a live install: POST /tag sat pending for over twenty
+         * seconds while the identical request from curl answered in one. The
+         * page had no toolbar, nothing outlined and nothing clickable for that
+         * whole time, because the editor was loaded only once tagging settled
+         * and tagging could not fail.
+         *
+         * Two things were wrong and both are fixed: the request now gives up,
+         * and the editor no longer waits for it at all.
+         */
+        const { autoTag } = await import('../../resources/js/autotag.js');
+        const fetched = vi.fn().mockResolvedValue({
+            ok: true,
+            status: 200,
+            json: async () => ({ elements: [] }),
+        });
+        vi.stubGlobal('fetch', fetched);
+
+        document.body.innerHTML = '<h1>Something worth tagging</h1>';
+        await autoTag({ base: 'https://x/api', site: 'acme', key: 'kbp_x', page: '/' }, document, { because: 'test' });
+
+        expect(fetched).toHaveBeenCalled();
+        expect(fetched.mock.calls[0][1].signal).toBeInstanceOf(AbortSignal);
+
+        vi.unstubAllGlobals();
+    });
+});
