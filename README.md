@@ -10,221 +10,225 @@ It runs on five kinds of site, through adapters over one engine:
 | | How it is installed |
 | --- | --- |
 | **Laravel** | this package, tagging Blade views |
-| **WordPress** | a plugin, keeping the client's content in their own database |
+| **WordPress** | [a plugin](packages/wordpress/kastsbuild/README.md), keeping content in the client's own database |
 | **Plain HTML** | one script tag |
-| **Next.js** | `@shipfasts/live-edit-react`, with a codemod |
+| **Next.js** | [`@shipfasts/live-edit-react`](packages/react/README.md), with a codemod |
 | **React** | the same package, provider and overlay |
 
-What has actually been driven through a browser on a real site, adapter by
-adapter, is in [ADAPTERS.md](ADAPTERS.md). What does not work yet, and whether
-it is being fixed or lived with, is in [LIMITATIONS.md](LIMITATIONS.md).
+What has been driven through a browser on a real site is in
+[ADAPTERS.md](ADAPTERS.md). What does not work yet is in
+[LIMITATIONS.md](LIMITATIONS.md).
 
-The rest of this file is the Laravel adapter. The others have their own
-instructions in the console when a site is registered.
+**The rest of this file is the Laravel adapter.** The other adapters have their
+own instructions in the console when a site is registered.
 
-## What the Laravel package provides
-
-- **Endpoints** (`ShipFast\LiveEdit\Http\Controllers\LiveEditController`) for
-  settings, records (create / update / move / delete), images (replace / alt /
-  title / remove), styles and undo — all whitelist-validated from your config.
-- **Models** `ElementStyle` (per-element visual overrides) and `EditRevision`
-  (undo history), with migrations.
-- **`RichText`** — XSS-safe markdown-lite (`**bold**`, `*italic*`, `[text](url)`).
-- **`live-edit:prune-orphans`** — deletes uploaded images nothing references.
-- **The editor itself** — drawer, toolbar, live preview as you type, undo and
-  redo, the image picker, publish review and preview mode. Served by the
-  package at `/live-edit/runtime.js` and loaded by `@liveEdit`; you never
-  import or build it.
+---
 
 ## Install
 
-Two steps.
+Two commands and one line.
 
 ```bash
-composer require shipfasts/live-edit
+composer require shipfast/live-edit
 php artisan migrate
 ```
 
-Then one line in your layout's `<head>`:
+Then in your layout's `<head>`:
 
 ```blade
 @liveEdit
 ```
 
-That is the whole integration. The directive serves the editor from this
-package, so there is nothing to import, nothing to publish, and nothing to add
-to your asset build.
+That is the whole integration. Nothing to import, nothing to publish, nothing
+to add to your asset build.
 
 **Do not import the editor in `app.js`.** Bundling it compiles a copy of the
-engine into your site's assets, which means an engine fix reaches you only
-when you rebuild and redeploy — and until you do, the copy in your bundle and
-the one composer installed are different versions of the same thing, with
-nothing to say so. `@liveEdit` loads the installed package, so updating it is
-`composer update`.
+engine into your assets, so an engine fix only reaches you when you rebuild and
+redeploy. Until then the copy in your bundle and the one composer installed are
+different versions of the same thing, with nothing to say so. `@liveEdit` loads
+the installed package, so updating is `composer update`.
 
-### Signing in
+## Who can edit
 
-The package serves its own sign-in at **`/live-edit/sign-in`**. Link to it from
-wherever suits the site — a footer link is usual:
-
-```blade
-<a href="{{ route('live-edit.sign-in') }}">Sign in</a>
-```
-
-It authenticates against **your** users, with your guard and your password
-hashes. The package stores no credential, issues none, and has no user of its
-own to reset or recover. Its one requirement of a host is a users table and an
-auth provider, which a Laravel application has whether or not it has ever had
-a login screen.
-
-That matters because most sites this is installed on have no admin panel.
-Requiring one would make "install it and add a line" untrue for exactly the
-sites it is for.
-
-Signing out is `POST /live-edit/sign-out`.
-
-### The three values a site is given
-
-```env
-LIVE_EDIT_HOST=https://live.tryshipfast.com
-LIVE_EDIT_SITE_ID=acme
-LIVE_EDIT_APP_KEY=kbp_…
-```
-
-`APP_KEY` is public. It is printed into the source of every page it edits, so
-it is not a secret and its name should not suggest one. A site whose own
-server talks to the service, to let its people in or to publish, also sets
-`LIVE_EDIT_SECRET_KEY`; a Laravel or WordPress install that keeps its own
-content never calls that API and never needs one.
-
-These were `LIVE_EDIT_SITE` and `LIVE_EDIT_KEY`, and before that the
-`LIVE_EDIT_LICENCE_*` and `LIVE_EDIT_CLOUD_*` pairs. Every one of them is
-still read, so an upgrade changes nothing on a site already running. An
-installation still using a retired name says so in its log once a day.
-
-### Three integrations, three answers
-
-Where the content lives, and where the person proves who they are, are two
-different questions. Forcing one answer onto every technology is what makes
-this kind of product awkward to install.
-
-| Integration    | Signing in         | Content lives      |
-| -------------- | ------------------ | ------------------ |
-| Laravel        | your own accounts  | your database      |
-| WordPress      | your own accounts  | your database      |
-| Static / React | with us            | our cloud          |
-
-Laravel and WordPress already have users, permissions and somewhere to put
-words. Neither needs us to duplicate any of it, so we do not: the editor is a
-better way to write the words, and they stay where they were.
-
-A site with none of that, built as static HTML or generated by a framework,
-has nothing to borrow. That is what the cloud content model is for.
-
-Set `LIVE_EDIT_SIGN_IN` to `host`, `service`, or `either` (the default, and
-the only value that cannot lock somebody out of a site that worked yesterday).
-A host that defines the `live-edit` gate itself decides on its own and this is
-ignored.
-
-### Who may edit
-
-The editor appears for whoever passes the `live-edit` gate. Define it:
+Define the `live-edit` gate:
 
 ```php
 // app/Providers/AppServiceProvider.php
 Gate::define('live-edit', fn (User $user): bool => $user->is_admin);
 ```
 
-Nobody else is served the editor at all, so a visitor's page is the page they
-would have had without this package.
+Nobody else is served the editor at all, so a visitor's page is exactly the page
+they would have had without this package.
 
-### Optional
+Sign-in is served for you at **`/live-edit/sign-in`**. Link to it wherever suits:
 
-```bash
-php artisan vendor:publish --tag=live-edit-config    # to change what is editable
+```blade
+<a href="{{ route('live-edit.sign-in') }}">Sign in</a>
 ```
 
-The defaults work. Publish the config when you want to declare your own
-setting keys, models or locales.
+It authenticates against **your** users, with your guard and your password
+hashes. The package stores no credential and has no user of its own. All it
+needs is a users table and an auth provider, which a Laravel app has whether or
+not it has ever had a login screen.
 
-## Configure
+Signing out is `POST /live-edit/sign-out`.
 
-Everything editable is declared in `config/live-edit.php`:
+## Making text editable
 
-- `setting_model` — the Eloquent model backing key/value settings.
-- `settings` / `images` — setting keys editable as text / as images.
-- `models` — collections (`class`, `fields`, `creatable`, `deletable`,
-  `image_field`, `defaults`).
-- `style_props`, `select_options`, `icon_options`, `rich_settings`,
-  `rich_fields` — typed field metadata.
-- `middleware` — guards the endpoints (default `['web', 'auth', 'can:live-edit']`).
-- `after_save` — invoked after every write, e.g. to bust a content cache.
+Two ways, and they mix.
 
-Define the `live-edit` gate (or your own `middleware`) to control who can edit.
-
-## Tagging
-
-Two ways, and they mix. Name the handful of things that matter and let the rest
-be found.
-
-**Named keys** are what the examples below use. They are stable: the key says
-what the element is for, so the client's words survive a developer rewriting
-the sentence around them. Worth writing for anything important.
-
-**Derived keys** need no attributes at all. Set `LIVE_EDIT_AUTO_TAG=true` and
-the editable parts of a page are found as it is served — only for somebody the
-gate allows, so a visitor's page is never parsed or rewritten. The trade is
-that a derived key is a signature *of* the current wording: change that
-sentence in the template and the client's edit is orphaned. Use it to make a
-site editable without touching its templates, which is the only option for a
-site somebody bought rather than built.
-
-A page that already carries `data-edit` keeps its own keys untouched.
+**Named keys**, written by you. Stable: the key says what the element is for, so
+the client's words survive you rewriting the sentence around them. Worth writing
+for anything important.
 
 ```blade
 <h1 data-edit="setting:heroTitle" data-edit-label="Hero heading">{{ $site->get('heroTitle') }}</h1>
-<div data-edit="record:faq:{{ $faq->id }}" data-edit-deletable
-     data-edit-values="{{ json_encode(['question' => $faq->question, 'answer' => $faq->answer]) }}">…</div>
-<section data-style="home.hero"> … <x-live-edit::style-chip key="home.hero" label="Hero" /> </section>
 ```
 
-## Onboarding an existing site — the auto-mapper
+**Derived keys**, found automatically. Set `LIVE_EDIT_AUTO_TAG=true` and the
+editable parts of a page are found as it is served, only for somebody the gate
+allows. The trade is that a derived key is a signature of the current wording:
+change that sentence in the template and the client's edit is orphaned. Use it
+to make a site editable without touching its templates, which is the only option
+for a site somebody bought rather than built.
 
-Point the scanner at a rendered page to get a tagging plan, or apply it:
+A page that already carries `data-edit` keeps its own keys untouched.
+
+## Locking the parts a client must not change
+
+New in 0.14.
+
+You hand over a site with your name on it. A client will forgive a rough
+install. They will not forgive breaking the navigation, and neither will you.
+
+Wrap anything they should not touch:
+
+```blade
+<nav data-live-lock>
+  ...
+</nav>
+```
+
+A nav, a footer, a pricing table, a legal line. In the markup rather than a
+dashboard, so it is reviewable in a pull request and cannot drift out of step
+with a setting somebody changed in a browser eight months ago.
+
+Then define the `live-edit-locked` gate to say who is trusted with them:
+
+```php
+Gate::define('live-edit-locked', fn (User $user): bool => $user->is_developer);
+```
+
+| Who | What they get |
+| --- | --- |
+| Passes `live-edit-locked` | everything, including locked parts |
+| Fails it | everything except the locked parts |
+
+Locked means fully refused, not just the text. Somebody narrowed cannot reword
+it, restyle it, or reorder the links inside it.
+
+**If you never define the gate, nothing is locked for anyone.** An install that
+upgrades keeps working exactly as it did.
+
+**`data-live-lock` is not `data-no-edit`.** They sound similar and do opposite
+jobs:
+
+- `data-no-edit` means "this is not the site". A toolbar, a debug bar. Nobody
+  edits it, including you.
+- `data-live-lock` means "this *is* the site, and it is not the client's". You
+  still edit it. They do not.
+
+## The three values a site is given
+
+```env
+LIVE_EDIT_HOST=https://live.tryshipfast.com
+LIVE_EDIT_SITE_ID=acme
+LIVE_EDIT_APP_KEY=kbp_...
+```
+
+`APP_KEY` is public. It is printed into the source of every page it edits, so it
+is not a secret and its name should not suggest one.
+
+A site whose own server talks to the service, to let its people in or to
+publish, also sets `LIVE_EDIT_SECRET_KEY`. A Laravel or WordPress install that
+keeps its own content never calls that API and never needs one.
+
+Older names (`LIVE_EDIT_SITE`, `LIVE_EDIT_KEY`, and the `LIVE_EDIT_LICENCE_*` /
+`LIVE_EDIT_CLOUD_*` pairs) are all still read, so upgrading changes nothing on a
+running site. An install using a retired name says so in its log once a day.
+
+## Where content lives, and where people sign in
+
+Two different questions. Forcing one answer onto every technology is what makes
+this kind of product awkward to install.
+
+| Integration | Signing in | Content lives |
+| --- | --- | --- |
+| Laravel | your own accounts | your database |
+| WordPress | your own accounts | your database |
+| Static / React | with us | our cloud |
+
+Laravel and WordPress already have users, permissions and somewhere to put
+words, so we do not duplicate any of it. A static site has nothing to borrow,
+which is what the cloud content model is for.
+
+Set `LIVE_EDIT_SIGN_IN` to `host`, `service`, or `either` (the default, and the
+only value that cannot lock somebody out of a site that worked yesterday). A
+host that defines the `live-edit` gate itself decides on its own and this is
+ignored.
+
+## Tagging an existing site
+
+Point the scanner at a rendered page:
 
 ```bash
-php artisan live-edit:scan home.html            # review plan (text/image/link/collection)
-php artisan live-edit:scan home.html --config    # print a starter config skeleton
-php artisan live-edit:scan home.html --apply     # write data-edit tags -> home.tagged.html
+php artisan live-edit:scan home.html             # review the plan
+php artisan live-edit:scan home.html --config    # print a starter config
+php artisan live-edit:scan home.html --apply     # write tags -> home.tagged.html
 php artisan live-edit:scan home.html --apply --in-place
 ```
 
-Add `--ai` to refine the mechanical keys into semantic ones with an LLM:
+`--apply` is idempotent: re-running skips tagged nodes. Collections are reported
+but not auto-tagged, because they need a backing model and real ids that markup
+alone cannot supply. Always review the output. It is a draft.
+
+Add `--ai` to turn the mechanical keys into semantic ones:
 
 ```bash
 php artisan live-edit:scan home.html --ai --config
 ```
 
-Set `LIVE_EDIT_MAPPER_AI=true` and `OPENAI_API_KEY` (provider-agnostic — override
+Set `LIVE_EDIT_MAPPER_AI=true` and `OPENAI_API_KEY` (override
 `LIVE_EDIT_AI_ENDPOINT` / `LIVE_EDIT_AI_MODEL` for a different model). The
-scanner still does all the *detection*; the LLM only renames/labels the
-elements it found (never adds or drops any), and any failure falls back to
-the deterministic result. The API key is read from the environment.
+scanner still does all the detection. The model only renames and labels what it
+found, never adds or drops any, and any failure falls back to the deterministic
+result.
 
-`--apply` writes text, image and link tags directly onto the recognised
-elements (idempotent — re-running skips tagged nodes). Collections are
-reported but not auto-tagged: they need a backing model and real ids, which
-markup alone can't supply. Always review the output — it is a draft.
+## Configure
 
-Load the admin partial once in your layout (`@include('live-edit::admin')`)
-and the drawer/toolbar handle the rest.
+Everything editable is declared in `config/live-edit.php`:
+
+```bash
+php artisan vendor:publish --tag=live-edit-config
+```
+
+The defaults work. Publish it when you want your own setting keys, models or
+locales.
+
+| Key | What it does |
+| --- | --- |
+| `setting_model` | the Eloquent model backing key/value settings |
+| `settings` / `images` | setting keys editable as text / as images |
+| `models` | collections (`class`, `fields`, `creatable`, `deletable`, ...) |
+| `style_props`, `icon_options`, `rich_fields` | typed field metadata |
+| `middleware` | guards the endpoints (default `['web', 'auth', 'can:live-edit']`) |
+| `after_save` | runs after every write, e.g. to bust a cache |
 
 ## If something is wrong
 
-**`@liveEdit` appears as text on the page.** Blade does not error on a
-directive it does not know — it prints it, so this ends up visible to
-visitors. It means the package is not registered. Usually the install skipped
-Laravel's discovery step, or the views were compiled before it ran:
+**`@liveEdit` appears as text on the page.** Blade prints a directive it does
+not know rather than erroring, so this ends up visible to visitors. The package
+is not registered:
 
 ```bash
 php artisan package:discover
@@ -232,27 +236,43 @@ php artisan view:clear
 ```
 
 **The runtime loads but no toolbar appears.** The editor mounts off the body,
-not off the script tag. With `LIVE_EDIT_AUTO_TAG=true` that is done for you;
-without it, the host's layout has to carry `data-admin` (and `data-csrf`) on
-`<body>` for whoever may edit.
+not the script tag. With `LIVE_EDIT_AUTO_TAG=true` that is done for you. Without
+it, your layout needs `data-admin` (and `data-csrf`) on `<body>` for whoever may
+edit.
 
-**Edits save and then vanish on reload.** The save is working; nothing is
-putting the value back. With named keys the template renders it from your own
-model — check it actually does. With derived keys this is the middleware's
-job, so it means `LIVE_EDIT_AUTO_TAG` is off. If publishing is switched on,
-an unpublished change is deliberately only visible to an editor.
+**Edits save, then vanish on reload.** The save worked; nothing is putting the
+value back. With named keys your template renders it from your own model, so
+check that it does. With derived keys this is the middleware's job, so it means
+`LIVE_EDIT_AUTO_TAG` is off. If publishing is on, an unpublished change is
+deliberately only visible to an editor.
+
+**A client can still edit something you locked.** The `live-edit-locked` gate is
+not defined, so nothing binds for anyone. See
+[Locking the parts a client must not change](#locking-the-parts-a-client-must-not-change).
+
+## What the package provides
+
+- **Endpoints** (`ShipFast\LiveEdit\Http\Controllers\LiveEditController`) for
+  settings, records, images, styles and undo, all whitelist-validated from your
+  config.
+- **Models** `ElementStyle` (per-element visual overrides) and `EditRevision`
+  (undo history), with migrations.
+- **`RichText`**, XSS-safe markdown-lite (`**bold**`, `*italic*`, `[text](url)`).
+- **`live-edit:prune-orphans`**, deletes uploaded images nothing references.
+- **The editor itself**: drawer, toolbar, live preview as you type, undo and
+  redo, image picker, publish review and preview mode. Served at
+  `/live-edit/runtime.js` and loaded by `@liveEdit`.
 
 ## Licence
 
 Proprietary. Copyright (c) 2026 TryShipFast. See [LICENSE](LICENSE).
 
-The source is public so that customers and integrators can read it, audit it
-and build against it. Readable is not the same as free to take: a current
+The source is public so customers and integrators can read it, audit it and
+build against it. Readable is not the same as free to take: a current
 subscription lets you run it on sites you own or operate, including sites you
 build for clients, and does not let you redistribute it, resell it, or offer it
 as a service of your own.
 
 If a subscription lapses, the editor stops. The websites do not. The content
-your clients wrote is in their own database and stays on their pages — losing
-the licence means losing the editor, not the site.
-
+your clients wrote is in their own database and stays on their pages. Losing the
+licence means losing the editor, not the site.
