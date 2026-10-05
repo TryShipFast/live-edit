@@ -10,6 +10,7 @@ use ShipFast\LiveEdit\Mapper\MarkupScanner;
 use ShipFast\LiveEdit\Support\CloudInstall;
 use ShipFast\LiveEdit\Support\DraftStore;
 use ShipFast\LiveEdit\Support\Licence;
+use ShipFast\LiveEdit\Support\MayEdit;
 use ShipFast\LiveEdit\Support\WhereTheWordsLive;
 use Symfony\Component\HttpFoundation\BinaryFileResponse;
 use Symfony\Component\HttpFoundation\Response;
@@ -68,7 +69,7 @@ class TagsEditableMarkup
          * page load, and every visitor carried on reading the original. The
          * edit was stored the whole time and never reached anybody.
          */
-        $forAnEditor = Gate::allows('live-edit') && Licence::permits();
+        $forAnEditor = MayEdit::check() && Licence::permits();
 
         /*
          * A plan can cover fewer pages than the site has.

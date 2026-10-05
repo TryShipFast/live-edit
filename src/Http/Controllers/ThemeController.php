@@ -4,11 +4,11 @@ namespace ShipFast\LiveEdit\Http\Controllers;
 
 use Illuminate\Http\Response;
 use Illuminate\Routing\Controller;
-use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\URL;
 use ShipFast\LiveEdit\Mapper\MarkupScanner;
 use ShipFast\LiveEdit\Support\DraftStore;
 use ShipFast\LiveEdit\Support\EditorConfig;
+use ShipFast\LiveEdit\Support\MayEdit;
 use ShipFast\LiveEdit\Support\PublishedContent;
 use ShipFast\LiveEdit\Support\StyleCss;
 
@@ -39,7 +39,7 @@ class ThemeController extends Controller
         }
 
         $attributes = 'data-csrf="'.e(csrf_token()).'"';
-        if (Gate::allows('live-edit')) {
+        if (MayEdit::check()) {
             $attributes .= ' data-admin';
         }
         $html = preg_replace('/<body\b/', '<body '.$attributes, $html, 1);

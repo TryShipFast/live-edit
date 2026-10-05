@@ -2,7 +2,6 @@
 
 namespace ShipFast\LiveEdit\Support;
 
-use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\URL;
 
 /**
@@ -19,7 +18,7 @@ class EditorConfig
     /** A script tag declaring the publishing state, or '' when not applicable. */
     public static function publishingScript(): string
     {
-        if (! DraftStore::enabled() || ! Gate::allows('live-edit')) {
+        if (! DraftStore::enabled() || ! MayEdit::check()) {
             return '';
         }
 

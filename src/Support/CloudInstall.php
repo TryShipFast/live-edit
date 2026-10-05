@@ -135,7 +135,7 @@ class CloudInstall
              * same gate the rest of the package already respects, so leaving
              * this one open made the answer depend on which part you asked.
              */
-            if (! Gate::allows('live-edit')) {
+            if (! MayEdit::check()) {
                 return '';
             }
 

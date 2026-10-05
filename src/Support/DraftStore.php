@@ -2,7 +2,6 @@
 
 namespace ShipFast\LiveEdit\Support;
 
-use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Schema;
 use ShipFast\LiveEdit\Models\Draft;
 use ShipFast\LiveEdit\Models\ElementStyle;
@@ -46,7 +45,7 @@ class DraftStore
             return false;
         }
 
-        return Gate::allows('live-edit') || (bool) session(self::PREVIEW_SESSION_KEY, false);
+        return MayEdit::check() || (bool) session(self::PREVIEW_SESSION_KEY, false);
     }
 
     /** Record a change as unpublished. */
