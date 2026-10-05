@@ -4,7 +4,6 @@ namespace ShipFast\LiveEdit\Http\Middleware;
 
 use Closure;
 use Illuminate\Http\Request;
-use Throwable;
 use Illuminate\Support\Facades\Gate;
 use ShipFast\LiveEdit\Domain\Content\PageAllowance;
 use ShipFast\LiveEdit\Mapper\MarkupScanner;
@@ -15,6 +14,7 @@ use ShipFast\LiveEdit\Support\WhereTheWordsLive;
 use Symfony\Component\HttpFoundation\BinaryFileResponse;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpFoundation\StreamedResponse;
+use Throwable;
 
 /**
  * Make an ordinary Laravel page editable without touching its templates.
@@ -52,7 +52,6 @@ class TagsEditableMarkup
         if (! config('live-edit.auto_tag', false)) {
             return $response;
         }
-
 
         if (! $this->isARewritablePage($request, $response)) {
             return $response;
@@ -413,7 +412,47 @@ class TagsEditableMarkup
             return false;
         }
 
-        return true;
+        return ! $this->isTheHostsOwnBackOffice($request);
+    }
+
+    /**
+     * Whether this is the host's own administration rather than their website.
+     *
+     * This middleware is pushed onto the global stack, so it rewrites every
+     * HTML response the application returns - and nothing told it that an
+     * admin panel is not a website. On a Laravel site with auto_tag on and
+     * Filament installed, the result was 110 data-edit attributes across the
+     * admin UI: every label, every column heading, every button, offered to a
+     * client as their own content to edit, with the editor toolbar floating
+     * over the top of the host's own tooling.
+     *
+     * Nothing was corrupted by it - those strings come from the host's views
+     * and templates, not from stored content - but it is the product reaching
+     * somewhere it was never invited, on the one screen a customer least wants
+     * a client poking at.
+     *
+     * The defaults are the paths an administration panel actually lives at.
+     * They are a config, because a host whose website genuinely lives under
+     * /admin has to be able to say so, and because the next panel will have a
+     * prefix nobody here has thought of.
+     */
+    private function isTheHostsOwnBackOffice(Request $request): bool
+    {
+        $except = config('live-edit.auto_tag_except', [
+            'admin',
+            'admin/*',
+            'dashboard',
+            'dashboard/*',
+            'horizon',
+            'horizon/*',
+            'telescope',
+            'telescope/*',
+            'nova-api/*',
+            'livewire/*',
+            'filament/*',
+        ]);
+
+        return $except !== [] && $request->is(...(array) $except);
     }
 
     /**

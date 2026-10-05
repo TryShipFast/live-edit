@@ -338,6 +338,33 @@ return [
     // No key here on purpose: the per-site install script carries the site's
     // current publishable key, so rotating one does not mean a deploy.
     // ------------------------------------------------------------------
+    /*
+     * Paths this never touches, however editable the rest of the site is.
+     *
+     * The tagging middleware sits on the global stack, so without this it
+     * rewrites every HTML response the application returns - and an admin
+     * panel is not a website. Measured on a Laravel site with Filament: 110
+     * data-edit attributes across the admin UI, every label and button
+     * offered to a client as their own content, with the editor toolbar over
+     * the top of the host's own tooling.
+     *
+     * Set to an empty array to tag everything, which is what installs before
+     * 0.15.1 did.
+     */
+    'auto_tag_except' => [
+        'admin',
+        'admin/*',
+        'dashboard',
+        'dashboard/*',
+        'horizon',
+        'horizon/*',
+        'telescope',
+        'telescope/*',
+        'nova-api/*',
+        'livewire/*',
+        'filament/*',
+    ],
+
     'cloud' => [
         'host' => env('LIVE_EDIT_CLOUD_HOST'),
         'site' => env('LIVE_EDIT_CLOUD_SITE'),
