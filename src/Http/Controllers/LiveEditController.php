@@ -7,16 +7,15 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Routing\Controller;
 use Illuminate\Support\Facades\Storage;
-use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use ShipFast\LiveEdit\Domain\Content\EditPolicy;
 use ShipFast\LiveEdit\Domain\Content\ImageStore;
 use ShipFast\LiveEdit\Domain\Content\StylePolicy;
 use ShipFast\LiveEdit\Models\Draft;
 use ShipFast\LiveEdit\Models\EditRevision;
-use ShipFast\LiveEdit\Support\OneAction;
 use ShipFast\LiveEdit\Models\ElementStyle;
 use ShipFast\LiveEdit\Support\DraftStore;
+use ShipFast\LiveEdit\Support\OneAction;
 
 /**
  * ShipFast live-edit CMS: generic, config-driven endpoints for editing a
@@ -355,6 +354,33 @@ class LiveEditController extends Controller
      * said it could not list what was waiting, and offered to publish it
      * anyway, which is the one moment a client wants to see the list.
      */
+    /**
+     * Which languages this site is written in.
+     *
+     * The shape the runtime reads: the locales to offer, which one is the
+     * source, and what each is called so a menu can say "French" rather than
+     * "FR". It takes them from config('live-edit.locales'), which is where a
+     * host declares them and where the docs already say to.
+     *
+     * Not included, and deliberately: needing_review and stale. Those count
+     * translations that have drifted from the English they were made from,
+     * which the hosted service can say because it stores both sides and
+     * stamps them. A site keeping content in its own database has no such
+     * record, and inventing an empty one would read as "nothing has drifted"
+     * rather than "nobody is tracking that here". The runtime only reads the
+     * three above to decide whether to show a picker at all.
+     */
+    public function translations(): JsonResponse
+    {
+        $names = (array) config('live-edit.locales', ['en' => 'English']);
+
+        return response()->json([
+            'default_locale' => (string) config('live-edit.default_locale', config('app.locale', 'en')),
+            'locales' => array_keys($names),
+            'names' => $names,
+        ]);
+    }
+
     public function changes(): JsonResponse
     {
         abort_unless(DraftStore::enabled(), 404);

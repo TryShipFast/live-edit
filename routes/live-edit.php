@@ -39,6 +39,22 @@ Route::middleware(array_merge(
          */
         Route::get('/changes', [LiveEditController::class, 'changes'])->name('changes');
         Route::delete('/changes', [LiveEditController::class, 'discardChange'])->name('changes.revert');
+
+        /*
+         * Which languages this site is written in.
+         *
+         * The runtime asks every page, because the language picker has to know
+         * whether there is a choice to offer before it can decide to stay
+         * hidden. On a site we host, support.js rewrites this path to the
+         * content API. A site keeping its own content has no rewrite and no
+         * route, so it asked here and got a 404 on every page load.
+         *
+         * The call is wrapped in a try/catch that swallows it, so nothing
+         * broke and the picker correctly stayed hidden. What it left was a red
+         * line in the console of every customer running the self-hosted
+         * adapter, which is how a working install gets reported as broken.
+         */
+        Route::get('/translations', [LiveEditController::class, 'translations'])->name('translations');
     });
 
 /*
