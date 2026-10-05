@@ -4,14 +4,15 @@ namespace ShipFast\LiveEdit\Application\Api;
 
 use Illuminate\Validation\ValidationException;
 use ShipFast\LiveEdit\Domain\Content\EditPolicy;
+use ShipFast\LiveEdit\Domain\Content\LockedRegions;
 use ShipFast\LiveEdit\Domain\Content\SiteStore;
 use ShipFast\LiveEdit\Domain\Site\ApiToken;
 use ShipFast\LiveEdit\Domain\Site\Meter;
 use ShipFast\LiveEdit\Domain\Site\OverLimit;
 use ShipFast\LiveEdit\Domain\Site\Site;
 use ShipFast\LiveEdit\Models\EditRevision;
-use ShipFast\LiveEdit\Support\OneAction;
 use ShipFast\LiveEdit\Support\DraftStore;
+use ShipFast\LiveEdit\Support\OneAction;
 
 /**
  * Writes one change, to one site, through the same rules the editor writes
@@ -19,7 +20,10 @@ use ShipFast\LiveEdit\Support\DraftStore;
  */
 class ApplyEdit
 {
-    public function __construct(private readonly EditPolicy $policy) {}
+    public function __construct(
+        private readonly EditPolicy $policy,
+        private readonly LockedRegions $locked,
+    ) {}
 
     /**
      * @return array{saved: true, key: string, held: bool}
@@ -29,6 +33,23 @@ class ApplyEdit
     public function __invoke(Site $site, ApiToken $token, string $key, string $value, ?string $locale = null): array
     {
         $this->policy->assert($key, $value);
+
+        /*
+         * The developer's half of the site stays the developer's.
+         *
+         * The scanner already refuses to offer a locked region to somebody
+         * who was invited, so the editor never shows this and never sends it.
+         * That is a guardrail and it is not a boundary: it worked by declining
+         * to hand out a key, and a key that arrives anyway - from a colleague,
+         * from an earlier unnarrowed session, from a React build whose markers
+         * were baked in and never scanned - went straight through to the
+         * store. Asked here because this is where every adapter meets.
+         */
+        if ($this->locked->refuses($site, $token, $key)) {
+            throw ValidationException::withMessages([
+                'key' => 'That part of the site is the developer\'s to change.',
+            ]);
+        }
 
         // The site's own languages, not the installation's. On the service
         // one list would be one list for every customer, so a site would be

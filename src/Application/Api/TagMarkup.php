@@ -7,6 +7,7 @@ use DOMElement;
 use DOMXPath;
 use Illuminate\Support\Facades\Cache;
 use ShipFast\LiveEdit\Domain\Content\CarryContentAcrossRetag;
+use ShipFast\LiveEdit\Domain\Content\LockedRegions;
 use ShipFast\LiveEdit\Domain\Content\SiteStore;
 use ShipFast\LiveEdit\Domain\Site\Site;
 use ShipFast\LiveEdit\LiveEdit;
@@ -111,7 +112,7 @@ class TagMarkup
      *                               Part of the cache key, because two people
      *                               must not be handed each other's answer.
      */
-    public function __invoke(Site $site, string $html, string $page = '', bool $mayEditLocked = true): array
+    public function __invoke(Site $site, string $html, string $page = '', bool $mayEditLocked = true, bool $mayClearLocks = false): array
     {
         $this->remembered = false;
 
@@ -171,6 +172,25 @@ class TagMarkup
         // Costs a hash and a comparison on an ordinary view; writes only when
         // the names actually move, which is almost never.
         rescue(fn () => app(CarryContentAcrossRetag::class)(new SiteStore($site), $page, $tagged), null, false);
+
+        /*
+         * While the page is in hand, write down what it keeps behind a lock.
+         *
+         * The write endpoint takes a key and a value and never sees a page, so
+         * on its own it cannot tell a locked region from an open one. This is
+         * the only moment anything knows, so this is where it is recorded.
+         *
+         * Only on a scan nobody narrowed. A narrowed scan has already skipped
+         * the locked subtrees, so it would find nothing behind a lock and
+         * record an empty set - which reads as "this page locks nothing" and
+         * would quietly undo the protection for everybody on the site.
+         *
+         * Rescued like its neighbour: remembering is worth doing and is not
+         * worth failing somebody's page load over.
+         */
+        if ($mayEditLocked) {
+            rescue(fn () => app(LockedRegions::class)->record($site, $page, $tagged, $mayClearLocks), null, false);
+        }
 
         $doc = new DOMDocument;
         libxml_use_internal_errors(true);

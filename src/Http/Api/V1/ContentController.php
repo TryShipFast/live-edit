@@ -17,6 +17,7 @@ use ShipFast\LiveEdit\Application\Api\PrepareMarkup;
 use ShipFast\LiveEdit\Application\Api\PublishSite;
 use ShipFast\LiveEdit\Application\Api\ReadPublishedContent;
 use ShipFast\LiveEdit\Application\Api\TagMarkup;
+use ShipFast\LiveEdit\Domain\Content\LockedRegions;
 use ShipFast\LiveEdit\Domain\Content\PageAllowance;
 use ShipFast\LiveEdit\Domain\Content\SiteSnapshot;
 use ShipFast\LiveEdit\Domain\Content\SiteStore;
@@ -276,6 +277,65 @@ class ContentController
     }
 
     /**
+     * Whether this caller may take a lock off, or only put one on.
+     *
+     * Reporting a lock is something a page does, and a page reports with the
+     * publishable key, which is printed in that page for everybody. So the
+     * markup arriving is only as trustworthy as a public key, and the person
+     * the lock is against - the invited editor - is on the page holding it.
+     * Left open, the feature came apart in two requests: report a copy of the
+     * page with the locks taken out, then write to the nav it no longer
+     * protects.
+     *
+     * Taking one off needs a key that can write AND has not been narrowed:
+     * the developer, or a session they minted for themselves. That is the same
+     * person who put the lock in the markup, which is the only place it is
+     * ever declared.
+     */
+    private static function mayClearLocks(Request $request): bool
+    {
+        $token = ApiContext::token($request);
+
+        return $token->can(Ability::Write) && $token->mayEditLocked();
+    }
+
+    /**
+     * A page saying which of its own elements the developer kept.
+     *
+     * Tagging is what ordinarily records this, because the scan has the page
+     * in hand and can see what sits behind a lock. An adapter that brings its
+     * own markers never tags: the React codemod writes data-edit into the
+     * source at build time, so the page is already prepared and asks nothing.
+     * That left React the one adapter where data-live-lock did nothing at all
+     * - no scan, no record, and so nothing for the write path to refuse.
+     *
+     * It needs no scanner. The markers and the lock attributes are both in the
+     * markup already; this only reads which of the first sit inside the
+     * second. Cheap enough that the page can report it without tagging, and
+     * separate from tagging so a prepared page is not re-tagged as a side
+     * effect of mentioning its locks.
+     *
+     * Unnarrowed by construction: the page says what IS locked, and who is
+     * asking does not change the answer. Only the write path cares who.
+     */
+    public function locks(Request $request, LockedRegions $locks): JsonResponse
+    {
+        $validated = $request->validate([
+            'html' => ['required', 'string', 'max:'.TagMarkup::MAX_BYTES],
+            'page' => ['nullable', 'string', 'max:200'],
+        ]);
+
+        $site = ApiContext::site($request);
+        $page = $validated['page'] ?? '';
+
+        $locks->record($site, $page, $validated['html'], self::mayClearLocks($request));
+
+        return response()->json([
+            'recorded' => count($locks->keysFor($site, $page)),
+        ]);
+    }
+
+    /**
      * Tell a page which of its own elements are editable.
      *
      * For a site nobody prepared: no build step, no command to run, nothing
@@ -303,7 +363,8 @@ class ContentController
             $site,
             $validated['html'],
             $validated['page'] ?? '',
-            ApiContext::token($request)->mayEditLocked()
+            ApiContext::token($request)->mayEditLocked(),
+            self::mayClearLocks($request),
         );
 
         Meter::record($site, Meter::TAG);

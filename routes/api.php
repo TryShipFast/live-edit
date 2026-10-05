@@ -10,8 +10,8 @@ use ShipFast\LiveEdit\Http\Api\Middleware\ThrottleApi;
 use ShipFast\LiveEdit\Http\Api\V1\ContentController;
 use ShipFast\LiveEdit\Http\Api\V1\EmbedController;
 use ShipFast\LiveEdit\Http\Api\V1\LicenceController;
-use ShipFast\LiveEdit\Http\Api\V1\PluginController;
 use ShipFast\LiveEdit\Http\Api\V1\MediaController;
+use ShipFast\LiveEdit\Http\Api\V1\PluginController;
 use ShipFast\LiveEdit\Http\Api\V1\SessionController;
 use ShipFast\LiveEdit\Http\Api\V1\SignInController;
 use ShipFast\LiveEdit\Http\Api\V1\SiteController;
@@ -117,6 +117,21 @@ Route::prefix(config('live-edit.api.prefix', 'api/live-edit/v1').'/{site}')
             // to run the scanner itself. Costs a parse for the same reason, so
             // it is metered and throttled alongside tagging.
             Route::post('/prepare', [ContentController::class, 'prepare'])->name('live-edit.api.prepare');
+            /*
+             * A page reporting which of its own elements the developer kept.
+             *
+             * For the adapters that bring their own markers and so never tag -
+             * React's codemod writes data-edit into the source at build time,
+             * and a page that is already prepared asks nothing. That left the
+             * lock recorded nowhere for them, and a lock recorded nowhere is a
+             * lock the write path cannot enforce.
+             *
+             * A read key, because this is the page describing itself and the
+             * key that renders the page is the one printed in it. No scan, so
+             * it is not metered alongside tagging - it reads attributes that
+             * are already in the markup.
+             */
+            Route::post('/locks', [ContentController::class, 'locks'])->name('live-edit.api.locks');
         });
 
         // Writing: a session key, which only the customer's own server can mint.

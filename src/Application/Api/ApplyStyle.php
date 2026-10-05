@@ -3,6 +3,7 @@
 namespace ShipFast\LiveEdit\Application\Api;
 
 use Illuminate\Validation\ValidationException;
+use ShipFast\LiveEdit\Domain\Content\LockedRegions;
 use ShipFast\LiveEdit\Domain\Content\SiteStore;
 use ShipFast\LiveEdit\Domain\Content\StylePolicy;
 use ShipFast\LiveEdit\Domain\Site\ApiToken;
@@ -10,8 +11,8 @@ use ShipFast\LiveEdit\Domain\Site\Meter;
 use ShipFast\LiveEdit\Domain\Site\OverLimit;
 use ShipFast\LiveEdit\Domain\Site\Site;
 use ShipFast\LiveEdit\Models\EditRevision;
-use ShipFast\LiveEdit\Support\OneAction;
 use ShipFast\LiveEdit\Support\DraftStore;
+use ShipFast\LiveEdit\Support\OneAction;
 
 /**
  * How a section looks, on a site that is not this application.
@@ -25,7 +26,10 @@ use ShipFast\LiveEdit\Support\DraftStore;
  */
 class ApplyStyle
 {
-    public function __construct(private readonly StylePolicy $policy) {}
+    public function __construct(
+        private readonly StylePolicy $policy,
+        private readonly LockedRegions $locked,
+    ) {}
 
     /**
      * @param  array<string, string|null>  $props
@@ -39,6 +43,20 @@ class ApplyStyle
             $this->policy->permitsKey($key),
             ValidationException::withMessages(['key' => 'Unknown style.'])
         );
+
+        /*
+         * A locked region's appearance is locked too.
+         *
+         * Styles are a separate key namespace off the same element - a style
+         * key is "s" and the hash where the words are "auto:" and the hash -
+         * so guarding the words alone would leave an invited editor able to
+         * hide the nav, or paint it, having been refused its text.
+         */
+        if ($this->locked->refuses($site, $token, $key)) {
+            throw ValidationException::withMessages([
+                'key' => 'That part of the site is the developer\'s to change.',
+            ]);
+        }
 
         $clean = $this->policy->clean($props);
 

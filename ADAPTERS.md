@@ -245,6 +245,24 @@ that row needs a different app before it can be judged.
 | Removing an editor ends their session | ✓ | ✓ | ✓ | ✓ |
 | A revoked key ends a session already open | ? | ? | ✓ | ? |
 | A revoked site key leaves the site standing | ? | ? | ✓ | ? |
+| `data-live-lock` keeps a narrowed editor out | ✓ * | ✓ | ✓ | ✓ |
+
+The lock row reads ✓ everywhere from 0.15, and did not before. Until then it
+was applied only while a page was being tagged, by declining to mark a locked
+region - which is a guardrail rather than a boundary, and worked only on the
+adapters where the scanner tags the page. Next.js never tags, because its
+codemod writes the markers at build time, so the lock did nothing there at all;
+Laravel had the same gap on any page already tagged by `live-edit:scan` or by
+hand, because the middleware skips the scanner when `data-edit` is already
+present and the gate never runs. It is now checked where the change arrives, so
+it holds wherever the write goes through the service.
+
+\* The Laravel tick is for a site using the hosted service, which is where a
+narrowed editor exists at all. A self-hosted install writes through its own
+controller, with no site and no session token - it has no narrowed editor to
+keep out, and decides who may touch a locked region with the
+`live-edit-locked` gate while the page is tagged. If you self-host AND hand
+out narrowed sessions, the write-time check is not in that path yet.
 
 The WordPress row that reads ✓ for "no host account at all" was proven the
 hard way: every WordPress session was deleted server-side first, so the

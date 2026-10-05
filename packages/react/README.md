@@ -233,36 +233,62 @@ session itself. Pass this only if your own server mints sessions.
 
 ## Locking parts of the page
 
-New in 0.14, and **not yet effective in React**. Worth reading so you do not
-rely on it here.
+New in 0.14, and effective in React from 0.15.
 
-Other adapters let you mark a region as yours rather than the client's:
+Mark a region as yours rather than the client's:
 
 ```html
 <nav data-live-lock> ... </nav>
 ```
 
-The lock is applied by the engine's scanner as it discovers editable elements:
-it skips a locked region, so nothing inside becomes editable for an editor the
-console has narrowed. That works on **Laravel** and **WordPress**, where the
-scanner is what tags the page.
+A narrowed editor cannot change anything inside it. You still can.
 
-React is tagged differently. `live-edit-codemod` writes `data-edit` into your
-source at build time, so those markers are in the HTML before any scanner sees
-it, and skipping a subtree does not remove a marker that is already there. The
-practical result is that `data-live-lock` around codemod-tagged JSX does not
-currently keep a narrowed editor out of it.
+### How it works here, and why that took a version
 
-If you need a region kept away from a client today, leave it untagged. The
-codemod takes `--exclude`, repeatable, matched against the path:
+The lock used to be applied only by the engine's scanner as it discovered
+editable elements: it skipped a locked region, so nothing inside ever became
+editable. That works where the scanner tags the page, which is Laravel and
+WordPress. React is tagged differently - `live-edit-codemod` writes `data-edit`
+into your source at build time - so the markers are in the HTML before any
+scanner sees it, and skipping a subtree does not remove a marker that is
+already there.
+
+Two things changed in 0.15:
+
+- The lock is now checked when the change **arrives**, not only when the page
+  is tagged. Declining to offer something is a guardrail; refusing to store it
+  is the boundary. This closes every adapter at once, including ones that bake
+  their own markers, because none of them can reach the store another way.
+- A page that never tags now reports its own locks once per deploy, so there
+  is something to refuse against. That request is automatic and carries only
+  markup your publishable key already renders.
+
+### What this means for you
+
+Nothing, if you are already on `@shipfasts/live-edit-react` 0.15 or later and
+your engine is 0.15 or later. Add the attribute and it holds.
+
+Two things worth knowing:
+
+- It binds from the first page view after a deploy, not from the build. The
+  lock is recorded when a page that carries it is first loaded.
+- A page reporting its locks can only ever **add** one. Taking a lock off
+  needs a key that can write and has not been narrowed - yours, not your
+  client's - so an invited editor cannot report the lock away and then write
+  through the gap.
+
+### The blunter alternative
+
+If you would rather a region were never editable by anybody, including you,
+leave it untagged. The codemod takes `--exclude`, repeatable, matched against
+the path:
 
 ```bash
 npx live-edit-codemod . --write --exclude "**/nav/**" --exclude "**/footer/**"
 ```
 
-Nothing it never tagged can be edited by anybody, which is a blunter guarantee
-than the lock but a real one. Removing the `data-edit` markers it already wrote
-has the same effect.
+Nothing it never tagged can be edited at all. Removing the `data-edit` markers
+it already wrote has the same effect.
 
 ## Which key is which
 

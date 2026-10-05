@@ -599,6 +599,54 @@ export const watchForLateBackgrounds = (doc = document, onFound = () => {}) => {
     return observer;
 };
 
+const LOCKS_PREFIX = 'kb_locks_';
+
+/**
+ * Tell the service which of this page's elements the developer kept.
+ *
+ * Only for pages that never tag. A tagged page records this as a side effect
+ * of the scan, which is where it belongs; a page that arrives already prepared
+ * - React's codemod, a CLI run, a plugin - never scans, and so never recorded
+ * anything. The lock then held in the editor, which is only a guardrail, and
+ * not on the write, which is the boundary it is sold as.
+ *
+ * No scanner involved on either side. The markers and the lock attributes are
+ * both already in the markup; the service only reads which of the first sit
+ * inside the second.
+ *
+ * Remembered against the markup like tagging is, so this is one request per
+ * version of a page rather than one per page view, and silent: a page whose
+ * locks could not be reported is a page that still works, and saying so in the
+ * console would be a red line on a working install.
+ */
+const reportLocks = async ({ base, site, key, page }, doc) => {
+    if (!doc.querySelector('[data-live-lock], [data-live-edit-lock]')) {
+        return;
+    }
+
+    try {
+        const html = worthSending(doc);
+        const id = LOCKS_PREFIX + fingerprint(masked(html));
+
+        if (cached(id)) {
+            return;
+        }
+
+        const response = await fetch(`${String(base).replace(/\/$/, '')}/${site}/locks`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', Accept: 'application/json', Authorization: `Bearer ${key}` },
+            body: JSON.stringify({ html, page: page ?? doc.location?.pathname ?? '' }),
+            signal: givesUpAfter(20000),
+        });
+
+        if (response.ok) {
+            remember(id, true);
+        }
+    } catch {
+        // Reported next page view. Nothing here is worth failing over.
+    }
+};
+
 /**
  * Ask what is editable here, and mark it.
  *
@@ -645,6 +693,24 @@ export const autoTag = async ({ base, site, key, page }, doc = document, { becau
      * there uneditable.
      */
     if (prepared && !unanswered() && because === null) {
+        /*
+         * One thing still has to be said on the way out.
+         *
+         * A prepared page asks nothing, which is the point of preparing it.
+         * But data-live-lock is recorded by the scan, and a page that never
+         * scans is a page whose locks were recorded nowhere - so the write
+         * path had nothing to refuse against and an invited editor could set
+         * anything whose key they came by. React is the adapter where that is
+         * routine rather than theoretical: its codemod writes the markers into
+         * the source at build time, so no page of a React site has ever tagged.
+         *
+         * Costs nothing on the pages that matter, because the guard below is
+         * the question "does this page lock anything at all", and almost none
+         * of them do. Not awaited: the answer changes nothing on this page,
+         * and the person should not wait on it to start editing.
+         */
+        reportLocks({ base, site, key, page }, doc);
+
         return 0;
     }
 

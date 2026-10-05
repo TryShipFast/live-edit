@@ -203,6 +203,22 @@ class BoundedToTheSiteTest extends TestCase
                 continue;
             }
 
+            /*
+             * And one POST that is a page describing itself: /locks says which
+             * of this page's elements the developer marked data-live-lock. It
+             * has to accept the publishable key, because the page reporting it
+             * is the page that key renders - a React site never tags, so this
+             * is the only moment its locks are ever recorded.
+             *
+             * It is safe for a public key to reach because a public key can
+             * only ADD a lock. Clearing one needs a key that can write and has
+             * not been narrowed, which is covered in
+             * TheLockHoldsWhenTheChangeArrivesTest.
+             */
+            if (str_ends_with($route['uri'], '/locks')) {
+                continue;
+            }
+
             $this->json(
                 $route['method'],
                 $this->path($route['uri'], $this->mine),
