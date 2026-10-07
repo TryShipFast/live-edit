@@ -23,7 +23,7 @@ cd packages/react
 
 npm whoami                      # confirms which account is about to publish
 npm pack                        # writes a tarball, contacts nothing
-tar -tzf shipfast-live-edit-react-*.tgz   # 12 files: bin, src, README.md, LICENSE, package.json
+tar -tzf shipfasts-live-edit-react-*.tgz   # bin/, src/, README.md, LICENSE, package.json
 npm publish --otp=123456        # the six digits from your authenticator
 ```
 
@@ -34,6 +34,12 @@ flag, npm prompts on the terminal; passing `--otp` just saves a round trip.
 `npm publish` runs `npm pack` itself, so the pack step above is only there to
 let you look at the tarball before it leaves the machine. Delete the `.tgz`
 afterwards, it is not source.
+
+What you are looking for is anything that is NOT `bin/`, `src/`, `README.md`,
+`LICENSE` or `package.json` - a stray `.tgz`, `types-check/`, a `node_modules`.
+This said "12 files" once and the package has grown since, which taught
+whoever read it next to distrust the check rather than the count. The `files`
+field in `package.json` is what decides this; the count is a consequence.
 
 ## Check afterwards
 
