@@ -5,6 +5,20 @@ import { confirm as confirmChange, expectChange, takeExpected } from './verify.j
 import { apiRequestFor, attributeOf, backgroundImageOf, classListWith, declaredStyleProps, displayedValue, iconNamesIn, isJsonResponse, looksLikeAPicture, orderedIcons, ownTextOf, parseEditKey, requestInit, stylePropsFor, interactiveTarget, nameOfControl, givesUpAfter, ranOutOfTime, WAITS_AT_MOST, wordsEditedElsewhere, PUTS_BACK, worthReverting, shownWords } from './support.js';
 
 /**
+ * "Keep all of it", as distinct from "no choice was made".
+ *
+ * Produced where the crop sheet is built and read where the upload is sent,
+ * which are two different closures - so it lives here rather than being a
+ * string typed out twice and only wrong once.
+ *
+ * A string rather than a flag object because it travels through the same
+ * variable a rectangle does, and anything truthy that is not a rectangle has
+ * to be unmistakable where it lands.
+ */
+export const WHOLE_PICTURE = 'whole';
+
+
+/**
  * Start only once the host page has finished loading.
  *
  * A bought theme runs its own setup: jQuery plugins, preload fades, scroll
@@ -2181,7 +2195,24 @@ const bootLiveEdit = () => {
                     const url = drawerFields.querySelector('input[type=url]').value.trim();
                     // What the replacement has to match, measured from the
                 // picture being replaced where that is knowable.
-                const fitTo = whatIsThereNow(current.element);
+                const keepingAllOfIt = current.crop === WHOLE_PICTURE;
+
+                /*
+                 * No box when they asked to keep the whole picture.
+                 *
+                 * Fitting is how a replacement is held to the design: a tall
+                 * portrait dropped into a wide banner would otherwise stretch
+                 * the layout the template was bought for. But somebody who has
+                 * opened the crop sheet and pressed Whole picture has said
+                 * what they want, and holding them to the old picture's
+                 * dimensions anyway is the editor overruling them.
+                 *
+                 * Sending no box at all rather than a bigger one, because the
+                 * server fits only when it is given one - so this stores the
+                 * file exactly as it was uploaded, which is what the button
+                 * says.
+                 */
+                const fitTo = keepingAllOfIt ? null : whatIsThereNow(current.element);
                 if (fitTo) {
                     formData.append('fitWidth', String(fitTo.width));
                     formData.append('fitHeight', String(fitTo.height));
@@ -2190,7 +2221,7 @@ const bootLiveEdit = () => {
 
                 // Which part of it to keep, when somebody chose. Absent, the
                 // middle is taken, which is what every save did before.
-                if (current.crop) {
+                if (current.crop && !keepingAllOfIt) {
                     formData.append('cropX', String(current.crop.x));
                     formData.append('cropY', String(current.crop.y));
                     formData.append('cropWidth', String(current.crop.width));
@@ -3880,7 +3911,21 @@ const bootLiveEdit = () => {
                     finish(inSourcePixels(at, shot.clientWidth, shot.naturalWidth));
                 });
 
-                whole.addEventListener('click', () => finish(null));
+                /*
+                 * The whole picture, and it has to be distinguishable from
+                 * dismissing this sheet.
+                 *
+                 * Both used to resolve to null, and null means "no rectangle
+                 * chosen", which the server reads as "take the middle of it,
+                 * cut to the shape of the spot". So a button labelled Whole
+                 * picture cropped the picture, and a client who uploaded a
+                 * 4000px photograph into a 644px slot got 644px of its middle.
+                 * Reported as exactly that: upload is limited to the size that
+                 * was there before, and only on upload, because a free
+                 * photograph is pointed at rather than stored and never passes
+                 * through any of this.
+                 */
+                whole.addEventListener('click', () => finish(WHOLE_PICTURE));
             });
 
             const takeChosen = ({ url, file, credit, alt, creditBy, creditUrl, creditSource, creditSourceUrl }) => {
