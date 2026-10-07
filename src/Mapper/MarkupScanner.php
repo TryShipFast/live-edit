@@ -459,6 +459,9 @@ class MarkupScanner
             $node->parentNode?->replaceChild($replacement, $node);
         }
 
+        /** @var list<string> Pictures that have been replaced, by their old address. */
+        $replacedSources = [];
+
         foreach ($xpath->query('//*[@data-edit-img]') as $node) {
             $value = $node->getAttribute('data-edit-img');
             if (! str_starts_with($value, 'setting:')) {
@@ -466,6 +469,10 @@ class MarkupScanner
             }
             $key = substr($value, strlen('setting:'));
             if (array_key_exists($key, $overrides) && strtolower($node->tagName) === 'img') {
+                // What it pointed at before, so a preload naming that file can
+                // be found and taken out further down.
+                $replacedSources[] = $node->getAttribute('src');
+
                 $node->setAttribute('src', $overrides[$key]);
                 $this->clearTheSourcesAround($node);
 
@@ -612,7 +619,72 @@ class MarkupScanner
             $node->setAttribute('style', trim($style.";background-image:url('".$url."')", '; '));
         }
 
+        $this->dropPreloadsFor($xpath, $replacedSources);
+
         return $this->serialize();
+    }
+
+    /**
+     * Take away a preload that still names a picture somebody replaced.
+     *
+     * `clearTheSourcesAround` deals with what a browser consults to decide
+     * which file to show. This deals with what it fetches before it has
+     * decided anything at all: a `<link rel=preload as=image>` in the head is
+     * requested while the document is still being parsed, so it outranks every
+     * one of those by simply happening first.
+     *
+     * Reported as "the old image loads, then the replacement" with a 404 in
+     * the console for a file the theme no longer had. Both halves are this:
+     * the preload fetched the original, and the swap that followed was the
+     * editor doing its job a beat too late to stop it.
+     *
+     * Common rather than exotic. Preloading the hero is the standard advice
+     * for a good LCP score, so a theme worth buying has one, and the hero is
+     * the picture a client is most likely to replace first.
+     *
+     * Matched on the address the picture used to carry, so a preload for
+     * anything else - a font, a logo nobody touched - is left exactly where
+     * the theme put it.
+     *
+     * @param  list<string>  $replaced  Old addresses, as they appeared in src.
+     */
+    protected function dropPreloadsFor(DOMXPath $xpath, array $replaced): void
+    {
+        $wanted = array_filter(array_map('trim', $replaced), fn (string $src) => $src !== '');
+
+        if ($wanted === []) {
+            return;
+        }
+
+        foreach (iterator_to_array($xpath->query('//link[@rel]')) as $link) {
+            if (! $link instanceof DOMElement) {
+                continue;
+            }
+
+            // preload and prefetch both start a request for the file. A
+            // preconnect names a host rather than a file and is harmless.
+            $rel = strtolower(trim($link->getAttribute('rel')));
+
+            if ($rel !== 'preload' && $rel !== 'prefetch') {
+                continue;
+            }
+
+            $names = [$link->getAttribute('href')];
+
+            // imagesrcset is how a responsive preload is written, and it can
+            // name the old file even when href does not.
+            foreach (explode(',', $link->getAttribute('imagesrcset')) as $candidate) {
+                $names[] = trim(explode(' ', trim($candidate))[0] ?? '');
+            }
+
+            foreach ($names as $name) {
+                if ($name !== '' && in_array(trim($name), $wanted, true)) {
+                    $link->parentNode?->removeChild($link);
+
+                    break;
+                }
+            }
+        }
     }
 
     protected bool $autoMode = false;
