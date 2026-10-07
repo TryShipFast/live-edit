@@ -11,6 +11,7 @@ use ShipFast\LiveEdit\Support\CloudInstall;
 use ShipFast\LiveEdit\Support\DraftStore;
 use ShipFast\LiveEdit\Support\Licence;
 use ShipFast\LiveEdit\Support\MayEdit;
+use ShipFast\LiveEdit\Support\RemoteContent;
 use ShipFast\LiveEdit\Support\WhereTheWordsLive;
 use Symfony\Component\HttpFoundation\BinaryFileResponse;
 use Symfony\Component\HttpFoundation\Response;
@@ -150,12 +151,6 @@ class TagsEditableMarkup
          * a cloud install reads local settings at all, and the answer is that
          * it should not.
          */
-        if (WhereTheWordsLive::withTheService()) {
-            $response->setContent($html);
-
-            return $response;
-        }
-
         $stored = $this->storedWords($forAnEditor);
 
         if (! $forAnEditor && $stored === []) {
@@ -257,6 +252,37 @@ class TagsEditableMarkup
      */
     private function publishedSettings(): array
     {
+        /*
+         * A cloud install's words are ours, so they are fetched rather than
+         * read.
+         *
+         * This used to return before it got here, and the whole page went out
+         * exactly as the theme wrote it: every replaced sentence served as the
+         * original and swapped in the browser a moment later, every replaced
+         * picture requested from its old address before the new one arrived.
+         * Usually invisible, because the old address usually still answers.
+         * Found on a site where it did not - a 404 for a file the theme no
+         * longer had, with the replacement appearing immediately afterwards.
+         *
+         * Not only cosmetic. What a crawler reads is what is in the HTML, so
+         * a client's published words were not the words being indexed.
+         *
+         * RemoteContent is cached against the published version pointer and
+         * gives up after a timeout, returning nothing. Nothing means no
+         * overrides, which is precisely what this did before - so the worst a
+         * bad afternoon on our side can do is put the behaviour back the way
+         * it already was, never worse.
+         */
+        if (WhereTheWordsLive::withTheService()) {
+            try {
+                return RemoteContent::settings();
+            } catch (Throwable $e) {
+                report($e);
+
+                return [];
+            }
+        }
+
         $model = config('live-edit.setting_model');
 
         if (! is_string($model) || ! class_exists($model)) {

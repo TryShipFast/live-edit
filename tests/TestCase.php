@@ -4,6 +4,7 @@ namespace ShipFast\LiveEdit\Tests;
 
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Http;
 use Orchestra\Testbench\TestCase as Orchestra;
 use ShipFast\LiveEdit\LiveEditServiceProvider;
 use ShipFast\LiveEdit\Tests\Fixtures\Setting;
@@ -26,6 +27,22 @@ abstract class TestCase extends Orchestra
     protected function setUp(): void
     {
         parent::setUp();
+
+        /*
+         * No test may call the internet.
+         *
+         * The licence answer below has been pinned for a while for exactly
+         * this reason, but it pinned one call rather than closing the door.
+         * Published content for a cloud install is now read over HTTP during
+         * a page render, so a test that forgets to fake it would reach the
+         * real service - slowly, flakily, and with whatever happens to be
+         * published there deciding the result.
+         *
+         * A test that wants an answer fakes one. A test that gets this
+         * exception has found a call it did not know it was making, which is
+         * the point.
+         */
+        Http::preventStrayRequests();
 
         // Answered here so no test asks the network whether an invented
         // licence is real. A test that wants a lapsed or refused one
