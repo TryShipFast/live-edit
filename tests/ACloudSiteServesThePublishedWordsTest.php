@@ -6,6 +6,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 use ShipFast\LiveEdit\Http\Middleware\TagsEditableMarkup;
+use ShipFast\LiveEdit\Mapper\MarkupScanner;
 use Symfony\Component\HttpFoundation\Response;
 
 /**
@@ -35,15 +36,25 @@ class ACloudSiteServesThePublishedWordsTest extends TestCase
         config()->set('live-edit.auto_tag', true);
 
         /*
-         * Where this install's published snapshots can be fetched from.
+         * No snapshot url, which is the shape a real cloud install has.
          *
-         * The thing that makes the whole fix reachable, and the thing a cloud
-         * install has to be given. Without it RemoteContent has no address to
-         * ask, returns nothing, and the middleware serves the theme's own
-         * words - which is the behaviour being fixed, so a test that forgot
-         * this would pass while proving the opposite.
+         * Checked rather than assumed: learnkasts carries a cloud host, a
+         * cloud site and an app key, and no LIVE_EDIT_SNAPSHOT_URL - the
+         * install instructions never mention one. An earlier version of this
+         * test set one, and so proved the fix on a configuration almost
+         * nobody runs.
          */
-        config()->set('live-edit.snapshot_url', 'https://cdn.tryshipfast.com/learnkasts');
+        config()->set('live-edit.snapshot_url', null);
+
+        /*
+         * The licence, which is what actually gets asked. The cloud pair above
+         * is only its fallback: an install that names LIVE_EDIT_SITE_ID uses
+         * that, and the suite's own environment names one - so setting only
+         * the cloud pair tested a site this test does not describe.
+         */
+        config()->set('live-edit.licence.host', 'https://live.tryshipfast.com');
+        config()->set('live-edit.licence.site', 'learnkasts');
+        config()->set('live-edit.licence.key', 'kbp_test_key');
 
         Cache::flush();
     }
@@ -52,15 +63,18 @@ class ACloudSiteServesThePublishedWordsTest extends TestCase
     private function theServiceHasPublished(array $settings): void
     {
         Http::fake([
-            '*current.json*' => Http::response(['version' => 7]),
-            '*' => Http::response(['settings' => $settings, 'styles' => []]),
+            '*/api/live-edit/v1/learnkasts/content*' => Http::response([
+                'version' => 5,
+                'locale' => 'en',
+                'settings' => $settings,
+            ]),
         ]);
     }
 
     /** What the scanner would name this page's picture, before stripping. */
     private function keyTheScannerGivesTo(string $html): string
     {
-        $tagged = (new \ShipFast\LiveEdit\Mapper\MarkupScanner)->apply(
+        $tagged = (new MarkupScanner)->apply(
             $html,
             ['text', 'image', 'link', 'icon'],
             true,
@@ -154,6 +168,41 @@ class ACloudSiteServesThePublishedWordsTest extends TestCase
         $this->assertLessThanOrEqual(10, (int) config('live-edit.remote_timeout', 5));
     }
 
+    public function test_it_asks_with_a_bearer_token_because_that_is_what_the_service_accepts(): void
+    {
+        /*
+         * Checked against the live service rather than reasoned about: the
+         * content endpoint answers 200 to Authorization: Bearer <app key> and
+         * 401 to the X-Live-Edit-Key header the browser runtime uses
+         * elsewhere. Getting this wrong fails silently - a 401 is swallowed
+         * and the page goes out with the theme's words, which is exactly the
+         * bug being fixed and would look like no fix at all.
+         */
+        $this->theServiceHasPublished([]);
+
+        $this->serve('<html lang="en"><body><h1>Words</h1></body></html>');
+
+        Http::assertSent(fn ($request) => str_contains($request->url(), '/api/live-edit/v1/learnkasts/content')
+            && $request->hasHeader('Authorization', 'Bearer kbp_test_key'));
+    }
+
+    public function test_a_second_page_in_the_same_half_minute_does_not_ask_again(): void
+    {
+        /*
+         * Every page render would otherwise cost a round trip to us, so a
+         * burst of traffic on a customer's site becomes a burst on ours and
+         * their time-to-first-byte becomes our latency. Held for the pointer's
+         * lifetime, so a publish still shows up within the same.
+         */
+        $this->theServiceHasPublished([]);
+
+        foreach (range(1, 3) as $ignored) {
+            $this->serve('<html lang="en"><body><h1>Words</h1></body></html>');
+        }
+
+        Http::assertSentCount(1);
+    }
+
     public function test_it_still_never_reaches_for_a_local_database(): void
     {
         /*
@@ -162,7 +211,7 @@ class ACloudSiteServesThePublishedWordsTest extends TestCase
          * site off the internet twice. Reading from the service instead must
          * not quietly put that back.
          */
-        config()->set('live-edit.setting_model', \ShipFast\LiveEdit\Tests\ATableThatIsNotThere::class);
+        config()->set('live-edit.setting_model', ATableThatIsNotThere::class);
 
         $this->theServiceHasPublished([]);
 
