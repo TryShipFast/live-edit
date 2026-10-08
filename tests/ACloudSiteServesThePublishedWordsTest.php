@@ -3,6 +3,7 @@
 namespace ShipFast\LiveEdit\Tests;
 
 use Illuminate\Http\Request;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 use ShipFast\LiveEdit\Http\Middleware\TagsEditableMarkup;
@@ -71,30 +72,30 @@ class ACloudSiteServesThePublishedWordsTest extends TestCase
         ]);
     }
 
-    /** What the scanner would name this page's picture, before stripping. */
-    private function keyTheScannerGivesTo(string $html): string
+    private function serve(string $html, string $path = '/'): string
+    {
+        $response = (new TagsEditableMarkup)->handle(
+            Request::create($path, 'GET'),
+            fn (): Response => new Response($html, 200, ['Content-Type' => 'text/html'])
+        );
+
+        return (string) $response->getContent();
+    }
+
+    /** What the service's own tagging endpoint would call this page's picture. */
+    private function keyTheServiceGivesTo(string $html, string $page): string
     {
         $tagged = (new MarkupScanner)->apply(
             $html,
             ['text', 'image', 'link', 'icon'],
             true,
             null,
-            '',
+            $page,
         )['html'] ?? '';
 
         preg_match('/data-edit-img="setting:([^"]+)"/', $tagged, $found);
 
         return $found[1] ?? '';
-    }
-
-    private function serve(string $html): string
-    {
-        $response = (new TagsEditableMarkup)->handle(
-            Request::create('/', 'GET'),
-            fn (): Response => new Response($html, 200, ['Content-Type' => 'text/html'])
-        );
-
-        return (string) $response->getContent();
     }
 
     public function test_a_replaced_picture_is_in_the_html_before_the_browser_runs(): void
@@ -115,7 +116,7 @@ class ACloudSiteServesThePublishedWordsTest extends TestCase
          * test skips itself - which is how this very test first passed while
          * proving nothing at all.
          */
-        $key = $this->keyTheScannerGivesTo($theme);
+        $key = $this->keyTheServiceGivesTo($theme, '/');
 
         $this->assertNotSame('', $key, 'The scanner must tag an image for any of this to be reachable.');
 
@@ -203,6 +204,77 @@ class ACloudSiteServesThePublishedWordsTest extends TestCase
         Http::assertSentCount(1);
     }
 
+    public function test_it_spells_the_page_the_way_the_browser_does(): void
+    {
+        /*
+         * The second half of the bug, and the half that made the first half
+         * look like no fix at all.
+         *
+         * An auto key is scoped to its page, so the spelling of the page is
+         * part of the hash. The browser sends location.pathname when it asks
+         * the service to tag a page, so everything stored for a cloud install
+         * is keyed under "/" and "/about". This middleware trimmed the slashes
+         * off, so its keys were "" and "about" - the same element, a different
+         * name, and not one override could ever match.
+         *
+         * Measured against learnkasts before guessing: nought of twenty-nine
+         * published overrides matched the trimmed spelling, and every one of
+         * the three on its home page matched the browser's.
+         */
+        $theme = '<html lang="en"><body><img src="/hero.jpg" alt="A hero"></body></html>';
+
+        $home = $this->keyTheServiceGivesTo($theme, '/');
+        $about = $this->keyTheServiceGivesTo($theme, '/about');
+
+        $this->assertNotSame($home, $about, 'Two pages built from one layout must not share a key.');
+
+        // Both at once, the way a real site's published set spans its pages -
+        // and because Http::fake appends stubs rather than replacing them, so
+        // a second fake for the same address would never be reached.
+        $this->theServiceHasPublished([
+            $home => '/storage/live/home.jpg',
+            $about => '/storage/live/about.jpg',
+        ]);
+
+        $this->assertStringContainsString('/storage/live/home.jpg', $this->serve($theme, '/'));
+        $this->assertStringContainsString('/storage/live/about.jpg', $this->serve($theme, '/about'));
+    }
+
+    public function test_a_self_hosted_install_keeps_the_spelling_its_content_is_stored_under(): void
+    {
+        /*
+         * The positive control, and the reason the spelling is not simply
+         * changed for everybody.
+         *
+         * A self-hosted install keeps its content in its own table, keyed by
+         * this middleware under the trimmed spelling. Renaming every auto key
+         * on those sites to fix a cloud one would orphan the lot - the page
+         * quietly reverts to the theme's words and the client concludes we lost
+         * their work.
+         */
+        config()->set('live-edit.cloud.site', null);
+        config()->set('live-edit.licence.site', null);
+
+        $theme = '<html lang="en"><body><img src="/hero.jpg" alt="A hero"></body></html>';
+
+        $this->assertNotSame(
+            $this->keyTheServiceGivesTo($theme, '/about'),
+            $this->keyTheServiceGivesTo($theme, 'about'),
+            'The two spellings must genuinely differ, or this test proves nothing.',
+        );
+
+        /*
+         * Stored the way a self-hosted install's content already is, and
+         * served from the install's own table rather than from us.
+         */
+        $key = $this->keyTheServiceGivesTo($theme, 'about');
+
+        ATableTheInstallOwns::$rows = [$key => '/uploads/their-hero.jpg'];
+        config()->set('live-edit.setting_model', ATableTheInstallOwns::class);
+
+        $this->assertStringContainsString('/uploads/their-hero.jpg', $this->serve($theme, '/about'));
+    }
+
     public function test_it_still_never_reaches_for_a_local_database(): void
     {
         /*
@@ -218,6 +290,26 @@ class ACloudSiteServesThePublishedWordsTest extends TestCase
         $served = $this->serve('<html lang="en"><body><h1>Still here</h1></body></html>');
 
         $this->assertStringContainsString('Still here', $served);
+    }
+}
+
+/**
+ * A self-hosted install's own settings table, in as much as the middleware
+ * uses one: it asks for value-by-key and nothing else.
+ */
+class ATableTheInstallOwns
+{
+    /** @var array<string, string> */
+    public static array $rows = [];
+
+    public static function query(): self
+    {
+        return new self;
+    }
+
+    public function pluck(string $value, string $key): Collection
+    {
+        return collect(self::$rows);
     }
 }
 

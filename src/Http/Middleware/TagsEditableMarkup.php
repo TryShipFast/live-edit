@@ -188,7 +188,7 @@ class TagsEditableMarkup
                 ['text', 'image', 'link', 'icon'],
                 true,
                 null,
-                trim($request->path(), '/'),
+                $this->scopeFor($request),
             )['html'] ?? null;
 
             if (is_string($tagged) && $tagged !== '') {
@@ -214,6 +214,43 @@ class TagsEditableMarkup
         $response->setContent($html);
 
         return $response;
+    }
+
+    /**
+     * Which page an auto key belongs to, said the way whoever stored it said it.
+     *
+     * An auto key is scoped to its page, so two pages built from one layout do
+     * not overwrite each other's words. That makes the exact spelling of the
+     * page part of the key, and there are two spellings in use.
+     *
+     * The browser sends `location.pathname` when it asks the service to tag a
+     * page, so everything the service has ever stored for a cloud install is
+     * keyed under "/" and "/about". This middleware passed the path with the
+     * slashes trimmed, so its keys were "" and "about" - a different hash for
+     * the same element.
+     *
+     * It never showed, because until now this middleware returned before
+     * applying anything on a cloud install. The moment it stopped, the mismatch
+     * became the whole bug: measured against learnkasts, nought of twenty-nine
+     * published overrides matched the keys this produced, and three of three on
+     * the home page matched once it spelled the page the way the browser does.
+     *
+     * Only for an install whose words live with us, and deliberately so. A
+     * self-hosted install keeps its content in its own table, keyed by this
+     * middleware under the trimmed spelling, and changing the spelling there
+     * would rename every auto key on the site and orphan the lot. The cohort
+     * that can move is the one with nothing stored under the old spelling.
+     *
+     * The two want unifying, along with the third spelling the scan command
+     * uses for files. Not here: that is a migration for stored content, not a
+     * one-line change, and this is a fix for a site serving the wrong words
+     * today.
+     */
+    private function scopeFor(Request $request): string
+    {
+        return WhereTheWordsLive::withTheService()
+            ? $this->pageOf($request)
+            : trim($request->path(), '/');
     }
 
     /** @return array<string, string> */
