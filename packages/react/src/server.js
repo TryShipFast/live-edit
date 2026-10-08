@@ -56,7 +56,9 @@ const settings = () => {
      *
      * Said once, out loud, so the five minutes go on the real cause.
      */
-    if (typeof window !== 'undefined' && !warnedAboutTheBrowser) {
+    const inTheBrowser = typeof window !== 'undefined';
+
+    if (inTheBrowser && !warnedAboutTheBrowser) {
         warnedAboutTheBrowser = true;
         console.warn(
             '[live-edit] /server was imported into code running in the browser, where it can read no '
@@ -67,11 +69,85 @@ const settings = () => {
 
     const env = typeof process === 'undefined' ? {} : (process.env ?? {});
 
-    const site = configured?.site ?? env.LIVE_EDIT_SITE ?? null;
-    const apiBase = configured?.apiBase ?? env.LIVE_EDIT_API_BASE ?? null;
-    const key = configured?.key ?? configured?.publishableKey ?? env.LIVE_EDIT_KEY ?? null;
+    /*
+     * Every spelling the rest of the product uses.
+     *
+     * This read only LIVE_EDIT_SITE, LIVE_EDIT_API_BASE and LIVE_EDIT_KEY,
+     * while the documented three values a site is given are LIVE_EDIT_HOST,
+     * LIVE_EDIT_SITE_ID and LIVE_EDIT_APP_KEY. A developer who followed the
+     * install instructions set three variables this file then ignored, and got
+     * a page that rendered its template's words with nothing said about why.
+     * Two packages reading different names for one value is a trap we laid
+     * ourselves.
+     */
+    const first = (...names) => names.map((name) => env[name]).find((value) => value) ?? null;
 
-    return site && apiBase && key ? { site, apiBase, key } : null;
+    const site = configured?.site ?? first('LIVE_EDIT_SITE_ID', 'LIVE_EDIT_SITE', 'LIVE_EDIT_CLOUD_SITE');
+    const key = configured?.key ?? configured?.publishableKey
+        ?? first('LIVE_EDIT_APP_KEY', 'LIVE_EDIT_KEY', 'LIVE_EDIT_LICENCE_KEY');
+
+    // A host is the documented value; an api base is this package's own older
+    // one. Either is accepted, and a bare host gets the path appended rather
+    // than the developer being told to work it out.
+    const host = first('LIVE_EDIT_HOST', 'LIVE_EDIT_CLOUD_HOST');
+    const apiBase = configured?.apiBase
+        ?? env.LIVE_EDIT_API_BASE
+        ?? (host ? `${String(host).replace(/\/$/, '')}/api/live-edit/v1` : null);
+
+    if (site && apiBase && key) {
+        return { site, apiBase, key };
+    }
+
+    /*
+     * Only on a server. In the browser this module can read no configuration
+     * by definition, so naming the missing variables would be a second and
+     * wrong diagnosis, sending somebody to check an environment that is set
+     * correctly. The import is the fault and there is one thing to say about
+     * it, which was said above.
+     */
+    if (! inTheBrowser) {
+        sayWhatIsMissing({ site, apiBase, key });
+    }
+
+    return null;
+};
+
+/** So an unconfigured install is named once, not once per render. */
+let saidWhatWasMissing = false;
+
+/**
+ * Not being set up is a thing worth saying out loud.
+ *
+ * This returned null in silence, and silence is the worst behaviour available
+ * here. `readContent` then resolves to an empty object, every component falls
+ * back to the words written in it, and the page looks deliberate. The overlay
+ * applies published content after hydration, so the person who owns the site
+ * sees their own copy and has no reason to suspect anything. Only the server
+ * HTML is wrong, which is to say only crawlers and first paint are wrong, and
+ * they are the audience marketing copy exists for.
+ *
+ * The same fault in the PHP package took four releases and about thirty
+ * messages to find, for exactly this reason. One console line would have ended
+ * it on the first afternoon.
+ */
+const sayWhatIsMissing = ({ site, apiBase, key }) => {
+    if (saidWhatWasMissing) {
+        return;
+    }
+
+    saidWhatWasMissing = true;
+
+    const missing = [
+        site ? null : 'LIVE_EDIT_SITE_ID',
+        apiBase ? null : 'LIVE_EDIT_HOST',
+        key ? null : 'LIVE_EDIT_APP_KEY',
+    ].filter(Boolean);
+
+    console.warn(
+        `[live-edit] not configured (${missing.join(', ')}), so published content cannot be read while `
+        + 'rendering. Visitors and crawlers are being served the words written in your components. '
+        + 'The key is the publishable one already printed into every page this site serves.',
+    );
 };
 
 /**

@@ -123,13 +123,26 @@ const words = await liveEditWords();
 <h1>{words('auto:1a2b3c', 'Original words')}</h1>
 ```
 
-The `/server` entry reads three server-only variables:
+The `/server` entry reads three server-only variables. These are the three
+values a site is given, under the same names the rest of the product uses:
 
 ```
-LIVE_EDIT_SITE=acme
-LIVE_EDIT_API_BASE=https://live.tryshipfast.com/api/live-edit/v1
-LIVE_EDIT_KEY=kbp_...
+LIVE_EDIT_SITE_ID=acme
+LIVE_EDIT_HOST=https://live.tryshipfast.com
+LIVE_EDIT_APP_KEY=kbp_...
 ```
+
+The older `LIVE_EDIT_SITE`, `LIVE_EDIT_API_BASE` and `LIVE_EDIT_KEY` are still
+read, so nothing already deployed has to change. `LIVE_EDIT_HOST` is a bare
+host and the API path is appended for you; `LIVE_EDIT_API_BASE` is the full
+path if you would rather give it.
+
+**Without all three, nothing is read and every component renders its own
+words.** That used to happen in silence, which is the worst way for it to
+happen: the overlay applies published content after hydration, so you see your
+own copy and have no reason to suspect anything, while crawlers and first paint
+get the words in your components. It now says so in the console once, naming
+the variable that is missing.
 
 **`/server` is a separate entry point deliberately.** It holds your key, and an
 import that cannot appear in a client bundle cannot leak one into a client
