@@ -8,6 +8,7 @@ use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 use ShipFast\LiveEdit\Http\Middleware\TagsEditableMarkup;
 use ShipFast\LiveEdit\Mapper\MarkupScanner;
+use ShipFast\LiveEdit\Support\RemoteContent;
 use Symfony\Component\HttpFoundation\Response;
 
 /**
@@ -344,6 +345,92 @@ class ACloudSiteServesThePublishedWordsTest extends TestCase
         $theme = '<html lang="en"><body><h1>The theme\'s own words</h1></body></html>';
 
         $this->assertStringContainsString("The theme's own words", $this->serve($theme));
+    }
+
+    public function test_a_stale_snapshot_does_not_outrank_the_service(): void
+    {
+        /*
+         * The fault that made the whole fix invisible on the site it was
+         * written for, and the reason it took so long to find: nothing failed.
+         *
+         * A snapshot is a copy of a publish, and Snapshot::url() falls back to
+         * the configured disk's own address when no snapshot url is set - so a
+         * site that published locally once still has a reachable file. Asking
+         * the snapshot first meant that file won. Measured on learnkasts: the
+         * service held twenty-nine overrides, the site served one, under a key
+         * the service has never heard of. Every change published since was
+         * invisible.
+         */
+        $theme = '<html lang="en"><body><img src="/hero.jpg" alt="A hero"></body></html>';
+        $key = $this->keyTheServiceGivesTo($theme, '/');
+
+        config()->set('live-edit.snapshot_url', 'https://cdn.learnkasts.com/live-edit/content');
+
+        Http::fake([
+            '*/api/live-edit/v1/learnkasts/content*' => Http::response([
+                'version' => 5,
+                'settings' => [$key => '/storage/live/what-they-published-today.jpg'],
+            ]),
+            // A real file, answering, holding something from years ago.
+            '*current.json*' => Http::response(['version' => 1, 'locales' => ['en']]),
+            '*' => Http::response([
+                'settings' => ['auto:somethingelse' => '/storage/live/from-years-ago.jpg'],
+            ]),
+        ]);
+
+        $served = $this->serve($theme);
+
+        $this->assertStringContainsString('what-they-published-today.jpg', $served);
+        $this->assertStringNotContainsString('from-years-ago.jpg', $served);
+    }
+
+    public function test_a_site_that_has_published_nothing_is_not_given_yesterday_s_words(): void
+    {
+        /*
+         * The other half, and the reason reaching the service counts as an
+         * answer even when the answer is nothing. A client who clears an
+         * override has published an empty set; falling through to a snapshot
+         * there would quietly put the old content back.
+         */
+        config()->set('live-edit.snapshot_url', 'https://cdn.learnkasts.com/live-edit/content');
+
+        $theme = '<html lang="en"><body><img src="/hero.jpg" alt="A hero"></body></html>';
+        $key = $this->keyTheServiceGivesTo($theme, '/');
+
+        Http::fake([
+            '*/api/live-edit/v1/learnkasts/content*' => Http::response(['version' => 6, 'settings' => []]),
+            '*current.json*' => Http::response(['version' => 1, 'locales' => ['en']]),
+            '*' => Http::response(['settings' => [$key => '/storage/live/from-years-ago.jpg']]),
+        ]);
+
+        $this->assertStringNotContainsString('from-years-ago.jpg', $this->serve($theme));
+    }
+
+    public function test_a_self_hosted_install_still_reads_its_own_snapshot_first(): void
+    {
+        /*
+         * The positive control. A site that keeps its own words has a snapshot
+         * because that is where they are - reversing the order for everybody
+         * would send every self-hosted install's page render to us.
+         */
+        config()->set('live-edit.cloud.site', null);
+        config()->set('live-edit.cloud.host', null);
+        config()->set('live-edit.snapshot_url', 'https://cdn.example.com/live-edit/content');
+
+        Http::fake([
+            '*current.json*' => Http::response(['version' => 3, 'locales' => ['en']]),
+            '*/api/live-edit/*' => Http::response(['version' => 9, 'settings' => ['x' => 'ours']]),
+            '*' => Http::response(['settings' => ['x' => 'their-own']]),
+        ]);
+
+        /*
+         * Asked of RemoteContent directly rather than through the middleware,
+         * which is the honest way round: a self-hosted install's middleware
+         * reads its own settings table and never reaches this class at all.
+         * Routing the control through the middleware tested nothing, and said
+         * so by failing.
+         */
+        $this->assertSame(['x' => 'their-own'], RemoteContent::settings('en'));
     }
 
     public function test_it_still_never_reaches_for_a_local_database(): void

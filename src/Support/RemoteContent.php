@@ -29,25 +29,52 @@ class RemoteContent
             return [];
         }
 
+        /*
+         * A cloud install asks the service first, and takes its answer.
+         *
+         * Checked rather than assumed: learnkasts is configured with a cloud
+         * host and site and no LIVE_EDIT_SNAPSHOT_URL, which is the ordinary
+         * shape - the install instructions never mention one. So the service
+         * has to be asked at all, over the endpoint the browser runtime
+         * already uses, with the same key, which is public by design and
+         * printed into every page it edits.
+         *
+         * But asking it SECOND was the bug, and a worse one than not asking.
+         * A snapshot is a copy of a publish, and Snapshot::url() falls back to
+         * the configured disk's own address when no snapshot url is set - so
+         * an install that published locally once, years of edits ago, still
+         * has a reachable file. That file answered, it was non-empty, and it
+         * won. Measured on learnkasts: the service had twenty-nine overrides
+         * and the site served one, under a key the service has never heard of.
+         * Every published change since was invisible, and nothing failed.
+         *
+         * The authority is whoever the words live with. A copy must never
+         * outrank the thing it was a copy of.
+         */
+        if (WhereTheWordsLive::withTheService()) {
+            $answer = self::fromTheService($locale);
+
+            if ($answer !== []) {
+                /*
+                 * Reached the service, so its answer is the answer - empty
+                 * included. A site that has published nothing has no
+                 * overrides, and falling through to a stale snapshot here
+                 * would put the old content back on exactly the sites that
+                 * had just cleared it.
+                 */
+                return $answer['settings'] ?? [];
+            }
+
+            // Unreachable. Fall through rather than serve nothing, so a site
+            // that does keep a snapshot still has its words.
+        }
+
         $snapshot = self::snapshot($locale);
 
         if ($snapshot !== []) {
             return $snapshot['settings'] ?? [];
         }
 
-        /*
-         * A cloud install asks the service, because it has no snapshot to read.
-         *
-         * Checked rather than assumed: learnkasts is configured with a cloud
-         * host and site and no LIVE_EDIT_SNAPSHOT_URL, which is the ordinary
-         * shape - the install instructions never mention one. Everything above
-         * would therefore return nothing on exactly the installs that most
-         * need an answer, and the page would go out carrying the theme's own
-         * words.
-         *
-         * The same endpoint the browser runtime already uses, with the same
-         * key, which is public by design and printed into every page it edits.
-         */
         return self::fromTheService($locale)['settings'] ?? [];
     }
 
