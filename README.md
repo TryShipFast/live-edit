@@ -149,6 +149,19 @@ LIVE_EDIT_APP_KEY=kbp_...
 `APP_KEY` is public. It is printed into the source of every page it edits, so it
 is not a secret and its name should not suggest one.
 
+**A site whose content lives with the service needs `LIVE_EDIT_APP_KEY` in its
+own environment**, not only in the page. Until 0.15.4 nothing on the server side
+ever asked the service anything, so an install could work without one: the key
+reaches the browser through the loader script the service generates, and the
+editor only ever ran in the browser. From 0.15.4 the server reads published
+content while rendering a page, so that it is in the HTML a visitor and a
+crawler get rather than swapped in afterwards, and that read needs the key.
+
+Without it, nothing fails. The editor works, the browser swaps every change in,
+and the client sees their own site exactly as they left it; only visitors and
+search engines are served the words in your templates. From 0.15.8 the log says
+so once an hour instead of leaving you to find it.
+
 A site whose own server talks to the service, to let its people in or to
 publish, also sets `LIVE_EDIT_SECRET_KEY`. A Laravel or WordPress install that
 keeps its own content never calls that API and never needs one.

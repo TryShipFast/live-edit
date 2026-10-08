@@ -6,6 +6,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
 use ShipFast\LiveEdit\Http\Middleware\TagsEditableMarkup;
 use ShipFast\LiveEdit\Mapper\MarkupScanner;
 use ShipFast\LiveEdit\Support\RemoteContent;
@@ -431,6 +432,87 @@ class ACloudSiteServesThePublishedWordsTest extends TestCase
          * so by failing.
          */
         $this->assertSame(['x' => 'their-own'], RemoteContent::settings('en'));
+    }
+
+    public function test_a_cloud_install_with_no_key_says_so_rather_than_serving_old_words(): void
+    {
+        /*
+         * The gap that cost four releases. A cloud install's key reaches the
+         * BROWSER through the loader the service generates, so the application
+         * may never have had LIVE_EDIT_APP_KEY in its environment - and never
+         * needed one, because until 0.15.4 nothing on the server side asked us
+         * anything. Measured on learnkasts: key configured NO, direct call
+         * 401, and the page quietly serving content from an inferred snapshot
+         * nobody had configured.
+         *
+         * Silence was the worst of it. The editor worked, the browser swapped
+         * every picture in, the client saw their site exactly as they left it,
+         * and only visitors and crawlers got the theme's words.
+         */
+        config()->set('live-edit.licence.key', '');
+        config()->set('live-edit.snapshot_url', null);
+
+        Log::shouldReceive('warning')->once()->withArgs(
+            fn (string $said) => str_contains($said, 'LIVE_EDIT_APP_KEY') && str_contains($said, 'learnkasts')
+        );
+
+        $theme = '<html lang="en"><body><h1>The theme\'s own words</h1></body></html>';
+
+        $this->assertStringContainsString("The theme's own words", $this->serve($theme));
+    }
+
+    public function test_it_complains_once_rather_than_once_a_page(): void
+    {
+        // This runs on every page render. A line per request buries the log it
+        // is trying to be found in.
+        config()->set('live-edit.licence.key', '');
+        config()->set('live-edit.snapshot_url', null);
+
+        Log::shouldReceive('warning')->once();
+
+        foreach (range(1, 3) as $ignored) {
+            RemoteContent::settings('en');
+        }
+    }
+
+    public function test_a_cloud_install_never_reads_a_snapshot_nobody_configured(): void
+    {
+        /*
+         * Snapshot::url() infers an address from whichever disk is default, so
+         * an install that published locally once has a file still sitting
+         * there answering. It answered, it was non-empty, and it outranked the
+         * service. Nulling snapshot_disk does not switch it off, because the
+         * inference falls back to the default disk again - measured on
+         * learnkasts, where clearing both snapshot settings still returned the
+         * same single ancient override.
+         */
+        config()->set('live-edit.licence.key', '');
+        config()->set('live-edit.snapshot_url', null);
+
+        Http::fake(['*' => Http::response(['settings' => ['auto:ancient' => '/from-years-ago.jpg']])]);
+
+        $this->assertSame([], RemoteContent::settings('en'));
+
+        // Not merely "the wrong answer was not used" - the guess is never made.
+        Http::assertNothingSent();
+    }
+
+    public function test_an_explicitly_named_snapshot_is_still_honoured(): void
+    {
+        /*
+         * The positive control, and the line this draws: naming a snapshot_url
+         * is somebody saying "my published content lives there". Inferring one
+         * is a guess, and a guess loses to nothing at all.
+         */
+        config()->set('live-edit.licence.key', '');
+        config()->set('live-edit.snapshot_url', 'https://cdn.learnkasts.example/live-edit/content');
+
+        Http::fake([
+            '*current.json*' => Http::response(['version' => 4, 'locales' => ['en']]),
+            '*' => Http::response(['settings' => ['auto:named' => '/they-asked-for-this.jpg']]),
+        ]);
+
+        $this->assertSame(['auto:named' => '/they-asked-for-this.jpg'], RemoteContent::settings('en'));
     }
 
     public function test_it_still_never_reaches_for_a_local_database(): void

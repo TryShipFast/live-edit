@@ -4,6 +4,7 @@ namespace ShipFast\LiveEdit\Support;
 
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
 
 /**
  * Published content fetched over HTTP.
@@ -65,8 +66,26 @@ class RemoteContent
                 return $answer['settings'] ?? [];
             }
 
-            // Unreachable. Fall through rather than serve nothing, so a site
-            // that does keep a snapshot still has its words.
+            /*
+             * Unreachable, or not configured to ask. Fall through only to a
+             * snapshot somebody explicitly named.
+             *
+             * Snapshot::url() otherwise infers an address from whichever disk
+             * is default, so an install that published locally once still has
+             * a file sitting there answering - and it answered, and it won.
+             * Nulling snapshot_disk does not switch that off, because the
+             * inference falls back again to the default disk; measured on
+             * learnkasts, where clearing both snapshot settings still returned
+             * the same single ancient override.
+             *
+             * An explicit snapshot_url is somebody saying "my published
+             * content lives there". An inferred one is a guess, and a guess
+             * that loses to nothing at all: serving the theme's words is
+             * honest, and serving a stranger's years-old content is not.
+             */
+            if (blank(config('live-edit.snapshot_url'))) {
+                return [];
+            }
         }
 
         $snapshot = self::snapshot($locale);
@@ -121,7 +140,13 @@ class RemoteContent
         $site = (string) (config('live-edit.licence.site') ?: config('live-edit.cloud.site'));
         $key = (string) config('live-edit.licence.key');
 
-        if ($host === '' || $site === '' || $key === '') {
+        if ($host === '' || $site === '') {
+            return [];
+        }
+
+        if ($key === '') {
+            self::sayThatNobodyGaveUsAKey($site);
+
             return [];
         }
 
@@ -152,6 +177,48 @@ class RemoteContent
 
                 return self::looksLikeOurs($body) ? (array) $body : [];
             }
+        );
+    }
+
+    /**
+     * A cloud install that cannot prove who it is, said out loud, once.
+     *
+     * The gap this closes, found the hard way. A cloud install's key reaches
+     * the BROWSER through the loader script the service generates, so the
+     * application itself may never have had LIVE_EDIT_APP_KEY in its
+     * environment - and never needed one, because until 0.15.4 nothing on the
+     * server side ever asked us anything. The fix that made the server ask
+     * quietly depends on a value half those installs do not have.
+     *
+     * Silence here is the worst possible behaviour: the editor works, the
+     * browser swaps every picture in, the client sees their own site exactly
+     * as they left it, and only a visitor - and every crawler - gets the
+     * theme's words. Nothing fails, so nobody looks.
+     *
+     * Throttled through the cache rather than a static flag. This runs on
+     * every page render, and under php-fpm every request is a fresh process -
+     * so a static would have meant "once per request", which is the line-per-
+     * request flood it was meant to avoid. Hourly, per site, and a cache that
+     * is unavailable simply lets it through: a duplicated warning is a far
+     * smaller problem than a silent one.
+     */
+    protected static function sayThatNobodyGaveUsAKey(string $site): void
+    {
+        $firstTimeInAWhile = rescue(
+            fn () => Cache::add("live-edit.no-key-warning.{$site}", true, now()->addHour()),
+            true,
+            false
+        );
+
+        if (! $firstTimeInAWhile) {
+            return;
+        }
+
+        Log::warning(
+            "Live Edit: site [{$site}] keeps its content with the service but this application has no "
+            .'LIVE_EDIT_APP_KEY, so published content cannot be read while rendering a page. Visitors and '
+            .'crawlers are being served the words in your templates. The key is the publishable one already '
+            .'printed into every page this site serves.'
         );
     }
 
