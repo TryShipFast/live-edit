@@ -239,6 +239,17 @@ locales.
 
 ## If something is wrong
 
+**Start here.** One command, safe on production, that says where this site's
+published content is read from and whether that read works:
+
+```bash
+php artisan live-edit:diagnose
+```
+
+It names the four things that decide whether a visitor sees the client's words
+or the theme's: where content lives, whether tagging is on, whether the app key
+is set, and what the service actually answers. It never prints the key.
+
 **`@liveEdit` appears as text on the page.** Blade prints a directive it does
 not know rather than erroring, so this ends up visible to visitors. The package
 is not registered:
