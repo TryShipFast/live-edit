@@ -53,6 +53,33 @@ return [
     'snapshot_url' => env('LIVE_EDIT_SNAPSHOT_URL'),
 
     /*
+     * Ask the service for this site's published content while rendering a page.
+     *
+     * On, because a cloud install has nowhere else to read it from: its words
+     * live with us, and without this a visitor and every crawler are served
+     * the theme's own words while the client's are swapped in afterwards in
+     * the browser.
+     *
+     * Unset means on everywhere except while the host is running its own
+     * tests, and that exception is the whole reason this switch exists. A host
+     * application's suite very reasonably writes Http::fake(['*' => ...]) to
+     * stub ITS api, and a wildcard fake answers our call too - so the host's
+     * fixture arrives here looking like its client's published content and the
+     * middleware rewrites the page with it. What the consumer sees is page
+     * tests failing after a patch bump with nothing in their own diff to
+     * explain it; reported from a real upgrade, where five green tests went
+     * red and took a bisection to attribute.
+     * Http::preventStrayRequests() turns the same thing into a stray-request
+     * error instead. Neither is a fault in the host's suite.
+     *
+     * Decided at the point of use rather than here, so it survives a cached
+     * config and does not depend on how the host spells its test environment.
+     * A suite that wants the real behaviour sets this to true, which is what
+     * this package's own suite does.
+     */
+    'remote_content' => env('LIVE_EDIT_REMOTE_CONTENT'),
+
+    /*
      * Signing for a distribution that is not public. Published content usually
      * is — it is a website — so these are optional, and without them a plain
      * URL is returned rather than failing.

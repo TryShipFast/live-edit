@@ -17,6 +17,15 @@ class RemoteContentTest extends TestCase
         parent::setUp();
         Cache::flush();
         config(['live-edit.snapshot_url' => 'https://cdn.test/content']);
+
+        /*
+         * This is the suite that wants the real behaviour, so it says so.
+         * Reading content off this machine is off by default while a host
+         * application runs its tests - a wildcard Http::fake in somebody
+         * else's suite would otherwise be taken for their client's published
+         * words.
+         */
+        config(['live-edit.remote_content' => true]);
     }
 
     public function test_it_reads_the_pointer_then_the_version(): void

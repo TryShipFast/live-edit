@@ -250,6 +250,26 @@ deliberately only visible to an editor.
 not defined, so nothing binds for anyone. See
 [Locking the parts a client must not change](#locking-the-parts-a-client-must-not-change).
 
+**Your own page tests started failing after upgrading to 0.15.4 or later.** From
+0.15.4 a site whose content lives with the service fetches it over HTTP while
+rendering a page, which earlier versions did not do. A suite that stubs its own
+api with a wildcard `Http::fake(['*' => ...])` answers that call too, so the
+fixture arrives looking like published content and the page is rewritten with
+it; `Http::preventStrayRequests()` turns the same thing into a stray-request
+error. Neither is a fault in your suite.
+
+Reading content off the machine is therefore off by default while the host
+application is running its tests, so an upgrade from 0.15.6 onwards needs
+nothing from you. A test that wants the real behaviour asks for it:
+
+```php
+config(['live-edit.remote_content' => true]);
+```
+
+Set `LIVE_EDIT_REMOTE_CONTENT=false` to switch it off outside tests too. The
+page then renders the words in your templates, which is what it did before the
+package arrived.
+
 ## What the package provides
 
 - **Endpoints** (`ShipFast\LiveEdit\Http\Controllers\LiveEditController`) for

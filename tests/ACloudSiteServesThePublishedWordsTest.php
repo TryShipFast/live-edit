@@ -57,6 +57,14 @@ class ACloudSiteServesThePublishedWordsTest extends TestCase
         config()->set('live-edit.licence.site', 'learnkasts');
         config()->set('live-edit.licence.key', 'kbp_test_key');
 
+        /*
+         * Asked for explicitly, because it is off by default under testing -
+         * a host application's wildcard Http::fake would otherwise be taken
+         * for its client's published content. A suite that wants the real
+         * behaviour is the suite that says so.
+         */
+        config()->set('live-edit.remote_content', true);
+
         Cache::flush();
     }
 
@@ -273,6 +281,69 @@ class ACloudSiteServesThePublishedWordsTest extends TestCase
         config()->set('live-edit.setting_model', ATableTheInstallOwns::class);
 
         $this->assertStringContainsString('/uploads/their-hero.jpg', $this->serve($theme, '/about'));
+    }
+
+    public function test_a_host_application_can_switch_the_call_off(): void
+    {
+        /*
+         * Reported from a real upgrade of a consumer application. Its suite
+         * stubs its own api the ordinary way - Http::fake(['*' => ...]) - and
+         * a wildcard fake answers this call too, so the application's own
+         * fixture arrived here looking like its client's published content and
+         * the middleware rewrote the page with it. Five green page tests went
+         * red on a patch bump with nothing in their own diff to explain it.
+         *
+         * Nobody should have to work out which five environment variables to
+         * blank to get out of that.
+         */
+        config()->set('live-edit.remote_content', false);
+
+        Http::fake(['*' => Http::response(['settings' => ['anything' => 'at all']])]);
+
+        $theme = '<html lang="en"><body><h1>The theme\'s own words</h1></body></html>';
+
+        $this->assertStringContainsString("The theme's own words", $this->serve($theme));
+
+        Http::assertNothingSent();
+    }
+
+    public function test_it_is_off_by_default_under_testing(): void
+    {
+        /*
+         * The default is the fix, not the switch. A consumer who never reads
+         * our config still gets a suite that behaves as it did before the
+         * upgrade.
+         */
+        // Unset, which is what a host application that has never read our
+        // config has.
+        config()->set('live-edit.remote_content', null);
+
+        $this->assertTrue(app()->runningUnitTests(), 'This test only means anything inside a test run.');
+
+        Http::fake(['*' => Http::response(['settings' => ['anything' => 'at all']])]);
+
+        $theme = '<html lang="en"><body><h1>The theme\'s own words</h1></body></html>';
+
+        $this->assertStringContainsString("The theme's own words", $this->serve($theme));
+
+        Http::assertNothingSent();
+    }
+
+    public function test_a_payload_that_is_not_ours_is_not_treated_as_published_content(): void
+    {
+        /*
+         * Belt to the switch's braces, and right on its own terms: a client's
+         * published words are not "whatever JSON answered this address". A
+         * captive portal, a proxy's JSON error page and a host's own fixture
+         * all answer successfully, and rewriting somebody's live page with a
+         * stranger's payload is the one outcome worse than serving the theme's
+         * own words.
+         */
+        Http::fake(['*' => Http::response(['data' => ['id' => 1, 'title' => 'A course of theirs']])]);
+
+        $theme = '<html lang="en"><body><h1>The theme\'s own words</h1></body></html>';
+
+        $this->assertStringContainsString("The theme's own words", $this->serve($theme));
     }
 
     public function test_it_still_never_reaches_for_a_local_database(): void

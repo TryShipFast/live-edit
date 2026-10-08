@@ -201,7 +201,7 @@ class MarkupScanner
 
         $this->fullDocument = (bool) preg_match('/<html[\s>]/i', $html);
 
-        $html = TheTreeABrowserBuilds::from($html);
+        $html = AttributesAParserMayNotKeep::protect(TheTreeABrowserBuilds::from($html));
 
         $this->doc = new DOMDocument;
         libxml_use_internal_errors(true);
@@ -337,7 +337,7 @@ class MarkupScanner
         }
 
         $this->fullDocument = (bool) preg_match('/<html[\s>]/i', $html);
-        $html = TheTreeABrowserBuilds::from($html);
+        $html = AttributesAParserMayNotKeep::protect(TheTreeABrowserBuilds::from($html));
 
         $this->doc = new DOMDocument;
         libxml_use_internal_errors(true);
@@ -1468,6 +1468,9 @@ class MarkupScanner
             return '';
         }
 
+        // Every return below goes through here, so the @ goes back on exactly
+        // once however the document leaves.
+
         // A fragment came in without <html>: return the body's inner HTML so we
         // don't emit a doctype/html/body wrapper the source never had.
         if (! $this->fullDocument) {
@@ -1479,13 +1482,15 @@ class MarkupScanner
                 }
             }
 
-            return trim($inner);
+            return AttributesAParserMayNotKeep::restore(trim($inner));
         }
 
         $out = (string) $this->doc->saveHTML();
 
         // Drop the UTF-8 hint we injected (DOMDocument renders it as a comment).
-        return trim(preg_replace('/<!--\?xml[^>]*-->\s*/', '', $out));
+        return AttributesAParserMayNotKeep::restore(
+            trim(preg_replace('/<!--\?xml[^>]*-->\s*/', '', $out))
+        );
     }
 
     protected function humanise(string $key): string

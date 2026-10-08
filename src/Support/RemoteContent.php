@@ -25,6 +25,10 @@ class RemoteContent
      */
     public static function settings(?string $locale = null): array
     {
+        if (! self::mayAskAnybody()) {
+            return [];
+        }
+
         $snapshot = self::snapshot($locale);
 
         if ($snapshot !== []) {
@@ -45,6 +49,27 @@ class RemoteContent
          * key, which is public by design and printed into every page it edits.
          */
         return self::fromTheService($locale)['settings'] ?? [];
+    }
+
+    /**
+     * Whether a page render may go looking for content off this machine.
+     *
+     * Covers both addresses this class knows, which is the point: the snapshot
+     * pointer is fetched before the service is asked, and gating only the
+     * second one left a consumer's wildcard Http::fake still answering the
+     * first. Measured, after fixing the obvious half and finding a request
+     * still recorded.
+     *
+     * Unset means on, except while the host application is running its own
+     * tests. Decided here rather than in the config file so it survives a
+     * cached config and does not depend on how the host spells its test
+     * environment.
+     */
+    protected static function mayAskAnybody(): bool
+    {
+        $asked = config('live-edit.remote_content');
+
+        return $asked === null ? ! app()->runningUnitTests() : (bool) $asked;
     }
 
     /**
@@ -92,9 +117,37 @@ class RemoteContent
                     return [];
                 }
 
-                return $response->successful() ? (array) $response->json() : [];
+                if (! $response->successful()) {
+                    return [];
+                }
+
+                $body = $response->json();
+
+                return self::looksLikeOurs($body) ? (array) $body : [];
             }
         );
+    }
+
+    /**
+     * Whether a payload is one of ours, rather than merely a 200.
+     *
+     * Belt to the config switch's braces, and worth having on its own terms:
+     * a client's published words are not "whatever JSON answered this
+     * address". A host application's wildcard Http::fake, a captive portal, a
+     * proxy's error page rendered as JSON - all of them answer successfully
+     * and none of them is a client's content. Rewriting somebody's live page
+     * with a stranger's payload is the one outcome here worse than serving the
+     * theme's own words.
+     *
+     * Deliberately shallow: the shape our endpoint has always returned, and
+     * nothing about what is inside. A stricter check would be a second place
+     * to keep in step with the API.
+     */
+    protected static function looksLikeOurs(mixed $body): bool
+    {
+        return is_array($body)
+            && array_key_exists('settings', $body)
+            && is_array($body['settings']);
     }
 
     /**
