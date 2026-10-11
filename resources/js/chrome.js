@@ -714,7 +714,9 @@ export const PAGE_CSS = `
 html:has(#live-edit-ui) {
   scroll-padding-bottom: 96px;
 }
-body:has(#live-edit-ui) {
+/* The editor is mounted on <html> rather than inside <body> (see
+   createChrome), so the clearance is asked for through the root. */
+html:has(#live-edit-ui) > body {
   padding-bottom: 96px;
 }
 /* Sticky footers and cookie bars sit at the bottom too, and two things
@@ -723,7 +725,7 @@ body:has(#live-edit-ui) {
    covering theirs. */
 @media (max-width: 700px) {
   html:has(#live-edit-ui) { scroll-padding-bottom: 112px; }
-  body:has(#live-edit-ui) { padding-bottom: 112px; }
+  html:has(#live-edit-ui) > body { padding-bottom: 112px; }
 }
 body.editing [data-edit],
 body.editing [data-edit-href]:not([data-edit]),
@@ -789,7 +791,33 @@ export function createChrome() {
 
     const root = document.createElement('div');
     root.id = 'live-edit-ui';
-    document.body.append(root);
+
+    /*
+     * Mounted on <html>, not in <body>, and that is about zoom.
+     *
+     * Everything this chrome draws over the page — the hover outline, the
+     * pencil, the background handle — is positioned from
+     * getBoundingClientRect(), which already answers in post-zoom pixels. A
+     * template that scales itself for wide screens does it on the body:
+     *
+     *   @media (min-width: 1880px) { body { zoom: 1.25; } }
+     *
+     * is a real rule from a real template. Inside the body, our overlay
+     * inherits that zoom and multiplies by it a second time, so an outline
+     * told to sit at 334px paints at 418px and the error grows with every
+     * pixel down the page. It reads as the editor highlighting the wrong
+     * thing, which is close to useless: the one job of that outline is to say
+     * "this is what you are about to change".
+     *
+     * The real reason it belongs here is simpler than the bug, though. This
+     * is not part of the page. It is our furniture, sitting on top, and the
+     * page's own layout should not be able to move it, scale it, or clip it.
+     *
+     * <html> can be zoomed too and nothing here would stop that. No template
+     * seen so far does it, and it is visible the moment anybody looks, which
+     * is the trade being made rather than one being hidden.
+     */
+    document.documentElement.append(root);
     const shadow = root.attachShadow({ mode: 'open' });
     const style = document.createElement('style');
     style.textContent = CHROME_CSS;

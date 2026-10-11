@@ -193,6 +193,12 @@ class EmbedTest extends TestCase
         // customers are given has to be derived from the bytes of the files
         // this endpoint will actually hand them.
         $paths = glob(__DIR__.'/../../resources/js/*.js') ?: [];
+
+        // The built bundle as well as the sources. It is not in that directory
+        // and it is the only file most installs ever load, so a version taken
+        // from the sources alone can stand still while the thing being served
+        // changes underneath it.
+        $paths[] = __DIR__.'/../../resources/dist/live-edit.js';
         sort($paths);
 
         $this->assertNotSame([], $paths, 'the runtime this test fingerprints has moved');
@@ -202,6 +208,44 @@ class EmbedTest extends TestCase
             EmbedController::assetVersion(),
             'the version customers are given does not follow the runtime they are given'
         );
+    }
+
+    public function test_rebuilding_the_bundle_moves_the_address(): void
+    {
+        /*
+         * The failure this is here to stop is silent and total.
+         *
+         * Every asset goes out as "immutable, max-age=one year", so a browser
+         * that already holds one never asks again. If the version does not
+         * move when the bundle does, the fix is deployed, the server serves
+         * it, and not one customer receives it until next year. Nothing on
+         * the page says so, and the only symptom is a bug report about a bug
+         * that was fixed.
+         *
+         * Exercised through fingerprintOf rather than by rebuilding the real
+         * bundle: the question is whether the bundle's bytes are part of the
+         * answer at all, and assetVersion() memoises, so a test that edited
+         * the real file would depend on which test ran first.
+         */
+        $directory = sys_get_temp_dir().'/'.uniqid('le-bundle-', true);
+        mkdir($directory);
+
+        $source = $directory.'/chrome.js';
+        $bundle = $directory.'/live-edit.js';
+        file_put_contents($source, 'export const PAGE_CSS = ``;');
+        file_put_contents($bundle, 'built from the above');
+
+        $before = EmbedController::fingerprintOf([$source, $bundle]);
+
+        // The source is untouched, exactly as it is on a rebuild of an
+        // unchanged working tree, or a release built on another machine.
+        file_put_contents($bundle, 'built again, and differently');
+        $after = EmbedController::fingerprintOf([$source, $bundle]);
+
+        array_map(unlink(...), [$source, $bundle]);
+        rmdir($directory);
+
+        $this->assertNotSame($before, $after, 'a rebuilt bundle kept the address browsers cache it under');
     }
 
     public function test_the_runtime_moves_as_one_set(): void

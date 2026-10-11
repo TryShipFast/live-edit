@@ -100,10 +100,19 @@ class EmbedController
      * and a version that ignored it would hand browsers a stale build under a
      * name that claimed to be current. Reading the directory means adding a
      * file is enough.
+     *
+     * And the built bundle, which the directory does not contain and which is
+     * the only thing most installs ever load. Leaving it out undid the whole
+     * point of deriving the version from the bytes: a rebuilt bundle shipped
+     * without a source file also changing kept the old URL, and every browser
+     * holding it under "immutable, one year" went on running the old editor.
+     * That is not hypothetical. It happened while fixing the editor overlay,
+     * and it cost an hour of looking at a fix that was already deployed.
      */
     private static function fingerprint(): string
     {
         $files = glob(self::path('*.js')) ?: [];
+        $files[] = self::path('bundle.js');
         sort($files);
 
         return self::fingerprintOf($files);
