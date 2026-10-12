@@ -1932,7 +1932,32 @@ const bootLiveEdit = () => {
             const api = window.liveEditApi;
             const session = await import('./session.js').catch(() => null);
 
+            /*
+             * Whether there was anything to end.
+             *
+             * This is the whole guard, and it exists because reloading cannot
+             * fix "you were never signed in" - it can only ask the same
+             * question again. A page served to somebody the host considers an
+             * editor, calling a route the host answers with 401, used to come
+             * here, find no session, reload, and arrive at exactly the same
+             * 401: a tight loop that reloaded the page for ever and sent
+             * hundreds of requests a minute, on the site of the person who
+             * owns the product.
+             *
+             * Ending a session that exists is worth a reload, because the page
+             * is still showing editing chrome that no longer works. Ending one
+             * that never existed is worth nothing at all.
+             */
+            const hadOne = session?.currentSession?.(window) ?? null;
+
             session?.forget(window);
+
+            if (!hadOne) {
+                // Nothing was ended, so there is nothing to put back. The
+                // caller still throws, which is what tells whoever asked that
+                // their request failed.
+                return;
+            }
 
             if (!api || !session) {
                 window.location.reload();
