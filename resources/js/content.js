@@ -206,17 +206,72 @@ const clearTheSourcesAround = (element) => {
  * writing markup from a network response into a page is how a content service
  * becomes a way to run scripts on every visitor's browser.
  */
+/**
+ * Whether something already reads as these words.
+ *
+ * Whitespace collapsed on both sides, because the spacing in the markup is the
+ * theme's business rather than the sentence's: a heading written across three
+ * indented lines carries tabs and newlines that the panel never showed and the
+ * person never typed. Comparing them raw reports a difference on every such
+ * heading and defeats the point of asking.
+ */
+const collapse = (text) => String(text ?? '').replace(/\s+/g, ' ').trim();
+
+const sameWords = (text, value) => collapse(text) === collapse(value);
+
 const applyWords = (element, value, keepRuns = false) => {
     const runs = [...element.childNodes].filter((node) => node.nodeType === TEXT_NODE);
 
     if (runs.length === 0) {
-        // No words of its own. A wrapper around a single element that holds
-        // them — the button above — is the one case where where they go is not
-        // a guess; anything else is left alone rather than rearranged.
-        const children = [...element.children];
+        /*
+         * Already saying it, so there is nothing to apply.
+         *
+         * Checked first because the alternative used to be to append, and a
+         * template that rebuilds the inside of its own heading turns that into
+         * the sentence twice. One ships with:
+         *
+         *   <h1 data-split="lines" data-edit="text">Hi, I'm<br>Temitope</h1>
+         *
+         * and its animation wraps each line in a div on load. The server has
+         * already rendered the saved words; by the time the runtime applies
+         * them there are no text runs left to recognise, only the divs the
+         * template made, so the words were appended beside themselves. The
+         * person who had just pressed Save watched their heading double.
+         */
+        if (sameWords(element.textContent, value)) {
+            return;
+        }
 
-        if (children.length === 1 && children[0].children.length === 0) {
-            applyWords(children[0], value);
+        // Whatever the words actually live in. Children with no words of their
+        // own are passed over rather than counted: an icon span beside a label
+        // is not somewhere the sentence might be hiding.
+        const holders = [...element.children].filter((child) => child.textContent.trim() !== '');
+
+        if (holders.length === 1) {
+            // A wrapper around the one element that holds them, which is the
+            // case where where they go is not a guess. Recursing rather than
+            // writing here means the careful run matching below still applies
+            // however deep the theme wrapped them.
+            applyWords(holders[0], value);
+
+            return;
+        }
+
+        if (holders.length > 1) {
+            /*
+             * Split across several wrappers, which is the line-by-line heading
+             * above once its animation has run.
+             *
+             * The same answer the rewrite branch below gives when words are
+             * spread over runs it cannot map: put them in the first and empty
+             * the rest. It loses the theme's arrangement of the old sentence,
+             * which the theme is about to rebuild anyway, and never loses a
+             * word the person typed.
+             */
+            applyWords(holders[0], value);
+            holders.slice(1).forEach((holder) => {
+                holder.textContent = '';
+            });
 
             return;
         }
