@@ -1,5 +1,12 @@
 # ShipFast Live Edit for WordPress
 
+## 0.15.13
+
+The shared editor runtime now waits for the page's editor marker before
+starting, so the toolbar is not lost to a timing race. Invited editors also no
+longer get editing controls for regions the developer locked; the API
+continues to enforce the same restriction when a save is submitted.
+
 ## 0.11.0
 
 The first release since plans were enforced, so most of this is a customer

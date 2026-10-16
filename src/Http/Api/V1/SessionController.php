@@ -88,6 +88,10 @@ class SessionController
                         ?: (is_string($token->editor?->email) ? explode('@', $token->editor->email)[0] : $token->name),
                 ] : null,
                 'expires_at' => $token->expires_at?->toIso8601String(),
+                // The browser uses this to avoid offering a locked region
+                // that the API will refuse at save time. Keep the API as the
+                // authority; this only controls editor affordances.
+                'may_edit_locked' => $usable ? $token->mayEditLocked() : false,
             ],
         ])->withHeaders(['Cache-Control' => 'no-store, private']);
     }

@@ -563,6 +563,21 @@ class LicenceTest extends TestCase
         ])->assertUnauthorized();
     }
 
+    public function test_a_session_reports_whether_it_may_edit_locked_regions(): void
+    {
+        $site = Site::query()->create(['slug' => 'acme', 'name' => 'Acme', 'allowed_origins' => ['https://acme.test']]);
+        [, $invited] = $site->issueToken(TokenType::Session, 'Invited editor', null, now()->addHour(), null, false);
+        [, $owner] = $site->issueToken(TokenType::Session, 'Owner', null, now()->addHour(), null, true);
+
+        $this->getJson('/api/live-edit/v1/acme/session', [
+            'Authorization' => 'Bearer '.$invited, 'Origin' => 'https://acme.test',
+        ])->assertOk()->assertJsonPath('session.may_edit_locked', false);
+
+        $this->getJson('/api/live-edit/v1/acme/session', [
+            'Authorization' => 'Bearer '.$owner, 'Origin' => 'https://acme.test',
+        ])->assertOk()->assertJsonPath('session.may_edit_locked', true);
+    }
+
     public function test_a_session_says_who_is_editing_so_a_site_can_greet_them(): void
     {
         $site = Site::query()->create(['slug' => 'acme', 'name' => 'Acme', 'allowed_origins' => ['https://acme.test']]);

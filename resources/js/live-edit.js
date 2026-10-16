@@ -46,6 +46,20 @@ const bootLiveEdit = () => {
      */
     const api = window.liveEditApi;
 
+    // A locked edit is rejected by the API regardless. Learn a remote
+    // session's permission so the editor does not invite somebody to make a
+    // change they cannot save. Host-authenticated adapters already decide who
+    // may edit, and have no remote session token to ask about.
+    let mayEditLocked = true;
+    if (api?.base && api?.site && api?.token) {
+        mayEditLocked = null;
+        fetch(`${String(api.base).replace(/\/$/, '')}/${api.site}/session`, {
+            headers: { Accept: 'application/json', Authorization: `Bearer ${api.token}` },
+        }).then((response) => response.ok ? response.json() : null).then((payload) => {
+            mayEditLocked = payload?.session?.valid ? payload.session.may_edit_locked === true : false;
+        }).catch(() => { mayEditLocked = false; });
+    }
+
     if (api?.base && api?.site) {
         import('./autotag.js')
             .then((m) => m.ensureBackgroundsAreFound({ base: api.base, site: api.site, key: api.token }))
@@ -1775,7 +1789,8 @@ const bootLiveEdit = () => {
             current = null;
         };
 
-        const editables = () => document.querySelectorAll('[data-edit], [data-edit-img], [data-edit-bg], [data-edit-href], [data-edit-icon], [data-edit-svg]');
+        const editables = () => [...document.querySelectorAll('[data-edit], [data-edit-img], [data-edit-bg], [data-edit-href], [data-edit-icon], [data-edit-svg]')]
+            .filter((element) => mayEditLocked === true || !element.closest('[data-live-lock]'));
 
         /**
          * Every icon name the theme's own stylesheets define.
@@ -1857,7 +1872,7 @@ const bootLiveEdit = () => {
                 const match = computed.match(/url\((['"]?)(.*?)\1\)/);
                 const rect = element.getBoundingClientRect();
                 const worthEditing = match && !match[2].startsWith('data:') && rect.width >= 120 && rect.height >= 120;
-                element.toggleAttribute('data-has-bg', Boolean(worthEditing));
+                element.toggleAttribute('data-has-bg', Boolean(worthEditing) && (mayEditLocked === true || !element.closest('[data-live-lock]')));
             });
         };
 
@@ -4121,7 +4136,11 @@ const bootLiveEdit = () => {
         // in edit mode a link still navigates (so you browse the whole site while
         // editing — edit mode persists across the page load), and this handle,
         // shown on hover, opens the link's editor instead.
-        const editableAnchor = (target) => target?.closest?.('a[data-edit], a[data-edit-href]') ?? null;
+        const editableAnchor = (target) => {
+            const anchor = target?.closest?.('a[data-edit], a[data-edit-href]') ?? null;
+
+            return anchor && (mayEditLocked === true || !anchor.closest('[data-live-lock]')) ? anchor : null;
+        };
         const navigable = (anchor) => {
             const href = anchor?.getAttribute('href') ?? '';
             return href !== '' && href !== '#' && !href.startsWith('javascript:');
@@ -4165,6 +4184,7 @@ const bootLiveEdit = () => {
          */
         const resolveTarget = (node) => {
             if (!node?.closest) return null;
+            if (mayEditLocked !== true && node.closest('[data-live-lock]')) return null;
             const chip = node.closest('[data-style-edit]');
             if (chip) return { element: chip, kind: 'style' };
             // A picture you click ON, so it is the nearest thing and wins.
@@ -4274,7 +4294,7 @@ const bootLiveEdit = () => {
         document.addEventListener('pointerover', (event) => {
             if (!document.body.classList.contains('editing')) return;
             const withBackground = event.target.closest?.('[data-has-bg]');
-            if (withBackground) showBgHandle(withBackground);
+            if (withBackground && (mayEditLocked === true || !withBackground.closest('[data-live-lock]'))) showBgHandle(withBackground);
             const anchor = editableAnchor(event.target);
             if (anchor && navigable(anchor)) {
                 cancelHide();
@@ -5177,6 +5197,7 @@ window.liveEditDisplayedValue = (element) => displayedValue({
 
 const startLiveEdit = (() => {
     let started = false;
+    let observer = null;
 
     return () => {
         if (started) return;
@@ -5191,7 +5212,25 @@ const startLiveEdit = (() => {
         const how = new URLSearchParams(window.location.search).get('live-edit');
         if (how === 'off' || how === 'published') return;
 
+        // boot.js marks the body after its load-safe tagging pass. This
+        // module can finish loading first (notably on already prepared HTML),
+        // so starting once and returning here permanently loses the toolbar.
+        if (!document.body?.hasAttribute('data-admin')) {
+            if (window.liveEditApi?.token && !observer && typeof MutationObserver !== 'undefined') {
+                observer = new MutationObserver(() => {
+                    if (document.body?.hasAttribute('data-admin')) {
+                        observer.disconnect();
+                        observer = null;
+                        startLiveEdit();
+                    }
+                });
+                observer.observe(document.body, { attributes: true, attributeFilter: ['data-admin'] });
+            }
+            return;
+        }
+
         started = true;
+        observer?.disconnect();
         bootLiveEdit();
     };
 })();
