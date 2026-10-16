@@ -2,6 +2,8 @@
 
 namespace ShipFast\LiveEdit\Console\Commands;
 
+use Aws\S3\S3Client;
+use Aws\Sts\StsClient;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Storage;
 
@@ -219,12 +221,12 @@ class CheckMediaStorage extends Command
             return;
         }
 
-        if (($defined['driver'] ?? null) !== 's3' || ! class_exists(\Aws\Sts\StsClient::class)) {
+        if (($defined['driver'] ?? null) !== 's3' || ! class_exists(StsClient::class)) {
             return;
         }
 
         try {
-            $sts = new \Aws\Sts\StsClient([
+            $sts = new StsClient([
                 'version' => 'latest',
                 'region' => $defined['region'] ?? 'us-east-1',
                 'credentials' => [
@@ -268,12 +270,12 @@ class CheckMediaStorage extends Command
     {
         $bucket = (string) ($defined['bucket'] ?? '');
 
-        if ($bucket === '' || ! class_exists(\Aws\S3\S3Client::class)) {
+        if ($bucket === '' || ! class_exists(S3Client::class)) {
             return;
         }
 
         try {
-            $client = new \Aws\S3\S3Client([
+            $client = new S3Client([
                 'version' => 'latest',
                 'region' => $defined['region'] ?? 'us-east-1',
                 'credentials' => [

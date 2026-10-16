@@ -4,6 +4,7 @@ namespace ShipFast\LiveEdit\Tests\Api;
 
 use ShipFast\LiveEdit\Domain\Site\Site;
 use ShipFast\LiveEdit\Http\Api\V1\EmbedController;
+use ShipFast\LiveEdit\LiveEdit;
 use ShipFast\LiveEdit\Tests\TestCase;
 
 /**
@@ -30,7 +31,7 @@ class EmbedTest extends TestCase
          *
          * No secret: the runtime it names is served publicly to every visitor.
          */
-        $site = \ShipFast\LiveEdit\Domain\Site\Site::query()->create([
+        $site = Site::query()->create([
             'slug' => 'acme',
             'name' => 'Acme',
             'allowed_origins' => ['https://acme.test'],
@@ -39,7 +40,7 @@ class EmbedTest extends TestCase
         $body = $this->get("/s/{$site->slug}.js")->getContent();
 
         $this->assertStringContainsString('engine', $body);
-        $this->assertStringContainsString(\ShipFast\LiveEdit\LiveEdit::VERSION, $body);
+        $this->assertStringContainsString(LiveEdit::VERSION, $body);
     }
 
     public function test_the_one_line_a_customer_pastes_serves_javascript(): void

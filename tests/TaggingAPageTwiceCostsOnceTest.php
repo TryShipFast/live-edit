@@ -4,8 +4,8 @@ namespace ShipFast\LiveEdit\Tests;
 
 use Illuminate\Support\Facades\Cache;
 use ShipFast\LiveEdit\Application\Api\TagMarkup;
-use ShipFast\LiveEdit\Domain\Site\Site;
 use ShipFast\LiveEdit\Domain\Content\KeyMap;
+use ShipFast\LiveEdit\Domain\Site\Site;
 
 /**
  * The next visitor to a page does not pay to tag it again.
@@ -181,7 +181,7 @@ class TaggingAPageTwiceCostsOnceTest extends TestCase
          */
         $expected = $this->tag($this->page('AAAAAAAAAAAAAAAA'));
 
-        Cache::swap(new class extends \Illuminate\Support\Facades\Cache
+        Cache::swap(new class extends Cache
         {
             public function __call($method, $arguments)
             {

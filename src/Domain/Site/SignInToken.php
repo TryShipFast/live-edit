@@ -2,9 +2,9 @@
 
 namespace ShipFast\LiveEdit\Domain\Site;
 
-use ShipFast\LiveEdit\Models\Concerns\OnTheConfiguredConnection;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use ShipFast\LiveEdit\Models\Concerns\OnTheConfiguredConnection;
 
 /**
  * A single use of a link sent to somebody's inbox.

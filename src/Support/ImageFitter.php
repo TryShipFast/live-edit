@@ -41,10 +41,10 @@ class ImageFitter
      */
     /**
      * @param  array{x: int, y: int, width: int, height: int}|null  $crop
-     *   The part of the picture to keep, in the source file's own pixels.
-     *   Null takes the middle, which is right until it is not: a face or a
-     *   product off to one side is exactly what the middle cuts off, and that
-     *   single failure is the whole reason a client ever wants a crop tool.
+     *                                                                     The part of the picture to keep, in the source file's own pixels.
+     *                                                                     Null takes the middle, which is right until it is not: a face or a
+     *                                                                     product off to one side is exactly what the middle cuts off, and that
+     *                                                                     single failure is the whole reason a client ever wants a crop tool.
      */
     public static function fit(string $path, int $width, int $height, bool $exact = false, ?array $crop = null): bool
     {

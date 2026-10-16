@@ -5,6 +5,7 @@ namespace ShipFast\LiveEdit\Tests;
 use Illuminate\Support\Facades\Gate;
 use ShipFast\LiveEdit\Application\Api\IssueEditSession;
 use ShipFast\LiveEdit\Domain\Site\Site;
+use ShipFast\LiveEdit\Domain\Site\TokenType;
 
 /**
  * A guardrail is only a guardrail on the platforms that honour it.
@@ -64,7 +65,7 @@ class EveryAdapterHonoursTheLockTest extends TestCase
          */
         $site = Site::query()->create(['slug' => 'client', 'name' => 'Client']);
 
-        [$token] = $site->issueToken(\ShipFast\LiveEdit\Domain\Site\TokenType::Publishable, 'In the page');
+        [$token] = $site->issueToken(TokenType::Publishable, 'In the page');
 
         $this->assertTrue($token->mayEditLocked());
     }

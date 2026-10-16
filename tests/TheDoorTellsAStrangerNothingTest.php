@@ -2,6 +2,10 @@
 
 namespace ShipFast\LiveEdit\Tests;
 
+use Illuminate\Http\Request;
+use ShipFast\LiveEdit\Http\Middleware\OpensTheEditorFromAnyPage;
+use Symfony\Component\HttpFoundation\Response;
+
 class TheDoorTellsAStrangerNothingTest extends TestCase
 {
     /**
@@ -90,9 +94,9 @@ class TheDoorTellsAStrangerNothingTest extends TestCase
         config()->set('live-edit.cloud.site', 'learnkasts');
         config()->set('live-edit.cloud.host', 'https://live.tryshipfast.com');
 
-        $handled = (new \ShipFast\LiveEdit\Http\Middleware\OpensTheEditorFromAnyPage)->handle(
-            \Illuminate\Http\Request::create('/about?kb-enter=1', 'GET'),
-            fn () => new \Symfony\Component\HttpFoundation\Response('the page itself', 200)
+        $handled = (new OpensTheEditorFromAnyPage)->handle(
+            Request::create('/about?kb-enter=1', 'GET'),
+            fn () => new Response('the page itself', 200)
         );
 
         $this->assertSame(200, $handled->getStatusCode());
@@ -108,9 +112,9 @@ class TheDoorTellsAStrangerNothingTest extends TestCase
         config()->set('live-edit.cloud.site', null);
         config()->set('live-edit.cloud.host', null);
 
-        $handled = (new \ShipFast\LiveEdit\Http\Middleware\OpensTheEditorFromAnyPage)->handle(
-            \Illuminate\Http\Request::create('/about?kb-enter=1', 'GET'),
-            fn () => new \Symfony\Component\HttpFoundation\Response('the page itself', 200)
+        $handled = (new OpensTheEditorFromAnyPage)->handle(
+            Request::create('/about?kb-enter=1', 'GET'),
+            fn () => new Response('the page itself', 200)
         );
 
         $this->assertSame(302, $handled->getStatusCode());

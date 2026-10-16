@@ -2,8 +2,8 @@
 
 namespace ShipFast\LiveEdit\Models;
 
-use ShipFast\LiveEdit\Models\Concerns\OnTheConfiguredConnection;
 use Illuminate\Database\Eloquent\Model;
+use ShipFast\LiveEdit\Models\Concerns\OnTheConfiguredConnection;
 
 /**
  * Style overrides for one element, belonging to one site.

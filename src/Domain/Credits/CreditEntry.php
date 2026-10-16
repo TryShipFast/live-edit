@@ -2,8 +2,8 @@
 
 namespace ShipFast\LiveEdit\Domain\Credits;
 
-use ShipFast\LiveEdit\Models\Concerns\OnTheConfiguredConnection;
 use Illuminate\Database\Eloquent\Model;
+use ShipFast\LiveEdit\Models\Concerns\OnTheConfiguredConnection;
 
 /**
  * One line of the ledger: credits given, or credits spent.

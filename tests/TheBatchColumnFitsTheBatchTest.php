@@ -40,7 +40,7 @@ class TheBatchColumnFitsTheBatchTest extends TestCase
      * The migrations are where the mistake was: `uuid('batch')`, which is
      * char(36), for a value of 68. That much is readable anywhere.
      *
-     * @return array<string, int>  file => declared length
+     * @return array<string, int> file => declared length
      */
     private function declaredIn(): array
     {

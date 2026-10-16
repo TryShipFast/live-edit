@@ -2,8 +2,8 @@
 
 namespace ShipFast\LiveEdit\Models;
 
-use ShipFast\LiveEdit\Models\Concerns\OnTheConfiguredConnection;
 use Illuminate\Database\Eloquent\Model;
+use ShipFast\LiveEdit\Models\Concerns\OnTheConfiguredConnection;
 
 /**
  * One value, belonging to one site.

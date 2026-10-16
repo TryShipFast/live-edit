@@ -2,8 +2,10 @@
 
 namespace ShipFast\LiveEdit\Tests\Api;
 
+use Illuminate\Http\Request;
 use ShipFast\LiveEdit\Domain\Site\Site;
 use ShipFast\LiveEdit\Domain\Site\TokenType;
+use ShipFast\LiveEdit\Http\Api\Middleware\AnswersJsonAlways;
 use ShipFast\LiveEdit\Tests\TestCase;
 
 /**
@@ -108,10 +110,10 @@ class AnErrorIsNeverARedirectTest extends TestCase
          * the whole fault. An API that answers one way on success and another
          * on failure is an API whose failures nobody can read.
          */
-        $request = \Illuminate\Http\Request::create('/api/live-edit/v1/acme/tag', 'POST');
+        $request = Request::create('/api/live-edit/v1/acme/tag', 'POST');
         $request->headers->set('Accept', 'text/html');
 
-        (new \ShipFast\LiveEdit\Http\Api\Middleware\AnswersJsonAlways)->handle(
+        (new AnswersJsonAlways)->handle(
             $request,
             fn () => response('fine')
         );
@@ -121,10 +123,10 @@ class AnErrorIsNeverARedirectTest extends TestCase
 
     public function test_a_caller_that_asked_for_nothing_is_given_json(): void
     {
-        $request = \Illuminate\Http\Request::create('/api/live-edit/v1/acme/tag', 'POST');
+        $request = Request::create('/api/live-edit/v1/acme/tag', 'POST');
         $request->headers->remove('Accept');
 
-        (new \ShipFast\LiveEdit\Http\Api\Middleware\AnswersJsonAlways)->handle(
+        (new AnswersJsonAlways)->handle(
             $request,
             fn () => response('fine')
         );

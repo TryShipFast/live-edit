@@ -2,9 +2,9 @@
 
 namespace ShipFast\LiveEdit\Domain\Site;
 
-use ShipFast\LiveEdit\Models\Concerns\OnTheConfiguredConnection;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+use ShipFast\LiveEdit\Models\Concerns\OnTheConfiguredConnection;
 
 /**
  * Someone who may edit. A person, not a person-on-one-site.

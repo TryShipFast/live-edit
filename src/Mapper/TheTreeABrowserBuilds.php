@@ -2,6 +2,8 @@
 
 namespace ShipFast\LiveEdit\Mapper;
 
+use Dom\HTMLDocument;
+
 /**
  * The same tree the browser has, before anything is keyed against it.
  *
@@ -37,7 +39,7 @@ final class TheTreeABrowserBuilds
 {
     public static function available(): bool
     {
-        return class_exists(\Dom\HTMLDocument::class);
+        return class_exists(HTMLDocument::class);
     }
 
     /**
@@ -63,7 +65,7 @@ final class TheTreeABrowserBuilds
              */
             $whole = (bool) preg_match('/<html[\s>]/i', $html);
 
-            $document = \Dom\HTMLDocument::createFromString(
+            $document = HTMLDocument::createFromString(
                 $whole ? $html : '<!DOCTYPE html><html><body>'.$html.'</body></html>',
                 // LIBXML_NOERROR only. The HTML5 parser rejects flags libxml
                 // accepts - NOWARNING among them - and rejects them by

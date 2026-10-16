@@ -2,8 +2,8 @@
 
 namespace ShipFast\LiveEdit\Domain\Content;
 
-use ShipFast\LiveEdit\Models\Concerns\OnTheConfiguredConnection;
 use Illuminate\Database\Eloquent\Model;
+use ShipFast\LiveEdit\Models\Concerns\OnTheConfiguredConnection;
 
 /**
  * What each element of one page was last called.

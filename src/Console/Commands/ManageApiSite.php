@@ -94,10 +94,10 @@ class ManageApiSite extends Command
         }
 
         $this->newLine();
-        $this->info("Publishable key (the page reads with this):");
+        $this->info('Publishable key (the page reads with this):');
         $this->line($result['keys']['publishable']);
         $this->newLine();
-        $this->info("Secret key (keep this on a server):");
+        $this->info('Secret key (keep this on a server):');
         $this->line($result['keys']['secret']);
         $this->newLine();
 

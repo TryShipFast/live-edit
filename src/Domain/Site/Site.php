@@ -2,12 +2,12 @@
 
 namespace ShipFast\LiveEdit\Domain\Site;
 
-use ShipFast\LiveEdit\Models\Concerns\OnTheConfiguredConnection;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use ShipFast\LiveEdit\Domain\Content\SiteSnapshot;
 use ShipFast\LiveEdit\Domain\Content\SiteStore;
+use ShipFast\LiveEdit\Models\Concerns\OnTheConfiguredConnection;
 use ShipFast\LiveEdit\Models\Draft;
 use ShipFast\LiveEdit\Models\SiteSetting;
 use ShipFast\LiveEdit\Models\SiteStyle;

@@ -2,11 +2,11 @@
 
 namespace ShipFast\LiveEdit\Domain\Site;
 
-use ShipFast\LiveEdit\Models\Concerns\OnTheConfiguredConnection;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\MassPrunable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use ShipFast\LiveEdit\Models\Concerns\OnTheConfiguredConnection;
 
 /**
  * A stored key: what it may do, until when, and a hash of the secret.
@@ -15,9 +15,8 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  */
 class ApiToken extends Model
 {
-    use OnTheConfiguredConnection;
-
     use MassPrunable;
+    use OnTheConfiguredConnection;
 
     protected $table = 'live_edit_api_tokens';
 

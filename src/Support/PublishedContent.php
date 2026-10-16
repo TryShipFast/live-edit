@@ -3,7 +3,6 @@
 namespace ShipFast\LiveEdit\Support;
 
 use Illuminate\Support\Facades\Schema;
-use ShipFast\LiveEdit\Support\WhereTheWordsLive;
 use ShipFast\LiveEdit\Models\ElementStyle;
 use ShipFast\LiveEdit\Models\Version;
 use Throwable;
@@ -77,6 +76,7 @@ class PublishedContent
      * told by taking the site off the internet.
      *
      * @template T
+     *
      * @param  callable(): T  $read
      * @return T|array{}
      */

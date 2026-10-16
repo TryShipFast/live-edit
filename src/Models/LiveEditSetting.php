@@ -2,8 +2,8 @@
 
 namespace ShipFast\LiveEdit\Models;
 
-use ShipFast\LiveEdit\Models\Concerns\OnTheConfiguredConnection;
 use Illuminate\Database\Eloquent\Model;
+use ShipFast\LiveEdit\Models\Concerns\OnTheConfiguredConnection;
 
 /**
  * Somewhere for a site's words to live when the host has nowhere of its own.
