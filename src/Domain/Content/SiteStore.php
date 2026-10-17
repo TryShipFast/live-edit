@@ -280,33 +280,104 @@ class SiteStore
      */
     public function restore(int $number): ?int
     {
-        $snapshot = (new SiteSnapshot($this))->read($number);
+        $snapshots = new SiteSnapshot($this);
+        $defaultLocale = $this->site->writtenIn();
+        $snapshot = $snapshots->read($number, $defaultLocale);
 
         if ($snapshot === null) {
             return null;
         }
 
-        $changed = 0;
-
-        foreach (($snapshot['settings'] ?? []) as $key => $value) {
-            $existing = $this->settings()->where('key', $key)->value('value');
-
-            if ((string) $existing === (string) $value) {
+        /*
+         * A restore is the complete state of a site at that version, not a
+         * patch containing only the values that happened to survive until
+         * then. Replaying the keys in an older snapshot left anything added
+         * later behind: a hidden section, a new list order, or a customer's
+         * later replacement image. The page was reported as restored while
+         * still carrying the newer structural edit.
+         *
+         * Snapshots are written per locale with the default values filled in.
+         * Rebuild the stored representation from those resolved pages: the
+         * default file is canonical, and a locale-specific row is needed only
+         * where that locale differs from the default. This preserves reviewed
+         * translations while letting the snapshot remain the exact answer.
+         */
+        $desiredSettings = (array) ($snapshot['settings'] ?? []);
+        foreach (array_keys($this->site->languages()) as $locale) {
+            if ($locale === $defaultLocale) {
                 continue;
             }
 
-            SiteSetting::query()->updateOrCreate(
-                ['site_id' => $this->site->id, 'key' => $key],
-                ['value' => (string) $value]
-            );
+            $localized = $snapshots->read($number, $locale);
+            foreach ((array) ($localized['settings'] ?? $desiredSettings) as $key => $value) {
+                if (! array_key_exists($key, $desiredSettings)
+                    || (string) $desiredSettings[$key] !== (string) $value) {
+                    $desiredSettings[$locale.':'.$key] = (string) $value;
+                }
+            }
+        }
+
+        $changed = 0;
+
+        $existingSettings = $this->settings()->get()->keyBy('key');
+        foreach ($existingSettings as $key => $setting) {
+            if (! array_key_exists($key, $desiredSettings)) {
+                $setting->delete();
+                $changed++;
+
+                continue;
+            }
+
+            if ((string) $setting->value === (string) $desiredSettings[$key]) {
+                unset($desiredSettings[$key]);
+
+                continue;
+            }
+
+            $setting->value = (string) $desiredSettings[$key];
+            $setting->save();
+            unset($desiredSettings[$key]);
             $changed++;
         }
 
-        foreach (($snapshot['styles'] ?? []) as $key => $props) {
-            SiteStyle::query()->updateOrCreate(
-                ['site_id' => $this->site->id, 'key' => $key],
-                ['props' => $props]
-            );
+        foreach ($desiredSettings as $key => $value) {
+            SiteSetting::query()->create([
+                'site_id' => $this->site->id,
+                'key' => $key,
+                'value' => (string) $value,
+            ]);
+            $changed++;
+        }
+
+        $desiredStyles = (array) ($snapshot['styles'] ?? []);
+        $existingStyles = $this->styles()->get()->keyBy('key');
+        foreach ($existingStyles as $key => $style) {
+            if (! array_key_exists($key, $desiredStyles)) {
+                $style->delete();
+                $changed++;
+
+                continue;
+            }
+
+            if ((array) $style->props === (array) $desiredStyles[$key]) {
+                unset($desiredStyles[$key]);
+
+                continue;
+            }
+
+            $style->props = (array) $desiredStyles[$key];
+            $style->save();
+            unset($desiredStyles[$key]);
+            $changed++;
+        }
+
+        foreach ($desiredStyles as $key => $props) {
+            SiteStyle::query()->create([
+                'site_id' => $this->site->id,
+                'key' => $key,
+                'props' => (array) $props,
+            ]);
+            $changed++;
         }
 
         // Pending work is not what was asked for: restoring is a decision

@@ -187,6 +187,30 @@ class SnapshotTest extends TestCase
         $this->getJson($this->url(), $this->editor())->assertJsonPath('settings.heroTitle', 'First words');
     }
 
+    public function test_restoring_a_version_removes_later_content_and_styles(): void
+    {
+        $store = new SiteStore($this->acme);
+        $store->put('structure:home', '{"gallery":{"visible":true}}', false);
+        $store->putStyle('s-home-gallery', ['hidden' => '1'], false);
+        $store->publish(); // v1
+
+        $store->put('structure:home', '{"gallery":{"visible":false}}', false);
+        $store->put('newSetting', 'Added later', false);
+        $store->putStyle('s-home-gallery', [], false);
+        $store->putStyle('s-new-section', ['hidden' => '1'], false);
+        $store->publish(); // v2
+
+        $this->postJson($this->url('/restore'), ['version' => 1], $this->server())
+            ->assertOk()
+            ->assertJsonPath('restored_from', 1);
+
+        $restored = new SiteStore($this->acme->fresh());
+        $this->assertSame('{"gallery":{"visible":true}}', $restored->published()['structure:home']);
+        $this->assertArrayNotHasKey('newSetting', $restored->published());
+        $this->assertSame(['hidden' => '1'], $restored->publishedStyles()['s-home-gallery']);
+        $this->assertArrayNotHasKey('s-new-section', $restored->publishedStyles());
+    }
+
     public function test_restoring_a_version_that_is_not_there_says_so(): void
     {
         $this->publish();

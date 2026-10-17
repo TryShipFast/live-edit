@@ -5,6 +5,11 @@ people who own the site edit text, images, links, icons, styles and lists on
 the page itself. There are no admin screens for content, because the page is
 the admin screen.
 
+The inline SVG picker includes common outline icons, drawings already used by
+the site, and an option to paste a custom SVG. The bundled icon set is fetched
+only when someone opens that picker, so it adds no request to visitor page
+loads or to the editor's initial load.
+
 It runs on five kinds of site, through adapters over one engine:
 
 | | How it is installed |
@@ -236,6 +241,41 @@ locales.
 | `style_props`, `icon_options`, `rich_fields` | typed field metadata |
 | `middleware` | guards the endpoints (default `['web', 'auth', 'can:live-edit']`) |
 | `after_save` | runs after every write, e.g. to bust a cache |
+
+## Optional page structure controls
+
+Live Edit keeps the page structure unchanged unless the template opts in. To
+make existing sections reorderable, mark one region and every direct section
+inside it:
+
+```html
+<main data-edit-section-region="home.main" data-edit-list-label="Home page">
+  <section data-edit-section="home.hero" data-edit-section-label="Hero">
+    ...
+  </section>
+  <section data-edit-section="home.gallery" data-edit-section-label="Gallery"
+           data-edit-section-duplicate="true">
+    ...
+  </section>
+</main>
+```
+
+Section movement is available only when every direct element child has a
+unique `data-edit-section` key and is not inside a locked area. Duplicate a
+section only when its author adds `data-edit-section-duplicate="true"`; that
+marker is the author's confirmation that its IDs, scripts and relationships
+can safely be copied. Sections are hidden and restored with the existing
+visibility control. Repeated collections retain their add, delete and move
+controls, and new copies receive distinct editing keys and HTML IDs.
+
+Keep at least one original item in the template markup as the seed design. An
+owner may remove every visible item; choosing **Add item** later copies that
+seed from the original markup. A list that the developer ships with no item or
+seed template has no structure to copy, so Live Edit cannot invent a fresh
+gallery card or navigation row for it.
+
+Templates without `data-edit-section-region` take the existing scanner path;
+the scanner skips the optional section pass entirely for them.
 
 ## If something is wrong
 

@@ -912,7 +912,8 @@ const bootLiveEdit = () => {
             // arrives after it was built. See redrawPanel().
             lastOpened = node;
 
-            if (node.dataset.editImg !== undefined) editImage(node);
+            if (node.hasAttribute('data-edit-list')) editList(node);
+            else if (node.dataset.editImg !== undefined) editImage(node);
             else if (node.dataset.edit !== undefined) editText(node);
             else if (node.dataset.svgEdit !== undefined || node.dataset.editSvg !== undefined) editDrawing(node);
             // A link with no words of its own — a social icon is the usual one
@@ -2233,6 +2234,7 @@ const bootLiveEdit = () => {
                     formData.append('target', current.target);
                     const file = drawerFields.querySelector('input[type=file]').files[0];
                     const url = drawerFields.querySelector('input[type=url]').value.trim();
+                    const captionChanged = current.caption && current.caption.input.value !== current.caption.original;
                     // What the replacement has to match, measured from the
                 // picture being replaced where that is knowable.
                 const keepingAllOfIt = current.crop === WHOLE_PICTURE;
@@ -2303,7 +2305,7 @@ const bootLiveEdit = () => {
                     if (file) formData.append('file', file);
                     else if (url) formData.append('url', url.startsWith('http') ? url : `https://${url}`);
                     changedAttrs.forEach((input) => formData.append(input.dataset.imgAttr, input.value));
-                    if (!file && !url && changedAttrs.length === 0) {
+                    if (!file && !url && changedAttrs.length === 0 && !captionChanged) {
                         restoreButton();
                         // Told apart, because they are different situations:
                         // a panel nobody typed in, and a panel with nowhere
@@ -2313,7 +2315,22 @@ const bootLiveEdit = () => {
                             : 'Choose a file from your computer or paste an image URL first.');
                         return;
                     }
-                    await request('/live-edit/image', { method: 'POST', body: formData });
+                    if (file || url || changedAttrs.length > 0) {
+                        await request('/live-edit/image', { method: 'POST', body: formData });
+                    }
+                    if (captionChanged) {
+                        await request('/live-edit/setting', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                key: current.caption.key,
+                                value: current.caption.input.value,
+                                locale: window.liveEditLocale,
+                            }),
+                        });
+                        current.caption.original = current.caption.input.value;
+                        current.caption.slide.setAttribute('data-edit-value', current.caption.input.value);
+                    }
                 }
                 if (current.hrefKey) {
                     const hrefValue = drawerFields.querySelector('[data-link-field=href]').value.trim();
@@ -3147,7 +3164,7 @@ const bootLiveEdit = () => {
                 if (window.liveEditPublishing) {
                     const immediate = document.createElement('div');
                     immediate.className = 'le-hint le-immediate';
-                    immediate.textContent = 'Changes here go live as soon as you save, without publishing.';
+                    immediate.textContent = 'Saving this item updates the live website right away. You do not need to press Publish.';
                     drawerFields.append(immediate);
                 }
 
@@ -3191,7 +3208,9 @@ const bootLiveEdit = () => {
         const appendListControls = (element) => {
             const item = element.closest?.('[data-edit-item]');
             // Either an item was clicked, or the list itself was.
-            const list = item?.parentElement?.dataset?.editList ? item.parentElement : element.closest?.('[data-edit-list]');
+            const list = element.matches?.('[data-edit-list]')
+                ? element
+                : item?.parentElement?.dataset?.editList ? item.parentElement : element.closest?.('[data-edit-list]');
             if (!list?.dataset?.editList) return;
 
             const currentOrder = () =>
@@ -3210,35 +3229,76 @@ const bootLiveEdit = () => {
                 }
             };
 
+            const sections = list.dataset.editListKind === 'sections';
             const heading = document.createElement('div');
             heading.className = 'le-section-heading';
-            heading.textContent = 'List';
+            heading.textContent = (sections && item?.dataset.editSectionLabel)
+                || list.dataset.editListLabel
+                || (sections ? 'Page sections' : 'Items');
 
             const row = document.createElement('div');
             row.className = 'le-row';
 
-            const add = document.createElement('button');
-            add.type = 'button';
-            add.className = 'le-chip-btn';
-            add.textContent = item ? '+ Add another' : '+ Add item';
-            add.addEventListener('click', () => {
-                const ids = currentOrder();
-                const at = item ? ids.indexOf(item.dataset.editItem) : ids.length - 1;
-                ids.splice(at + 1, 0, 'n' + Date.now().toString(36));
-                saveOrder(ids, 'Added \u2713');
-            });
-            row.append(add);
+            if (!sections) {
+                const add = document.createElement('button');
+                add.type = 'button';
+                add.className = 'le-chip-btn';
+                add.textContent = item ? '+ Add another' : '+ Add item';
+                add.addEventListener('click', () => {
+                    const ids = currentOrder();
+                    const at = item ? ids.indexOf(item.dataset.editItem) : ids.length - 1;
+                    ids.splice(at + 1, 0, 'n' + Date.now().toString(36));
+                    saveOrder(ids, 'Added \u2713');
+                });
+                row.append(add);
+            }
 
             if (item) {
-                const remove = document.createElement('button');
-                remove.type = 'button';
-                remove.className = 'le-btn-danger';
-                remove.textContent = 'Delete this item';
-                remove.addEventListener('click', () => {
-                    if (!window.confirm('Delete this item?')) return;
-                    saveOrder(currentOrder().filter((id) => id !== item.dataset.editItem), 'Deleted \u2713');
-                });
-                row.append(remove);
+                const ids = currentOrder();
+                const index = ids.indexOf(item.dataset.editItem);
+                for (const [delta, label] of [[-1, '\u2191 Move up'], [1, '\u2193 Move down']]) {
+                    const next = index + delta;
+                    if (next < 0 || next >= ids.length) continue;
+                    const move = document.createElement('button');
+                    move.type = 'button';
+                    move.className = 'le-chip-btn';
+                    move.textContent = label;
+                    move.addEventListener('click', () => {
+                        const reordered = currentOrder();
+                        const from = reordered.indexOf(item.dataset.editItem);
+                        const to = from + delta;
+                        [reordered[from], reordered[to]] = [reordered[to], reordered[from]];
+                        saveOrder(reordered, sections ? 'Section moved \u2713' : 'Item moved \u2713');
+                    });
+                    row.append(move);
+                }
+
+                const canDuplicate = !sections || item.dataset.editSectionDuplicate === 'true';
+                if (canDuplicate) {
+                    const duplicate = document.createElement('button');
+                    duplicate.type = 'button';
+                    duplicate.className = 'le-chip-btn';
+                    duplicate.textContent = sections ? 'Duplicate section' : 'Duplicate item';
+                    duplicate.addEventListener('click', () => {
+                        const reordered = currentOrder();
+                        const at = reordered.indexOf(item.dataset.editItem);
+                        reordered.splice(at + 1, 0, 'n' + Date.now().toString(36));
+                        saveOrder(reordered, sections ? 'Section duplicated \u2713' : 'Item duplicated \u2713');
+                    });
+                    row.append(duplicate);
+                }
+
+                if (!sections) {
+                    const remove = document.createElement('button');
+                    remove.type = 'button';
+                    remove.className = 'le-btn-danger';
+                    remove.textContent = 'Delete this item';
+                    remove.addEventListener('click', () => {
+                        if (!window.confirm('Delete this item?')) return;
+                        saveOrder(currentOrder().filter((id) => id !== item.dataset.editItem), 'Deleted \u2713');
+                    });
+                    row.append(remove);
+                }
             }
             drawerFields.append(heading, row);
         };
@@ -3403,6 +3463,41 @@ const bootLiveEdit = () => {
                 // menus would otherwise crowd out the real content.
                 .filter((node) => node !== element && node.getBoundingClientRect().width > 0);
 
+            // A collection can be empty after its last row is removed, so it
+            // has no page area to click. Keep its manager reachable from the
+            // containing section. The source template remains in the page
+            // file and is used when the owner adds the first row again.
+            const lists = [...element.querySelectorAll('[data-edit-list]')]
+                .filter((list) => !list.parentElement?.closest('[data-edit-list]')
+                    && (mayEditLocked === true || !list.closest('[data-live-lock], [data-live-edit-lock]')));
+
+            if (lists.length > 0) {
+                const heading = document.createElement('div');
+                heading.className = 'le-section-heading';
+                heading.textContent = 'Repeated content';
+                drawerFields.append(heading);
+
+                const row = document.createElement('div');
+                row.className = 'le-row';
+                lists.slice(0, 24).forEach((list) => {
+                    const count = [...list.children].filter((child) => child.hasAttribute('data-edit-item')).length;
+                    const name = list.dataset.editListLabel
+                        || list.getAttribute('aria-label')
+                        || (list.dataset.editListKind === 'sections'
+                            ? 'Page sections'
+                            : list.closest('nav')
+                                ? 'Navigation items'
+                                : list.closest('footer') ? 'Footer items' : 'List items');
+                    const button = document.createElement('button');
+                    button.type = 'button';
+                    button.className = 'le-chip-btn';
+                    button.textContent = `Manage ${name} (${count})`;
+                    button.addEventListener('click', () => switchToNode(list));
+                    row.append(button);
+                });
+                drawerFields.append(row);
+            }
+
             if (inside.length === 0) {
                 return;
             }
@@ -3442,6 +3537,21 @@ const bootLiveEdit = () => {
             drawerFields.replaceChildren();
             drawerDelete.classList.add('le-hidden');
             finishPanel(element, { styleKey });
+        };
+
+        const editList = (list) => {
+            current = { kind: 'list' };
+            const name = list.dataset.editListLabel
+                || list.getAttribute('aria-label')
+                || (list.dataset.editListKind === 'sections'
+                    ? 'Page sections'
+                    : list.closest('nav')
+                        ? 'Navigation items'
+                        : list.closest('footer') ? 'Footer items' : 'List items');
+            drawerTitle.textContent = name;
+            drawerFields.replaceChildren();
+            drawerDelete.classList.add('le-hidden');
+            finishPanel(list);
         };
 
         /**
@@ -3650,12 +3760,24 @@ const bootLiveEdit = () => {
          * it. Pasting one is there for anything else, and the server rebuilds
          * whatever arrives from an allowed list before it reaches a page.
          */
-        const editDrawing = (element) => {
+        const editDrawing = async (element) => {
             const was = element.outerHTML;
             current = { kind: 'setting', key: element.dataset.editSvg.replace(/^setting:/, ''), element };
             drawerTitle.textContent = element.dataset.editLabel ?? 'Drawing';
             drawerFields.replaceChildren();
             drawerDelete.classList.add('le-hidden');
+            const loading = document.createElement('div');
+            loading.className = 'le-hint';
+            loading.textContent = 'Loading the icon library…';
+            drawerFields.append(loading);
+
+            // The broad icon set is a separate small chunk. Fetch it only when
+            // somebody opens this picker; normal page views and opening other
+            // edit fields do no extra work or network requests.
+            const iconLibraryUrl = new URL('./icon-library.js', import.meta.url).href;
+            const { iconLibrary = [] } = await import(iconLibraryUrl).catch(() => ({}));
+            if (current?.element !== element) return;
+            drawerFields.replaceChildren();
 
             const restore = () => { element.outerHTML = was; };
             current.restore = restore;
@@ -3671,14 +3793,74 @@ const bootLiveEdit = () => {
                 drawings.push(markup);
             });
 
+            const chooseDrawing = (markup, choice) => {
+                current.value = markup;
+                current.dirty = true;
+                // Show the change on the page straight away, keeping its size,
+                // editor identity, and accessibility information.
+                const live = document.querySelector(`[data-edit-svg="${element.dataset.editSvg}"]`) ?? element;
+                const next = new DOMParser().parseFromString(markup, 'image/svg+xml').documentElement;
+                ['class', 'width', 'height', 'style', 'role', 'aria-label', 'aria-hidden', 'focusable', 'data-edit-svg', 'data-edit-label']
+                    .forEach((name) => {
+                        if (live.hasAttribute(name)) next.setAttribute(name, live.getAttribute(name));
+                    });
+                live.replaceWith(next);
+                choice?.parentElement?.querySelectorAll('.le-icon-choice').forEach((other) => other.classList.remove('is-current'));
+                choice?.classList.add('is-current');
+            };
+
+            const libraryHeading = document.createElement('div');
+            libraryHeading.className = 'le-section-heading';
+            libraryHeading.textContent = `Icon library (${iconLibrary.length})`;
+
+            const librarySearch = document.createElement('input');
+            librarySearch.type = 'search';
+            librarySearch.className = 'le-input';
+            librarySearch.placeholder = 'Search the icon library…';
+            librarySearch.setAttribute('aria-label', 'Search the icon library');
+
+            const libraryGrid = document.createElement('div');
+            libraryGrid.className = 'le-icon-grid';
+
+            const libraryHint = document.createElement('div');
+            libraryHint.className = 'le-hint';
+
+            const drawLibrary = (query = '') => {
+                const term = query.trim().toLowerCase();
+                const matches = iconLibrary.filter(({ name }) => name.toLowerCase().includes(term));
+                libraryGrid.replaceChildren();
+                matches.forEach(({ name, markup }) => {
+                    const choice = document.createElement('button');
+                    choice.type = 'button';
+                    choice.className = 'le-icon-choice';
+                    choice.title = name;
+                    choice.setAttribute('aria-label', name);
+                    choice.innerHTML = markup;
+                    const drawn = choice.firstElementChild;
+                    drawn?.setAttribute('width', '20');
+                    drawn?.setAttribute('height', '20');
+                    choice.addEventListener('click', () => chooseDrawing(markup, choice));
+                    libraryGrid.append(choice);
+                });
+                libraryHint.textContent = matches.length ? '' : 'No library icons match that name.';
+            };
+
+            librarySearch.addEventListener('input', () => drawLibrary(librarySearch.value));
+            drawLibrary();
+
+            const pageHeading = document.createElement('div');
+            pageHeading.className = 'le-section-heading';
+            pageHeading.textContent = drawings.length ? 'Drawings on this site' : 'No drawings on this site';
+
             const grid = document.createElement('div');
             grid.className = 'le-icon-grid';
-            let chosen = null;
 
-            drawings.slice(0, 120).forEach((markup) => {
+            drawings.slice(0, 120).forEach((markup, index) => {
                 const choice = document.createElement('button');
                 choice.type = 'button';
                 choice.className = 'le-icon-choice';
+                choice.title = `Drawing ${index + 1} from this site`;
+                choice.setAttribute('aria-label', choice.title);
                 choice.innerHTML = markup;
                 const drawn = choice.firstElementChild;
                 if (drawn) {
@@ -3688,18 +3870,7 @@ const bootLiveEdit = () => {
                 }
                 choice.classList.toggle('is-current', markup === was);
                 choice.addEventListener('click', () => {
-                    chosen = markup;
-                    current.value = markup;
-                    current.dirty = true;
-                    // Show it in place, keeping whatever sized it.
-                    const live = document.querySelector(`[data-edit-svg="${element.dataset.editSvg}"]`) ?? element;
-                    const next = new DOMParser().parseFromString(markup, 'image/svg+xml').documentElement;
-                    ['class', 'width', 'height', 'style', 'data-edit-svg', 'data-edit-label'].forEach((name) => {
-                        if (live.hasAttribute(name)) next.setAttribute(name, live.getAttribute(name));
-                    });
-                    live.replaceWith(next);
-                    grid.querySelectorAll('.le-icon-choice').forEach((other) => other.classList.remove('is-current'));
-                    choice.classList.add('is-current');
+                    chooseDrawing(markup, choice);
                 });
                 grid.append(choice);
             });
@@ -3722,9 +3893,9 @@ const bootLiveEdit = () => {
 
             const heading = document.createElement('div');
             heading.className = 'le-section-heading';
-            heading.textContent = drawings.length ? 'Drawings on this site' : 'No other drawings here';
+            heading.textContent = 'Use a custom SVG';
 
-            drawerFields.append(heading, grid, pasteWrap);
+            drawerFields.append(libraryHeading, librarySearch, libraryGrid, libraryHint, pageHeading, grid, heading, pasteWrap);
             finishPanel(element);
         };
 
@@ -3737,6 +3908,9 @@ const bootLiveEdit = () => {
             drawerTitle.textContent = element.dataset.editLabel ?? (isBackground ? 'Background image' : 'Image');
             drawerFields.replaceChildren();
             drawerDelete.classList.add('le-hidden');
+            const slide = element.closest?.('[data-slide][data-edit-slide-caption]');
+            const captionMarker = slide?.dataset.editSlideCaption ?? '';
+            const captionKey = captionMarker.startsWith('setting:') ? captionMarker.slice('setting:'.length) : '';
 
             const preview = document.createElement('div');
             preview.className = 'le-preview';
@@ -4109,6 +4283,43 @@ const bootLiveEdit = () => {
                     textInput('alt', 'Alt text', attributeOf(element, 'alt', 'editAlt'), 'Describes the image for search engines and screen readers.'),
                     textInput('imgTitle', 'Title attribute', attributeOf(element, 'title', 'editTitle'), 'Optional tooltip shown on hover.')
                 );
+            }
+
+            if (slide && captionKey) {
+                const original = slide.getAttribute('data-cap') ?? '';
+                const captionField = document.createElement('label');
+                captionField.className = 'le-field le-divided';
+                captionField.append('Slide caption');
+                const captionInput = document.createElement('textarea');
+                captionInput.className = 'le-input';
+                captionInput.rows = 2;
+                captionInput.value = original;
+                captionInput.dataset.slideCaptionKey = captionKey;
+                captionField.append(captionInput);
+                const captionHint = document.createElement('span');
+                captionHint.className = 'le-hint';
+                captionHint.textContent = 'Shown by the slideshow when this photo is active.';
+                captionField.append(captionHint);
+                drawerFields.append(captionField);
+
+                const captionOutput = slide.closest('[data-slider]')?.querySelector('[data-cap-out]');
+                let lastPreview = original;
+                const previewCaption = (value) => {
+                    slide.setAttribute('data-cap', value);
+                    if (captionOutput && (captionOutput.textContent === original || captionOutput.textContent === lastPreview)) {
+                        captionOutput.textContent = value;
+                    }
+                    lastPreview = value;
+                };
+                captionInput.addEventListener('input', () => {
+                    current.dirty = true;
+                    previewCaption(captionInput.value);
+                });
+                current.caption = { slide, key: captionKey, original, input: captionInput, output: captionOutput };
+                current.restore = () => {
+                    slide.setAttribute('data-cap', original);
+                    if (captionOutput && captionOutput.textContent === lastPreview) captionOutput.textContent = original;
+                };
             }
 
             if (current.target.startsWith('setting:')) {

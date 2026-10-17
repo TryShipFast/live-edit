@@ -1,0 +1,65 @@
+/**
+ * A compact, bundled set of outline icons for the SVG picker.
+ *
+ * These are intentionally small SVG path strings rather than an icon font or
+ * remote catalogue. They load with the editor only, work offline, and remain
+ * ordinary SVG values that the existing sanitizer knows how to store.
+ */
+const paths = {
+    'Activity': '<path d="M22 12h-4l-3 9L9 3l-3 9H2"/>',
+    'Arrow down': '<path d="M12 5v14M19 12l-7 7-7-7"/>',
+    'Arrow left': '<path d="M19 12H5m7 7-7-7 7-7"/>',
+    'Arrow right': '<path d="M5 12h14m-7-7 7 7-7 7"/>',
+    'Arrow up': '<path d="M12 19V5m-7 7 7-7 7 7"/>',
+    'Bell': '<path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9M10 21h4"/>',
+    'Book open': '<path d="M12 7v14m0-14C9 4 5 4 2 5v14c3-1 7-1 10 2m0-14c3-3 7-3 10-2v14c-3-1-7-1-10 2"/>',
+    'Briefcase': '<rect x="3" y="7" width="18" height="14" rx="2"/><path d="M8 7V5a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M3 12h18m-11 0v2h4v-2"/>',
+    'Building': '<rect x="4" y="3" width="16" height="18" rx="2"/><path d="M9 21v-4h6v4M8 7h1m6 0h1M8 11h1m6 0h1"/>',
+    'Calendar': '<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4M8 3v4M3 11h18"/>',
+    'Camera': '<path d="M14 4h-4L8 7H4a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-4z"/><circle cx="12" cy="13" r="3"/>',
+    'Car': '<path d="m5 11 1.5-5h11L19 11M3 11h18v8H3zM5 19v2m14-2v2M3 15h3m12 0h3"/><circle cx="7" cy="15" r="1"/><circle cx="17" cy="15" r="1"/>',
+    'Check': '<path d="m5 12 4 4L19 6"/>',
+    'Chevron down': '<path d="m6 9 6 6 6-6"/>',
+    'Chevron right': '<path d="m9 18 6-6-6-6"/>',
+    'Clock': '<circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/>',
+    'Coffee': '<path d="M10 2v2m4-2v2M4 7h14v9a4 4 0 0 1-4 4h-6a4 4 0 0 1-4-4zM18 10h1a3 3 0 1 1 0 6h-1M2 22h20"/>',
+    'Download': '<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4m4-5 5 5 5-5m-5 5V3"/>',
+    'External link': '<path d="M15 3h6v6m-11 5L21 3M19 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2h6"/>',
+    'Eye': '<path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7"/><circle cx="12" cy="12" r="3"/>',
+    'Globe': '<circle cx="12" cy="12" r="10"/><path d="M2 12h20M12 2a15 15 0 0 1 0 20m0-20a15 15 0 0 0 0 20"/>',
+    'Graduation cap': '<path d="m2 10 10-5 10 5-10 5zM6 12v5c4 3 8 3 12 0v-5m4-2v6"/>',
+    'Heart': '<path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.7l-1.1-1.1a5.5 5.5 0 0 0-7.8 7.8l1.1 1.1L12 21l7.8-7.5 1.1-1.1a5.5 5.5 0 0 0-.1-7.8z"/>',
+    'Help': '<circle cx="12" cy="12" r="10"/><path d="M9.1 9a3 3 0 0 1 5.8 1c0 2-3 3-3 3m.1 4h.01"/>',
+    'Home': '<path d="m3 10 9-7 9 7v10a1 1 0 0 1-1 1h-5v-7H9v7H4a1 1 0 0 1-1-1z"/>',
+    'Image': '<rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="m21 15-5-5L5 21"/>',
+    'Key': '<circle cx="8" cy="15" r="5"/><path d="m11.5 11.5 9-9L23 5l-3 3 2 2-3 3-2-2-3 3"/>',
+    'Leaf': '<path d="M20 4c-7 0-13 2-15 7a6 6 0 0 0 8 8c5-2 7-8 7-15Z"/><path d="M4 21c2-5 6-8 12-11"/>',
+    'Link': '<path d="M10 13a5 5 0 0 0 7.1 0l3-3A5 5 0 0 0 13 2.9l-1.7 1.7m2.7 6.4a5 5 0 0 0-7.1 0l-3 3A5 5 0 0 0 11 21.1l1.7-1.7"/>',
+    'Lock': '<rect x="4" y="10" width="16" height="11" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3m-4 5v2"/>',
+    'Mail': '<rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3 7 9 6 9-6"/>',
+    'Map pin': '<path d="M20 10c0 5-8 12-8 12S4 15 4 10a8 8 0 1 1 16 0Z"/><circle cx="12" cy="10" r="2.5"/>',
+    'Menu': '<path d="M4 6h16M4 12h16M4 18h16"/>',
+    'Message': '<path d="M21 11.5a8.5 8.5 0 0 1-12.8 7.3L3 20l1.2-4.2A8.5 8.5 0 1 1 21 11.5Z"/>',
+    'Minus': '<path d="M5 12h14"/>',
+    'Music': '<path d="M9 18V5l12-2v13M9 18c0 1.7-1.6 3-3.5 3S2 20 2 18.5 3.6 16 5.5 16 9 16.7 9 18Zm12-2c0 1.7-1.6 3-3.5 3S14 18 14 16.5 15.6 14 17.5 14 21 14.7 21 16Z"/>',
+    'Phone': '<path d="M22 16.9v3a2 2 0 0 1-2.2 2 19.8 19.8 0 0 1-8.6-3.1 19.4 19.4 0 0 1-6-6A19.8 19.8 0 0 1 2.1 4.2 2 2 0 0 1 4.1 2h3a2 2 0 0 1 2 1.7l.5 2.8a2 2 0 0 1-.6 1.7L7.7 9.5a16 16 0 0 0 6 6l1.3-1.3a2 2 0 0 1 1.7-.6l2.8.5a2 2 0 0 1 1.5 2.8Z"/>',
+    'Play': '<path d="m7 4 14 8-14 8z"/>',
+    'Plus': '<path d="M12 5v14m-7-7h14"/>',
+    'Search': '<circle cx="11" cy="11" r="7"/><path d="m20 20-4-4"/>',
+    'Settings': '<circle cx="12" cy="12" r="3"/><path d="m19.4 15 .1.1 1.4 1.1-1.4 2.4-1.8-.6a8 8 0 0 1-1.7 1l-.3 1.9h-2.8l-.3-1.9a8 8 0 0 1-1.7-1l-1.8.6-1.4-2.4L7.1 15a8 8 0 0 1 0-2l-1.4-1.1 1.4-2.4 1.8.6a8 8 0 0 1 1.7-1l.3-1.9h2.8l.3 1.9a8 8 0 0 1 1.7 1l1.8-.6 1.4 2.4-1.4 1.1a8 8 0 0 1-.1 2Z"/>',
+    'Shield check': '<path d="M12 22s8-4 8-11V5l-8-3-8 3v6c0 7 8 11 8 11Z"/><path d="m9 12 2 2 4-4"/>',
+    'Shopping bag': '<path d="M5 8h14l1 13H4L5 8Z"/><path d="M9 8V6a3 3 0 0 1 6 0v2"/>',
+    'Sparkles': '<path d="m12 3 1.9 5.8L20 11l-6.1 2.2L12 19l-1.9-5.8L4 11l6.1-2.2L12 3Zm7 12 .9 2.1L22 18l-2.1.9L19 21l-.9-2.1L16 18l2.1-.9L19 15ZM5 2l.8 2.2L8 5l-2.2.8L5 8l-.8-2.2L2 5l2.2-.8L5 2Z"/>',
+    'Star': '<path d="m12 3 2.8 5.7 6.2.9-4.5 4.4 1.1 6.2-5.6-3-5.6 3 1.1-6.2L3 9.6l6.2-.9z"/>',
+    'Trash': '<path d="M3 6h18m-2 0-.9 14H5.9L5 6m4 0V4h6v2m-5 4v6m4-6v6"/>',
+    'Upload': '<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4m4-5 5-5 5 5m-5-5v12"/>',
+    'User': '<circle cx="12" cy="8" r="4"/><path d="M5 21v-2a7 7 0 0 1 14 0v2z"/>',
+    'Users': '<path d="M16 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2m6-10a4 4 0 1 0 0-8 4 4 0 0 0 0 8Zm6-7.5a4 4 0 0 1 0 7.8m2 3.2a4 4 0 0 1 3 3.9V21"/>',
+    'Video': '<rect x="3" y="5" width="13" height="14" rx="2"/><path d="m16 10 5-3v10l-5-3"/>',
+    'X': '<path d="m18 6-12 12M6 6l12 12"/>',
+};
+
+export const iconLibrary = Object.entries(paths).map(([name, body]) => ({
+    name,
+    markup: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><title>${name}</title>${body}</svg>`,
+}));

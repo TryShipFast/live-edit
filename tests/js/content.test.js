@@ -1,6 +1,62 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { applyContent, applyStyles, applyValue, defendContent, fetchContent, resolve, styleRules } from '../../resources/js/content.js';
 
+describe('structural edits to repeated content', () => {
+    it('duplicates a repeated item with distinct content and element identities', () => {
+        const root = page('<ul data-edit-list="cards"><li data-edit-item="one"><h2 id="title" data-edit="setting:cards.title">Original</h2><a href="#title" data-edit-href="cards.link">Read</a></li></ul>');
+
+        applyContent(root, { cards: '["one","nabc"]' });
+
+        const rows = root.querySelectorAll('[data-edit-item]');
+        expect(rows).toHaveLength(2);
+        expect(rows[1].querySelector('h2').getAttribute('data-edit')).toBe('setting:cards.title@nabc');
+        expect(rows[1].querySelector('h2').id).toBe('title--nabc');
+        expect(rows[1].querySelector('a').getAttribute('href')).toBe('#title--nabc');
+        expect(rows[1].querySelector('a').getAttribute('data-edit-href')).toBe('cards.link@nabc');
+    });
+
+    it('can remove every item from a collection', () => {
+        const root = page('<ul data-edit-list="cards"><li data-edit-item="one">One</li></ul>');
+
+        applyContent(root, { cards: '[]' });
+
+        expect(root.querySelectorAll('[data-edit-item]')).toHaveLength(0);
+    });
+
+    it('can add a fresh row after an empty collection reloads from its source markup', () => {
+        const source = '<ul data-edit-list="cards"><li data-edit-item="seed"><img data-edit-img="setting:auto:photo" src="/starter.jpg"></li></ul>';
+        const emptied = page(source);
+        applyContent(emptied, { cards: '[]' });
+        expect(emptied.querySelectorAll('[data-edit-item]')).toHaveLength(0);
+
+        const rebuilt = page(source);
+        applyContent(rebuilt, { cards: '["nfresh"]' });
+        expect(rebuilt.querySelectorAll('[data-edit-item]')).toHaveLength(1);
+        expect(rebuilt.querySelector('[data-edit-item]').getAttribute('data-edit-item')).toBe('nfresh');
+    });
+
+    it('keeps carousel captions on their slides and refreshes slide positions', () => {
+        const root = page('<div data-slider="fade"><p data-cap-out>First</p><div data-edit-list="photos">'
+            + '<div data-slide data-edit-item="one" data-edit-slide-caption="setting:auto:caption-one" data-cap="First" aria-label="1 of 2"></div>'
+            + '<div data-slide data-edit-item="two" data-edit-slide-caption="setting:auto:caption-two" data-cap="Second" aria-label="2 of 2"></div>'
+            + '</div></div>');
+
+        applyContent(root, {
+            photos: '["one","nfresh","two"]',
+            'auto:caption-one@nfresh': 'Added photo',
+        });
+
+        const slides = root.querySelectorAll('[data-slide]');
+        expect(slides).toHaveLength(3);
+        expect(slides[1].getAttribute('data-edit-slide-caption')).toBe('setting:auto:caption-one@nfresh');
+        expect(slides[1].getAttribute('data-cap')).toBe('Added photo');
+        expect([...slides].map((slide) => slide.getAttribute('aria-label'))).toEqual(['1 of 3', '2 of 3', '3 of 3']);
+
+        applyContent(root, { photos: '[]' });
+        expect(root.querySelectorAll('[data-slide]')).toHaveLength(0);
+    });
+});
+
 const page = (html) => {
     document.body.innerHTML = html;
     return document;

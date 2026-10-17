@@ -57,6 +57,37 @@ class AnAddedItemCopiesTheOneYouWereOnTest extends TestCase
         $this->assertSame(1, substr_count($out, 'One words'));
     }
 
+    public function test_a_copy_gets_distinct_edit_keys_and_valid_internal_id_references(): void
+    {
+        $html = '<ul data-edit-list="courses"><li data-edit-item="one">'
+            .'<label for="name">Name</label><input id="name" data-edit="setting:course.name">'
+            .'<a href="#name">Open</a></li></ul>';
+
+        $out = $this->render($html, ['one', 'n123']);
+        $doc = new \DOMDocument;
+        $doc->loadHTML($out);
+        $xpath = new \DOMXPath($doc);
+        $items = $xpath->query('//*[@data-edit-item]');
+
+        $this->assertCount(2, $items);
+        $second = $items->item(1);
+        $this->assertSame('name--n123', $xpath->query('.//*[@id]', $second)->item(0)->getAttribute('id'));
+        $this->assertSame('name--n123', $xpath->query('.//label', $second)->item(0)->getAttribute('for'));
+        $this->assertSame('#name--n123', $xpath->query('.//a', $second)->item(0)->getAttribute('href'));
+        $this->assertSame('setting:course.name@n123', $xpath->query('.//*[@data-edit]', $second)->item(0)->getAttribute('data-edit'));
+    }
+
+    public function test_a_collection_can_be_emptied_then_rebuilt_from_its_original_template(): void
+    {
+        $source = $this->list('seed');
+        $empty = $this->render($source, []);
+        $rebuilt = $this->render($source, ['n123']);
+
+        $this->assertStringNotContainsString('data-edit-item=', $empty);
+        $this->assertStringContainsString('data-edit-item="n123"', $rebuilt);
+        $this->assertStringContainsString('Seed words', $rebuilt);
+    }
+
     public function test_adding_from_the_last_item_copies_the_last(): void
     {
         $out = $this->render(
@@ -117,9 +148,9 @@ class AnAddedItemCopiesTheOneYouWereOnTest extends TestCase
 
         $this->assertStringContainsString('data-edit-item="new1"', $out);
 
-        // Three items, three different keys: the copy cannot write over the
-        // card it came from.
-        preg_match_all('/setting:auto:([a-f0-9]+)/', $out, $found);
+        // Three items, three distinct full keys: the copy cannot write over
+        // the card it came from, while retaining an auto key's stable base.
+        preg_match_all('/data-edit="(setting:auto:[^"]+)"/', $out, $found);
         $this->assertCount(3, $found[1]);
         $this->assertCount(3, array_unique($found[1]), 'the copy shares a key with the item it came from');
     }

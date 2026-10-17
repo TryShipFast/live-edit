@@ -41,6 +41,51 @@ class MarkupScannerTest extends TestCase
         $this->assertMatchesRegularExpression('/<p data-edit="setting:auto:[a-f0-9]{12}"/', $applied);
     }
 
+    public function test_explicit_section_regions_become_reorderable_lists(): void
+    {
+        $html = '<main data-edit-section-region="home.main">'
+            .'<section data-edit-section="home.hero" data-edit-section-label="Hero"><h1>Welcome</h1></section>'
+            .'<section data-edit-section="home.gallery" data-edit-section-label="Gallery"><p>Photos</p></section>'
+            .'</main>';
+
+        $tagged = (new MarkupScanner)->apply($html, ['text'], false)['html'];
+
+        $this->assertMatchesRegularExpression('/<main[^>]+data-edit-list="auto:[a-f0-9]{12}"[^>]+data-edit-list-kind="sections"/', $tagged);
+        $this->assertStringContainsString('data-edit-item="home.hero"', $tagged);
+        $this->assertStringContainsString('data-edit-item="home.gallery"', $tagged);
+    }
+
+    public function test_ambiguous_or_locked_section_regions_are_left_untagged(): void
+    {
+        $html = '<main data-edit-section-region="home.main">'
+            .'<section data-edit-section="home.hero">Hero</section>'
+            .'<section data-edit-section="home.hero">Duplicate id</section>'
+            .'</main>';
+
+        $tagged = (new MarkupScanner)->apply($html, ['text'], false)['html'];
+
+        $this->assertStringNotContainsString('data-edit-list-kind="sections"', $tagged);
+    }
+
+    public function test_a_duplicated_section_has_a_new_identity_and_its_own_content_keys(): void
+    {
+        $html = '<main data-edit-section-region="home.main">'
+            .'<section data-edit-section="home.hero" data-edit-section-duplicate="true">'
+            .'<h1 data-edit="setting:home.hero.title">Welcome</h1></section></main>';
+        $scanner = new MarkupScanner;
+        $tagged = $scanner->apply($html, ['text'], false)['html'];
+        preg_match('/data-edit-list="([^"]+)"/', $tagged, $list);
+
+        $duplicated = $scanner->applyOverrides($tagged, [
+            $list[1] => json_encode(['home.hero', 'n123']),
+        ]);
+
+        $this->assertSame(2, substr_count($duplicated, 'data-edit-section='));
+        $this->assertStringContainsString('data-edit-section="n123"', $duplicated);
+        $this->assertStringContainsString('data-edit="setting:home.hero.title@n123"', $duplicated);
+        $this->assertStringContainsString('data-edit="setting:home.hero.title"', $duplicated);
+    }
+
     public function test_the_paragraph_and_the_phrase_inside_it_keep_separate_keys(): void
     {
         // Two targets, two histories. Sharing a key would make an edit to one
@@ -425,8 +470,10 @@ class MarkupScannerTest extends TestCase
         $this->assertSame(4, substr_count($rendered, 'data-edit-item='));
         $this->assertStringContainsString('data-edit-item="n7"', $rendered);
         // The copy must not share the original's content key.
-        preg_match('/data-edit-item="i0"[^>]*>\s*<h3 data-edit="setting:(auto:[a-f0-9]+)"/', $rendered, $first);
-        preg_match('/data-edit-item="n7"[^>]*>\s*<h3 data-edit="setting:(auto:[a-f0-9]+)"/', $rendered, $copy);
+        preg_match('/data-edit-item="i0"[^>]*>\s*<h3 data-edit="setting:(auto:[^"]+)"/', $rendered, $first);
+        preg_match('/data-edit-item="n7"[^>]*>\s*<h3 data-edit="setting:(auto:[^"]+)"/', $rendered, $copy);
+        $this->assertArrayHasKey(1, $first);
+        $this->assertArrayHasKey(1, $copy);
         $this->assertNotSame($first[1], $copy[1]);
     }
 
@@ -1100,5 +1147,34 @@ class MarkupScannerTest extends TestCase
 
             $this->assertNotNull($this->keyOfText($html, $words), "<{$tag}> was left uneditable");
         }
+    }
+
+    public function test_auto_tagged_carousel_captions_follow_new_slides_and_empty_lists(): void
+    {
+        $source = '<div data-slider="fade"><div data-track data-edit-list="photos">'
+            .'<div data-slide data-edit-item="one" data-cap="First" aria-label="1 of 2"><img src="/one.jpg"></div>'
+            .'<div data-slide data-edit-item="two" data-cap="Second" aria-label="2 of 2"><img src="/two.jpg"></div>'
+            .'</div></div>';
+        $scanner = new MarkupScanner;
+        $prepared = $scanner->apply($source, ['image'], true)['html'];
+        preg_match_all('/data-edit-slide-caption="setting:([^"]+)"/', $prepared, $matches);
+
+        $this->assertCount(2, $matches[1]);
+        $this->assertCount(2, array_unique($matches[1]), 'each slide caption needs an independent setting');
+
+        $ordered = $scanner->applyOverrides($prepared, ['photos' => '["one","nfresh","two"]']);
+        preg_match_all('/data-edit-slide-caption="setting:([^"]+)"/', $ordered, $addedMatches);
+        $captionKey = $addedMatches[1][1];
+        $rendered = $scanner->applyOverrides($prepared, [
+            'photos' => '["one","nfresh","two"]',
+            $captionKey => 'A new caption',
+        ]);
+
+        $this->assertStringContainsString('data-cap="A new caption"', $rendered);
+        $this->assertStringContainsString('aria-label="2 of 3"', $rendered);
+        $this->assertStringContainsString('aria-label="3 of 3"', $rendered);
+
+        $empty = $scanner->applyOverrides($prepared, ['photos' => '[]']);
+        $this->assertStringNotContainsString('data-slide=', $empty);
     }
 }

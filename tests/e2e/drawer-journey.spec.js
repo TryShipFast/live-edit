@@ -53,7 +53,9 @@ const asEditor = async (page, request, path = '/') => {
 };
 
 const settled = async (page) => {
-    await page.waitForLoadState('networkidle');
+    // Templates can keep a carousel/media request open indefinitely; the
+    // editor's own state is what matters here, not network quiescence.
+    await page.waitForLoadState('domcontentloaded');
     // The applier runs after the document is ready and one fetch has returned.
     await page.waitForTimeout(1200);
 };
@@ -438,15 +440,27 @@ test('an item added to a list is on the page, and can be taken off again', async
     // whole site can be browsed, and it is edited from a handle instead.
     const list = await page.evaluate(() => {
         const opens = (el) => el && el.tagName !== 'A';
+        const visible = (el) => {
+            const rect = el.getBoundingClientRect();
+
+            return rect.width > 0 && rect.height > 0 && el.getClientRects().length > 0;
+        };
 
         for (const candidate of document.querySelectorAll('[data-edit-list]')) {
             const items = [...candidate.children].filter((child) => child.dataset.editItem);
-            const openable = items.some((item) => (
+            const openable = items.some((item) => visible(item) && (
                 (item.matches('[data-edit]') && opens(item))
                 || opens(item.querySelector('[data-edit], [data-edit-icon], [data-edit-img]'))
             ));
 
-            if (items.length > 0 && openable) return candidate.getAttribute('data-edit-list');
+            // Exercise a visible page collection whose empty state can be
+            // reached from its surrounding styleable section. Navigation
+            // menus contain collections too, but they are a separate UI path.
+            if (items.length > 0 && openable
+                && !candidate.closest('header, nav, footer, .mega, .menu')
+                && candidate.parentElement?.closest('[data-style]')) {
+                return candidate.getAttribute('data-edit-list');
+            }
         }
 
         return null;
@@ -456,6 +470,7 @@ test('an item added to a list is on the page, and can be taken off again', async
     const items = `[data-edit-list="${list}"] > [data-edit-item]`;
     const count = () => page.locator(items).count();
     const before = await count();
+    console.log(`Collection journey: ${list}; starting items: ${before}`);
 
     const openItem = async (which) => {
         const item = page.locator(which).first();
@@ -472,7 +487,9 @@ test('an item added to a list is on the page, and can be taken off again', async
     await page.reload();
     await settled(page);
 
-    expect(await count(), 'the new item is not on the page').toBe(before + 1);
+    const afterAdd = await count();
+    console.log(`Collection journey: ${list}; items after add: ${afterAdd}`);
+    expect(afterAdd, 'the new item is not on the page').toBe(before + 1);
 
     // And off again, so the suite leaves the site as it found it.
     await openItem(`${items}:last-child`);
@@ -483,6 +500,35 @@ test('an item added to a list is on the page, and can be taken off again', async
     await settled(page);
 
     expect(await count(), 'the item could not be taken off again').toBe(before);
+
+    // A customer may remove the final row. It should leave an empty list they
+    // can still manage from the surrounding section, and the source markup
+    // should provide the seed when they add the first row back.
+    while (await count() > 0) {
+        await openItem(`${items}:first-child`);
+        page.once('dialog', (d) => d.accept());
+        await panel(page).getByRole('button', { name: /Delete this item/ }).click();
+        await settled(page);
+        await page.reload();
+        await settled(page);
+    }
+
+    expect(await count(), 'the final item could not be removed').toBe(0);
+
+    const managerKey = await page.locator(`[data-edit-list="${list}"]`).evaluate((node) => {
+        const manager = node.parentElement?.closest('[data-style]');
+
+        return manager ? [...document.querySelectorAll('[data-style]')].indexOf(manager) : null;
+    });
+    expect(managerKey, 'no surrounding content can open the empty list manager').not.toBeNull();
+    await page.locator('[data-style]').nth(managerKey).click({ force: true });
+    await panel(page).getByRole('button', { name: /Manage .*\(0\)/ }).click();
+    await panel(page).getByRole('button', { name: /Add item/ }).click();
+    await settled(page);
+    await page.reload();
+    await settled(page);
+
+    expect(await count(), 'an empty collection could not be rebuilt from its template').toBe(1);
 });
 
 

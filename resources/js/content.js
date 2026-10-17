@@ -658,11 +658,11 @@ export const applyBackground = (element, url) => {
  * order here, for the same reason.
  *
  * An item named in the order but missing from the page is copied from the
- * first one — that is how an item added in the editor appears on a page whose
- * markup only ever had the originals.
+ * nearest existing item before it — matching the editor's insert-after rule.
  */
 export const applyOrder = (root, settings) => {
     let moved = 0;
+    let carouselOrderChanged = false;
 
     for (const container of root.querySelectorAll('[data-edit-list]')) {
         const key = container.getAttribute('data-edit-list');
@@ -679,7 +679,7 @@ export const applyOrder = (root, settings) => {
             continue;
         }
 
-        if (!Array.isArray(order) || order.length === 0) {
+        if (!Array.isArray(order)) {
             continue;
         }
 
@@ -696,9 +696,8 @@ export const applyOrder = (root, settings) => {
             continue;
         }
 
-        const template = items.values().next().value;
-
-        for (const id of order) {
+        const orderedIds = order.map(String);
+        for (const [position, id] of orderedIds.entries()) {
             const existing = items.get(String(id));
 
             if (existing) {
@@ -706,17 +705,77 @@ export const applyOrder = (root, settings) => {
                 continue;
             }
 
-            // Added in the editor: copy the first and give the copy its own
-            // identity, so editing it cannot disturb the original.
+            // Added in the editor: copy the nearest existing item before this
+            // id and give the copy its own editing identity.
+            let template = null;
+            for (let before = position - 1; before >= 0 && !template; before--) {
+                template = items.get(orderedIds[before]) ?? null;
+            }
+            template ??= items.values().next().value;
             const clone = template.cloneNode(true);
-            clone.setAttribute('data-edit-item', String(id));
+            rekeyRepeatedItem(clone, String(id));
             container.appendChild(clone);
         }
 
         moved++;
+        carouselOrderChanged ||= Boolean(container.querySelector('[data-slide]'));
+    }
+
+    if (carouselOrderChanged) {
+        for (const carousel of root.querySelectorAll('[data-slider]')) {
+            const slides = [...carousel.querySelectorAll('[data-slide]')]
+                .filter((slide) => slide.closest('[data-slider]') === carousel);
+            slides.forEach((slide, index) => {
+                if (/^\s*\d+\s+of\s+\d+\s*$/i.test(slide.getAttribute('aria-label') ?? '')) {
+                    slide.setAttribute('aria-label', `${index + 1} of ${slides.length}`);
+                }
+            });
+        }
     }
 
     return moved;
+};
+
+/** Give an inserted collection row its own editable keys and HTML ids. */
+const rekeyRepeatedItem = (item, id) => {
+    item.setAttribute('data-edit-item', id);
+    const nodes = [item, ...item.querySelectorAll('*')];
+    const idMap = new Map();
+
+    for (const node of nodes) {
+        if (node.hasAttribute('data-edit-section')) node.setAttribute('data-edit-section', id);
+        for (const attribute of ['data-edit', 'data-edit-img', 'data-edit-bg', 'data-edit-slide-caption']) {
+            const value = node.getAttribute(attribute) ?? '';
+            if (value.startsWith('setting:') && !value.startsWith('setting:auto:')) {
+                const key = value.slice('setting:'.length).replace(/@n[0-9a-z]+$/, '');
+                node.setAttribute(attribute, `setting:${key}@${id}`);
+            } else if (value.startsWith('setting:auto:')) {
+                node.setAttribute(attribute, `${value}@${id}`);
+            }
+        }
+        const href = node.getAttribute('data-edit-href') ?? '';
+        if (href.startsWith('auto:')) node.setAttribute('data-edit-href', `${href}@${id}`);
+        else if (href) node.setAttribute('data-edit-href', `${href.replace(/@n[0-9a-z]+$/, '')}@${id}`);
+        const style = node.getAttribute('data-style') ?? '';
+        if (style.startsWith('s')) node.setAttribute('data-style', `${style}.${id}`);
+        if (node.id) {
+            const oldId = node.id;
+            const newId = `${oldId}--${id}`;
+            idMap.set(oldId, newId);
+            node.id = newId;
+        }
+    }
+
+    for (const node of nodes) {
+        for (const attribute of ['for', 'aria-labelledby', 'aria-describedby', 'aria-controls', 'aria-owns']) {
+            const value = node.getAttribute(attribute);
+            if (value) node.setAttribute(attribute, value.split(/\s+/).map((part) => idMap.get(part) ?? part).join(' '));
+        }
+        for (const attribute of ['href', 'data-bs-target']) {
+            const value = node.getAttribute(attribute);
+            if (value?.startsWith('#') && idMap.has(value.slice(1))) node.setAttribute(attribute, `#${idMap.get(value.slice(1))}`);
+        }
+    }
 };
 
 /** @param {Record<string, string>} settings */
@@ -726,6 +785,16 @@ export const applyContent = (root, settings) => {
     // Lists first: an item moved or added changes what everything below has
     // to land on.
     applyOrder(root, settings);
+
+    // The slider reads this attribute when it changes slides; the editor
+    // stores it as content so the caption survives reordering and duplication.
+    for (const slide of root.querySelectorAll('[data-edit-slide-caption]')) {
+        const key = (slide.getAttribute('data-edit-slide-caption') ?? '').replace(/^setting:/, '');
+        if (Object.hasOwn(settings, key)) {
+            slide.setAttribute('data-cap', settings[key]);
+            slide.setAttribute('data-edit-value', settings[key]);
+        }
+    }
 
     // Before anything is applied, so the files are in flight while the words
     // are being written into the page.

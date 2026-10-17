@@ -157,10 +157,20 @@ class MarkupScanner
         $this->autoMode = $auto;
         $this->run($html);
 
+        // A developer may opt a set of page sections into structural editing
+        // without relying on the scanner to guess that the siblings are safe
+        // to move or duplicate.
+        if (str_contains($html, 'data-edit-section-region')) {
+            $this->applySectionTags();
+        }
+
         // Lists first: each item gets a stable id, so the keys of everything
         // inside it stay put when items are added or removed around it.
         if ($auto) {
             $this->applyListTags();
+            if (str_contains($html, 'data-slide') && str_contains($html, 'data-cap=')) {
+                $this->applyCarouselTags();
+            }
         }
 
         $labels = [];
@@ -412,7 +422,9 @@ class MarkupScanner
             if (! array_key_exists($key, $overrides)) {
                 continue;
             }
-            $this->writeWords($node, (string) $overrides[$key]);
+            if ($node->getAttribute('data-edit-attr-mode') !== 'attribute-only') {
+                $this->writeWords($node, (string) $overrides[$key]);
+            }
 
             // A counter renders from its attribute, so text alone would be
             // overwritten the moment the theme's script ran.
@@ -421,6 +433,22 @@ class MarkupScanner
                 $node->setAttribute($attribute, $overrides[$key]);
                 $node->setAttribute('data-edit-value', $overrides[$key]);
             }
+        }
+
+        foreach ($xpath->query('//*[@data-edit-slide-caption]') as $slide) {
+            $marker = $slide->getAttribute('data-edit-slide-caption');
+            if (! str_starts_with($marker, 'setting:')) {
+                continue;
+            }
+            $key = substr($marker, strlen('setting:'));
+            if (array_key_exists($key, $overrides)) {
+                $slide->setAttribute('data-cap', (string) $overrides[$key]);
+                $slide->setAttribute('data-edit-value', (string) $overrides[$key]);
+            }
+        }
+
+        if (str_contains($html, 'data-slide')) {
+            $this->renumberCarouselSlides($xpath);
         }
 
         foreach ($xpath->query('//*[@data-edit-svg]') as $node) {
@@ -1002,21 +1030,24 @@ class MarkupScanner
             $nodes[] = $descendant;
         }
 
+        $idMap = [];
         foreach ($nodes as $node) {
             if (! $node instanceof DOMElement) {
                 continue;
             }
-            foreach (['data-edit', 'data-edit-img', 'data-edit-bg'] as $attr) {
+            if ($node->hasAttribute('data-edit-section')) {
+                $node->setAttribute('data-edit-section', $newId);
+            }
+            if ($node->hasAttribute('id')) {
+                $oldId = $node->getAttribute('id');
+                $newHtmlId = $oldId.'--'.$newId;
+                $idMap[$oldId] = $newHtmlId;
+                $node->setAttribute('id', $newHtmlId);
+            }
+            foreach (['data-edit', 'data-edit-img', 'data-edit-bg', 'data-edit-slide-caption'] as $attr) {
                 $current = $node->getAttribute($attr);
 
                 if (! str_starts_with($current, 'setting:')) {
-                    continue;
-                }
-
-                if (str_starts_with($current, 'setting:auto:')) {
-                    $salt = $attr === 'data-edit-bg' ? '#bg' : '';
-                    $node->setAttribute($attr, 'setting:auto:'.$this->autoKey($node, $salt));
-
                     continue;
                 }
 
@@ -1028,14 +1059,34 @@ class MarkupScanner
 
             $href = $node->getAttribute('data-edit-href');
 
-            if (str_starts_with($href, 'auto:')) {
-                $node->setAttribute('data-edit-href', 'auto:'.$this->autoKey($node, '#href'));
-            } elseif ($href !== '') {
+            if ($href !== '') {
                 $node->setAttribute('data-edit-href', $this->derivedKey($href, $newId));
             }
 
             if (str_starts_with($node->getAttribute('data-style'), 's')) {
-                $node->setAttribute('data-style', 's'.$this->autoKey($node));
+                $node->setAttribute('data-style', $node->getAttribute('data-style').'.'.$newId);
+            }
+        }
+
+        foreach ($nodes as $node) {
+            if (! $node instanceof DOMElement) {
+                continue;
+            }
+            foreach (['for', 'aria-labelledby', 'aria-describedby', 'aria-controls', 'aria-owns'] as $attribute) {
+                $value = $node->getAttribute($attribute);
+                if ($value === '') {
+                    continue;
+                }
+                $node->setAttribute($attribute, implode(' ', array_map(
+                    static fn (string $part): string => $idMap[$part] ?? $part,
+                    preg_split('/\\s+/', trim($value)) ?: [],
+                )));
+            }
+            foreach (['href', 'data-bs-target'] as $attribute) {
+                $value = $node->getAttribute($attribute);
+                if (str_starts_with($value, '#') && isset($idMap[substr($value, 1)])) {
+                    $node->setAttribute($attribute, '#'.$idMap[substr($value, 1)]);
+                }
             }
         }
     }
@@ -1173,6 +1224,110 @@ class MarkupScanner
             foreach ($container->childNodes as $child) {
                 if ($child instanceof DOMElement) {
                     $child->setAttribute('data-edit-item', 'i'.$index++);
+                }
+            }
+        }
+    }
+
+    /**
+     * Turn an explicitly marked page region into an ordered collection.
+     *
+     * Automatic collection detection is useful for cards and galleries, but a
+     * page section can contain forms, navigation relationships or scripts that
+     * make moving or duplicating it unsafe. The author opts in by marking the
+     * region and every direct section child. Partial or ambiguous regions are
+     * left alone rather than rearranged by a guess.
+     */
+    protected function applySectionTags(): void
+    {
+        foreach (iterator_to_array($this->doc->getElementsByTagName('*')) as $region) {
+            if (! $region instanceof DOMElement || ! $region->hasAttribute('data-edit-section-region')) {
+                continue;
+            }
+
+            if ($this->insideChrome($region) || $this->isLockedAway($region)) {
+                continue;
+            }
+
+            $sections = [];
+            $ids = [];
+            $safe = true;
+
+            foreach ($region->childNodes as $child) {
+                if (! $child instanceof DOMElement) {
+                    continue;
+                }
+
+                $id = trim($child->getAttribute('data-edit-section'));
+                if ($id === '' || ! preg_match('/^[A-Za-z0-9_.~-]{1,64}$/', $id)
+                    || isset($ids[$id]) || $this->isLockedAway($child)) {
+                    $safe = false;
+
+                    break;
+                }
+
+                $sections[] = $child;
+                $ids[$id] = true;
+            }
+
+            if (! $safe || $sections === []) {
+                continue;
+            }
+
+            $regionId = trim($region->getAttribute('data-edit-section-region'));
+            if ($regionId === '') {
+                continue;
+            }
+
+            if (! $region->hasAttribute('data-edit-list')) {
+                $region->setAttribute(
+                    'data-edit-list',
+                    'auto:'.substr(hash('sha256', 'section-region:'.$this->page.':'.$regionId), 0, 12)
+                );
+            }
+            $region->setAttribute('data-edit-list-kind', 'sections');
+
+            foreach ($sections as $section) {
+                $section->setAttribute('data-edit-item', trim($section->getAttribute('data-edit-section')));
+            }
+        }
+    }
+
+    /** Make the caption source on each carousel slide editable as a setting. */
+    protected function applyCarouselTags(): void
+    {
+        foreach ($this->doc->getElementsByTagName('*') as $slide) {
+            if (! $slide instanceof DOMElement || ! $slide->hasAttribute('data-slide') || ! $slide->hasAttribute('data-cap')) {
+                continue;
+            }
+            if (! $slide->hasAttribute('data-edit-slide-caption')) {
+                $slide->setAttribute('data-edit-slide-caption', 'setting:auto:'.$this->autoKey($slide, '#caption'));
+            }
+        }
+    }
+
+    /** Keep slide position labels accurate after list edits. */
+    protected function renumberCarouselSlides(DOMXPath $xpath): void
+    {
+        foreach ($xpath->query('//*[@data-slider]') as $carousel) {
+            $slides = [];
+            foreach ($xpath->query('.//*[@data-slide]', $carousel) as $slide) {
+                if (! $slide instanceof DOMElement) {
+                    continue;
+                }
+                for ($parent = $slide->parentNode; $parent instanceof DOMElement; $parent = $parent->parentNode) {
+                    if ($parent->hasAttribute('data-slider')) {
+                        if ($parent->isSameNode($carousel)) {
+                            $slides[] = $slide;
+                        }
+                        break;
+                    }
+                }
+            }
+            $total = count($slides);
+            foreach ($slides as $index => $slide) {
+                if (preg_match('/^\s*\d+\s+of\s+\d+\s*$/i', $slide->getAttribute('aria-label'))) {
+                    $slide->setAttribute('aria-label', ($index + 1).' of '.$total);
                 }
             }
         }

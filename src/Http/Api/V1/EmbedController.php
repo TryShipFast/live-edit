@@ -46,6 +46,7 @@ class EmbedController
         'every-render.js' => 'every-render.js',
         'svg.js' => 'svg.js',
         'verify.js' => 'verify.js',
+        'icon-library.js' => 'icon-library.js',
         // The built bundle, resolved to resources/dist rather than to a
         // sibling of the modules.
         'bundle.js' => 'bundle.js',
