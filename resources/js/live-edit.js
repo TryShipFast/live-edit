@@ -1,4 +1,5 @@
 import { createChrome } from './chrome.js';
+import { renderBrandPanel } from './brand.js';
 import { biggestThatFits, inSourcePixels, movedWithin, whatIsThereNow } from './fitting.js';
 import { attrsWorthSending, creditWorthSending } from './only-what-changed.js';
 import { confirm as confirmChange, expectChange, takeExpected } from './verify.js';
@@ -1102,6 +1103,33 @@ const bootLiveEdit = () => {
 
             if (name === 'Changes') void renderChanges();
             if (name === 'History') void renderHistory();
+            if (name === 'Brand') renderBrand();
+            else brandPanel?.unpreview();
+        };
+
+        /*
+         * The Brand tab. Saved the way every edit is (one setting per token), so
+         * it is a draft until published and shows under Changes. Leaving the tab
+         * without saving puts the page back the way it was.
+         */
+        let brandPanel = null;
+        const renderBrand = () => {
+            brandPanel = renderBrandPanel({
+                container: drawerFields,
+                config: window.liveEditBrand,
+                save: async (key, value) => {
+                    await request('/live-edit/setting', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ key, value }),
+                    });
+                },
+                done: (message) => {
+                    if (message) reloadWithToast(message);
+                    else closeDrawer(true);
+                },
+                notify,
+            });
         };
 
         Object.entries(drawerTabs).forEach(([name, tab]) => {
@@ -4606,6 +4634,13 @@ const bootLiveEdit = () => {
 
         toggleButton?.addEventListener('click', () => setEditing(!document.body.classList.contains('editing')));
 
+        ui.brandButton?.addEventListener('click', () => {
+            if (!document.body.classList.contains('editing')) setEditing(true);
+
+            showTab('Brand');
+            openDrawer();
+        });
+
         ui.changesButton?.addEventListener('click', () => {
             // Somebody asking what they have changed is asking about editing,
             // so turn it on rather than showing them an empty answer.
@@ -5383,7 +5418,15 @@ const bootLiveEdit = () => {
         });
 
         const params = new URLSearchParams(window.location.search);
-        if (params.has('edit')) {
+        // Arriving to set the brand (a host's "Open Brand" link): straight to that tab.
+        if (params.has('brand') && window.liveEditBrand?.tokens?.length) {
+            params.delete('brand');
+            const query = params.toString();
+            window.history.replaceState(null, '', window.location.pathname + (query ? `?${query}` : ''));
+            setEditing(true);
+            showTab('Brand');
+            openDrawer();
+        } else if (params.has('edit')) {
             params.delete('edit');
             const query = params.toString();
             window.history.replaceState(null, '', window.location.pathname + (query ? `?${query}` : ''));
