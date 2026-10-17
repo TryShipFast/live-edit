@@ -3333,7 +3333,11 @@ const bootLiveEdit = () => {
                 open.title = 'Runs the control so you can edit what it reveals';
                 open.addEventListener('click', () => {
                     closeDrawer(true);
-                    passThroughClick(control);
+                    // After this click has finished travelling, not inside it. Sites close an open
+                    // menu on any click outside it, and this click, still bubbling to the document
+                    // from the editor's own button, is one: the menu opened and shut in the same
+                    // instant, so nothing a dropdown holds could ever be reached to edit.
+                    window.setTimeout(() => passThroughClick(control), 0);
                 });
                 row.append(open);
                 drawerFields.append(row);
