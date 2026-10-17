@@ -83,28 +83,27 @@ class LicenceController
             // mismatch switched the editor off on correctly licensed sites.
             $observed === '' => null,
 
-            // Verified: the licensed domain, and nothing else.
+            /*
+             * A local install is not another licensed website, verified or
+             * otherwise. These reserved names cannot resolve to a public
+             * website, so somebody can test their own verified licence on
+             * Herd, Valet or localhost without weakening the domain check
+             * for any address that could belong to another business.
+             *
+             * This must precede the verified-domain check: otherwise a
+             * verified production site refuses its own local development
+             * address before this safe exception can apply.
+             */
+            LocalAddress::is($observed) => null,
+
+            // Verified: the licensed domain, and nothing else public.
             $site->isVerified() => $site->ownsDomain($observed),
 
             /*
-             * Not verified yet, which is every site between installing the
-             * plugin and proving the domain. It cannot be held to a domain
-             * nobody has proved, so this used to say nothing at all and allow
-             * every address in the site's list.
-             *
-             * That was the way around the whole pricing model: register one
-             * site, never verify it, add a second business's domain to the
-             * list of addresses, and run the editor on both for one licence.
-             * Found by asking what stopped it. Nothing did.
-             *
-             * So: somewhere that cannot be a website on the internet is fine,
-             * because installing the plugin means trying it somewhere first
-             * and that somewhere is a local address. The domain they claimed
-             * is fine too, unproven or not, because claiming one and using it
-             * is not the abuse. Any OTHER public address is a second live
-             * site, and is refused until it holds a licence of its own.
+             * An unverified site cannot be held to a domain nobody has
+             * proved. Its own claimed domain is fine; any other public
+             * address is a second live site and needs its own licence.
              */
-            LocalAddress::is($observed) => null,
             SiteVerification::covers((string) $site->domain, $observed) => null,
             default => false,
         };

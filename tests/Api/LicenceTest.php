@@ -54,8 +54,8 @@ class LicenceTest extends TestCase
         $site = Site::query()->create(array_merge([
             'slug' => 'acme',
             'name' => 'Acme',
-            'allowed_origins' => ['https://acme.test'],
-            'domain' => 'acme.test',
+            'allowed_origins' => ['https://acme.com'],
+            'domain' => 'acme.com',
             'verification_code' => 'shipfast-verify-abc123',
             'verified_at' => now(),
         ], $attributes));
@@ -78,7 +78,7 @@ class LicenceTest extends TestCase
     {
         [, $key] = $this->licensedSite();
 
-        $this->ask($key, ['Origin' => 'https://acme.test'])
+        $this->ask($key, ['Origin' => 'https://acme.com'])
             ->assertOk()
             ->assertJsonPath('licence.valid', true)
             ->assertJsonPath('licence.verified', true)
@@ -122,6 +122,18 @@ class LicenceTest extends TestCase
             ->assertJsonPath('licence.reason', 'domain_mismatch');
     }
 
+    public function test_a_verified_licence_can_be_used_on_a_local_development_domain(): void
+    {
+        [, $key] = $this->licensedSite();
+
+        $this->ask($key, [], ['domain' => 'shipfast.test'])
+            ->assertOk()
+            ->assertJsonPath('licence.valid', true)
+            ->assertJsonPath('licence.domain_matches', null)
+            ->assertJsonPath('licence.observed_domain', 'shipfast.test')
+            ->assertJsonPath('licence.reason', null);
+    }
+
     public function test_a_key_used_from_an_unlisted_origin_never_reaches_the_licence_check(): void
     {
         [, $key] = $this->licensedSite();
@@ -138,9 +150,9 @@ class LicenceTest extends TestCase
         // origin policy is a list the customer edits, while the domain is the
         // one they PROVED. A stale or over-broad entry on the list gets past
         // the first and must still fail the second.
-        [, $key] = $this->licensedSite(['allowed_origins' => ['https://acme.test', 'https://old-brand.test']]);
+        [, $key] = $this->licensedSite(['allowed_origins' => ['https://acme.com', 'https://old-brand.com']]);
 
-        $this->ask($key, ['Origin' => 'https://old-brand.test'])
+        $this->ask($key, ['Origin' => 'https://old-brand.com'])
             ->assertOk()
             ->assertJsonPath('licence.valid', false)
             ->assertJsonPath('licence.domain_matches', false)
@@ -152,29 +164,29 @@ class LicenceTest extends TestCase
         // A server can say what it likes in the body; a browser cannot forge
         // Origin. Where both are present the unforgeable one has to decide,
         // or the check is worth nothing.
-        [, $key] = $this->licensedSite(['allowed_origins' => ['https://acme.test', 'https://old-brand.test']]);
+        [, $key] = $this->licensedSite(['allowed_origins' => ['https://acme.com', 'https://old-brand.com']]);
 
-        $this->ask($key, ['Origin' => 'https://old-brand.test'], ['domain' => 'acme.test'])
+        $this->ask($key, ['Origin' => 'https://old-brand.com'], ['domain' => 'acme.com'])
             ->assertJsonPath('licence.domain_matches', false)
-            ->assertJsonPath('licence.observed_domain', 'old-brand.test');
+            ->assertJsonPath('licence.observed_domain', 'old-brand.com');
     }
 
     public function test_www_is_the_same_site(): void
     {
-        [, $key] = $this->licensedSite(['allowed_origins' => ['https://acme.test', 'https://www.acme.test']]);
+        [, $key] = $this->licensedSite(['allowed_origins' => ['https://acme.com', 'https://www.acme.com']]);
 
-        $this->ask($key, ['Origin' => 'https://www.acme.test'])
+        $this->ask($key, ['Origin' => 'https://www.acme.com'])
             ->assertJsonPath('licence.domain_matches', true);
     }
 
     public function test_a_licence_for_a_domain_does_not_cover_its_subdomains(): void
     {
-        [, $key] = $this->licensedSite(['allowed_origins' => ['https://acme.test', 'https://staging.acme.test']]);
+        [, $key] = $this->licensedSite(['allowed_origins' => ['https://acme.com', 'https://staging.acme.com']]);
 
         // Staging, a client's white-label subdomain, anything else stood up
         // under a name the customer happens to control: separate sites, even
         // when the customer has allowed the origin.
-        $this->ask($key, ['Origin' => 'https://staging.acme.test'])
+        $this->ask($key, ['Origin' => 'https://staging.acme.com'])
             ->assertJsonPath('licence.domain_matches', false);
     }
 
@@ -219,7 +231,7 @@ class LicenceTest extends TestCase
     {
         [, $key] = $this->licensedSite(['verified_at' => null]);
 
-        $this->ask($key, ['Origin' => 'https://acme.test'])
+        $this->ask($key, ['Origin' => 'https://acme.com'])
             ->assertJsonPath('licence.verified', false)
             ->assertJsonPath('licence.domain_matches', null)
             ->assertJsonPath('licence.reason', 'unverified');

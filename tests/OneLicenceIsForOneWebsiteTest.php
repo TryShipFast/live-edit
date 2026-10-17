@@ -34,8 +34,8 @@ class OneLicenceIsForOneWebsiteTest extends TestCase
 
         return match (true) {
             $observed === '' => null,
-            $site->isVerified() => $site->ownsDomain($observed),
             LocalAddress::is($observed) => null,
+            $site->isVerified() => $site->ownsDomain($observed),
             SiteVerification::covers((string) $site->domain, $observed) => null,
             default => false,
         };
@@ -70,7 +70,7 @@ class OneLicenceIsForOneWebsiteTest extends TestCase
         $this->assertNull($this->verdict($this->site(false), 'https://acme.com'));
     }
 
-    public function test_a_herd_address_is_allowed_before_verification(): void
+    public function test_a_herd_address_is_allowed_with_or_without_verification(): void
     {
         /*
          * Every customer's first hour: the plugin installed on their own
@@ -79,6 +79,7 @@ class OneLicenceIsForOneWebsiteTest extends TestCase
          * enough of a rule.
          */
         $this->assertNull($this->verdict($this->site(false), 'http://shipfast.test'));
+        $this->assertNull($this->verdict($this->site(true), 'http://shipfast.test'));
     }
 
     public function test_the_addresses_a_person_develops_on(): void
