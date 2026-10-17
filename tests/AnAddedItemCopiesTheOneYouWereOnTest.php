@@ -221,4 +221,27 @@ class AnAddedItemCopiesTheOneYouWereOnTest extends TestCase
         $this->assertStringContainsString('One words', $this->render($html, ['one', 'two']));
         $this->assertSame(1, substr_count($this->render($html, ['one', 'two']), 'Two words'));
     }
+
+    public function test_an_item_added_after_the_lists_odd_one_out_takes_the_usual_shape(): void
+    {
+        // A gallery that opens with one large photo: "+" on the large one gives a normal tile.
+        $html = '<ul data-edit-list="gallery">'
+            .'<li class="tile tile--big" data-edit-item="a"><p data-edit="setting:a">Big</p></li>'
+            .'<li class="tile" data-edit-item="b"><p data-edit="setting:b">Small b</p></li>'
+            .'<li class="tile" data-edit-item="c"><p data-edit="setting:c">Small c</p></li>'
+            .'</ul>';
+
+        $out = (new MarkupScanner)->applyOverrides($html, ['gallery' => json_encode(['a', 'n1x', 'b', 'c'])]);
+
+        $this->assertSame(1, substr_count($out, 'tile--big'), 'the copy took the one large tile\'s size');
+        $this->assertSame(4, substr_count($out, 'class="tile'));
+    }
+
+    public function test_a_list_of_one_shape_still_copies_the_one_you_were_on(): void
+    {
+        $out = $this->render($this->list('one', 'two', 'three'), ['one', 'n1x', 'two', 'three']);
+
+        $this->assertSame(2, substr_count($out, 'One words'));
+    }
 }
+

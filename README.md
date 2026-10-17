@@ -277,6 +277,73 @@ gallery card or navigation row for it.
 Templates without `data-edit-section-region` take the existing scanner path;
 the scanner skips the optional section pass entirely for them.
 
+A host that marks pages itself can write the result of that pass directly:
+`data-edit-list` and `data-edit-list-kind="sections"` on the region, and
+`data-edit-item`, `data-edit-section`, `data-edit-section-label` and
+`data-edit-section-duplicate` on each section. The hosted service does this for
+templates that ship a Component Kit, because their pages arrive already marked
+and are never scanned.
+
+### How many a list holds
+
+A list can say how many items its design holds:
+
+```html
+<ul data-edit-list="tpl:82345243d687" data-edit-list-label="Photos"
+    data-edit-list-max="9" data-edit-list-min="1"> ... </ul>
+```
+
+At the maximum, **+ Add another** and **Duplicate item** are disabled, and the
+drawer says why ("This design holds 9. Replace one, or delete one to add
+another."). At the minimum, **Delete this item** is disabled. Without these
+attributes a list has no limit and keeps at least one item, as before.
+
+An added item copies the item it was added from, unless that item is the
+list's odd one out: when its class appears once and the list has a usual
+class, the copy is made from the nearest item of the usual class. A gallery
+that opens with one large photo gets a normal tile, not a second large one.
+
+### Links the editor steers
+
+A host that serves pages in its own editor can keep the visitor's address in
+`href` and put the editor's address for the same page in `data-editor-href`.
+**Open this link** in the drawer follows `data-editor-href` when present. The
+link field always shows and saves the `href`, so the address a customer
+publishes is never the editor's.
+
+## The Brand tab
+
+When the host sets `window.liveEditBrand` before the editor loads, a **Brand**
+tab appears in the drawer and a **Brand** button in the toolbar. `?brand` in
+the address opens the editor on it.
+
+```js
+window.liveEditBrand = {
+  tokens: [ // each colour or face the customer may set
+    { key: 'brand.ink', property: '--brand-ink', kind: 'colour',
+      label: 'Headings and buttons', hint: 'Your darkest brand colour.' },
+    { key: 'brand.font.display', property: '--font-display', kind: 'face',
+      label: 'Headings', hint: 'The face for titles.' },
+  ],
+  faces: [{ id: 'fraunces', name: 'Fraunces', stack: "Fraunces, Georgia, serif",
+            webfont: 'Fraunces:wght@400;500;700' }],
+  chosen: { 'brand.ink': '#5B1A3A' },   // drafts over published
+  styleId: 'live-edit-brand',           // the <style> carrying the chosen brand
+};
+```
+
+- Swatches start at the design's own colours, read from the page with the
+  `styleId` block switched off for a moment.
+- Every change previews at once (a custom property on `<html>`), and a face
+  loads its webfont as it is picked.
+- Text that read clearly in the design (4.5:1, or 3:1 when large) and no longer
+  does is counted and named, with **Show me**. This runs on every change and as
+  soon as the tab opens.
+- **Save brand** writes each changed token as a setting (`POST
+  /live-edit/setting`), so it is a draft until published. An empty value means
+  the design's own. The host validates the values and applies the chosen
+  brand to the page it renders.
+
 ## If something is wrong
 
 **Start here.** One command, safe on production, that says where this site's

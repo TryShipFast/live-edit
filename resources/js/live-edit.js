@@ -3267,11 +3267,21 @@ const bootLiveEdit = () => {
             const row = document.createElement('div');
             row.className = 'le-row';
 
+            // How many the design holds, when the site says (data-edit-list-max/min). A
+            // grid drawn for four stages with a fifth added breaks its rows; saying so
+            // beats letting it.
+            const count = currentOrder().length;
+            const most = parseInt(list.dataset.editListMax ?? '', 10);
+            const least = Math.max(1, parseInt(list.dataset.editListMin ?? '', 10) || 1);
+            const full = Number.isFinite(most) && most > 0 && count >= most;
+            const lowest = count <= least;
+
             if (!sections) {
                 const add = document.createElement('button');
                 add.type = 'button';
                 add.className = 'le-chip-btn';
                 add.textContent = item ? '+ Add another' : '+ Add item';
+                add.disabled = full;
                 add.addEventListener('click', () => {
                     const ids = currentOrder();
                     const at = item ? ids.indexOf(item.dataset.editItem) : ids.length - 1;
@@ -3307,6 +3317,7 @@ const bootLiveEdit = () => {
                     duplicate.type = 'button';
                     duplicate.className = 'le-chip-btn';
                     duplicate.textContent = sections ? 'Duplicate section' : 'Duplicate item';
+                    duplicate.disabled = !sections && full;
                     duplicate.addEventListener('click', () => {
                         const reordered = currentOrder();
                         const at = reordered.indexOf(item.dataset.editItem);
@@ -3321,6 +3332,7 @@ const bootLiveEdit = () => {
                     remove.type = 'button';
                     remove.className = 'le-btn-danger';
                     remove.textContent = 'Delete this item';
+                    remove.disabled = lowest;
                     remove.addEventListener('click', () => {
                         if (!window.confirm('Delete this item?')) return;
                         saveOrder(currentOrder().filter((id) => id !== item.dataset.editItem), 'Deleted \u2713');
@@ -3329,6 +3341,15 @@ const bootLiveEdit = () => {
                 }
             }
             drawerFields.append(heading, row);
+
+            if (!sections && (full || (item && lowest))) {
+                const why = document.createElement('p');
+                why.className = 'le-hint';
+                why.textContent = full
+                    ? `This design holds ${most}. Replace one, or delete one to add another.`
+                    : 'Keep at least one, so there is something to add another from.';
+                drawerFields.append(why);
+            }
         };
 
         /**
@@ -3382,7 +3403,9 @@ const bootLiveEdit = () => {
             visit.className = 'le-chip-btn';
             visit.textContent = 'Open this link \u2192';
             visit.addEventListener('click', () => {
-                window.location.href = anchor.href;
+                // A host that keeps the visitor's address in the href and its own beside it
+                // (data-editor-href) means the page in the editor, not the live one.
+                window.location.href = anchor.dataset.editorHref || anchor.href;
             });
             row.append(visit);
             drawerFields.append(row);
