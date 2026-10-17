@@ -266,6 +266,27 @@ a.le-mark:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
 .le-change:last-child { border-bottom: 0; padding-bottom: 0; }
 .le-change-head { justify-content: space-between; align-items: baseline; }
 .le-change-label { font-size: 13px; font-weight: 500; color: #0B0C0F; }
+/* Brand: a swatch you can press, its name and what it colours, and a way back
+   to the design's own. Two columns of these read as a palette, not a form. */
+.le-brand-intro { margin: 0 0 4px; }
+.le-brand-grid { display: grid; grid-template-columns: 1fr; gap: 2px; }
+.le-brand-row { display: grid; grid-template-columns: 40px 1fr auto; align-items: center; gap: 12px; padding: 8px 6px; border-radius: 10px; cursor: pointer; }
+.le-brand-row:hover { background: #F4F5F7; }
+.le-brand-swatch { width: 40px; height: 40px; padding: 0; border: 1px solid rgba(11,12,15,.12); border-radius: 10px; background: none; cursor: pointer; }
+.le-brand-swatch::-webkit-color-swatch-wrapper { padding: 0; }
+.le-brand-swatch::-webkit-color-swatch { border: 0; border-radius: 9px; }
+.le-brand-swatch::-moz-color-swatch { border: 0; border-radius: 9px; }
+.le-brand-words { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+.le-brand-label { font-size: 13px; font-weight: 500; color: #0B0C0F; }
+.le-brand-hint { font-size: 12px; color: #6B6F76; }
+.le-link-btn { border: 0; background: none; padding: 4px 2px; font: inherit; font-size: 12px; color: #4A4D55; text-decoration: underline; text-underline-offset: 2px; cursor: pointer; }
+.le-link-btn:hover { color: #0B0C0F; }
+.le-brand-type { display: grid; grid-template-columns: 1fr; gap: 12px; }
+.le-brand-face { display: flex; flex-direction: column; gap: 6px; }
+.le-brand-warning { display: block; padding: 12px 14px; border-radius: 10px; background: #FFF4F2; color: #8C1D18; font-size: 13px; line-height: 1.45; }
+.le-brand-warning strong { font-weight: 600; }
+.le-brand-dock { position: sticky; bottom: -22px; display: flex; flex-direction: column; gap: 10px; margin: 4px -24px -22px; padding: 14px 24px 20px; background: #fff; border-top: 1px solid rgba(11,12,15,.08); }
+.le-brand-actions { justify-content: flex-end; }
 /* Struck through, because it is what the page USED to say. Somebody checking
    a change reads these two lines as a before and an after. */
 .le-change-before { font-size: 13px; color: #9A9DA5; text-decoration: line-through; margin: 0; }
@@ -947,6 +968,11 @@ export function createChrome() {
     languagePicker.title = 'Which language you are editing';
     languagePicker.setAttribute('aria-label', 'Language');
 
+    const brandButton = el('button', 'le-bar-btn le-when-roomy', 'Brand');
+    brandButton.type = 'button';
+    brandButton.title = 'Your colours and type, across the whole website';
+    brandButton.hidden = !window.liveEditBrand?.tokens?.length;
+
     const changesButton = el('button', 'le-bar-btn le-when-roomy', 'Changes');
     changesButton.type = 'button';
     changesButton.title = 'Everything you have changed and not published';
@@ -977,6 +1003,7 @@ export function createChrome() {
         el("span", "le-sep"),
         pageSwitcher,
         languagePicker,
+        brandButton,
         changesButton,
         previewButton,
         publishButton,
@@ -1026,7 +1053,11 @@ export function createChrome() {
     tabs.setAttribute('role', 'tablist');
 
     const drawerTabs = {};
-    ['Edit', 'Changes', 'History'].forEach((name) => {
+    // Brand only where the host hands the editor one (window.liveEditBrand): a site
+    // without brand tokens has nothing for it to set.
+    const tabNames = ['Edit', 'Changes', 'History'];
+    if (window.liveEditBrand?.tokens?.length) tabNames.push('Brand');
+    tabNames.forEach((name) => {
         const tab = el('button', 'le-tab', name);
         tab.type = 'button';
         tab.dataset.tab = name;
@@ -1207,6 +1238,7 @@ export function createChrome() {
         publishLabel,
         publishCount,
         previewButton,
+        brandButton,
         changesButton,
         closeButton,
         cancelButton,
