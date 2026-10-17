@@ -436,6 +436,9 @@ a.le-mark:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
   border-radius: 999px; padding: 8px 14px; font-size: 12px; font-weight: 600; transition: background .15s ease, border-color .15s ease;
 }
 .le-chip-btn:hover { background: var(--le-soft); border-color: var(--le-accent); color: var(--le-accent); }
+/* A list at the size its design holds: the button stays, greyed, and the hint
+   under it says why, rather than the button vanishing without a word. */
+.le-chip-btn:disabled, .le-btn-danger:disabled { opacity: .45; cursor: not-allowed; background: transparent; border-color: var(--le-line); color: inherit; }
 .le-color { width: 56px; height: 38px; cursor: pointer; border: 1px solid var(--le-field); border-radius: 10px; background: #fff; padding: 3px; }
 .le-default { display: flex; align-items: center; gap: 6px; cursor: pointer; font-size: 12px; font-weight: 500; letter-spacing: normal; text-transform: none; color: var(--le-muted); }
 .le-tools { display: flex; align-items: center; gap: 5px; }

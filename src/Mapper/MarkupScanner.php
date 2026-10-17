@@ -1010,15 +1010,54 @@ class MarkupScanner
      */
     protected function itemAddedFrom(array $items, array $order, int $position): ?DOMElement
     {
+        $nearest = null;
+
         for ($back = $position - 1; $back >= 0; $back--) {
             $candidate = (string) ($order[$back] ?? '');
 
             if (isset($items[$candidate])) {
-                return $items[$candidate];
+                $nearest = $items[$candidate];
+
+                break;
             }
         }
 
-        return null;
+        if ($nearest === null) {
+            return null;
+        }
+
+        /*
+         * Unless the one you were on is the list's odd one out.
+         *
+         * A gallery that opens with one large photo marks it with a class the
+         * others do not have, and copying it gave a second large photo in the
+         * middle of a grid drawn for one. When the nearest item's shape (its
+         * class) is unique and the list has a usual shape, the copy is made
+         * from the nearest item of the usual shape instead: its words and
+         * picture are a placeholder to replace either way, but its size is
+         * the design's.
+         */
+        $shapes = array_count_values(array_map(fn (DOMElement $item) => $item->getAttribute('class'), $items));
+        arsort($shapes);
+        $usual = (string) array_key_first($shapes);
+        $mine = $nearest->getAttribute('class');
+
+        if (($shapes[$mine] ?? 0) > 1 || $shapes[$usual] < 2 || $mine === $usual) {
+            return $nearest;
+        }
+
+        $at = $position;
+        for ($step = 1; $step < count($order) + 1; $step++) {
+            foreach ([$at - $step, $at + $step] as $index) {
+                $candidate = (string) ($order[$index] ?? '');
+
+                if (isset($items[$candidate]) && $items[$candidate]->getAttribute('class') === $usual) {
+                    return $items[$candidate];
+                }
+            }
+        }
+
+        return $nearest;
     }
 
     protected function rekeyItem(DOMElement $item, string $newId): void
