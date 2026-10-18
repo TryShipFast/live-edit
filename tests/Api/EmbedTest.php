@@ -211,6 +211,35 @@ class EmbedTest extends TestCase
         );
     }
 
+    public function test_the_address_follows_an_edit_while_developing(): void
+    {
+        /*
+         * In production the digest is held for the life of the process, which
+         * is right: the files cannot change under a running worker. On a
+         * development machine they change constantly, and a worker that
+         * computed the digest before the edit goes on serving the address the
+         * browser has already cached for a year. The edit is saved, the server
+         * has it, the page runs the old one, and whoever is working concludes
+         * their change did nothing.
+         */
+        $file = __DIR__.'/../../resources/js/support.js';
+        $was = file_get_contents($file);
+
+        try {
+            config(['app.debug' => true]);
+            $before = EmbedController::assetVersion();
+            file_put_contents($file, $was."\n// touched by a test\n");
+            $this->assertNotSame($before, EmbedController::assetVersion(), 'an edit left the address where it was, so a browser would never ask for it');
+        } finally {
+            file_put_contents($file, $was);
+        }
+
+        // Held for the process when it is not a development machine.
+        config(['app.debug' => false]);
+        $first = EmbedController::assetVersion();
+        $this->assertSame($first, EmbedController::assetVersion());
+    }
+
     public function test_rebuilding_the_bundle_moves_the_address(): void
     {
         /*

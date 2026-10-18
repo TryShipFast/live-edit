@@ -71,6 +71,22 @@ class EmbedController
      */
     public static function assetVersion(): string
     {
+        /*
+         * Worked out again on every request while developing.
+         *
+         * Holding it for the life of the process is right in production, where
+         * the files cannot change under a running worker. On a development
+         * machine they change constantly, and a php-fpm worker that computed
+         * the digest before the edit keeps serving the address the browser has
+         * already cached for a year: the edit is saved, the server has it, and
+         * the page runs the old one until somebody restarts PHP. Hours go into
+         * that, and the conclusions drawn in between are wrong rather than
+         * merely late.
+         */
+        if (config('app.debug')) {
+            return self::VERSION.'-'.self::fingerprint();
+        }
+
         return self::VERSION.'-'.(self::$fingerprint ??= self::fingerprint());
     }
 
