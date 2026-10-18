@@ -66,6 +66,11 @@ export function orderWith(order, itemId, after = null) {
     return next;
 }
 
+/** The owner's pages with one put in the menus, or taken out. */
+export function withMenu(made, id, on) {
+    return (made ?? []).map((page) => (page.id === id ? { ...page, menu: on } : page));
+}
+
 /** The library grouped by the page each section comes from, in the design's order, filtered by what was typed. */
 export function grouped(library, query = '') {
     const words = query.trim().toLowerCase().split(/\s+/).filter(Boolean);
@@ -158,18 +163,40 @@ export function renderPagesPanel({ container, config, save, go, notify }) {
 
     const list = el('div', 'le-sitemap');
     for (const page of config.pages ?? []) {
-        const row = el('a', 'le-sitemap-row');
-        row.href = page.href;
-        if (page.id === config.page) row.setAttribute('aria-current', 'page');
+        const row = el('div', 'le-sitemap-row');
+        const open = el('a', 'le-sitemap-open');
+        open.href = page.href;
+        if (page.id === config.page) open.setAttribute('aria-current', 'page');
         const words = el('span', 'le-sitemap-words');
         words.append(el('span', 'le-sitemap-title', page.title), el('span', 'le-sitemap-address', `/${page.id}`));
-        row.append(words);
-        if (page.id === config.page) row.append(el('span', 'le-sitemap-tag', 'This page'));
-        else if (page.made) row.append(el('span', 'le-sitemap-tag le-sitemap-tag--yours', 'Yours'));
-        row.addEventListener('click', (event) => {
+        open.append(words);
+        if (page.id === config.page) open.append(el('span', 'le-sitemap-tag', 'This page'));
+        else if (page.made) open.append(el('span', 'le-sitemap-tag le-sitemap-tag--yours', 'Yours'));
+        open.addEventListener('click', (event) => {
             event.preventDefault();
             go(page.href);
         });
+        row.append(open);
+
+        // A page the owner made goes in the site's menus, or comes out, with one press.
+        const mine = (config.made ?? []).find((made) => made.id === page.id);
+        if (mine) {
+            const menu = el('button', 'le-sitemap-menu', mine.menu ? 'In the menu' : 'Add to menu');
+            menu.type = 'button';
+            menu.setAttribute('aria-pressed', mine.menu ? 'true' : 'false');
+            menu.title = mine.menu ? 'Take this page out of the menu' : 'Show this page in the menu';
+            menu.addEventListener('click', async () => {
+                menu.disabled = true;
+                try {
+                    await save(config.pagesKey, JSON.stringify(withMenu(config.made, page.id, !mine.menu)));
+                    go(window.location.href);
+                } catch (error) {
+                    notify(error.message);
+                    menu.disabled = false;
+                }
+            });
+            row.append(menu);
+        }
         list.append(row);
     }
     container.append(list);
@@ -208,12 +235,18 @@ export function renderPagesPanel({ container, config, save, go, notify }) {
     sectionsField.append(sectionsHint);
     const library = renderLibrary({ container: sectionsField, library: config.library, multiple: true, pick: () => refresh() });
 
+    const inMenu = el('label', 'le-default le-in-menu');
+    const inMenuBox = el('input');
+    inMenuBox.type = 'checkbox';
+    inMenuBox.checked = true;
+    inMenu.append(inMenuBox, document.createTextNode('Show it in the menu'));
+
     const create = el('button', 'le-btn-publish le-create-page', 'Create page');
     create.type = 'button';
     const actions = el('div', 'le-row le-sitemap-actions');
     actions.append(create);
 
-    container.append(titleField, addressField, sectionsField, actions);
+    container.append(titleField, addressField, sectionsField, inMenu, actions);
 
     const taken = config.taken ?? [];
     function refresh() {
@@ -239,7 +272,7 @@ export function renderPagesPanel({ container, config, save, go, notify }) {
             const added = {};
             for (const from of library.chosen()) added[newAddedId()] = from;
             await save(`structure:page:${id}`, JSON.stringify({ added }));
-            await save(config.pagesKey, JSON.stringify([...(config.made ?? []), { id, title: title.value.trim() }]));
+            await save(config.pagesKey, JSON.stringify([...(config.made ?? []), { id, title: title.value.trim(), menu: inMenuBox.checked }]));
             go(`${config.editorBase}${id}`);
         } catch (error) {
             notify(error.message);

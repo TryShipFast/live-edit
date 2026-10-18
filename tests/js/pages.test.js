@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 import { describe, expect, it } from 'vitest';
-import { addedWith, addressProblem, grouped, newAddedId, orderWith, renderPagesPanel, slugFor } from '../../resources/js/pages.js';
+import { addedWith, addressProblem, grouped, newAddedId, orderWith, renderPagesPanel, slugFor, withMenu } from '../../resources/js/pages.js';
 
 describe('the page builder names and places things the way the host reads them', () => {
     it('suggests an address from a title', () => {
@@ -55,7 +55,7 @@ describe('the Pages tab', () => {
     const config = {
         page: 'about',
         pagesKey: 'structure:pages',
-        made: [{ id: 'open-days', title: 'Open days' }],
+        made: [{ id: 'open-days', title: 'Open days', menu: false }],
         editorBase: '/sites/trial/edit/',
         taken: ['', 'about', 'open-days'],
         pages: [
@@ -75,8 +75,10 @@ describe('the Pages tab', () => {
         let went = null;
         renderPagesPanel({ container, config, save: async (key, value) => saved.push([key, value]), go: (href) => (went = href), notify: () => {} });
 
-        const rows = [...container.querySelectorAll('.le-sitemap-row')].map((row) => row.textContent);
+        const rows = [...container.querySelectorAll('.le-sitemap-open')].map((row) => row.textContent);
         expect(rows).toEqual(['Home/', 'About/aboutThis page', 'Open days/open-daysYours']);
+        // only the owner's own page can go in or out of the menu
+        expect([...container.querySelectorAll('.le-sitemap-menu')].map((b) => b.textContent)).toEqual(['Add to menu']);
 
         const create = container.querySelector('.le-create-page');
         expect(create.disabled).toBe(true);
@@ -95,8 +97,20 @@ describe('the Pages tab', () => {
 
         expect(saved[0][0]).toBe('structure:page:admissions-events');
         expect(Object.values(JSON.parse(saved[0][1]).added)).toEqual(['about.team']);
-        expect(saved[1]).toEqual(['structure:pages', JSON.stringify([{ id: 'open-days', title: 'Open days' }, { id: 'admissions-events', title: 'Admissions events' }])]);
+        expect(saved[1]).toEqual(['structure:pages', JSON.stringify([{ id: 'open-days', title: 'Open days', menu: false }, { id: 'admissions-events', title: 'Admissions events', menu: true }])]);
         expect(went).toBe('/sites/trial/edit/admissions-events');
+    });
+
+    it('puts a page the owner made in the menu with one press', async () => {
+        const container = document.createElement('div');
+        const saved = [];
+        renderPagesPanel({ container, config, save: async (key, value) => saved.push([key, value]), go: () => {}, notify: () => {} });
+
+        container.querySelector('.le-sitemap-menu').click();
+        await new Promise((resolve) => setTimeout(resolve, 0));
+
+        expect(saved).toEqual([['structure:pages', JSON.stringify([{ id: 'open-days', title: 'Open days', menu: true }])]]);
+        expect(withMenu([{ id: 'a', title: 'A', menu: true }], 'a', false)).toEqual([{ id: 'a', title: 'A', menu: false }]);
     });
 
     it('will not take an address a page already has', () => {
