@@ -1,6 +1,6 @@
 import { createChrome } from './chrome.js';
 import { renderBrandPanel } from './brand.js';
-import { addedWith, newAddedId, orderWith, renderLibrary, renderPagesPanel } from './pages.js';
+import { addedWith, describeStructure, newAddedId, orderWith, renderLibrary, renderPagesPanel } from './pages.js';
 import { biggestThatFits, inSourcePixels, movedWithin, whatIsThereNow } from './fitting.js';
 import { attrsWorthSending, creditWorthSending } from './only-what-changed.js';
 import { confirm as confirmChange, expectChange, takeExpected } from './verify.js';
@@ -1510,13 +1510,13 @@ const bootLiveEdit = () => {
                 if (change.before) {
                     const before = document.createElement('p');
                     before.className = 'le-change-before';
-                    before.textContent = trim(change.before);
+                    before.textContent = arrangement(change)?.before ?? trim(change.before);
                     row.append(before);
                 }
 
                 const after = document.createElement('p');
                 after.className = 'le-change-after';
-                after.textContent = readsOnThePageAs(change) || '(empty)';
+                after.textContent = arrangement(change)?.after ?? (readsOnThePageAs(change) || '(empty)');
                 row.append(after);
 
                 drawerFields.append(row);
@@ -1633,7 +1633,14 @@ const bootLiveEdit = () => {
             `[data-edit="setting:${CSS.escape(change.key)}"], [data-edit-img="setting:${CSS.escape(change.key)}"], [data-style="${CSS.escape(change.key)}"]`
         );
 
+        /** Arranging pages and sections, said in words; null for every other change. */
+        const arrangement = (change) => describeStructure(change.key, change.before, change.after, window.liveEditPages ?? {});
+
         const labelForChange = (change) => {
+            const said = arrangement(change);
+
+            if (said) return said.label;
+
             const onPage = elementForChange(change);
 
             if (onPage) return describeElement(onPage);
