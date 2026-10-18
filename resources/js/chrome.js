@@ -309,9 +309,15 @@ a.le-mark:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
 .le-library-see:hover { color: var(--le-ink); border-color: var(--le-ink); }
 .le-library-see:focus-visible { outline: none; border-color: var(--le-accent); box-shadow: 0 0 0 3px var(--le-accent-soft); }
 .le-library-see[aria-expanded="true"] { color: var(--le-accent); border-color: var(--le-accent); }
-.le-library-preview:not(:empty) { margin: 4px 0 10px; border: 1px solid var(--le-line); border-radius: 10px; overflow: hidden; background: #fff; }
+/* The frame is a desktop page shrunk to fit the panel. It is laid out at full
+   size and scaled, because a transform does not change what an element takes
+   up: the holder is given the scaled height and keeps the rest, rather than
+   the frame pulling itself up by a negative margin, which collapsed the holder
+   to its own borders and left the preview open but invisible. */
+.le-library-preview:not(:empty) { flex: none; position: relative; height: 190px; margin: 4px 0 10px; border: 1px solid var(--le-line); border-radius: 10px; overflow: hidden; background: #fff; }
+.le-library-preview:has(.le-hint) { height: auto; }
 .le-library-preview .le-hint { margin: 0; padding: 12px; }
-.le-library-frame { display: block; width: 1280px; height: 760px; border: 0; transform: scale(.25); transform-origin: 0 0; margin-bottom: -570px; pointer-events: none; }
+.le-library-frame { position: absolute; top: 0; left: 0; display: block; width: 1280px; height: 760px; border: 0; transform: scale(.25); transform-origin: 0 0; pointer-events: none; }
 .le-sitemap-actions { justify-content: flex-end; position: sticky; bottom: -22px; margin: 0 -24px -22px; padding: 14px 24px 20px; background: #fff; border-top: 1px solid var(--le-line); }
 
 /* Brand: a swatch you can press, its name and what it colours, and a way back

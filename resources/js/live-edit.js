@@ -520,19 +520,31 @@ const bootLiveEdit = () => {
             wrap.append(label);
 
             if (type === 'toggle') {
-                const row = document.createElement('div');
-                row.className = 'le-row';
+                /*
+                 * The box sits beside the words it answers.
+                 *
+                 * It was a field label with the box underneath it, so "Hide
+                 * this card" read as a heading over a lone checkbox that
+                 * answered nothing in particular. A checkbox is only a
+                 * question when its question is next to it, which is how the
+                 * rest of the drawer already asks ("Show it in the menu").
+                 */
                 const input = document.createElement('input');
                 input.type = 'checkbox';
                 input.checked = value === '1';
                 input.dataset.styleProp = name;
+                const thing = element ? describeElement(element).toLowerCase() : 'section';
+                const asked = document.createElement('span');
+                asked.textContent = `Hide this ${thing}`;
+                const row = document.createElement('div');
+                row.className = 'le-default';
+                row.append(input, asked);
                 const hint = document.createElement('span');
                 hint.className = 'le-hint';
                 hint.textContent = 'Hidden from visitors. You still see it, dimmed, while editing.';
-                row.append(input, hint);
-                const thing = element ? describeElement(element).toLowerCase() : 'section';
-                wrap.replaceChildren(`Hide this ${thing}`, row);
+                wrap.replaceChildren(row, hint);
                 wrap.className = 'le-field le-divided';
+
                 return wrap;
             }
             if (type === 'color') {

@@ -40,6 +40,12 @@ export function addressProblem(id, taken = []) {
     return null;
 }
 
+/**
+ * The preview frame: a desktop page laid out at full size and scaled to fit the
+ * panel. The scale lives here because the holder's height is worked out from it.
+ */
+const FRAME = { width: 1280, height: 760, scale: 0.25 };
+
 /** A fresh name for an added section, never one the engine would read as its own copy (n + base 36). */
 export function newAddedId(random = Math.random) {
     let id = '';
@@ -219,6 +225,7 @@ export function renderLibrary({ container, library, pick, multiple = false, fetc
      * opening a second section from the same page costs nothing.
      */
     const showPreview = async (section, holder) => {
+        holder.style.height = '';
         holder.replaceChildren(el('p', 'le-hint', 'Loading…'));
 
         try {
@@ -233,10 +240,18 @@ export function renderLibrary({ container, library, pick, multiple = false, fetc
 
             const frame = el('iframe', 'le-library-frame');
             frame.setAttribute('sandbox', '');
+            frame.style.width = `${FRAME.width}px`;
+            frame.style.height = `${FRAME.height}px`;
+            frame.style.transform = `scale(${FRAME.scale})`;
             frame.setAttribute('loading', 'lazy');
             frame.setAttribute('scrolling', 'no');
             frame.title = `${section.label}, as it looks on the site`;
             frame.srcdoc = previewDoc({ styles: styleHrefs(), markup });
+            // The frame is laid out at full size and scaled down, and a transform does not
+            // change what an element takes up, so the holder is told how tall the scaled
+            // picture is. Set here rather than in the stylesheet, where it was being
+            // overruled and the preview opened to nothing but its own borders.
+            holder.style.height = `${Math.round(FRAME.height * FRAME.scale)}px`;
             holder.replaceChildren(frame);
         } catch {
             holder.replaceChildren(el('p', 'le-hint', 'The preview could not be loaded.'));
