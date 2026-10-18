@@ -94,12 +94,111 @@ const el = (tag, className, text) => {
     return node;
 };
 
+/** The section's own markup, cut from the page the design keeps it on. */
+export function sectionMarkup(html, from) {
+    const page = new DOMParser().parseFromString(String(html ?? ''), 'text/html');
+    const found = page.querySelector(`[data-instance="${CSS.escape(String(from ?? ''))}"]`);
+
+    return found ? found.outerHTML : null;
+}
+
+/**
+ * A page holding one section, for the owner to look at before they choose it.
+ *
+ * It is the section's own markup under the site's own stylesheets, so what
+ * they see is what the page will hold. A component has to render on its own
+ * for the Kit to accept it at all (the Kit check places each one on a blank
+ * page), so showing one alone asks nothing new of the design.
+ *
+ * Nothing in here runs: the frame is sandboxed with no scripts allowed, and
+ * the markup is the design's, already served to every visitor.
+ */
+export function previewDoc({ styles = [], markup = '', background = '#fff' }) {
+    const sheets = styles.map((href) => `<link rel="stylesheet" href="${String(href).replace(/"/g, '&quot;')}">`).join('');
+
+    return `<!doctype html><html><head><meta charset="utf-8">${sheets}`
+        + `<style>html,body{margin:0;padding:0;background:${background};overflow-x:hidden}`
+        + `body>*{animation:none!important;transition:none!important}`
+        + `[data-reveal],[data-split],[data-stagger]>*{opacity:1!important;visibility:visible!important;transform:none!important}`
+        + `</style></head><body>${markup}</body></html>`;
+}
+
+/** The stylesheets the site is wearing, so a preview wears them too. */
+export function styleHrefs(doc = document) {
+    return [...doc.querySelectorAll('link[rel="stylesheet"]')].map((link) => link.href).filter(Boolean);
+}
+
+/** The words for a list of things, so a row reads as a sentence: "a, b and c". */
+const listed = (names) => (names.length < 2 ? (names[0] ?? '') : `${names.slice(0, -1).join(', ')} and ${names[names.length - 1]}`);
+
+/** The stored value, whether it arrives as JSON text or already read. */
+const parsed = (value, fallback) => {
+    if (value === null || value === undefined || value === '') return fallback;
+    if (typeof value !== 'string') return value;
+
+    try {
+        return JSON.parse(value) ?? fallback;
+    } catch {
+        return fallback;
+    }
+};
+
+/**
+ * A page and section change, said in the owner's words rather than printed as
+ * what is stored against the key.
+ *
+ * The panel is what somebody reads before pressing Publish, so a row there has
+ * to be checkable. Arranging a page stores its sections as
+ * `{"added":{"add-mqnnlyvb":"about.ethos"}}`, and printing that back asks the
+ * owner to approve a change they cannot read: the id is one the engine minted
+ * and `about.ethos` is the designer's name for the section, not the name the
+ * library showed them. This says "Added What we believe" instead, and names
+ * the page it happened on.
+ *
+ * Returns null for any other key, which the caller describes as it always did.
+ */
+export function describeStructure(key, before, after, { library = [], pages = [] } = {}) {
+    const named = (from) => (library.find((section) => section.from === from) ?? {}).label ?? from;
+    const sectionsIn = (value) => Object.values(parsed(value, { added: {} }).added ?? {}).map(named);
+    const titlesIn = (value) => (Array.isArray(parsed(value, [])) ? parsed(value, []) : []).map((page) => page.title ?? page.id);
+
+    if (key === 'structure:pages') {
+        const was = titlesIn(before);
+        const now = titlesIn(after);
+        const made = now.filter((title) => !was.includes(title));
+        const gone = was.filter((title) => !now.includes(title));
+        const said = [made.length ? `Added the page ${listed(made)}` : '', gone.length ? `Removed the page ${listed(gone)}` : '']
+            .filter(Boolean).join('. ');
+        // Renaming or reordering leaves the same titles on both sides; say that rather than list them back.
+        const otherwise = now.length ? `Your pages: ${listed(now)}` : 'The pages you made changed';
+
+        return { label: 'Pages', before: was.length ? `Your pages: ${listed(was)}` : 'No pages of your own', after: said || otherwise };
+    }
+
+    if (!String(key ?? '').startsWith('structure:page:')) return null;
+
+    const id = key.slice('structure:page:'.length);
+    const title = (pages.find((page) => page.id === id) ?? {}).title ?? `/${id}`;
+    const was = sectionsIn(before);
+    const now = sectionsIn(after);
+    const added = now.filter((name) => !was.includes(name));
+    const removed = was.filter((name) => !now.includes(name));
+    const said = [added.length ? `Added ${listed(added)}` : '', removed.length ? `Removed ${listed(removed)}` : '']
+        .filter(Boolean).join('. ');
+
+    return {
+        label: `Sections on ${title}`,
+        before: was.length ? listed(was) : 'No sections added',
+        after: said || (now.length ? listed(now) : 'No sections added'),
+    };
+}
+
 /**
  * The library as a list to choose from: a search field, then each page's
  * sections under its name. `pick(section)` runs for a section chosen; with
  * `multiple`, sections toggle and `chosen()` says which are on.
  */
-export function renderLibrary({ container, library, pick, multiple = false }) {
+export function renderLibrary({ container, library, pick, multiple = false, fetchPage = (href) => fetch(href).then((r) => r.text()) }) {
     const wrap = el('div', 'le-library');
     const search = el('input', 'le-input le-library-search');
     search.type = 'search';
@@ -107,6 +206,42 @@ export function renderLibrary({ container, library, pick, multiple = false }) {
     search.setAttribute('aria-label', 'Find a section');
     const list = el('div', 'le-library-list');
     const on = new Set();
+    const open = new Set();
+    const pageHtml = new Map();
+
+    /**
+     * Show the section itself under the row.
+     *
+     * A name alone ("Page heading", "Inside the stage") does not say what a
+     * section looks like, and the design has dozens of them, so choosing from
+     * the list was choosing blind: the first sight of a section was after it
+     * had been added. The page it comes from is fetched once and kept, so
+     * opening a second section from the same page costs nothing.
+     */
+    const showPreview = async (section, holder) => {
+        holder.replaceChildren(el('p', 'le-hint', 'Loading…'));
+
+        try {
+            if (!pageHtml.has(section.at)) pageHtml.set(section.at, await fetchPage(section.at));
+            const markup = sectionMarkup(pageHtml.get(section.at), section.from);
+
+            if (!markup) {
+                holder.replaceChildren(el('p', 'le-hint', 'This section cannot be shown on its own. It will still be added.'));
+
+                return;
+            }
+
+            const frame = el('iframe', 'le-library-frame');
+            frame.setAttribute('sandbox', '');
+            frame.setAttribute('loading', 'lazy');
+            frame.setAttribute('scrolling', 'no');
+            frame.title = `${section.label}, as it looks on the site`;
+            frame.srcdoc = previewDoc({ styles: styleHrefs(), markup });
+            holder.replaceChildren(frame);
+        } catch {
+            holder.replaceChildren(el('p', 'le-hint', 'The preview could not be loaded.'));
+        }
+    };
 
     const draw = () => {
         list.replaceChildren();
@@ -137,7 +272,28 @@ export function renderLibrary({ container, library, pick, multiple = false }) {
                     }
                     pick(section, [...on]);
                 });
-                list.append(row);
+
+                // A section the host gave no page to is one we cannot show; the row still adds it.
+                if (!section.at) {
+                    list.append(row);
+
+                    continue;
+                }
+
+                // The two are side by side, never nested: pressing "See it" must not add the section.
+                const line = el('div', 'le-library-line');
+                const holder = el('div', 'le-library-preview');
+                const see = el('button', 'le-library-see', open.has(section.from) ? 'Hide it' : 'See it');
+                see.type = 'button';
+                see.setAttribute('aria-expanded', open.has(section.from) ? 'true' : 'false');
+                see.title = `Look at "${section.label}" before you choose it`;
+                see.addEventListener('click', () => {
+                    open.has(section.from) ? open.delete(section.from) : open.add(section.from);
+                    draw();
+                });
+                line.append(row, see);
+                list.append(line, holder);
+                if (open.has(section.from)) showPreview(section, holder);
             }
         }
     };

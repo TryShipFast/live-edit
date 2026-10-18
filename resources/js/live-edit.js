@@ -1,7 +1,7 @@
 import { createChrome } from './chrome.js';
 import { renderBrandPanel } from './brand.js';
-import { addedWith, newAddedId, orderWith, renderLibrary, renderPagesPanel } from './pages.js';
-import { biggestThatFits, inSourcePixels, movedWithin, whatIsThereNow } from './fitting.js';
+import { addedWith, describeStructure, newAddedId, orderWith, renderLibrary, renderPagesPanel } from './pages.js';
+import { biggestThatFits, howMuchSurvives, inSourcePixels, movedWithin, whatIsThereNow } from './fitting.js';
 import { attrsWorthSending, creditWorthSending } from './only-what-changed.js';
 import { confirm as confirmChange, expectChange, takeExpected } from './verify.js';
 import { apiRequestFor, attributeOf, backgroundImageOf, classListWith, declaredStyleProps, displayedValue, iconNamesIn, isJsonResponse, looksLikeAPicture, orderedIcons, ownTextOf, parseEditKey, requestInit, stylePropsFor, interactiveTarget, nameOfControl, givesUpAfter, ranOutOfTime, WAITS_AT_MOST, wordsEditedElsewhere, PUTS_BACK, worthReverting, shownWords } from './support.js';
@@ -1510,13 +1510,13 @@ const bootLiveEdit = () => {
                 if (change.before) {
                     const before = document.createElement('p');
                     before.className = 'le-change-before';
-                    before.textContent = trim(change.before);
+                    before.textContent = arrangement(change)?.before ?? trim(change.before);
                     row.append(before);
                 }
 
                 const after = document.createElement('p');
                 after.className = 'le-change-after';
-                after.textContent = readsOnThePageAs(change) || '(empty)';
+                after.textContent = arrangement(change)?.after ?? (readsOnThePageAs(change) || '(empty)');
                 row.append(after);
 
                 drawerFields.append(row);
@@ -1633,7 +1633,14 @@ const bootLiveEdit = () => {
             `[data-edit="setting:${CSS.escape(change.key)}"], [data-edit-img="setting:${CSS.escape(change.key)}"], [data-style="${CSS.escape(change.key)}"]`
         );
 
+        /** Arranging pages and sections, said in words; null for every other change. */
+        const arrangement = (change) => describeStructure(change.key, change.before, change.after, window.liveEditPages ?? {});
+
         const labelForChange = (change) => {
+            const said = arrangement(change);
+
+            if (said) return said.label;
+
             const onPage = elementForChange(change);
 
             if (onPage) return describeElement(onPage);
@@ -4079,9 +4086,51 @@ const bootLiveEdit = () => {
                 preview.textContent = 'No image yet';
             
             }
+            /**
+             * Say when a picture will lose most of itself in this spot.
+             *
+             * A spot keeps its shape, so a wide photograph in a tall one is cut
+             * rather than squashed. For a file we store, the owner is handed the
+             * crop tool and chooses what to keep. For a free photograph or a
+             * pasted address there is nothing of ours to cut, so the middle is
+             * taken and nothing said: a 1080x608 photograph in a 4:5 spot loses
+             * 55% of its width, and the owner finds out by looking at the page.
+             *
+             * We cannot crop what we do not hold, but we can say so while they
+             * can still choose a different picture.
+             */
+            const sayIfItWillBeCut = (src) => {
+                drawerFields.querySelectorAll('.le-will-cut').forEach((said) => said.remove());
+
+                const spot = whatIsThereNow(current.element);
+
+                if (!spot || !src || src.startsWith('blob:')) {
+                    return;
+                }
+
+                const measuring = new Image();
+                measuring.onload = () => {
+                    const fit = howMuchSurvives({ width: measuring.naturalWidth, height: measuring.naturalHeight }, spot);
+
+                    // A third is the point where somebody notices; below that it is a different picture.
+                    if (!fit || fit.lost < 33) {
+                        return;
+                    }
+
+                    const said = el(
+                        'div',
+                        'le-hint le-hint--warn le-will-cut',
+                        `This spot is a different shape, so about ${fit.lost}% of this picture is cut off its ${fit.cut}. A picture shaped more like the spot keeps more of itself.`,
+                    );
+                    drawerFields.prepend(said);
+                };
+                measuring.src = src;
+            };
+
             const showPreview = (src) => {
                 preview.replaceChildren(previewImg);
                 previewImg.src = src;
+                sayIfItWillBeCut(src);
             };
 
             const fileWrap = uploadWidget({
@@ -4978,13 +5027,26 @@ const bootLiveEdit = () => {
                     ui.shadow.append(frame);
                 };
 
+                /*
+                 * Which one is chosen, said as well as drawn.
+                 *
+                 * These read as chosen because one of them is white, which is
+                 * nothing to a screen reader: both announced as plain buttons,
+                 * so there was no way to hear whether you were looking at the
+                 * phone or the desktop, your drafts or what is live.
+                 */
+                const chosen = (button, on) => {
+                    button.classList.toggle('is-on', on);
+                    button.setAttribute('aria-pressed', on ? 'true' : 'false');
+                };
+
                 const group = (choices, onPick) => choices.map(([label, value, hint]) => {
                     const button = el('button', 'le-back-btn', label);
                     button.type = 'button';
                     if (hint) button.title = hint;
+                    chosen(button, false);
                     button.addEventListener('click', () => {
-                        choices.buttons.forEach((other) => other.classList.remove('is-on'));
-                        button.classList.add('is-on');
+                        choices.buttons.forEach((other) => chosen(other, other === button));
                         onPick(value);
                         render();
                     });
@@ -4997,7 +5059,7 @@ const bootLiveEdit = () => {
                 widths.buttons = group(widths, (value) => {
                     onAPhone = value;
                 });
-                widths.buttons[0].classList.add('is-on');
+                chosen(widths.buttons[0], true);
 
                 pill.append(el('span', 'le-back-sep'));
 
@@ -5018,7 +5080,7 @@ const bootLiveEdit = () => {
                     asAVisitor = value;
                     pill.classList.toggle('is-live', value);
                 });
-                whose.buttons[0].classList.add('is-on');
+                chosen(whose.buttons[0], true);
 
                 /*
                  * Named, because "published" without a number is a claim and

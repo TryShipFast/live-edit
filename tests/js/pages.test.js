@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 import { describe, expect, it } from 'vitest';
-import { addedWith, addressProblem, grouped, newAddedId, orderWith, renderPagesPanel, slugFor, withMenu } from '../../resources/js/pages.js';
+import { addedWith, addressProblem, describeStructure, grouped, newAddedId, orderWith, previewDoc, renderLibrary, renderPagesPanel, sectionMarkup, slugFor, withMenu } from '../../resources/js/pages.js';
 
 describe('the page builder names and places things the way the host reads them', () => {
     it('suggests an address from a title', () => {
@@ -64,8 +64,8 @@ describe('the Pages tab', () => {
             { id: 'open-days', title: 'Open days', href: '/sites/trial/edit/open-days', made: true },
         ],
         library: [
-            { from: 'about.team', label: 'Leadership team', page: 'About' },
-            { from: 'visit.book', label: 'Book a visit', page: 'Visit' },
+            { from: 'about.team', label: 'Leadership team', page: 'About', at: '/sites/trial/edit/about' },
+            { from: 'visit.book', label: 'Book a visit', page: 'Visit', at: '/sites/trial/edit/visit' },
         ],
     };
 
@@ -111,6 +111,81 @@ describe('the Pages tab', () => {
 
         expect(saved).toEqual([['structure:pages', JSON.stringify([{ id: 'open-days', title: 'Open days', menu: true }])]]);
         expect(withMenu([{ id: 'a', title: 'A', menu: true }], 'a', false)).toEqual([{ id: 'a', title: 'A', menu: false }]);
+    });
+
+    it('shows a section before it is chosen, and pressing See it does not choose it', async () => {
+        const container = document.createElement('div');
+        const asked = [];
+        const fetchPage = async (href) => {
+            asked.push(href);
+
+            return '<html><body><section data-instance="about.team"><h2>Leadership team</h2></section>'
+                + '<section data-instance="about.other">Not this one</section></body></html>';
+        };
+        renderLibrary({ container, library: config.library, pick: () => {}, multiple: true, fetchPage });
+
+        container.querySelector('.le-library-see').click();
+        await new Promise((resolve) => setTimeout(resolve, 0));
+
+        const frame = container.querySelector('.le-library-frame');
+        expect(asked).toEqual(['/sites/trial/edit/about']);
+        expect(frame.getAttribute('sandbox')).toBe('');
+        expect(frame.srcdoc).toContain('<h2>Leadership team</h2>');
+        expect(frame.srcdoc).not.toContain('Not this one');
+        // Looking is not choosing: the row is still unpressed.
+        expect(container.querySelector('.le-library-item').getAttribute('aria-pressed')).toBe('false');
+
+        container.querySelector('.le-library-see').click();
+        expect(container.querySelector('.le-library-frame')).toBeNull();
+    });
+
+    it('cuts the right section out, and says so when it cannot', () => {
+        const html = '<body><section data-instance="a.one">One</section><section data-instance="a.two">Two</section></body>';
+        expect(sectionMarkup(html, 'a.two')).toContain('Two');
+        expect(sectionMarkup(html, 'a.two')).not.toContain('One');
+        expect(sectionMarkup(html, 'a.missing')).toBeNull();
+    });
+
+    it('builds a preview that wears the site stylesheets and runs nothing', () => {
+        const doc = previewDoc({ styles: ['/assets/css/site.css'], markup: '<section>Hello</section>' });
+        expect(doc).toContain('<link rel="stylesheet" href="/assets/css/site.css">');
+        expect(doc).toContain('<section>Hello</section>');
+        expect(doc).not.toContain('<script');
+    });
+
+    it('says what was arranged in the owner words, never the stored json', () => {
+        const said = describeStructure(
+            'structure:page:open-days',
+            JSON.stringify({ added: {} }),
+            JSON.stringify({ added: { 'add-mqnnlyvb': 'about.team' } }),
+            config,
+        );
+
+        expect(said.label).toBe('Sections on Open days');
+        expect(said.after).toBe('Added Leadership team');
+        expect(said.after).not.toContain('add-mqnnlyvb');
+        expect(said.after).not.toContain('about.team');
+
+        const removed = describeStructure(
+            'structure:page:open-days',
+            JSON.stringify({ added: { 'add-1': 'about.team', 'add-2': 'visit.book' } }),
+            JSON.stringify({ added: { 'add-1': 'about.team' } }),
+            config,
+        );
+        expect(removed.after).toBe('Removed Book a visit');
+
+        const made = describeStructure('structure:pages', '[]', JSON.stringify([{ id: 'open-days', title: 'Open days' }]), config);
+        expect(made.label).toBe('Pages');
+        expect(made.after).toBe('Added the page Open days');
+
+        // The value already read for us, rather than JSON text, says the same thing.
+        expect(describeStructure('structure:page:open-days', null, { added: { 'add-1': 'about.team' } }, config).after).toBe('Added Leadership team');
+        expect(describeStructure('structure:pages', null, [{ id: 'open-days', title: 'Open days' }], config).after).toBe('Added the page Open days');
+
+        // Anything else is still described the way it always was.
+        expect(describeStructure('tpl:abc', 'a', 'b', config)).toBeNull();
+        // Unreadable stored value: a row that says something beats a row that throws.
+        expect(describeStructure('structure:page:open-days', 'not json', 'not json', config).after).toBe('No sections added');
     });
 
     it('will not take an address a page already has', () => {

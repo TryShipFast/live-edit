@@ -300,6 +300,18 @@ a.le-mark:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
 .le-library-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .le-library-mark { flex: none; font-size: 12px; font-weight: 600; color: var(--le-accent); }
 .le-library-item[aria-pressed="false"] .le-library-mark { color: var(--le-muted); }
+/* The section itself, under its row: a name does not say what a section looks
+   like, so the owner can look before they choose. The frame is the site's own
+   stylesheets around the section's own markup, scrolling with the panel. */
+.le-library-line { display: flex; align-items: center; gap: 4px; }
+.le-library-line .le-library-item { flex: 1; min-width: 0; }
+.le-library-see { flex: none; padding: 6px 10px; border: 1px solid var(--le-line); border-radius: 8px; background: none; color: var(--le-muted); font: inherit; font-size: 12px; font-weight: 600; cursor: pointer; }
+.le-library-see:hover { color: var(--le-ink); border-color: var(--le-ink); }
+.le-library-see:focus-visible { outline: none; border-color: var(--le-accent); box-shadow: 0 0 0 3px var(--le-accent-soft); }
+.le-library-see[aria-expanded="true"] { color: var(--le-accent); border-color: var(--le-accent); }
+.le-library-preview:not(:empty) { margin: 4px 0 10px; border: 1px solid var(--le-line); border-radius: 10px; overflow: hidden; background: #fff; }
+.le-library-preview .le-hint { margin: 0; padding: 12px; }
+.le-library-frame { display: block; width: 1280px; height: 760px; border: 0; transform: scale(.25); transform-origin: 0 0; margin-bottom: -570px; pointer-events: none; }
 .le-sitemap-actions { justify-content: flex-end; position: sticky; bottom: -22px; margin: 0 -24px -22px; padding: 14px 24px 20px; background: #fff; border-top: 1px solid var(--le-line); }
 
 /* Brand: a swatch you can press, its name and what it colours, and a way back
