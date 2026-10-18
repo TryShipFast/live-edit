@@ -266,6 +266,37 @@ a.le-mark:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
 .le-change:last-child { border-bottom: 0; padding-bottom: 0; }
 .le-change-head { justify-content: space-between; align-items: baseline; }
 .le-change-label { font-size: 13px; font-weight: 500; color: #0B0C0F; }
+/* Pages: the website's pages as rows you can open, then a new page from the
+   design's own sections. The library is a list you search, grouped under the
+   page each section comes from, because that is how the owner knows it. */
+.le-sitemap-intro { margin: 0; font-size: 13px; line-height: 1.5; }
+.le-sitemap { display: flex; flex-direction: column; gap: 2px; max-height: 38vh; overflow: auto; margin: 0 -6px; }
+.le-sitemap-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 12px; border-radius: 10px; text-decoration: none; color: inherit; }
+.le-sitemap-row:hover { background: var(--le-soft); }
+.le-sitemap-row[aria-current="page"] { background: var(--le-soft); }
+.le-sitemap-words { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.le-sitemap-title { font-size: 14px; font-weight: 600; color: var(--le-ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.le-sitemap-address { font-size: 12px; color: var(--le-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.le-sitemap-tag { flex: none; font-size: 11px; font-weight: 600; color: var(--le-muted); padding: 3px 9px; border-radius: 999px; border: 1px solid var(--le-line); }
+.le-sitemap-tag--yours { color: var(--le-accent); border-color: var(--le-accent-soft); background: var(--le-accent-soft); }
+.le-address { display: flex; align-items: center; border: 1px solid var(--le-field); border-radius: 12px; background: #fff; transition: border-color .15s ease, box-shadow .15s ease; }
+.le-address:focus-within { border-color: var(--le-accent); box-shadow: 0 0 0 4px var(--le-accent-soft); }
+.le-address .le-input { border: 0; box-shadow: none; padding-left: 2px; }
+.le-address-origin { padding-left: 14px; font-size: 14px; color: var(--le-muted); letter-spacing: normal; text-transform: none; font-weight: 400; }
+.le-hint--warn { color: var(--le-danger); }
+.le-library { display: flex; flex-direction: column; gap: 10px; text-transform: none; letter-spacing: normal; }
+.le-library-list { display: flex; flex-direction: column; gap: 2px; max-height: 46vh; overflow: auto; margin: 0 -6px; padding: 0 2px; }
+.le-library-page { margin: 10px 6px 4px; font-size: 10px; font-weight: 700; letter-spacing: .14em; text-transform: uppercase; color: var(--le-muted); }
+.le-library-page:first-child { margin-top: 2px; }
+.le-library-item { display: flex; align-items: center; justify-content: space-between; gap: 12px; width: 100%; padding: 10px 12px; border: 1px solid transparent; border-radius: 10px; background: none; color: var(--le-ink); font: inherit; font-size: 14px; font-weight: 500; text-align: left; cursor: pointer; }
+.le-library-item:hover { background: var(--le-soft); }
+.le-library-item:focus-visible { outline: none; border-color: var(--le-accent); box-shadow: 0 0 0 3px var(--le-accent-soft); }
+.le-library-item[aria-pressed="true"] { background: var(--le-accent-soft); border-color: var(--le-accent-soft); }
+.le-library-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.le-library-mark { flex: none; font-size: 12px; font-weight: 600; color: var(--le-accent); }
+.le-library-item[aria-pressed="false"] .le-library-mark { color: var(--le-muted); }
+.le-sitemap-actions { justify-content: flex-end; position: sticky; bottom: -22px; margin: 0 -24px -22px; padding: 14px 24px 20px; background: #fff; border-top: 1px solid var(--le-line); }
+
 /* Brand: a swatch you can press, its name and what it colours, and a way back
    to the design's own. Two columns of these read as a palette, not a form. */
 .le-brand-intro { margin: 0 0 4px; }
@@ -976,6 +1007,11 @@ export function createChrome() {
     brandButton.title = 'Your colours and type, across the whole website';
     brandButton.hidden = !window.liveEditBrand?.tokens?.length;
 
+    const pagesButton = el('button', 'le-bar-btn le-when-roomy', 'Pages');
+    pagesButton.type = 'button';
+    pagesButton.title = 'Every page of your website, and a way to add one';
+    pagesButton.hidden = !window.liveEditPages;
+
     const changesButton = el('button', 'le-bar-btn le-when-roomy', 'Changes');
     changesButton.type = 'button';
     changesButton.title = 'Everything you have changed and not published';
@@ -1006,6 +1042,7 @@ export function createChrome() {
         el("span", "le-sep"),
         pageSwitcher,
         languagePicker,
+        pagesButton,
         brandButton,
         changesButton,
         previewButton,
@@ -1059,6 +1096,7 @@ export function createChrome() {
     // Brand only where the host hands the editor one (window.liveEditBrand): a site
     // without brand tokens has nothing for it to set.
     const tabNames = ['Edit', 'Changes', 'History'];
+    if (window.liveEditPages) tabNames.push('Pages');
     if (window.liveEditBrand?.tokens?.length) tabNames.push('Brand');
     tabNames.forEach((name) => {
         const tab = el('button', 'le-tab', name);
@@ -1242,6 +1280,7 @@ export function createChrome() {
         publishCount,
         previewButton,
         brandButton,
+        pagesButton,
         changesButton,
         closeButton,
         cancelButton,

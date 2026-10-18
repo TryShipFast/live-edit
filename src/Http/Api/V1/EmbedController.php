@@ -48,6 +48,7 @@ class EmbedController
         'verify.js' => 'verify.js',
         'icon-library.js' => 'icon-library.js',
         'brand.js' => 'brand.js',
+        'pages.js' => 'pages.js',
         // The built bundle, resolved to resources/dist rather than to a
         // sibling of the modules.
         'bundle.js' => 'bundle.js',

@@ -344,6 +344,47 @@ window.liveEditBrand = {
   the design's own. The host validates the values and applies the chosen
   brand to the page it renders.
 
+## The page builder (Pages tab)
+
+When the host sets `window.liveEditPages` before the editor loads, a **Pages**
+tab appears in the drawer and a **Pages** button in the toolbar. `?pages` in the
+address opens the editor on it. The host builds pages; the editor only says
+what the owner chose, as settings.
+
+```js
+window.liveEditPages = {
+  page: 'about',                          // this page's address ('' for home)
+  editorBase: '/sites/trial/edit/',       // + a page's address opens it in the editor
+  pages: [                                // every page, the design's then the owner's
+    { id: '', title: 'Home', href: '/sites/trial/edit/' },
+    { id: 'open-days', title: 'Open days', href: '/sites/trial/edit/open-days', made: true },
+  ],
+  taken: ['', 'about', 'open-days'],      // addresses a new page may not have
+  library: [                              // the sections the design has, named by its designer
+    { from: 'about.leadership', label: 'Leadership team', page: 'About the school' },
+  ],
+  pagesKey: 'structure:pages',            // the owner's pages: [{ id, title }]
+  made: [{ id: 'open-days', title: 'Open days' }],
+  structureKey: 'structure:page:about',   // this page's additions: { added: { <id>: <from> } }
+  added: { 'add-k3x9q2pa': 'admissions.apply' },
+};
+```
+
+- **Add a page:** a title (the address follows it until edited), an address,
+  and one or more sections from the library. Creating saves
+  `structure:page:<address>` then `pagesKey`, and opens the new page.
+- **Add a section:** in the panel of a page's sections (a list of kind
+  `sections`), **+ Add a section below** opens the library. Choosing one saves
+  this page's `structureKey` with the new section (`add-` and eight base-36
+  characters, never the `n` the engine mints for its own copies), then the
+  section order with `s-<id>` below the section it was added from.
+- **Remove this section** appears on sections the owner added (`s-<id>` whose
+  `<id>` is in `added`), and saves both settings without it. The design's own
+  sections are hidden instead, as before.
+- Every save is `POST /live-edit/setting`, so all of it is a draft until
+  published and shows under **Changes**. The host validates the values, draws
+  the sections, and keys their fields.
+
 ## If something is wrong
 
 **Start here.** One command, safe on production, that says where this site's
