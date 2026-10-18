@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 import { describe, expect, it } from 'vitest';
-import { addedWith, addressProblem, describeStructure, grouped, newAddedId, orderWith, previewDoc, renderLibrary, renderPagesPanel, sectionMarkup, slugFor, withMenu } from '../../resources/js/pages.js';
+import { addedWith, addressProblem, describeStructure, grouped, newAddedId, orderWith, previewDoc, renderLibrary, renderPagesPanel, sectionMarkup, slugFor, whyNotYet, withMenu } from '../../resources/js/pages.js';
 
 describe('the page builder names and places things the way the host reads them', () => {
     it('suggests an address from a title', () => {
@@ -186,6 +186,37 @@ describe('the Pages tab', () => {
         expect(describeStructure('tpl:abc', 'a', 'b', config)).toBeNull();
         // Unreadable stored value: a row that says something beats a row that throws.
         expect(describeStructure('structure:page:open-days', 'not json', 'not json', config).after).toBe('No sections added');
+    });
+
+    it('says what is still missing rather than leaving a dead button', () => {
+        expect(whyNotYet({})).toMatch(/title/i);
+        expect(whyNotYet({ title: 'Open days', address: 'open-days' })).toMatch(/at least one section/i);
+        expect(whyNotYet({ title: 'About', address: 'about', chosen: ['x'], taken: ['about'] })).toMatch(/already has that address/i);
+        expect(whyNotYet({ title: 'Open days', address: 'open-days', chosen: ['x'] })).toBeNull();
+    });
+
+    it('shows the reason beside the button, and takes it away when it is met', () => {
+        const container = document.createElement('div');
+        renderPagesPanel({ container, config, save: async () => {}, go: () => {}, notify: () => {} });
+
+        const create = container.querySelector('.le-create-page');
+        const waiting = container.querySelector('.le-create-waiting');
+        expect(create.disabled).toBe(true);
+        expect(waiting.hidden).toBe(false);
+        expect(waiting.textContent).toMatch(/title/i);
+
+        const [title] = container.querySelectorAll('input.le-input:not(.le-library-search)');
+        // A title whose address is free, so the only thing left is the section.
+        title.value = 'Admissions events';
+        title.dispatchEvent(new Event('input'));
+        // The title is in; the section nobody mentioned is what is actually missing.
+        expect(create.disabled).toBe(true);
+        expect(waiting.textContent).toMatch(/at least one section/i);
+
+        container.querySelector('.le-library-item').click();
+        expect(create.disabled).toBe(false);
+        expect(waiting.hidden).toBe(true);
+        expect(waiting.textContent).toBe('');
     });
 
     it('will not take an address a page already has', () => {

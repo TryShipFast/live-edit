@@ -318,6 +318,10 @@ a.le-mark:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
 .le-library-preview:has(.le-hint) { height: auto; }
 .le-library-preview .le-hint { margin: 0; padding: 12px; }
 .le-library-frame { position: absolute; top: 0; left: 0; display: block; width: 1280px; height: 760px; border: 0; transform: scale(.25); transform-origin: 0 0; pointer-events: none; }
+/* What is still missing, beside the button that will not press. The button is
+   what somebody is looking at when they find they cannot use it, so the reason
+   belongs there and not only where the problem is. */
+.le-create-waiting { flex: 1; min-width: 0; margin: 0; text-align: left; color: var(--le-muted); }
 .le-sitemap-actions { justify-content: flex-end; position: sticky; bottom: -22px; margin: 0 -24px -22px; padding: 14px 24px 20px; background: #fff; border-top: 1px solid var(--le-line); }
 
 /* Brand: a swatch you can press, its name and what it colours, and a way back

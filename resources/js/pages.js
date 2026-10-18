@@ -46,6 +46,26 @@ export function addressProblem(id, taken = []) {
  */
 const FRAME = { width: 1280, height: 760, scale: 0.25 };
 
+/**
+ * What is still missing before a page can be made, in the owner's words.
+ *
+ * The button was simply dead until all three were right, and a disabled button
+ * says nothing about why. The usual way to lose somebody is to type a title,
+ * watch the address fill itself in, and find the button still grey with no
+ * account of what is wrong: the section list is further up the panel and reads
+ * as optional, so the one thing actually missing is the one thing they cannot
+ * see. Null when nothing is missing.
+ */
+export function whyNotYet({ title = '', address = '', chosen = [], taken = [] } = {}) {
+    if (!String(title).trim()) return 'Give the page a title.';
+
+    const problem = addressProblem(address, taken);
+    if (problem) return problem;
+    if (!chosen.length) return 'Choose at least one section to start the page with.';
+
+    return null;
+}
+
 /** A fresh name for an added section, never one the engine would read as its own copy (n + base 36). */
 export function newAddedId(random = Math.random) {
     let id = '';
@@ -402,7 +422,11 @@ export function renderPagesPanel({ container, config, save, go, notify }) {
     });
 
     const sectionsField = el('div', 'le-field', 'Start it with');
-    const sectionsHint = el('span', 'le-hint', 'Choose one or more. You can add, move and hide sections on the page afterwards.');
+    // A composed page shows only the sections chosen, so one that starts with a heading is
+    // one that says its own name. We say so rather than adding a heading for them: the
+    // heading would arrive carrying the words of the page it was taken from, and a page
+    // announcing itself as another page is the thing this panel should not produce.
+    const sectionsHint = el('span', 'le-hint', 'Choose one or more. Starting with a heading gives the page its name at the top. You can add, move and hide sections afterwards.');
     sectionsField.append(sectionsHint);
     const library = renderLibrary({ container: sectionsField, library: config.library, multiple: true, pick: () => refresh() });
 
@@ -414,8 +438,9 @@ export function renderPagesPanel({ container, config, save, go, notify }) {
 
     const create = el('button', 'le-btn-publish le-create-page', 'Create page');
     create.type = 'button';
+    const waiting = el('span', 'le-hint le-create-waiting');
     const actions = el('div', 'le-row le-sitemap-actions');
-    actions.append(create);
+    actions.append(waiting, create);
 
     container.append(titleField, addressField, sectionsField, inMenu, actions);
 
@@ -424,7 +449,14 @@ export function renderPagesPanel({ container, config, save, go, notify }) {
         const problem = address.value ? addressProblem(address.value, taken) : null;
         addressHint.textContent = problem ?? (address.value ? `Visitors will find it at /${address.value}` : '');
         addressHint.classList.toggle('le-hint--warn', Boolean(problem));
-        create.disabled = !title.value.trim() || Boolean(addressProblem(address.value, taken)) || library.chosen().length === 0;
+
+        const missing = whyNotYet({ title: title.value, address: address.value, chosen: library.chosen(), taken });
+        create.disabled = Boolean(missing);
+        // Said beside the button rather than only where the problem is, because the
+        // button is what they are looking at when they find they cannot press it.
+        waiting.textContent = missing ?? '';
+        waiting.hidden = !missing;
+        create.title = missing ?? 'Make this page';
     }
     refresh();
 
