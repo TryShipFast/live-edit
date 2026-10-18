@@ -1,5 +1,6 @@
 import { createChrome } from './chrome.js';
 import { renderBrandPanel } from './brand.js';
+import { addedWith, newAddedId, orderWith, renderLibrary, renderPagesPanel } from './pages.js';
 import { biggestThatFits, inSourcePixels, movedWithin, whatIsThereNow } from './fitting.js';
 import { attrsWorthSending, creditWorthSending } from './only-what-changed.js';
 import { confirm as confirmChange, expectChange, takeExpected } from './verify.js';
@@ -1105,6 +1106,7 @@ const bootLiveEdit = () => {
             if (name === 'History') void renderHistory();
             if (name === 'Brand') renderBrand();
             else brandPanel?.unpreview();
+            if (name === 'Pages') renderPages();
         };
 
         /*
@@ -1112,6 +1114,31 @@ const bootLiveEdit = () => {
          * it is a draft until published and shows under Changes. Leaving the tab
          * without saving puts the page back the way it was.
          */
+        /*
+         * The Pages tab: the website's pages and a way to make another, from
+         * sections the design already has (pages.js). Only where the host
+         * hands the editor a page builder (window.liveEditPages).
+         */
+        const saveSetting = async (key, value) => {
+            await request('/live-edit/setting', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ key, value }),
+            });
+        };
+        const renderPages = () => {
+            renderPagesPanel({
+                container: drawerFields,
+                config: window.liveEditPages,
+                save: saveSetting,
+                go: (href) => {
+                    sessionStorage.setItem('tb_editing', '1');
+                    window.location.href = href;
+                },
+                notify,
+            });
+        };
+
         let brandPanel = null;
         const renderBrand = () => {
             brandPanel = renderBrandPanel({
@@ -3291,6 +3318,42 @@ const bootLiveEdit = () => {
                 row.append(add);
             }
 
+            /*
+             * A section from the design's library, added below this one (or
+             * last). Two saves: which section it is, under the page's
+             * arrangement, then where it goes, in this list's order. The host
+             * draws it from the page it was taken from with keys of its own.
+             */
+            const builder = window.liveEditPages;
+            if (sections && builder?.library?.length) {
+                const addSection = document.createElement('button');
+                addSection.type = 'button';
+                addSection.className = 'le-chip-btn';
+                addSection.textContent = item ? '+ Add a section below' : '+ Add a section';
+                addSection.addEventListener('click', () => {
+                    drawerFields.replaceChildren();
+                    const back = document.createElement('div');
+                    back.className = 'le-section-heading';
+                    back.textContent = item ? `Add below “${item.dataset.editSectionLabel ?? 'this section'}”` : 'Add a section';
+                    drawerFields.append(back);
+                    const picker = renderLibrary({
+                        container: drawerFields,
+                        library: builder.library,
+                        pick: async (section) => {
+                            const id = newAddedId();
+                            try {
+                                await saveSetting(builder.structureKey, addedWith(builder.added, id, section.from));
+                                await saveOrder(orderWith(currentOrder(), `s-${id}`, item?.dataset.editItem ?? null), `${section.label} added ✓`);
+                            } catch (error) {
+                                notify(error.message);
+                            }
+                        },
+                    });
+                    picker.focus();
+                });
+                row.append(addSection);
+            }
+
             if (item) {
                 const ids = currentOrder();
                 const index = ids.indexOf(item.dataset.editItem);
@@ -3325,6 +3388,25 @@ const bootLiveEdit = () => {
                         saveOrder(reordered, sections ? 'Section duplicated \u2713' : 'Item duplicated \u2713');
                     });
                     row.append(duplicate);
+                }
+
+                // A section the owner added can go again; the design's own are hidden instead.
+                const addedId = sections ? item.dataset.editItem.replace(/^s-/, '') : '';
+                if (sections && builder && addedId in (builder.added ?? {})) {
+                    const remove = document.createElement('button');
+                    remove.type = 'button';
+                    remove.className = 'le-btn-danger';
+                    remove.textContent = 'Remove this section';
+                    remove.addEventListener('click', async () => {
+                        if (!window.confirm('Remove this section and what you wrote in it?')) return;
+                        try {
+                            await saveSetting(builder.structureKey, addedWith(builder.added, addedId, null));
+                            await saveOrder(currentOrder().filter((id) => id !== item.dataset.editItem), 'Section removed ✓');
+                        } catch (error) {
+                            notify(error.message);
+                        }
+                    });
+                    row.append(remove);
                 }
 
                 if (!sections) {
@@ -4664,6 +4746,13 @@ const bootLiveEdit = () => {
             openDrawer();
         });
 
+        ui.pagesButton?.addEventListener('click', () => {
+            if (!document.body.classList.contains('editing')) setEditing(true);
+
+            showTab('Pages');
+            openDrawer();
+        });
+
         ui.changesButton?.addEventListener('click', () => {
             // Somebody asking what they have changed is asking about editing,
             // so turn it on rather than showing them an empty answer.
@@ -5448,6 +5537,13 @@ const bootLiveEdit = () => {
             window.history.replaceState(null, '', window.location.pathname + (query ? `?${query}` : ''));
             setEditing(true);
             showTab('Brand');
+            openDrawer();
+        } else if (params.has('pages') && window.liveEditPages) {
+            params.delete('pages');
+            const query = params.toString();
+            window.history.replaceState(null, '', window.location.pathname + (query ? `?${query}` : ''));
+            setEditing(true);
+            showTab('Pages');
             openDrawer();
         } else if (params.has('edit')) {
             params.delete('edit');
