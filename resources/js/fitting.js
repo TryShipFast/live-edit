@@ -146,3 +146,36 @@ export const movedWithin = (frame, by, shown) => {
         y: limit(frame.y + by.y, shown.height - frame.height),
     };
 };
+
+/**
+ * How much of a picture a spot of a different shape will show.
+ *
+ * A picture fitted with `cover` keeps its shape and loses its edges, so a wide
+ * photograph in a tall spot is not squashed, it is cut: the middle survives
+ * and the sides go. That is usually what somebody wants, and occasionally it
+ * takes the half of the photograph they chose it for.
+ *
+ * Returns the fraction that survives and which way it was cut, so the editor
+ * can say so before the owner finds out by looking.
+ */
+export const howMuchSurvives = (picture, spot) => {
+    const pw = Number(picture?.width ?? 0);
+    const ph = Number(picture?.height ?? 0);
+    const sw = Number(spot?.width ?? 0);
+    const sh = Number(spot?.height ?? 0);
+
+    if (pw < 1 || ph < 1 || sw < 1 || sh < 1) {
+        return null;
+    }
+
+    const picked = pw / ph;
+    const wanted = sw / sh;
+    // Cover scales until both sides reach the spot, so the long side overflows by exactly this much.
+    const kept = picked > wanted ? wanted / picked : picked / wanted;
+
+    return {
+        kept,
+        cut: picked > wanted ? 'sides' : 'top and bottom',
+        lost: Math.round((1 - kept) * 100),
+    };
+};

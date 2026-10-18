@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { biggestThatFits, inSourcePixels, movedWithin, whatIsThereNow } from '../../resources/js/fitting.js';
+import { biggestThatFits, howMuchSurvives, inSourcePixels, movedWithin, whatIsThereNow } from '../../resources/js/fitting.js';
 
 /**
  * The browser half of fitting a replacement to the spot it goes in.
@@ -166,5 +166,34 @@ describe('the crop frame', () => {
         const moved = movedWithin({ x: 100, y: 100, width: 200, height: 200 }, { x: 30, y: -40 }, { width: 1000, height: 1000 });
 
         expect(moved).toMatchObject({ x: 130, y: 60 });
+    });
+});
+
+describe('how much of a picture a spot of another shape keeps', () => {
+    it('counts what a wide photograph loses in a tall spot', () => {
+        // The one that started this: 1080x608 into a 4:5 portrait, "Welcome" read as "elcom".
+        const fit = howMuchSurvives({ width: 1080, height: 608 }, { width: 525, height: 656 });
+        expect(fit.lost).toBe(55);
+        expect(fit.cut).toBe('sides');
+    });
+
+    it('counts what a tall photograph loses in a wide spot', () => {
+        const fit = howMuchSurvives({ width: 600, height: 1200 }, { width: 1200, height: 600 });
+        expect(fit.cut).toBe('top and bottom');
+        expect(fit.lost).toBe(75);
+    });
+
+    it('says nothing is lost when the shapes agree, whatever the size', () => {
+        expect(howMuchSurvives({ width: 1000, height: 500 }, { width: 600, height: 300 }).lost).toBe(0);
+        expect(howMuchSurvives({ width: 4000, height: 4000 }, { width: 80, height: 80 }).lost).toBe(0);
+    });
+
+    it('keeps a portrait nearly whole in a square, which is why the team photographs were fine', () => {
+        expect(howMuchSurvives({ width: 1080, height: 720 }, { width: 435, height: 435 }).lost).toBe(33);
+    });
+
+    it('answers nothing rather than a wrong number when a side is missing', () => {
+        expect(howMuchSurvives({ width: 0, height: 0 }, { width: 10, height: 10 })).toBeNull();
+        expect(howMuchSurvives(null, null)).toBeNull();
     });
 });
