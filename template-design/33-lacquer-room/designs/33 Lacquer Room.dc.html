@@ -1,0 +1,634 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<title>Lacquer Room — nail studio (fictional template)</title>
+<link rel="icon" href="assets/33/favicon.svg">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Albert+Sans:wght@400;500;600&family=Gloock&display=swap" rel="stylesheet">
+<script src="33-lacquer-data.js"></script>
+<style>
+body{margin:0;background:#E4E8E2}
+*{box-sizing:border-box}
+h1,h2,h3,h4,p,dl,dd,figure{margin:0;color:inherit}
+a{color:#2F4A3D;text-decoration:none}a:hover{color:#2B2230}
+button,input,select,textarea{font:inherit;color:inherit}
+:focus-visible{outline:3px solid currentColor;outline-offset:3px}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+</style>
+</helmet>
+<div data-v33="frame" ref="{{ frameRef }}" onClick="{{ onClick }}" onChange="{{ onChange }}" onInput="{{ onChange }}" style="--ink:#2B2230;--accent:#3F5E4E;--accent-deep:#2F4A3D;--paper:#EEF1EC;--surface:#FFFFFF;--muted:#5A5560;--line:#C9CEC6;--accent-soft:#DCE5DE;--on-ink:#EEF1EC;--fixed-error:#B3261E;--fixed-success:#2E6B3A;--font-display:'Gloock',Georgia,serif;--font-body:'Albert Sans',system-ui,sans-serif;width:{{ fw }};max-width:100%;margin:0 auto;background:var(--surface);color:var(--ink);font-family:var(--font-body);font-size:16px;line-height:1.6;font-variant-numeric:tabular-nums;min-height:100vh;display:flex;flex-direction:column;overflow-x:clip;position:relative">
+
+<sc-if value="{{ showDemo }}" hint-placeholder-val="{{ true }}">
+<div style="background:var(--ink);color:var(--on-ink);padding:8px {{ r.px }};display:flex;flex-wrap:wrap;gap:8px 20px;align-items:center;justify-content:space-between;font-size:14px">
+  <div role="group" aria-label="Home demo" style="display:flex;gap:6px;flex-wrap:wrap"><sc-for list="{{ demoHomes }}" as="h" hint-placeholder-count="3"><button type="button" data-act="home" data-v="{{ h.v }}" aria-pressed="{{ h.on }}" style="height:32px;padding:0 12px;border-radius:999px;border:1px solid #8A8590;background:{{ h.bg }};color:{{ h.fg }};font-size:14px;white-space:nowrap;cursor:pointer">{{ h.l }}</button></sc-for></div>
+  <div role="group" aria-label="Device" style="display:flex;gap:6px;flex-wrap:wrap"><sc-for list="{{ demoDevs }}" as="d" hint-placeholder-count="4"><button type="button" data-act="dev" data-v="{{ d.v }}" aria-pressed="{{ d.on }}" style="height:32px;padding:0 12px;border-radius:999px;border:1px solid #8A8590;background:{{ d.bg }};color:{{ d.fg }};font-size:14px;white-space:nowrap;cursor:pointer">{{ d.l }}</button></sc-for></div>
+</div>
+</sc-if>
+
+<header style="position:sticky;top:0;z-index:40;background:var(--surface);border-bottom:1px solid var(--line);padding:0 {{ r.px }}">
+  <div style="max-width:1296px;margin:0 auto;height:76px;display:flex;align-items:center;justify-content:space-between;gap:12px">
+    <a href="#" data-go="home" aria-label="Lacquer Room, home" style="display:flex;align-items:center;color:var(--ink);flex:0 1 auto;min-width:0"><svg role="img" aria-label="Lacquer Room" preserveAspectRatio="xMinYMid meet" width="{{ r.logoW }}" height="30" viewBox="0 0 196 30"><rect x="4" y="2" width="16" height="26" rx="8" fill="#3F5E4E"></rect><path d="M12 9c2.4 3 3.6 5 3.6 6.8a3.6 3.6 0 0 1-7.2 0C8.4 14 9.6 12 12 9z" fill="#EEF1EC"></path><text x="30" y="23" font-family="Gloock, Georgia, serif" font-size="22" fill="#2B2230">Lacquer Room</text></svg></a>
+    <sc-if value="{{ wide }}" hint-placeholder-val="{{ true }}">
+    <nav aria-label="Main" style="display:flex;gap:28px;align-items:center"><sc-for list="{{ navLinks }}" as="n" hint-placeholder-count="6"><a href="#" data-go="{{ n.go }}" aria-current="{{ n.cur }}" style="color:var(--ink);font-size:15px;font-weight:500;padding:8px 0;border-bottom:2px solid {{ n.line }};white-space:nowrap">{{ n.l }}</a></sc-for></nav>
+    </sc-if>
+    <div style="display:flex;gap:10px;align-items:center;flex:0 0 auto">
+      <a href="#" data-go="book" style="height:44px;padding:{{ r.bkPad }};border-radius:999px;background:var(--accent);color:#FFFFFF;font-weight:600;font-size:15px;display:flex;align-items:center;white-space:nowrap">Book</a>
+      <sc-if value="{{ narrow }}" hint-placeholder-val="{{ false }}"><button type="button" data-act="menu" aria-expanded="{{ menuAria }}" aria-label="{{ menuLbl }}" style="width:44px;height:44px;border-radius:999px;border:1px solid var(--line);background:var(--surface);display:flex;align-items:center;justify-content:center;cursor:pointer"><span aria-hidden="true" style="width:20px;height:20px;background:currentColor;-webkit-mask:{{ menuIcon }};mask:{{ menuIcon }}"></span></button></sc-if>
+    </div>
+  </div>
+  <sc-if value="{{ menuOpen }}" hint-placeholder-val="{{ false }}">
+  <div role="dialog" aria-label="Menu" style="position:absolute;top:100%;left:0;right:0;height:calc(100vh - 76px);box-sizing:border-box;overflow-y:auto;overflow-x:hidden;z-index:60;background:var(--paper);padding:24px {{ r.px }};display:flex;flex-direction:column;gap:2px">
+    <sc-for list="{{ menuLinks }}" as="n" hint-placeholder-count="9"><a href="#" data-go="{{ n.go }}" style="color:var(--ink);font-family:var(--font-display);font-size:32px;line-height:1.2;padding:10px 0;border-bottom:1px solid var(--line)">{{ n.l }}</a></sc-for>
+    <a href="tel:+15550147" style="margin-top:20px;color:var(--ink);font-size:16px">Call {{ biz.phone }}</a>
+  </div>
+  </sc-if>
+</header>
+
+<main style="display:flex;flex-direction:column;flex:1 0 auto">
+
+<sc-if value="{{ isH1 }}" hint-placeholder-val="{{ true }}">
+<section aria-label="Introduction" style="order:0;padding:{{ r.heroPad }} {{ r.px }} {{ r.secS }}">
+  <div style="max-width:1296px;margin:0 auto;display:grid;grid-template-columns:{{ r.heroCols }};gap:{{ r.gap }};align-items:center">
+    <div style="display:flex;flex-direction:column;gap:20px;max-width:600px">
+      <h1 style="font-family:var(--font-display);font-weight:400;font-size:{{ r.disp }};line-height:1;letter-spacing:-0.5px">Pick the shade. We do the slow part.</h1>
+      <p style="font-size:{{ r.lead }};color:var(--muted);max-width:44ch">Gel, BIAB, chrome and pedicures in a quiet studio in Mill District. Hand-filed, never drilled.</p>
+      <div style="display:flex;flex-wrap:wrap;gap:12px">
+        <a href="#" data-go="book" style="height:52px;padding:0 28px;border-radius:999px;background:var(--ink);color:var(--on-ink);font-weight:600;display:flex;align-items:center;white-space:nowrap">Book a set</a>
+        <a href="#chart" data-act="scroll" data-v="chart" style="height:52px;padding:0 24px;border-radius:999px;border:1px solid var(--ink);color:var(--ink);font-weight:600;display:flex;align-items:center;gap:10px;white-space:nowrap">Open the colour chart<span aria-hidden="true" style="width:18px;height:18px;background:currentColor;-webkit-mask:url(https://unpkg.com/lucide-static@0.460.0/icons/arrow-down.svg) center/contain no-repeat;mask:url(https://unpkg.com/lucide-static@0.460.0/icons/arrow-down.svg) center/contain no-repeat"></span></a>
+      </div>
+    </div>
+    <div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));grid-template-rows:{{ r.mosRows }};gap:14px">
+      <div role="img" aria-label="Marbled white nails with purple and black tips" style="grid-row:span 2;border-radius:240px 240px 24px 24px;background:#C9CEC6 url(&quot;assets/33/marble-tips.jpg&quot;) center/cover"></div>
+      <div role="img" aria-label="A white treatment chair in a bright studio" style="border-radius:24px;background:#C9CEC6 url(&quot;assets/33/chair-white.jpg&quot;) center/cover"></div>
+      <div role="img" aria-label="A technician filing a client's nails at the desk" style="border-radius:999px;background:#C9CEC6 url(&quot;assets/33/file-desk.jpg&quot;) center/cover"></div>
+    </div>
+  </div>
+</section>
+</sc-if>
+
+<sc-if value="{{ isH2 }}" hint-placeholder-val="{{ false }}">
+<section aria-label="Introduction" style="order:0;background:var(--paper);padding:0 {{ r.px }}">
+  <div style="max-width:1296px;margin:0 auto;display:grid;grid-template-columns:{{ r.split }};gap:{{ r.gap }};align-items:stretch;min-height:{{ r.heroH }}">
+    <div style="display:flex;flex-direction:column;justify-content:center;gap:24px;padding:{{ r.secS }} 0">
+      <h1 style="font-family:var(--font-display);font-weight:400;font-size:{{ r.disp }};line-height:1.02">We file. We don&#39;t drill.</h1>
+      <p style="font-size:{{ r.lead }};color:var(--muted);max-width:46ch">New here? Your first visit starts with ten minutes on your nail health. Sterile tools from a sealed pouch, every time.</p>
+      <div style="display:flex;flex-wrap:wrap;gap:12px">
+        <a href="#" data-go="book" style="height:52px;padding:0 28px;border-radius:999px;background:var(--accent);color:#FFFFFF;font-weight:600;display:flex;align-items:center;white-space:nowrap">Book a first visit</a>
+        <a href="#first" data-act="scroll" data-v="first" style="height:52px;padding:0 22px;border-radius:999px;border:1px solid var(--ink);color:var(--ink);font-weight:600;display:flex;align-items:center;white-space:nowrap">What happens first</a>
+      </div>
+    </div>
+    <div role="img" aria-label="Nails being finished at a desk with a curing lamp" style="min-height:{{ r.splitImgH }};margin:{{ r.splitImgM }};border-radius:{{ r.splitImgR }};background:#C9CEC6 url(&quot;assets/33/desk-lamp.jpg&quot;) center/cover"></div>
+  </div>
+</section>
+</sc-if>
+
+<sc-if value="{{ isH3 }}" hint-placeholder-val="{{ false }}">
+<section aria-label="Introduction" style="order:0;position:relative;min-height:{{ r.heroH }};display:flex;align-items:center;justify-content:center;text-align:center;padding:{{ r.sec }} {{ r.px }};background:#2B2230 url(&quot;assets/33/chair-white.jpg&quot;) center/cover;color:#FFFFFF">
+  <div aria-hidden="true" style="position:absolute;inset:0;background:rgba(30,22,34,0.62)"></div>
+  <div style="position:relative;max-width:820px;display:flex;flex-direction:column;align-items:center;gap:24px">
+    <h1 style="font-family:var(--font-display);font-weight:400;font-size:{{ r.disp }};line-height:1.02">Your shade again, in two taps.</h1>
+    <p style="font-size:{{ r.lead }};max-width:44ch">Infills every three to four weeks. Same technician, same colour, or try the next one on the chart.</p>
+    <div style="display:flex;flex-wrap:wrap;gap:12px;justify-content:center">
+      <a href="#again" data-act="scroll" data-v="again" style="height:52px;padding:0 28px;border-radius:999px;background:#FFFFFF;color:#2B2230;font-weight:600;display:flex;align-items:center;white-space:nowrap">Rebook my shade</a>
+      <a href="#" data-go="services" style="height:52px;padding:0 24px;border-radius:999px;border:1px solid #FFFFFF;color:#FFFFFF;font-weight:600;display:flex;align-items:center;white-space:nowrap">Prices</a>
+    </div>
+  </div>
+</section>
+</sc-if>
+
+<section id="chart" aria-label="Colour chart" style="order:{{ chartOrder }};display:{{ chartShow }};background:var(--paper);padding:{{ r.sec }} {{ r.px }}">
+  <div style="max-width:1296px;margin:0 auto;display:flex;flex-direction:column;gap:32px">
+    <div style="display:flex;flex-direction:column;gap:12px;max-width:640px">
+      <h2 style="font-family:var(--font-display);font-weight:400;font-size:{{ r.h2 }};line-height:1.1">The colour chart</h2>
+      <p style="color:var(--muted)">Choose a finish, then a shade family. We show what it costs, how long it takes and how long it lasts.</p>
+    </div>
+    <div role="group" aria-label="Finish" style="display:flex;flex-wrap:wrap;gap:4px 28px;border-bottom:1px solid var(--line)"><sc-for list="{{ fins }}" as="f" hint-placeholder-count="5"><button type="button" data-act="fin" data-v="{{ f.id }}" aria-pressed="{{ f.on }}" style="background:none;border:0;border-bottom:3px solid {{ f.line }};padding:12px 0;font-size:16px;font-weight:600;color:{{ f.fg }};cursor:pointer;white-space:nowrap">{{ f.n }}</button></sc-for></div>
+    <div role="group" aria-label="Shade family" style="display:flex;flex-wrap:wrap;gap:14px"><sc-for list="{{ fams }}" as="m" hint-placeholder-count="6"><button type="button" data-act="fam" data-v="{{ m.id }}" aria-pressed="{{ m.on }}" style="display:flex;align-items:center;gap:10px;min-height:48px;padding:0;border:0;border-bottom:3px solid {{ m.bd }};background:none;cursor:pointer;font-size:15px;font-weight:600;white-space:nowrap"><span aria-hidden="true" style="width:30px;height:30px;border-radius:999px;background:{{ m.sw }};border:1px solid rgba(0,0,0,0.12)"></span>{{ m.n }}</button></sc-for></div>
+    <sc-if value="{{ chartFit }}" hint-placeholder-val="{{ true }}">
+    <div style="display:grid;grid-template-columns:{{ r.chartCols }};gap:{{ r.gap }};align-items:start">
+      <div role="radiogroup" aria-label="Shades" style="display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px"><sc-for list="{{ shades }}" as="s" hint-placeholder-count="4"><button type="button" role="radio" aria-checked="{{ s.on }}" data-act="shade" data-v="{{ s.i }}" style="display:flex;flex-direction:column;gap:10px;align-items:center;background:none;border:0;padding:0;cursor:pointer"><span aria-hidden="true" style="width:100%;aspect-ratio:2/3;border-radius:999px 999px 18px 18px;background:{{ s.hex }};outline:3px solid {{ s.ring }};outline-offset:4px;border:1px solid rgba(0,0,0,0.1)"></span><span style="font-size:14px;font-weight:500">{{ s.n }}</span></button></sc-for></div>
+      <div aria-live="polite" style="background:var(--surface);border-radius:28px;padding:{{ r.cardPad }};display:flex;flex-direction:column;gap:18px">
+        <div style="display:flex;gap:16px;align-items:center"><span aria-hidden="true" style="width:56px;height:56px;border-radius:999px;background:{{ pick.hex }};border:1px solid rgba(0,0,0,0.1);flex:0 0 auto"></span><div><p style="font-size:14px;color:var(--muted)">{{ pick.fam }} · Sample shade</p><h3 style="font-size:24px;font-weight:600;line-height:1.25">{{ pick.n }} in {{ pick.fin }}</h3></div></div>
+        <p style="color:var(--muted)">{{ pick.note }}</p>
+        <div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px">
+          <div><p style="font-size:14px;color:var(--muted)">Time</p><p style="font-size:20px;font-weight:600">{{ pick.min }}</p></div>
+          <div><p style="font-size:14px;color:var(--muted)">Lasts</p><p style="font-size:20px;font-weight:600">{{ pick.wear }}</p></div>
+          <div><p style="font-size:14px;color:var(--muted)">From</p><p style="font-size:20px;font-weight:600">{{ pick.price }}</p></div>
+        </div>
+        <p style="font-size:14px;color:var(--muted)">{{ pick.soak }}. Prices are Sample.</p>
+        <button type="button" data-act="bookshade" style="height:52px;border-radius:999px;border:0;background:var(--accent);color:#FFFFFF;font-weight:600;cursor:pointer">Book {{ pick.n }} in {{ pick.fin }}</button>
+      </div>
+    </div>
+    </sc-if>
+    <sc-if value="{{ chartNoFit }}" hint-placeholder-val="{{ false }}">
+    <div role="status" style="background:var(--surface);border-radius:28px;padding:{{ r.cardPad }};display:flex;flex-direction:column;gap:14px;max-width:640px">
+      <h3 style="font-size:22px;font-weight:600">{{ fitMsgH }}</h3>
+      <p style="color:var(--muted)">Mirror powder hides the white line of a French tip, so we don&#39;t pair them. A Classic or Gel French keeps the line crisp.</p>
+      <button type="button" data-act="fin" data-v="gel" style="align-self:flex-start;height:48px;padding:0 22px;border-radius:999px;border:1px solid var(--ink);background:none;font-weight:600;cursor:pointer">Show Gel French instead</button>
+    </div>
+    </sc-if>
+  </div>
+</section>
+
+<sc-if value="{{ isH1 }}" hint-placeholder-val="{{ true }}">
+<div style="order:2;display:flex;flex-direction:column">
+<section aria-label="Prices by finish" style="padding:{{ r.sec }} {{ r.px }}">
+  <div style="max-width:1296px;margin:0 auto;display:flex;flex-direction:column;gap:32px">
+    <div style="display:flex;flex-wrap:wrap;gap:12px 32px;justify-content:space-between;align-items:end"><h2 style="font-family:var(--font-display);font-weight:400;font-size:{{ r.h2 }};line-height:1.1;max-width:16ch">Five finishes, priced up front</h2><a href="#" data-go="services" style="font-weight:600;display:flex;gap:8px;align-items:center">Full price list<span aria-hidden="true" style="width:18px;height:18px;background:currentColor;-webkit-mask:url(https://unpkg.com/lucide-static@0.460.0/icons/arrow-right.svg) center/contain no-repeat;mask:url(https://unpkg.com/lucide-static@0.460.0/icons/arrow-right.svg) center/contain no-repeat"></span></a></div>
+    <div style="display:grid;grid-template-columns:{{ r.c5 }};gap:16px"><sc-for list="{{ pmTiles }}" as="t" hint-placeholder-count="5"><a href="#" data-act="fin" data-v="{{ t.id }}" data-scroll="chart" style="display:flex;flex-direction:column;justify-content:flex-end;gap:8px;min-height:{{ r.tileH }};padding:28px 22px;border-radius:999px 999px 24px 24px;background:{{ t.bg }};color:{{ t.fg }}"><h3 style="font-family:var(--font-display);font-weight:400;font-size:32px;line-height:1.1">{{ t.n }}</h3><p style="font-size:14px">{{ t.min }} · lasts {{ t.wear }}</p><p style="font-size:20px;font-weight:600">from {{ t.price }}</p></a></sc-for></div>
+    <p style="font-size:14px;color:var(--muted)">Sample prices. Add French or two-nail art to any gel or BIAB set.</p>
+  </div>
+</section>
+<section aria-label="Recent sets" style="padding:0 {{ r.px }} {{ r.sec }}">
+  <div style="max-width:1296px;margin:0 auto;display:flex;flex-direction:column;gap:32px">
+    <h2 style="font-family:var(--font-display);font-weight:400;font-size:{{ r.h2 }};line-height:1.1">Recent sets</h2>
+    <div style="display:grid;grid-template-columns:{{ r.c4 }};grid-auto-rows:{{ r.mosRow }};gap:12px"><sc-for list="{{ homeGal }}" as="g" hint-placeholder-count="6"><button type="button" data-act="lbh" data-v="{{ g.i }}" aria-label="Open photo: {{ g.alt }}" style="grid-column:{{ g.gc }};grid-row:{{ g.gr }};border:0;padding:0;cursor:zoom-in;border-radius:6px;background:#C9CEC6 url(&quot;{{ g.img }}&quot;) center/cover;position:relative"><span style="position:absolute;left:10px;bottom:10px;background:var(--surface);color:var(--ink);font-size:14px;padding:4px 10px;border-radius:6px">{{ g.tag }}</span></button></sc-for></div>
+    <a href="#" data-go="gallery" style="align-self:flex-start;font-weight:600">See the gallery</a>
+  </div>
+</section>
+<section aria-label="What clients say" style="background:var(--accent-soft);padding:{{ r.sec }} {{ r.px }}">
+  <div style="max-width:1296px;margin:0 auto;display:flex;flex-direction:column;gap:12px">
+    <h2 style="font-family:var(--font-display);font-weight:400;font-size:{{ r.h2 }};line-height:1.1;margin-bottom:20px">In their words</h2>
+    <sc-for list="{{ quotes }}" as="q" hint-placeholder-count="3"><figure style="max-width:760px;margin-left:{{ q.ml }};background:var(--surface);border-radius:28px;padding:{{ r.cardPad }};display:flex;flex-direction:column;gap:12px"><blockquote style="margin:0;font-family:var(--font-display);font-size:24px;line-height:1.35">“{{ q.q }}”</blockquote><figcaption style="font-size:14px;color:var(--muted)">{{ q.who }} · Sample review</figcaption></figure></sc-for>
+  </div>
+</section>
+<section aria-label="Gift a treatment" style="padding:{{ r.sec }} {{ r.px }}">
+  <div style="max-width:1296px;margin:0 auto;display:grid;grid-template-columns:{{ r.split }};gap:{{ r.gap }};align-items:center">
+    <div style="display:flex;flex-direction:column;gap:20px">
+      <h2 style="font-family:var(--font-display);font-weight:400;font-size:{{ r.h2 }};line-height:1.1">Give a treatment, not an amount</h2>
+      <p style="color:var(--muted)">They get the set, we cover the time. Valid twelve months.</p>
+      <div role="radiogroup" aria-label="Treatment to give" style="display:flex;flex-direction:column;gap:10px"><sc-for list="{{ gifts }}" as="g" hint-placeholder-count="5"><button type="button" role="radio" aria-checked="{{ g.on }}" data-act="gift" data-v="{{ g.id }}" style="display:flex;justify-content:space-between;align-items:center;gap:16px;min-height:56px;padding:0;border:0;border-bottom:1px solid {{ g.bd }};background:none;cursor:pointer;text-align:left"><span style="font-weight:600">{{ g.n }}</span><span style="font-weight:600;white-space:nowrap">{{ g.price }}</span></button></sc-for></div>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:18px;align-items:flex-start">
+      <div aria-label="Gift card preview" style="width:100%;max-width:480px;aspect-ratio:1.6;border-radius:28px;background:var(--ink);color:var(--on-ink);padding:32px;display:flex;flex-direction:column;justify-content:space-between">
+        <span style="font-family:var(--font-display);font-size:22px">Lacquer Room</span>
+        <div><p style="font-family:var(--font-display);font-size:36px;line-height:1.1">{{ giftPick.n }}</p><p style="font-size:14px">{{ giftPick.min }} · worth {{ giftPick.price }} (Sample)</p></div>
+      </div>
+      <a href="#" data-go="vouchers" style="height:52px;padding:0 28px;border-radius:999px;background:var(--accent);color:#FFFFFF;font-weight:600;display:flex;align-items:center;white-space:nowrap">Add names and send</a>
+    </div>
+  </div>
+</section>
+</div>
+</sc-if>
+
+<sc-if value="{{ isH2 }}" hint-placeholder-val="{{ false }}">
+<div style="order:2;display:flex;flex-direction:column">
+<section aria-label="A result" style="padding:{{ r.sec }} {{ r.px }}">
+  <div style="max-width:1296px;margin:0 auto;display:grid;grid-template-columns:{{ r.c2 }};border-radius:32px;overflow:hidden;background:var(--accent-soft)">
+    <div role="img" aria-label="Natural nails after three BIAB infills" style="min-height:{{ r.baH }};background:#C9CEC6 url(&quot;assets/33/pastel-close.jpg&quot;) center/cover"></div>
+    <div style="padding:{{ r.cardPadL }};display:flex;flex-direction:column;justify-content:center;gap:16px">
+      <p style="font-size:14px;font-weight:600">Individual result, shared with consent (Sample)</p>
+      <h2 style="font-family:var(--font-display);font-weight:400;font-size:{{ r.h2 }};line-height:1.1">Three infills later, past the fingertip</h2>
+      <p style="color:var(--muted)">Peeling, bendy nails at the first visit. BIAB in a sheer shade, infilled every three weeks, no full removal. Your nails will grow differently.</p>
+      <a href="#" data-go="treatment" data-k="biab" style="font-weight:600;align-self:flex-start">How BIAB works</a>
+    </div>
+  </div>
+</section>
+<section aria-label="Technicians" style="padding:0 {{ r.px }} {{ r.sec }}">
+  <div style="max-width:1296px;margin:0 auto;display:flex;flex-direction:column;gap:32px">
+    <h2 style="font-family:var(--font-display);font-weight:400;font-size:{{ r.h2 }};line-height:1.1">Who will do your nails</h2>
+    <div style="display:grid;grid-template-columns:{{ r.c4 }};gap:{{ r.gap }}"><sc-for list="{{ techs }}" as="t" hint-placeholder-count="4"><div style="display:flex;flex-direction:column;gap:14px">
+      <a href="#" data-go="person" data-k="{{ t.id }}" aria-label="{{ t.n }}, {{ t.role }}" style="position:relative;display:block;aspect-ratio:3/4;border-radius:24px;background:#C9CEC6 url(&quot;{{ t.img }}&quot;) center/cover"><span aria-hidden="true" style="position:absolute;left:16px;bottom:16px;width:56px;height:56px;border-radius:999px;background:var(--surface);color:var(--ink);display:flex;align-items:center;justify-content:center;font-family:var(--font-display);font-size:20px">{{ t.mono }}</span></a>
+      <div><h3 style="font-size:18px;font-weight:600">{{ t.n }}</h3><p style="font-size:15px;color:var(--muted)">{{ t.role }} · {{ t.yrs }} years, qualified (Sample)</p></div>
+      <p style="font-size:15px">{{ t.nextT }}</p>
+      <button type="button" data-act="bookwith" data-v="{{ t.id }}" disabled="{{ t.dis }}" style="align-self:flex-start;height:44px;padding:0 20px;border-radius:999px;border:1px solid var(--ink);background:none;font-weight:600;cursor:pointer;opacity:{{ t.op }}">{{ t.btn }}</button>
+    </div></sc-for></div>
+  </div>
+</section>
+<section id="first" aria-label="Your first visit" style="background:var(--paper);padding:{{ r.sec }} {{ r.px }}">
+  <div style="max-width:1296px;margin:0 auto;display:flex;flex-direction:column;gap:32px">
+    <div style="display:flex;flex-direction:column;gap:12px;max-width:640px"><h2 style="font-family:var(--font-display);font-weight:400;font-size:{{ r.h2 }};line-height:1.1">Your first visit</h2><p style="color:var(--muted)">About an hour for a BIAB set. Nothing happens to your nails before the consultation.</p></div>
+    <div style="display:grid;grid-template-columns:{{ r.c4 }};gap:{{ r.gap }};border-top:1px solid var(--ink);padding-top:28px"><sc-for list="{{ first }}" as="f" hint-placeholder-count="4"><div style="display:flex;flex-direction:column;gap:14px"><div role="img" aria-label="{{ f.alt }}" style="aspect-ratio:1;border-radius:999px;background:#C9CEC6 url(&quot;{{ f.img }}&quot;) center/cover"></div><h3 style="font-size:18px;font-weight:600">{{ f.t }}</h3><p style="font-size:15px;color:var(--muted)">{{ f.d }}</p></div></sc-for></div>
+  </div>
+</section>
+<section aria-label="Hands and feet" style="padding:{{ r.sec }} {{ r.px }}">
+  <div style="max-width:1296px;margin:0 auto;display:grid;grid-template-columns:{{ r.c2 }};gap:{{ r.gapL }}"><sc-for list="{{ pcCols }}" as="c" hint-placeholder-count="2"><div style="display:flex;flex-direction:column;gap:20px">
+    <div role="img" aria-label="{{ c.alt }}" style="aspect-ratio:16/9;border-radius:24px 24px 120px 24px;background:#C9CEC6 url(&quot;{{ c.img }}&quot;) center/cover"></div>
+    <h2 style="font-family:var(--font-display);font-weight:400;font-size:{{ r.h2 }};line-height:1.1">{{ c.n }}</h2>
+    <div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px"><sc-for list="{{ c.items }}" as="i" hint-placeholder-count="4"><a href="#" data-act="booksvc" data-v="{{ i.id }}" style="display:flex;flex-direction:column;gap:4px;padding:18px;border-radius:18px;background:var(--paper);color:var(--ink)"><span style="font-weight:600">{{ i.n }}</span><span style="font-size:14px;color:var(--muted)">{{ i.min }} min</span><span style="font-weight:600">{{ i.price }}</span></a></sc-for></div>
+  </div></sc-for></div>
+  <p style="max-width:1296px;margin:20px auto 0;font-size:14px;color:var(--muted)">Sample prices.</p>
+</section>
+<section aria-label="Find us" style="background:var(--ink);color:var(--on-ink);padding:{{ r.sec }} {{ r.px }}">
+  <div style="max-width:1296px;margin:0 auto;display:grid;grid-template-columns:{{ r.hmCols }};gap:{{ r.gap }};align-items:stretch">
+    <div style="display:flex;flex-direction:column;gap:20px">
+      <h2 style="font-family:var(--font-display);font-weight:400;font-size:{{ r.h2 }};line-height:1.1">Opening hours</h2>
+      <dl style="display:grid;grid-template-columns:auto 1fr;gap:6px 24px"><sc-for list="{{ hours }}" as="h" hint-placeholder-count="7"><dt style="font-weight:{{ h.fw }}">{{ h.d }}</dt><dd style="font-weight:{{ h.fw }}">{{ h.h }}</dd></sc-for></dl>
+      <p>{{ biz.addr }}</p><p style="font-size:15px">Step-free entrance from Weaver Yard. Bike rack outside; paid parking on Mill Lane.</p>
+    </div>
+    <div style="border-radius:28px;min-height:320px;background:#3A3140;display:flex;align-items:flex-end;padding:24px;position:relative;overflow:hidden"><div role="img" aria-label="The bright treatment room" style="position:absolute;inset:0;background:url(&quot;assets/33/room-light.jpg&quot;) center/cover;opacity:0.85"></div><p style="position:relative;background:var(--ink);color:var(--on-ink);padding:10px 14px;border-radius:12px;font-size:14px">Map: the buyer&#39;s map embed goes here</p></div>
+  </div>
+</section>
+</div>
+</sc-if>
+
+<sc-if value="{{ isH3 }}" hint-placeholder-val="{{ false }}">
+<div style="order:2;display:flex;flex-direction:column">
+<section aria-label="The studio" style="padding:{{ r.secS }} {{ r.px }}">
+  <div style="max-width:1296px;margin:0 auto;display:grid;grid-template-columns:{{ r.spCols }};gap:12px"><sc-for list="{{ tour }}" as="p" hint-placeholder-count="3"><figure style="display:flex;flex-direction:column;gap:10px"><div role="img" aria-label="{{ p.alt }}" style="aspect-ratio:{{ p.ar }};border-radius:6px;background:#C9CEC6 url(&quot;{{ p.img }}&quot;) center/cover"></div><figcaption style="font-size:14px;color:var(--muted)">{{ p.c }}</figcaption></figure></sc-for></div>
+</section>
+<section id="again" aria-label="Same shade again" style="padding:{{ r.secS }} {{ r.px }} {{ r.sec }}">
+  <div style="max-width:960px;margin:0 auto;border-radius:40px;background:var(--paper);padding:{{ r.cardPadL }};display:grid;grid-template-columns:{{ r.againCols }};gap:{{ r.gap }};align-items:center">
+    <span aria-hidden="true" style="width:100%;max-width:160px;aspect-ratio:2/3;border-radius:999px 999px 20px 20px;background:var(--accent);justify-self:center"></span>
+    <div style="display:flex;flex-direction:column;gap:16px">
+      <h2 style="font-family:var(--font-display);font-weight:400;font-size:{{ r.h2 }};line-height:1.1">Same shade again</h2>
+      <p style="color:var(--muted)">Last visit: BIAB infill in Oxide with Inés, three weeks ago (Sample). Pick a time and we keep the rest.</p>
+      <div role="group" aria-label="Next times with Inés" style="display:flex;flex-wrap:wrap;gap:10px"><sc-for list="{{ againTimes }}" as="a" hint-placeholder-count="3"><button type="button" data-act="again" data-v="{{ a.i }}" style="height:48px;padding:0 2px;border:0;border-bottom:2px solid var(--ink);background:none;font-weight:600;font-size:17px;cursor:pointer;white-space:nowrap">{{ a.l }}</button></sc-for></div>
+      <a href="#" data-go="services" style="font-weight:600;align-self:flex-start">Change shade on the colour chart</a>
+    </div>
+  </div>
+</section>
+<section aria-label="Aftercare" style="background:var(--accent-soft);padding:{{ r.sec }} {{ r.px }}">
+  <div style="max-width:1296px;margin:0 auto;display:flex;flex-direction:column;gap:32px">
+    <div style="display:flex;flex-direction:column;gap:12px;max-width:640px"><h2 style="font-family:var(--font-display);font-weight:400;font-size:{{ r.h2 }};line-height:1.1">Make the set last</h2><p style="color:var(--muted)">Four things at the desk. Ask your technician; nothing is sold online.</p></div>
+    <div style="display:grid;grid-template-columns:{{ r.c2 }};gap:16px"><sc-for list="{{ shelf }}" as="s" hint-placeholder-count="4"><div style="display:grid;grid-template-columns:120px minmax(0,1fr);gap:18px;align-items:center;background:var(--surface);border-radius:999px 28px 28px 999px;padding:10px 24px 10px 10px"><div role="img" aria-label="{{ s.alt }}" style="aspect-ratio:1;border-radius:999px;background:#C9CEC6 url(&quot;{{ s.img }}&quot;) center/cover"></div><div><h3 style="font-size:18px;font-weight:600">{{ s.n }} · {{ s.price }}</h3><p style="font-size:15px;color:var(--muted)">{{ s.d }}</p></div></div></sc-for></div>
+    <p style="font-size:14px;color:var(--muted)">Sample prices.</p>
+  </div>
+</section>
+<section aria-label="Rating" style="padding:{{ r.sec }} {{ r.px }} 0">
+  <p style="max-width:1296px;margin:0 auto;font-family:var(--font-display);font-size:{{ r.h2 }};line-height:1.2;text-align:center">Rated 4.9 from 212 reviews on our booking platform <span style="font-family:var(--font-body);font-size:16px;color:var(--muted)">(Sample)</span></p>
+</section>
+<section aria-label="Questions" style="padding:{{ r.sec }} {{ r.px }}">
+  <div style="max-width:880px;margin:0 auto;display:flex;flex-direction:column;gap:24px">
+    <h2 style="font-family:var(--font-display);font-weight:400;font-size:{{ r.h2 }};line-height:1.1">Questions we get every week</h2>
+    <div style="display:flex;flex-direction:column;gap:10px"><sc-for list="{{ faq }}" as="f" hint-placeholder-count="6"><div style="border-radius:20px;background:var(--paper)"><button type="button" data-act="faq" data-v="{{ f.i }}" aria-expanded="{{ f.on }}" style="width:100%;display:flex;justify-content:space-between;gap:16px;align-items:center;min-height:60px;padding:0 24px;background:none;border:0;text-align:left;font-weight:600;cursor:pointer">{{ f.q }}<span aria-hidden="true" style="width:20px;height:20px;flex:0 0 auto;background:currentColor;-webkit-mask:{{ f.ic }};mask:{{ f.ic }}"></span></button><p style="display:{{ f.show }};padding:0 24px 20px;color:var(--muted)">{{ f.a }}</p></div></sc-for></div>
+  </div>
+</section>
+</div>
+</sc-if>
+
+<sc-if value="{{ hasPageHead }}" hint-placeholder-val="{{ false }}">
+<section aria-label="Page title" style="order:0;padding:{{ r.secS }} {{ r.px }} 40px">
+  <div style="max-width:1296px;margin:0 auto;display:flex;flex-direction:column;gap:16px">
+    <sc-if value="{{ crumb.show }}" hint-placeholder-val="{{ false }}"><a href="#" data-go="{{ crumb.go }}" style="font-size:15px;font-weight:600;display:flex;gap:6px;align-items:center;align-self:flex-start"><span aria-hidden="true" style="width:16px;height:16px;background:currentColor;-webkit-mask:url(https://unpkg.com/lucide-static@0.460.0/icons/arrow-left.svg) center/contain no-repeat;mask:url(https://unpkg.com/lucide-static@0.460.0/icons/arrow-left.svg) center/contain no-repeat"></span>{{ crumb.l }}</a></sc-if>
+    <h1 style="font-family:var(--font-display);font-weight:400;font-size:{{ r.h1i }};line-height:1.05;max-width:20ch">{{ head.h }}</h1>
+    <p style="font-size:{{ r.lead }};color:var(--muted);max-width:56ch">{{ head.p }}</p>
+  </div>
+</section>
+</sc-if>
+
+<sc-if value="{{ isServices }}" hint-placeholder-val="{{ false }}">
+<div style="order:2;display:flex;flex-direction:column;gap:{{ r.sec }};padding:{{ r.sec }} {{ r.px }}">
+  <sc-for list="{{ cats }}" as="c" hint-placeholder-count="3"><section aria-label="{{ c.n }}" style="max-width:1296px;width:100%;margin:0 auto;display:grid;grid-template-columns:{{ r.catCols }};gap:{{ r.gap }};align-items:start">
+    <div style="display:flex;flex-direction:column;gap:16px"><div role="img" aria-label="{{ c.alt }}" style="aspect-ratio:4/5;border-radius:28px;background:#C9CEC6 url(&quot;{{ c.img }}&quot;) center/cover"></div><h2 style="font-family:var(--font-display);font-weight:400;font-size:{{ r.h2 }}">{{ c.n }}</h2></div>
+    <div style="display:grid;grid-template-columns:{{ r.c2 }};gap:14px"><sc-for list="{{ c.items }}" as="i" hint-placeholder-count="4"><div style="display:flex;flex-direction:column;gap:8px;padding:24px;border-radius:20px;background:var(--paper)">
+      <div style="display:flex;justify-content:space-between;gap:12px;align-items:baseline"><h3 style="font-size:18px;font-weight:600">{{ i.n }}</h3><span style="font-size:20px;font-weight:600;white-space:nowrap">{{ i.price }}</span></div>
+      <p style="font-size:14px;color:var(--muted)">{{ i.min }} min</p><p style="font-size:15px">{{ i.d }}</p>
+      <div style="display:flex;flex-wrap:wrap;gap:8px 18px;margin-top:6px"><button type="button" data-act="booksvc" data-v="{{ i.id }}" style="height:44px;padding:0 18px;border-radius:999px;border:0;background:var(--ink);color:var(--on-ink);font-weight:600;cursor:pointer;white-space:nowrap">Book</button><a href="#" data-go="{{ i.dGo }}" data-k="{{ i.id }}" style="display:{{ i.dShow }};align-items:center;font-weight:600">How it works</a></div>
+    </div></sc-for></div>
+  </section></sc-for>
+  <p style="max-width:1296px;width:100%;margin:0 auto;font-size:14px;color:var(--muted)">All prices are Sample, in one currency the buyer sets. A consultation comes free with every first visit; patch tests on request 48 hours before.</p>
+</div>
+</sc-if>
+
+<sc-if value="{{ isTreat }}" hint-placeholder-val="{{ false }}">
+<div style="order:2;display:flex;flex-direction:column;padding:0 {{ r.px }} {{ r.sec }}">
+  <div style="max-width:1296px;width:100%;margin:0 auto;display:grid;grid-template-columns:{{ r.split }};gap:{{ r.gapL }};align-items:start">
+    <div role="img" aria-label="{{ tr.alt }}" style="aspect-ratio:4/5;border-radius:999px 999px 28px 28px;background:#C9CEC6 url(&quot;{{ tr.img }}&quot;) center/cover"></div>
+    <div style="display:flex;flex-direction:column;gap:28px">
+      <div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;background:var(--paper);border-radius:24px;padding:24px"><div><p style="font-size:14px;color:var(--muted)">Time</p><p style="font-size:20px;font-weight:600">{{ tr.min }}</p></div><div><p style="font-size:14px;color:var(--muted)">Lasts</p><p style="font-size:20px;font-weight:600">{{ tr.wear }}</p></div><div><p style="font-size:14px;color:var(--muted)">From</p><p style="font-size:20px;font-weight:600">{{ tr.price }}</p></div></div>
+      <div style="display:flex;flex-direction:column;gap:0;border-top:1px solid var(--line)"><sc-for list="{{ tr.steps }}" as="s" hint-placeholder-count="4"><p style="padding:16px 0;border-bottom:1px solid var(--line)">{{ s.x }}</p></sc-for></div>
+      <div style="display:grid;grid-template-columns:{{ r.c2 }};gap:12px"><div style="border-radius:20px;background:var(--accent-soft);padding:22px"><h2 style="font-size:18px;font-weight:600">Good for</h2><p style="font-size:15px">{{ tr.good }}</p></div><div style="border-radius:20px;border:1px solid var(--line);padding:22px"><h2 style="font-size:18px;font-weight:600">Not for</h2><p style="font-size:15px">{{ tr.not }}</p></div></div>
+      <p style="font-size:14px;color:var(--muted)">Sample price and times. Every first visit includes a short consultation.</p>
+      <button type="button" data-act="booksvc" data-v="{{ tr.id }}" style="align-self:flex-start;height:52px;padding:0 28px;border-radius:999px;border:0;background:var(--accent);color:#FFFFFF;font-weight:600;cursor:pointer">Book {{ tr.n }}</button>
+    </div>
+  </div>
+</div>
+</sc-if>
+
+<sc-if value="{{ isTeam }}" hint-placeholder-val="{{ false }}">
+<div style="order:2;padding:0 {{ r.px }} {{ r.sec }}"><div style="max-width:1296px;margin:0 auto;display:grid;grid-template-columns:{{ r.c2 }};gap:16px"><sc-for list="{{ techs }}" as="t" hint-placeholder-count="4"><a href="#" data-go="person" data-k="{{ t.id }}" style="display:grid;grid-template-columns:minmax(0,2fr) minmax(0,3fr);border-radius:28px;overflow:hidden;background:var(--paper);color:var(--ink)"><div role="img" aria-label="{{ t.alt }}" style="min-height:240px;background:#C9CEC6 url(&quot;{{ t.img }}&quot;) center/cover"></div><div style="padding:24px;display:flex;flex-direction:column;gap:8px;justify-content:center"><h2 style="font-family:var(--font-display);font-weight:400;font-size:32px">{{ t.n }}</h2><p style="font-size:15px;color:var(--muted)">{{ t.role }} · {{ t.yrs }} years, qualified (Sample)</p><p style="font-size:15px">{{ t.nextT }}</p></div></a></sc-for></div></div>
+</sc-if>
+
+<sc-if value="{{ isPerson }}" hint-placeholder-val="{{ false }}">
+<div style="order:2;padding:0 {{ r.px }} {{ r.sec }}"><div style="max-width:1296px;margin:0 auto;display:grid;grid-template-columns:{{ r.split }};gap:{{ r.gapL }};align-items:start">
+  <div style="position:relative"><div role="img" aria-label="{{ pr.alt }}" style="aspect-ratio:1;border-radius:999px;background:#C9CEC6 url(&quot;{{ pr.img }}&quot;) center/cover"></div><span aria-hidden="true" style="position:absolute;right:8%;bottom:6%;width:88px;height:88px;border-radius:999px;background:var(--ink);color:var(--on-ink);display:flex;align-items:center;justify-content:center;font-family:var(--font-display);font-size:30px">{{ pr.mono }}</span></div>
+  <div style="display:flex;flex-direction:column;gap:20px">
+    <p style="font-size:{{ r.lead }}">{{ pr.bio }}</p>
+    <p style="font-size:15px;color:var(--muted)">{{ pr.yrs }} years · certified and insured (Sample). Monogram used instead of a portrait; the buyer adds a photo.</p>
+    <div style="display:flex;flex-direction:column;gap:10px"><h2 style="font-size:18px;font-weight:600">Books for</h2><div style="display:flex;flex-wrap:wrap;gap:10px"><sc-for list="{{ pr.specL }}" as="s" hint-placeholder-count="2"><a href="#" data-act="booksvc" data-v="{{ s.id }}" style="height:44px;padding:0 18px;border-radius:12px;background:var(--paper);color:var(--ink);font-weight:600;display:flex;align-items:center;white-space:nowrap">{{ s.n }} · {{ s.price }}</a></sc-for></div></div>
+    <div style="border-radius:24px;background:var(--accent-soft);padding:24px;display:flex;flex-direction:column;gap:12px"><p style="font-weight:600">{{ pr.nextT }}</p><button type="button" data-act="bookwith" data-v="{{ pr.id }}" disabled="{{ pr.dis }}" style="align-self:flex-start;height:48px;padding:0 22px;border-radius:999px;border:0;background:var(--ink);color:var(--on-ink);font-weight:600;cursor:pointer;opacity:{{ pr.op }}">{{ pr.btn }}</button><sc-if value="{{ pr.dis }}" hint-placeholder-val="{{ false }}"><a href="#" data-go="team" style="font-weight:600">Choose another technician</a></sc-if></div>
+  </div>
+</div></div>
+</sc-if>
+
+<sc-if value="{{ isGallery }}" hint-placeholder-val="{{ false }}">
+<div style="order:2;padding:0 {{ r.px }} {{ r.sec }}"><div style="max-width:1296px;margin:0 auto;display:flex;flex-direction:column;gap:24px">
+  <div style="display:flex;flex-wrap:wrap;gap:12px 24px;align-items:center;justify-content:space-between">
+    <div role="group" aria-label="Filter by finish" style="display:flex;flex-wrap:wrap;gap:4px 22px"><sc-for list="{{ gtags }}" as="g" hint-placeholder-count="7"><button type="button" data-act="gtag" data-v="{{ g.t }}" aria-pressed="{{ g.on }}" style="background:none;border:0;border-bottom:3px solid {{ g.line }};padding:10px 0;font-weight:600;color:{{ g.fg }};cursor:pointer">{{ g.t }}</button></sc-for></div>
+    <p aria-live="polite" style="font-size:15px;color:var(--muted)">{{ galCount }}</p>
+  </div>
+  <sc-if value="{{ galEmpty }}" hint-placeholder-val="{{ false }}"><div role="status" style="border-radius:28px;background:var(--paper);padding:40px;display:flex;flex-direction:column;gap:12px;align-items:flex-start"><h2 style="font-size:22px;font-weight:600">No press-on sets photographed yet</h2><p style="color:var(--muted)">Jun is back on 4 November with new sets. Until then, see everything else.</p><button type="button" data-act="gtag" data-v="All" style="height:48px;padding:0 22px;border-radius:999px;border:1px solid var(--ink);background:none;font-weight:600;cursor:pointer">Show all photos</button></div></sc-if>
+  <div style="display:grid;grid-template-columns:{{ r.c3 }};gap:12px"><sc-for list="{{ galList }}" as="g" hint-placeholder-count="6"><button type="button" data-act="lb" data-v="{{ g.i }}" aria-label="Open photo: {{ g.alt }}" style="border:0;padding:0;cursor:zoom-in;aspect-ratio:1;border-radius:6px;background:#C9CEC6 url(&quot;{{ g.img }}&quot;) center/cover;position:relative"><span style="position:absolute;left:10px;bottom:10px;background:var(--surface);color:var(--ink);font-size:14px;padding:4px 10px;border-radius:6px">{{ g.tag }}</span></button></sc-for></div>
+  <p style="font-size:14px;color:var(--muted)">Work photos are placeholders. Shown with the client&#39;s consent; individual results.</p>
+</div></div>
+</sc-if>
+
+<sc-if value="{{ isGift }}" hint-placeholder-val="{{ false }}">
+<div style="order:2;padding:0 {{ r.px }} {{ r.sec }}"><div style="max-width:1296px;margin:0 auto;display:grid;grid-template-columns:{{ r.split }};gap:{{ r.gapL }};align-items:start">
+  <div style="display:flex;flex-direction:column;gap:18px">
+    <div aria-label="Gift card preview" style="width:100%;aspect-ratio:1.6;border-radius:28px;background:var(--accent);color:#FFFFFF;padding:32px;display:flex;flex-direction:column;justify-content:space-between"><span style="font-family:var(--font-display);font-size:22px">Lacquer Room</span><div><p style="font-family:var(--font-display);font-size:36px;line-height:1.1">{{ giftPick.n }}</p><p style="font-size:15px">For {{ gfTo }} · from {{ gfFrom }} · worth {{ giftPick.price }} (Sample)</p></div></div>
+    <div role="radiogroup" aria-label="Treatment to give" style="display:flex;flex-direction:column;gap:10px"><sc-for list="{{ gifts }}" as="g" hint-placeholder-count="5"><button type="button" role="radio" aria-checked="{{ g.on }}" data-act="gift" data-v="{{ g.id }}" style="display:flex;justify-content:space-between;align-items:center;gap:16px;min-height:56px;padding:0;border:0;border-bottom:1px solid {{ g.bd }};background:none;cursor:pointer;text-align:left"><span style="font-weight:600">{{ g.n }}</span><span style="font-weight:600;white-space:nowrap">{{ g.price }}</span></button></sc-for></div>
+  </div>
+  <div>
+    <sc-if value="{{ giftDone }}" hint-placeholder-val="{{ false }}"><div role="status" style="border-radius:28px;background:var(--accent-soft);padding:32px;display:flex;flex-direction:column;gap:12px"><h2 style="font-size:24px;font-weight:600">Gift request sent</h2><p>We&#39;ll email {{ gfTo }}&#39;s gift card once the studio confirms payment through the booking system (Sample flow).</p><button type="button" data-act="reset" data-v="gift" style="align-self:flex-start;height:48px;padding:0 22px;border-radius:999px;border:1px solid var(--ink);background:none;font-weight:600;cursor:pointer">Send another</button></div></sc-if>
+    <sc-if value="{{ giftForm }}" hint-placeholder-val="{{ true }}"><form novalidate="" style="display:flex;flex-direction:column;gap:16px">
+      <sc-for list="{{ giftFields }}" as="f" hint-placeholder-count="3"><label style="display:flex;flex-direction:column;gap:6px;font-weight:500;font-size:15px">{{ f.l }}<input name="{{ f.k }}" data-f="{{ f.k }}" value="{{ f.v }}" type="{{ f.type }}" aria-invalid="{{ f.inv }}" style="height:52px;border-radius:14px;border:{{ f.bd }};padding:0 16px;background:var(--surface)"><span role="alert" style="display:{{ f.es }};color:var(--fixed-error);font-size:14px">{{ f.err }}</span></label></sc-for>
+      <label style="display:flex;flex-direction:column;gap:6px;font-weight:500;font-size:15px">Message (optional)<textarea name="gf_msg" data-f="gf_msg" value="{{ fv.gf_msg }}" rows="3" style="border-radius:14px;border:1px solid #767C76;padding:12px 16px"></textarea></label>
+      <p style="font-size:14px;color:var(--muted)">Valid 12 months. The studio&#39;s booking system takes payment and sends the card.</p>
+      <button type="button" data-act="submit" data-v="gift" style="align-self:flex-start;height:52px;padding:0 28px;border-radius:999px;border:0;background:var(--ink);color:var(--on-ink);font-weight:600;cursor:pointer">{{ giftBtn }}</button>
+    </form></sc-if>
+  </div>
+</div></div>
+</sc-if>
+
+<sc-if value="{{ isBook }}" hint-placeholder-val="{{ false }}">
+<div style="order:2;padding:0 {{ r.px }} {{ r.sec }}"><div style="max-width:960px;margin:0 auto;display:flex;flex-direction:column;gap:28px">
+  <ol aria-label="Booking steps" style="list-style:none;margin:0;padding:0;display:flex;flex-wrap:wrap;gap:8px 24px"><sc-for list="{{ bkSteps }}" as="s" hint-placeholder-count="4"><li><button type="button" data-act="bkstep" data-v="{{ s.v }}" disabled="{{ s.dis }}" aria-current="{{ s.cur }}" style="background:none;border:0;border-bottom:3px solid {{ s.line }};padding:8px 0;font-weight:600;color:{{ s.fg }};cursor:pointer">{{ s.l }}</button></li></sc-for></ol>
+  <sc-if value="{{ bkSummary.show }}" hint-placeholder-val="{{ false }}"><p style="background:var(--paper);border-radius:16px;padding:14px 18px;font-size:15px">{{ bkSummary.t }}</p></sc-if>
+  <sc-if value="{{ bk1 }}" hint-placeholder-val="{{ true }}"><div style="display:grid;grid-template-columns:{{ r.c2 }};gap:12px"><sc-for list="{{ bkSvcs }}" as="s" hint-placeholder-count="6"><button type="button" data-act="bksvc" data-v="{{ s.id }}" style="display:flex;justify-content:space-between;gap:12px;align-items:center;text-align:left;min-height:64px;padding:14px 0;border:0;border-bottom:2px solid {{ s.bd }};background:none;cursor:pointer"><span><span style="display:block;font-weight:600">{{ s.n }}</span><span style="font-size:14px;color:var(--muted)">{{ s.min }} min</span></span><span style="font-weight:600">{{ s.price }}</span></button></sc-for></div></sc-if>
+  <sc-if value="{{ bk2 }}" hint-placeholder-val="{{ false }}"><div style="display:grid;grid-template-columns:{{ r.c2 }};gap:12px"><sc-for list="{{ bkTechs }}" as="t" hint-placeholder-count="5"><button type="button" data-act="bktech" data-v="{{ t.id }}" disabled="{{ t.dis }}" style="display:flex;gap:14px;align-items:center;text-align:left;min-height:72px;padding:12px 0;border:0;border-bottom:2px solid {{ t.bd }};background:none;cursor:pointer;opacity:{{ t.op }}"><span aria-hidden="true" style="width:48px;height:48px;border-radius:999px;background:var(--paper);display:flex;align-items:center;justify-content:center;font-family:var(--font-display);font-size:18px;flex:0 0 auto">{{ t.mono }}</span><span><span style="display:block;font-weight:600">{{ t.n }}</span><span style="font-size:14px;color:var(--muted)">{{ t.sub }}</span></span></button></sc-for></div></sc-if>
+  <sc-if value="{{ bk3 }}" hint-placeholder-val="{{ false }}"><div style="display:flex;flex-direction:column;gap:20px">
+    <div role="group" aria-label="Day" style="display:flex;flex-wrap:wrap;gap:10px"><sc-for list="{{ bkDays }}" as="d" hint-placeholder-count="6"><button type="button" data-act="bkday" data-v="{{ d.i }}" aria-pressed="{{ d.on }}" style="height:48px;padding:0 4px;border:0;border-bottom:3px solid {{ d.bd }};background:none;font-weight:600;cursor:pointer;white-space:nowrap">{{ d.l }}</button></sc-for></div>
+    <div role="group" aria-label="Time" style="display:grid;grid-template-columns:{{ r.slotCols }};gap:10px"><sc-for list="{{ bkSlots }}" as="s" hint-placeholder-count="8"><button type="button" data-act="bktime" data-v="{{ s.s }}" disabled="{{ s.dis }}" aria-label="{{ s.lbl }}" style="height:48px;border:0;border-bottom:3px solid {{ s.bd }};background:none;color:{{ s.fg }};font-weight:600;cursor:pointer;text-decoration:{{ s.td }}">{{ s.s }}</button></sc-for></div>
+    <p style="font-size:14px;color:var(--muted)">Sample availability. The studio&#39;s booking system fills this in.</p>
+  </div></sc-if>
+  <sc-if value="{{ bk4 }}" hint-placeholder-val="{{ false }}"><div>
+    <sc-if value="{{ bkDone }}" hint-placeholder-val="{{ false }}"><div role="status" style="border-radius:28px;background:var(--accent-soft);padding:32px;display:flex;flex-direction:column;gap:12px"><h2 style="font-size:24px;font-weight:600">Request sent</h2><p>We text {{ fv.bk_phone }} to confirm within two hours in opening times (Sample flow).</p><button type="button" data-act="bknew" style="align-self:flex-start;height:48px;padding:0 22px;border-radius:999px;border:1px solid var(--ink);background:none;font-weight:600;cursor:pointer">Book something else</button></div></sc-if>
+    <sc-if value="{{ bkForm }}" hint-placeholder-val="{{ true }}"><form novalidate="" style="display:flex;flex-direction:column;gap:16px">
+      <sc-for list="{{ bkFields }}" as="f" hint-placeholder-count="3"><label style="display:flex;flex-direction:column;gap:6px;font-weight:500;font-size:15px">{{ f.l }}<input name="{{ f.k }}" data-f="{{ f.k }}" value="{{ f.v }}" type="{{ f.type }}" aria-invalid="{{ f.inv }}" style="height:52px;border-radius:14px;border:{{ f.bd }};padding:0 16px;background:var(--surface)"><span role="alert" style="display:{{ f.es }};color:var(--fixed-error);font-size:14px">{{ f.err }}</span></label></sc-for>
+      <label style="display:flex;flex-direction:column;gap:6px;font-weight:500;font-size:15px">Anything we should know? (optional)<textarea name="bk_notes" data-f="bk_notes" value="{{ fv.bk_notes }}" rows="3" style="border-radius:14px;border:1px solid #767C76;padding:12px 16px"></textarea></label>
+      <div style="border-radius:18px;background:var(--paper);padding:18px;display:flex;flex-direction:column;gap:6px;font-size:15px"><p>{{ bkNote.dep }}</p><p>{{ bkNote.patch }}</p><p>Free cancellation up to 24 hours before. 10 minutes grace for late arrival.</p></div>
+      <button type="button" data-act="submit" data-v="bk" style="align-self:flex-start;height:52px;padding:0 28px;border-radius:999px;border:0;background:var(--accent);color:#FFFFFF;font-weight:600;cursor:pointer">{{ bkBtn }}</button>
+    </form></sc-if>
+  </div></sc-if>
+</div></div>
+</sc-if>
+
+<sc-if value="{{ isAbout }}" hint-placeholder-val="{{ false }}">
+<div style="order:2;padding:0 {{ r.px }} {{ r.sec }};display:flex;flex-direction:column;gap:{{ r.sec }}">
+  <div style="max-width:1296px;width:100%;margin:0 auto;display:grid;grid-template-columns:{{ r.split }};gap:{{ r.gapL }};align-items:center"><div role="img" aria-label="Two pairs of hands at a marble manicure table" style="aspect-ratio:5/4;border-radius:28px 160px 28px 28px;background:#C9CEC6 url(&quot;assets/33/marble-hands.jpg&quot;) center/cover"></div><div style="display:flex;flex-direction:column;gap:16px"><h2 style="font-family:var(--font-display);font-weight:400;font-size:{{ r.h2 }}">Four desks, one rule</h2><p>Inés opened Lacquer Room in 2019 in an old weaving shed. The rule then is the rule now: nothing touches your natural nail that could thin it. Hand files, wooden sticks, gentle soak-offs.</p><p>We keep it to four desks so nobody is rushed and the room stays quiet.</p></div></div>
+  <div style="max-width:1296px;width:100%;margin:0 auto;display:grid;grid-template-columns:{{ r.c3 }};gap:16px"><sc-for list="{{ values }}" as="v" hint-placeholder-count="3"><div style="border-radius:24px;background:{{ v.bg }};color:{{ v.fg }};padding:28px;display:flex;flex-direction:column;gap:10px;min-height:200px;justify-content:flex-end"><h3 style="font-family:var(--font-display);font-weight:400;font-size:28px">{{ v.t }}</h3><p style="font-size:15px">{{ v.d }}</p></div></sc-for></div>
+</div>
+</sc-if>
+
+<sc-if value="{{ isContact }}" hint-placeholder-val="{{ false }}">
+<div style="order:2;padding:0 {{ r.px }} {{ r.sec }}"><div style="max-width:1296px;margin:0 auto;display:grid;grid-template-columns:{{ r.split }};gap:{{ r.gapL }};align-items:start">
+  <div style="display:flex;flex-direction:column;gap:20px">
+    <div style="border-radius:28px;background:var(--paper);padding:28px;display:flex;flex-direction:column;gap:10px"><h2 style="font-size:20px;font-weight:600">Visit</h2><p>{{ biz.addr }}</p><a href="tel:+15550147">{{ biz.phone }}</a><a href="mailto:hello@lacquerroom.example">{{ biz.email }}</a><p style="font-size:15px;color:var(--muted)">Step-free entrance. Bike rack outside; paid parking on Mill Lane. Accessible toilet.</p></div>
+    <div style="border-radius:28px;border:1px solid var(--line);padding:28px"><h2 style="font-size:20px;font-weight:600;margin-bottom:10px">Opening hours</h2><dl style="display:grid;grid-template-columns:auto 1fr;gap:4px 24px"><sc-for list="{{ hours }}" as="h" hint-placeholder-count="7"><dt style="font-weight:{{ h.fw }}">{{ h.d }}</dt><dd style="font-weight:{{ h.fw }}">{{ h.h }}</dd></sc-for></dl></div>
+  </div>
+  <div>
+    <sc-if value="{{ ctDone }}" hint-placeholder-val="{{ false }}"><div role="status" style="border-radius:28px;background:var(--accent-soft);padding:32px;display:flex;flex-direction:column;gap:12px"><h2 style="font-size:24px;font-weight:600">Message sent</h2><p>We reply within one working day (Sample).</p><button type="button" data-act="reset" data-v="ct" style="align-self:flex-start;height:48px;padding:0 22px;border-radius:999px;border:1px solid var(--ink);background:none;font-weight:600;cursor:pointer">Send another</button></div></sc-if>
+    <sc-if value="{{ ctForm }}" hint-placeholder-val="{{ true }}"><form novalidate="" style="display:flex;flex-direction:column;gap:16px">
+      <sc-for list="{{ ctFields }}" as="f" hint-placeholder-count="2"><label style="display:flex;flex-direction:column;gap:6px;font-weight:500;font-size:15px">{{ f.l }}<input name="{{ f.k }}" data-f="{{ f.k }}" value="{{ f.v }}" type="{{ f.type }}" aria-invalid="{{ f.inv }}" style="height:52px;border-radius:14px;border:{{ f.bd }};padding:0 16px;background:var(--surface)"><span role="alert" style="display:{{ f.es }};color:var(--fixed-error);font-size:14px">{{ f.err }}</span></label></sc-for>
+      <label style="display:flex;flex-direction:column;gap:6px;font-weight:500;font-size:15px">Topic<select name="ct_topic" data-f="ct_topic" value="{{ fv.ct_topic }}" style="height:52px;border-radius:14px;border:1px solid #767C76;padding:0 12px;background:var(--surface)"><option>Booking</option><option>Gift vouchers</option><option>Allergies or patch test</option><option>Something else</option></select></label>
+      <label style="display:flex;flex-direction:column;gap:6px;font-weight:500;font-size:15px">Message<textarea name="ct_msg" data-f="ct_msg" value="{{ fv.ct_msg }}" rows="4" aria-invalid="{{ ctMsg.inv }}" style="border-radius:14px;border:{{ ctMsg.bd }};padding:12px 16px"></textarea><span role="alert" style="display:{{ ctMsg.es }};color:var(--fixed-error);font-size:14px">{{ ctMsg.err }}</span></label>
+      <button type="button" data-act="submit" data-v="ct" style="align-self:flex-start;height:52px;padding:0 28px;border-radius:999px;border:0;background:var(--ink);color:var(--on-ink);font-weight:600;cursor:pointer">{{ ctBtn }}</button>
+    </form></sc-if>
+  </div>
+</div></div>
+</sc-if>
+
+<sc-if value="{{ isPolicies }}" hint-placeholder-val="{{ false }}">
+<div style="order:2;padding:0 {{ r.px }} {{ r.sec }}"><div style="max-width:1296px;margin:0 auto;display:grid;grid-template-columns:{{ r.c3 }};gap:16px"><sc-for list="{{ policies }}" as="p" hint-placeholder-count="7"><div style="border-radius:24px;background:var(--paper);padding:26px;display:flex;flex-direction:column;gap:8px"><h2 style="font-size:20px;font-weight:600">{{ p.t }}</h2><p style="font-size:15px">{{ p.d }}</p></div></sc-for></div></div>
+</sc-if>
+
+<sc-if value="{{ isCareers }}" hint-placeholder-val="{{ false }}">
+<div style="order:2;padding:0 {{ r.px }} {{ r.sec }}"><div style="max-width:1296px;margin:0 auto;display:grid;grid-template-columns:{{ r.split }};gap:{{ r.gapL }};align-items:start">
+  <div style="display:flex;flex-direction:column;gap:14px"><sc-for list="{{ roles }}" as="o" hint-placeholder-count="2"><div style="border-radius:28px;background:var(--paper);padding:28px;display:flex;flex-direction:column;gap:8px"><h2 style="font-size:22px;font-weight:600">{{ o.n }}</h2><p style="font-size:14px;color:var(--muted)">{{ o.type }}</p><p style="font-size:15px">{{ o.d }}</p></div></sc-for><div role="img" aria-label="A technician's desk with a curing lamp" style="aspect-ratio:16/10;border-radius:28px;background:#C9CEC6 url(&quot;assets/33/desk-lamp.jpg&quot;) center/cover"></div></div>
+  <div>
+    <sc-if value="{{ apDone }}" hint-placeholder-val="{{ false }}"><div role="status" style="border-radius:28px;background:var(--accent-soft);padding:32px;display:flex;flex-direction:column;gap:12px"><h2 style="font-size:24px;font-weight:600">Application sent</h2><p>Inés reads every one and replies within a week (Sample).</p><button type="button" data-act="reset" data-v="ap" style="align-self:flex-start;height:48px;padding:0 22px;border-radius:999px;border:1px solid var(--ink);background:none;font-weight:600;cursor:pointer">Send another</button></div></sc-if>
+    <sc-if value="{{ apForm }}" hint-placeholder-val="{{ true }}"><form novalidate="" style="display:flex;flex-direction:column;gap:16px">
+      <sc-for list="{{ apFields }}" as="f" hint-placeholder-count="2"><label style="display:flex;flex-direction:column;gap:6px;font-weight:500;font-size:15px">{{ f.l }}<input name="{{ f.k }}" data-f="{{ f.k }}" value="{{ f.v }}" type="{{ f.type }}" aria-invalid="{{ f.inv }}" style="height:52px;border-radius:14px;border:{{ f.bd }};padding:0 16px;background:var(--surface)"><span role="alert" style="display:{{ f.es }};color:var(--fixed-error);font-size:14px">{{ f.err }}</span></label></sc-for>
+      <label style="display:flex;flex-direction:column;gap:6px;font-weight:500;font-size:15px">Role<select name="ap_role" data-f="ap_role" value="{{ fv.ap_role }}" style="height:52px;border-radius:14px;border:1px solid #767C76;padding:0 12px;background:var(--surface)"><option value="desk">Desk rental</option><option value="tech">Nail technician</option></select></label>
+      <label style="display:flex;flex-direction:column;gap:6px;font-weight:500;font-size:15px">Your experience<textarea name="ap_msg" data-f="ap_msg" value="{{ fv.ap_msg }}" rows="4" aria-invalid="{{ apMsg.inv }}" style="border-radius:14px;border:{{ apMsg.bd }};padding:12px 16px"></textarea><span role="alert" style="display:{{ apMsg.es }};color:var(--fixed-error);font-size:14px">{{ apMsg.err }}</span></label>
+      <button type="button" data-act="submit" data-v="ap" style="align-self:flex-start;height:52px;padding:0 28px;border-radius:999px;border:0;background:var(--ink);color:var(--on-ink);font-weight:600;cursor:pointer">{{ apBtn }}</button>
+    </form></sc-if>
+  </div>
+</div></div>
+</sc-if>
+
+<sc-if value="{{ isJournal }}" hint-placeholder-val="{{ false }}">
+<div style="order:2;padding:0 {{ r.px }} {{ r.sec }}"><div style="max-width:1296px;margin:0 auto;display:grid;grid-template-columns:{{ r.c3 }};gap:{{ r.gap }}"><sc-for list="{{ posts }}" as="p" hint-placeholder-count="3"><a href="#" data-go="post" data-k="{{ p.id }}" style="display:flex;flex-direction:column;gap:12px;color:var(--ink)"><div role="img" aria-label="{{ p.alt }}" style="aspect-ratio:4/3;border-radius:24px;background:{{ p.bg }};display:flex;align-items:center;justify-content:center"><span style="display:{{ p.noImg }};font-family:var(--font-display);font-size:28px;color:var(--accent)">Notes</span></div><p style="font-size:14px;color:var(--muted)">{{ p.dateT }}</p><h2 style="font-size:20px;font-weight:600;line-height:1.3">{{ p.t }}</h2><p style="font-size:15px;color:var(--muted)">{{ p.ex }}</p></a></sc-for></div></div>
+</sc-if>
+
+<sc-if value="{{ isPost }}" hint-placeholder-val="{{ false }}">
+<article style="order:2;padding:0 {{ r.px }} {{ r.sec }}"><div style="max-width:760px;margin:0 auto;display:flex;flex-direction:column;gap:20px">
+  <sc-if value="{{ post.hasImg }}" hint-placeholder-val="{{ true }}"><div role="img" aria-label="{{ post.alt }}" style="aspect-ratio:16/9;border-radius:28px;background:#C9CEC6 url(&quot;{{ post.img }}&quot;) center/cover"></div></sc-if>
+  <sc-for list="{{ post.bodyL }}" as="b" hint-placeholder-count="3"><p style="font-size:18px">{{ b.x }}</p></sc-for>
+  <a href="#" data-go="book" style="align-self:flex-start;height:52px;padding:0 28px;border-radius:999px;background:var(--accent);color:#FFFFFF;font-weight:600;display:flex;align-items:center">Book a consultation</a>
+</div></article>
+</sc-if>
+
+<sc-if value="{{ isPrivacy }}" hint-placeholder-val="{{ false }}">
+<div style="order:2;padding:0 {{ r.px }} {{ r.sec }}"><div style="max-width:760px;margin:0 auto;display:flex;flex-direction:column;gap:16px"><sc-for list="{{ privacy }}" as="x" hint-placeholder-count="4"><div><h2 style="font-size:20px;font-weight:600">{{ x.t }}</h2><p>{{ x.d }}</p></div></sc-for></div></div>
+</sc-if>
+
+<sc-if value="{{ is404 }}" hint-placeholder-val="{{ false }}">
+<div style="order:2;padding:0 {{ r.px }} {{ r.sec }}"><div style="max-width:1296px;margin:0 auto;display:flex;flex-wrap:wrap;gap:12px"><a href="#" data-go="home" style="height:52px;padding:0 24px;border-radius:999px;background:var(--ink);color:var(--on-ink);font-weight:600;display:flex;align-items:center">Home</a><a href="#" data-go="services" style="height:52px;padding:0 24px;border-radius:999px;border:1px solid var(--ink);color:var(--ink);font-weight:600;display:flex;align-items:center">Prices</a><a href="#" data-go="book" style="height:52px;padding:0 24px;border-radius:999px;border:1px solid var(--ink);color:var(--ink);font-weight:600;display:flex;align-items:center">Book</a></div></div>
+</sc-if>
+
+</main>
+
+<footer style="background:var(--ink);color:var(--on-ink);padding:{{ r.sec }} {{ r.px }} 32px">
+  <div style="max-width:1296px;margin:0 auto;display:flex;flex-direction:column;gap:48px">
+    <div style="display:flex;flex-wrap:wrap;gap:24px;justify-content:space-between;align-items:end;border-bottom:1px solid #5A5160;padding-bottom:40px">
+      <p style="font-family:var(--font-display);font-size:{{ r.h2 }};line-height:1.1;max-width:14ch">Your next set is three weeks away.</p>
+      <a href="#" data-go="book" style="height:52px;padding:0 28px;border-radius:999px;background:var(--on-ink);color:var(--ink);font-weight:600;display:flex;align-items:center;white-space:nowrap">Book</a>
+    </div>
+    <div style="display:grid;grid-template-columns:{{ r.c3 }};gap:32px">
+      <div style="display:flex;flex-direction:column;gap:10px"><svg role="img" aria-label="Lacquer Room" width="196" height="30" viewBox="0 0 196 30"><rect x="4" y="2" width="16" height="26" rx="8" fill="#EEF1EC"></rect><path d="M12 9c2.4 3 3.6 5 3.6 6.8a3.6 3.6 0 0 1-7.2 0C8.4 14 9.6 12 12 9z" fill="#2B2230"></path><text x="30" y="23" font-family="Gloock, Georgia, serif" font-size="22" fill="#EEF1EC">Lacquer Room</text></svg><p>{{ biz.addr }}</p><a href="tel:+15550147" style="color:var(--on-ink)">{{ biz.phone }}</a><a href="mailto:hello@lacquerroom.example" style="color:var(--on-ink)">{{ biz.email }}</a></div>
+      <nav aria-label="Footer" style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px 24px;align-content:start"><sc-for list="{{ footLinks }}" as="n" hint-placeholder-count="8"><a href="#" data-go="{{ n.go }}" style="color:var(--on-ink);padding:4px 0">{{ n.l }}</a></sc-for></nav>
+      <div style="display:flex;flex-direction:column;gap:8px"><h2 style="font-size:16px;font-weight:600">Opening hours</h2><dl style="display:grid;grid-template-columns:auto 1fr;gap:4px 20px;font-size:15px"><sc-for list="{{ hours }}" as="h" hint-placeholder-count="7"><dt>{{ h.d }}</dt><dd>{{ h.h }}</dd></sc-for></dl></div>
+    </div>
+    <div style="display:flex;flex-wrap:wrap;gap:12px 24px;justify-content:space-between;font-size:14px;color:#D5D0D8">
+      <p>Lacquer Room is a fictional business. Prices, ratings, qualifications and the address are Sample. © {{ year }}</p>
+      <div style="display:flex;gap:20px"><a href="#" data-go="policies" style="color:var(--on-ink)">Policies</a><a href="#" data-go="privacy" style="color:var(--on-ink)">Privacy</a></div>
+    </div>
+  </div>
+</footer>
+
+<sc-if value="{{ isMobile }}" hint-placeholder-val="{{ false }}">
+<div style="position:sticky;bottom:0;z-index:30;display:grid;grid-template-columns:2fr 1fr;gap:8px;padding:10px 12px;background:var(--surface);border-top:1px solid var(--line)">
+  <a href="#" data-go="book" style="height:48px;border-radius:999px;background:var(--accent);color:#FFFFFF;font-weight:600;display:flex;align-items:center;justify-content:center">Book</a>
+  <a href="tel:+15550147" style="height:48px;border-radius:999px;border:1px solid var(--ink);color:var(--ink);font-weight:600;display:flex;align-items:center;justify-content:center">Call</a>
+</div>
+</sc-if>
+
+<sc-if value="{{ lbOpen }}" hint-placeholder-val="{{ false }}">
+<div role="dialog" aria-label="Photo viewer" style="position:fixed;inset:0;z-index:80;background:rgba(20,16,24,0.92);display:flex;align-items:center;justify-content:center;padding:24px">
+  <figure style="max-width:960px;width:100%;display:flex;flex-direction:column;gap:12px;color:#FFFFFF"><div role="img" aria-label="{{ lb.alt }}" style="width:100%;aspect-ratio:4/3;border-radius:12px;background:#3A3140 url(&quot;{{ lb.img }}&quot;) center/contain no-repeat"></div><figcaption style="font-size:15px">{{ lb.alt }} · {{ lb.tag }} · {{ lb.pos }}</figcaption></figure>
+  <button type="button" data-act="lbx" aria-label="Close" style="position:absolute;top:16px;right:16px;width:48px;height:48px;border-radius:999px;border:0;background:#FFFFFF;cursor:pointer;display:flex;align-items:center;justify-content:center"><span aria-hidden="true" style="width:20px;height:20px;background:#2B2230;-webkit-mask:url(https://unpkg.com/lucide-static@0.460.0/icons/x.svg) center/contain no-repeat;mask:url(https://unpkg.com/lucide-static@0.460.0/icons/x.svg) center/contain no-repeat"></span></button>
+  <button type="button" data-act="lbn" data-v="-1" aria-label="Previous photo" style="position:absolute;left:12px;top:50%;width:48px;height:48px;border-radius:999px;border:0;background:#FFFFFF;cursor:pointer;display:flex;align-items:center;justify-content:center"><span aria-hidden="true" style="width:20px;height:20px;background:#2B2230;-webkit-mask:url(https://unpkg.com/lucide-static@0.460.0/icons/chevron-left.svg) center/contain no-repeat;mask:url(https://unpkg.com/lucide-static@0.460.0/icons/chevron-left.svg) center/contain no-repeat"></span></button>
+  <button type="button" data-act="lbn" data-v="1" aria-label="Next photo" style="position:absolute;right:12px;top:50%;width:48px;height:48px;border-radius:999px;border:0;background:#FFFFFF;cursor:pointer;display:flex;align-items:center;justify-content:center"><span aria-hidden="true" style="width:20px;height:20px;background:#2B2230;-webkit-mask:url(https://unpkg.com/lucide-static@0.460.0/icons/chevron-right.svg) center/contain no-repeat;mask:url(https://unpkg.com/lucide-static@0.460.0/icons/chevron-right.svg) center/contain no-repeat"></span></button>
+</div>
+</sc-if>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;currency&quot;:{&quot;editor&quot;:&quot;text&quot;,&quot;default&quot;:&quot;$&quot;,&quot;tsType&quot;:&quot;string&quot;},&quot;showDemoBar&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:true,&quot;tsType&quot;:&quot;boolean&quot;}}">
+class Component extends DCLogic {
+  constructor(p){super(p);let h=1,d='auto';try{h=+localStorage.getItem('lr33-home')||1;d=localStorage.getItem('lr33-device')||'auto'}catch(e){}
+    const F={};['gf_to','gf_from','gf_email','gf_msg','bk_name','bk_phone','bk_email','bk_notes','ct_name','ct_email','ct_topic','ct_msg','ap_name','ap_email','ap_role','ap_msg'].forEach(k=>F[k]='');F.ct_topic='Booking';F.ap_role='desk';
+    this.state={page:'home',key:null,home:h,dev:d,w:1440,menu:false,lb:null,lbSet:'home',gtag:'All',faq:-1,fv:F,err:{},st:{},fin:'gel',fam:'berry',shade:0,gift:'gel',bk:{step:1,svc:null,tech:'any',day:0,time:null,shade:null}};
+    this.frameRef=React.createRef();}
+  componentDidMount(){const el=this.frameRef.current;if(el&&window.ResizeObserver){this.ro=new ResizeObserver(es=>{const w=Math.round(es[0].contentRect.width);if(w&&w!==this.state.w)this.setState({w})});this.ro.observe(el)}
+    this.kd=e=>{if(e.key==='Escape')this.setState({menu:false,lb:null});if(this.state.lb!==null&&(e.key==='ArrowRight'||e.key==='ArrowLeft'))this.stepLb(e.key==='ArrowRight'?1:-1)};
+    window.addEventListener('keydown',this.kd);window.__lr33={go:(p,k)=>this.go(p,k),set:o=>this.setState(o),get:()=>this.state};}
+  componentWillUnmount(){this.ro&&this.ro.disconnect();window.removeEventListener('keydown',this.kd)}
+  top(){try{const r=document.querySelector('[data-v33="frame"]');if(r)window.scrollTo(0,r.getBoundingClientRect().top+window.scrollY)}catch(e){}}
+  go(page,key){this.setState({page,key:key||null,menu:false,lb:null,err:{},faq:-1});this.top()}
+  scrollTo(id){setTimeout(()=>{const el=document.getElementById(id);if(el)window.scrollTo(0,el.getBoundingClientRect().top+window.scrollY-80)},30)}
+  lbList(){const T=window.LR33,S=this.state;if(S.lbSet==='home')return T.GALLERY.slice(0,6);return T.GALLERY.filter(g=>S.gtag==='All'||g.tag===S.gtag)}
+  stepLb(d){const g=this.lbList();if(!g.length)return;this.setState(s=>({lb:(s.lb+d+g.length)%g.length}))}
+  svcAll(){return window.LR33.CATS.flatMap(c=>c.items)}
+  validate(f){const v=this.state.fv,e={},em=/^[^@\s]+@[^@\s]+\.[^@\s]+$/,ph=/^[+()\d\s-]{7,}$/;const req=(k,m)=>{if(!String(v[k]||'').trim())e[k]=m};
+    if(f==='gift'){req('gf_to','Who is it for?');req('gf_from','Who is it from?');if(!em.test(v.gf_email))e.gf_email='Add an email to send the gift to.'}
+    if(f==='bk'){req('bk_name','Add your name.');if(!ph.test(v.bk_phone))e.bk_phone='Add a phone number for the confirmation text.';if(v.bk_email&&!em.test(v.bk_email))e.bk_email='Check the email address.'}
+    if(f==='ct'){req('ct_name','Add your name.');if(!em.test(v.ct_email))e.ct_email='Add an email so we can reply.';req('ct_msg','Write a short message.')}
+    if(f==='ap'){req('ap_name','Add your name.');if(!em.test(v.ap_email))e.ap_email='Add an email so we can reply.';req('ap_msg','Tell us about your experience.')}
+    return e}
+  submit(f){const e=this.validate(f);if(Object.keys(e).length){this.setState({err:e,st:{...this.state.st,[f]:'error'}});return}
+    this.setState({err:{},st:{...this.state.st,[f]:'sending'}});setTimeout(()=>this.setState(s=>({st:{...s.st,[f]:'done'}})),900)}
+  onClick=e=>{const t=e.target.closest&&e.target.closest('[data-go],[data-act]');if(!t)return;if(t.tagName==='A')e.preventDefault();
+    if(t.dataset.go){this.go(t.dataset.go,t.dataset.k);return}
+    const a=t.dataset.act,v=t.dataset.v,S=this.state,svcs=this.svcAll();
+    if(a==='home'){this.setState({home:+v,page:'home',menu:false});try{localStorage.setItem('lr33-home',v)}catch(x){}}
+    else if(a==='dev'){this.setState({dev:v});try{localStorage.setItem('lr33-device',v)}catch(x){}}
+    else if(a==='menu')this.setState({menu:!S.menu});
+    else if(a==='scroll')this.scrollTo(v);
+    else if(a==='fin'){this.setState({fin:v,shade:0});if(t.dataset.scroll)this.scrollTo(t.dataset.scroll)}
+    else if(a==='fam')this.setState({fam:v,shade:0});
+    else if(a==='shade')this.setState({shade:+v});
+    else if(a==='bookshade'){const map={classic:'classic-mani',gel:'gel',biab:'biab',chrome:'chrome',press:'press'};const sh=window.LR33.SHADES[S.fam][S.shade];this.setState({bk:{step:2,svc:map[S.fin],tech:'any',day:0,time:null,shade:sh[0]}});this.go('book')}
+    else if(a==='gift')this.setState({gift:v});
+    else if(a==='gtag')this.setState({gtag:v,lb:null});
+    else if(a==='lbh')this.setState({lbSet:'home',lb:+v});
+    else if(a==='lb')this.setState({lbSet:'gal',lb:+v});
+    else if(a==='lbx')this.setState({lb:null});
+    else if(a==='lbn')this.stepLb(+v);
+    else if(a==='faq')this.setState({faq:S.faq===+v?-1:+v});
+    else if(a==='submit'){e.preventDefault();this.submit(v)}
+    else if(a==='reset')this.setState({st:{...S.st,[v]:null}});
+    else if(a==='booksvc'){this.setState({bk:{step:2,svc:v,tech:'any',day:0,time:null,shade:null}});this.go('book')}
+    else if(a==='bookwith'){this.setState({bk:{step:1,svc:null,tech:v,day:0,time:null,shade:null}});this.go('book')}
+    else if(a==='again'){this.setState({bk:{step:4,svc:'biab-infill',tech:'ines',day:+v+1,time:['11:30','14:00','10:30'][+v],shade:'Oxide'}});this.go('book')}
+    else if(a==='bksvc')this.setState({bk:{...S.bk,svc:v,step:2}});
+    else if(a==='bktech')this.setState({bk:{...S.bk,tech:v,step:3}});
+    else if(a==='bkday')this.setState({bk:{...S.bk,day:+v,time:null}});
+    else if(a==='bktime')this.setState({bk:{...S.bk,time:v,step:4}});
+    else if(a==='bkstep')this.setState({bk:{...S.bk,step:+v}});
+    else if(a==='bknew')this.setState({bk:{step:1,svc:null,tech:'any',day:0,time:null,shade:null},st:{...S.st,bk:null}});};
+  onChange=e=>{const k=e.target.dataset&&e.target.dataset.f;if(!k)return;this.setState({fv:{...this.state.fv,[k]:e.target.value}})};
+  renderVals(){
+    const T=window.LR33;if(!T)return {r:{},fw:'100%'};
+    const S=this.state,P=this.props,cur=P.currency||'$',$=n=>cur+n,ic=n=>'url(https://unpkg.com/lucide-static@0.460.0/icons/'+n+'.svg) center/contain no-repeat';
+    const fixed={d:1440,t:768,m:390}[S.dev];const w=fixed||S.w||1440;const m=w<640,t=!m&&w<1024,d=!m&&!t;const fw=fixed?fixed+'px':'100%';
+    const r={px:d?'56px':t?'32px':'20px',sec:d?'112px':t?'80px':'64px',secS:d?'64px':t?'48px':'40px',heroPad:d?'40px':t?'40px':'28px',
+      disp:d?'96px':t?'64px':'44px',h1i:d?'64px':t?'52px':'40px',h2:d?'44px':t?'36px':'32px',lead:d?'20px':t?'18px':'16px',logoW:w<360?150:196,bkPad:w<360?'0 16px':'0 22px',
+      gap:d?'40px':t?'28px':'24px',gapL:d?'64px':t?'40px':'40px',cardPad:d?'32px':'24px',cardPadL:d?'56px':t?'40px':'28px',
+      heroCols:d?'minmax(0,5fr) minmax(0,6fr)':'minmax(0,1fr)',mosRows:d?'236px 236px':t?'220px 220px':'160px 160px',
+      split:d||t?'repeat(2,minmax(0,1fr))':'minmax(0,1fr)',heroH:d?'min(760px,calc(100vh - 76px))':t?'620px':'560px',
+      splitImgH:m?'320px':'auto',splitImgM:m?'0 0 32px':'40px 0',splitImgR:m?'24px':'320px 320px 28px 28px',
+      chartCols:d?'minmax(0,6fr) minmax(0,5fr)':'minmax(0,1fr)',c5:d?'repeat(5,minmax(0,1fr))':t?'repeat(3,minmax(0,1fr))':'repeat(2,minmax(0,1fr))',tileH:d?'340px':t?'300px':'240px',
+      c4:d?'repeat(4,minmax(0,1fr))':'repeat(2,minmax(0,1fr))',c3:d?'repeat(3,minmax(0,1fr))':t?'repeat(2,minmax(0,1fr))':'minmax(0,1fr)',c2:m?'minmax(0,1fr)':'repeat(2,minmax(0,1fr))',
+      mosRow:d?'220px':t?'180px':'140px',baH:m?'280px':'440px',hmCols:d?'minmax(0,5fr) minmax(0,7fr)':'minmax(0,1fr)',spCols:d?'minmax(0,5fr) minmax(0,3fr) minmax(0,4fr)':'minmax(0,1fr)',
+      againCols:m?'minmax(0,1fr)':'160px minmax(0,1fr)'};
+    const p=S.page,H=S.home;
+    const navDef=[['services','Services'],['team','Team'],['gallery','Gallery'],['vouchers','Gift vouchers'],['about','About'],['contact','Contact']];
+    const navLinks=navDef.map(([go,l])=>({go,l,cur:p===go?'page':'false',line:p===go?'var(--accent)':'transparent'}));
+    const menuLinks=[['home','Home'],...navDef,['policies','Policies'],['journal','Journal'],['careers','Careers']].map(([go,l])=>({go,l}));
+    const footLinks=[['services','Services'],['team','Team'],['gallery','Gallery'],['vouchers','Gift vouchers'],['book','Book'],['about','About'],['journal','Journal'],['careers','Careers'],['contact','Contact']].map(([go,l])=>({go,l}));
+    const td=(new Date().getDay()+6)%7;const hours=T.HOURS.map(([dd,h],i)=>({d:dd,h,fw:i===td?600:400}));
+    // chart
+    const F=T.FINISHES.find(f=>f.id===S.fin)||T.FINISHES[1];const noFit=(T.NOFIT[S.fin]||[]).includes(S.fam);
+    const fins=T.FINISHES.map(f=>({...f,on:String(f.id===S.fin),line:f.id===S.fin?'var(--accent)':'transparent',fg:f.id===S.fin?'var(--ink)':'var(--muted)'}));
+    const fams=T.FAMILIES.map(f=>({...f,on:String(f.id===S.fam),bd:f.id===S.fam?'var(--ink)':'#C9CEC6',sw:T.SHADES[f.id][f.id==='french'?3:0][1]}));
+    const shades=T.SHADES[S.fam].map(([n,hex],i)=>({n,hex,i,on:String(i===S.shade),ring:i===S.shade?'var(--ink)':'transparent'}));
+    const sh=T.SHADES[S.fam][S.shade]||T.SHADES[S.fam][0];const famN=T.FAMILIES.find(f=>f.id===S.fam).n;
+    const pick={n:sh[0],hex:sh[1],fam:famN,fin:F.n,note:F.note,min:F.min+' min',wear:F.wear,price:$(F.p+(S.fam==='french'?12:0)),soak:F.soak};
+    const showChart=(p==='home'&&H===1)||p==='services';
+    const pmBg=[['var(--accent)','#FFFFFF'],['var(--accent-soft)','var(--ink)'],['var(--ink)','var(--on-ink)'],['var(--paper)','var(--ink)'],['#93A58E','var(--ink)']];
+    const pmTiles=T.FINISHES.map((f,i)=>({...f,price:$(f.p),min:f.min+' min',bg:pmBg[i][0],fg:pmBg[i][1]}));
+    const spans=d?[['span 2','span 2'],['span 1','span 1'],['span 1','span 2'],['span 1','span 1'],['span 2','span 1'],['span 1','span 1']]:[['span 2','span 2'],['span 1','span 1'],['span 1','span 1'],['span 1','span 1'],['span 1','span 1'],['span 2','span 1']];
+    const homeGal=T.GALLERY.slice(0,6).map((g,i)=>({...g,i,gc:spans[i][0],gr:spans[i][1]}));
+    const quotes=T.QUOTES.map((q,i)=>({...q,ml:m?'0':['0','auto','12%'][i]}));
+    const giftIds=['gel','biab','chrome','pedicure','classic-mani'];const svcById={};this.svcAll().forEach(s=>svcById[s.id]=s);
+    const gifts=giftIds.map(id=>{const s=svcById[id];const on=S.gift===id;return {id,n:s.n,price:$(s.p),on:String(on),bd:on?'var(--ink)':'#C9CEC6',bg:on?'var(--paper)':'var(--surface)'}});
+    const gs=svcById[S.gift]||svcById.gel;const giftPick={n:gs.n,min:gs.min+' min',price:$(gs.p)};
+    const techs=T.TECHS.map(x=>({...x,nextT:x.leave?'On leave. '+x.leave+'.':'Next free: '+x.next+' (Sample)',dis:!!x.leave,op:x.leave?0.45:1,btn:x.leave?'Not taking bookings':'Book with '+x.n}));
+    const first=T.FIRST;
+    const pcCols=T.CATS.slice(0,2).map(c=>({...c,items:c.items.slice(0,4).map(i=>({...i,price:$(i.p)}))}));
+    const tour=[{img:T.A+'room-light.jpg',alt:'Warm pendant light over the desks',c:'Warm light over the desks, daylight bulbs for colour',ar:'4/3'},{img:T.A+'gloves-nippers.jpg',alt:'Sterile nippers in gloved hands',c:'Tools from a sealed pouch',ar:m?'4/3':'3/4'},{img:T.A+'desk-lamp.jpg',alt:'A technician\u2019s desk with a curing lamp',c:'Four desks, never more than four clients',ar:'4/3'}];
+    const againTimes=['Thu 11:30','Fri 14:00','Sat 10:30'].map((l,i)=>({l:l+' (Sample)',i}));
+    const shelf=T.SHELF.map(s=>({...s,price:$(s.p)}));
+    const faq=T.FAQ.map((f,i)=>({...f,i,on:String(S.faq===i),show:S.faq===i?'block':'none',ic:ic(S.faq===i?'minus':'plus')}));
+    const lbL=this.lbList();const lbi=S.lb!==null&&lbL.length?lbL[S.lb%lbL.length]:null;
+    const lb=lbi?{...lbi,pos:(S.lb%lbL.length+1)+' of '+lbL.length}:{img:'',alt:'',tag:'',pos:''};
+    return Object.assign({r,fw,frameRef:this.frameRef,onClick:this.onClick,onChange:this.onChange,biz:T.BIZ,year:new Date().getFullYear(),
+      showDemo:P.showDemoBar!==false,demoHomes:[1,2,3].map(v=>({v,l:'Home '+v,on:String(H===v),bg:H===v?'#EEF1EC':'transparent',fg:H===v?'#2B2230':'#EEF1EC'})),
+      demoDevs:[['auto','Fluid'],['d','Desktop'],['t','Tablet'],['m','Mobile']].map(([v,l])=>({v,l,on:String(S.dev===v),bg:S.dev===v?'#EEF1EC':'transparent',fg:S.dev===v?'#2B2230':'#EEF1EC'})),
+      wide:d,narrow:!d,isMobile:m,menuOpen:S.menu&&!d,menuAria:String(S.menu),menuLbl:S.menu?'Close menu':'Open menu',menuIcon:ic(S.menu?'x':'menu'),
+      navLinks,menuLinks,footLinks,hours,
+      isH1:p==='home'&&H===1,isH2:p==='home'&&H===2,isH3:p==='home'&&H===3,
+      chartShow:showChart?'block':'none',chartOrder:1,fins,fams,shades,pick,chartFit:!noFit,chartNoFit:noFit,fitMsgH:F.n+' and '+famN+' is not a pair we do',
+      pmTiles,homeGal,quotes,gifts,giftPick,techs,first,pcCols,tour,againTimes,shelf,faq,lbOpen:S.lb!==null,lb},this.pageVals(T,S,r,$,ic,m,svcById));}
+  pageVals(T,S,r,$,ic,m,svcById){
+    const p=S.page,k=S.key,w=S.dev==='d'?1440:S.dev==='t'?768:S.dev==='m'?390:S.w,d=w>=1024;
+    r.catCols=d?'minmax(0,4fr) minmax(0,8fr)':'minmax(0,1fr)';r.slotCols=m?'repeat(3,minmax(0,1fr))':'repeat(5,minmax(0,1fr))';
+    const tKey=T.TREAT[k]?k:'gel',techK=T.TECHS.find(x=>x.id===k)||T.TECHS[0],postK=T.POSTS.find(x=>x.id===k)||T.POSTS[0];
+    const heads={services:['Prices and treatments','Every treatment with its time and price. Use the colour chart to see a finish before you book.'],
+      treatment:[T.TREAT[tKey].n,T.TREAT[tKey].lead],team:['Technicians','Four qualified technicians, four desks. Book with someone by name or take the first free.'],
+      person:[techK.n,techK.role],gallery:['Gallery','Recent sets from the studio, by finish.'],vouchers:['Gift a treatment','Choose the treatment, add the names, and we send a card by email.'],
+      book:['Book an appointment','Four short steps. This sends a request; the studio confirms by text.'],about:['About the studio','A small nail studio in an old weaving shed in Mill District, since 2019.'],
+      contact:['Contact and find us','Questions about allergies, gift cards or a booking. Or just walk in on a weekday afternoon.'],
+      policies:['Studio policies','Cancellation, late arrival, deposits, patch tests and hygiene, in plain words.'],
+      careers:['Work with us','A rentable desk two days a week and a part-time technician role.'],journal:['Journal','Short notes on nail health and how we work.'],
+      post:[postK.t,new Date(postK.date).toLocaleDateString('en-GB',{day:'numeric',month:'long',year:'numeric'})],
+      privacy:['Privacy','What we keep about you, and for how long. Sample policy for the template buyer to replace.'],notfound:['This page has chipped','The link may be old. Try one of these instead.']};
+    const pk=heads[p]?p:(p==='home'?null:'notfound');const hd=pk?heads[pk]:['',''];
+    const crumbs={treatment:['services','Prices'],person:['team','Technicians'],post:['journal','Journal']};const cr=crumbs[pk];
+    const cats=T.CATS.map(c=>({...c,items:c.items.map(i=>({...i,price:$(i.p),dShow:i.detail?'flex':'none',dGo:i.detail?'treatment':'services'}))}));
+    const Tt=T.TREAT[tKey],ts=svcById[tKey]||svcById.gel,fin=T.FINISHES.find(f=>f.id===tKey);
+    const tr={...Tt,id:tKey,min:ts.min+' min',price:$(ts.p),wear:fin?fin.wear:tKey==='pedicure'?'4–6 weeks':'2–3 weeks',steps:Tt.steps.map(x=>({x}))};
+    const nT=x=>x.leave?'On leave. '+x.leave+'.':'Next free: '+x.next+' (Sample)';
+    const pr={...techK,nextT:nT(techK),dis:!!techK.leave,op:techK.leave?0.45:1,btn:techK.leave?'Not taking bookings':'Book with '+techK.n,specL:techK.spec.map(id=>({id,n:svcById[id].n,price:$(svcById[id].p)}))};
+    const gl=T.GALLERY.filter(g=>S.gtag==='All'||g.tag===S.gtag);
+    const gtags=T.GTAGS.map(t=>({t,on:String(S.gtag===t),line:S.gtag===t?'var(--accent)':'transparent',fg:S.gtag===t?'var(--ink)':'var(--muted)'}));
+    const E=S.err,fv=S.fv,field=(k,l,type)=>({k,l,type:type||'text',v:fv[k],err:E[k]||'',es:E[k]?'block':'none',inv:String(!!E[k]),bd:E[k]?'2px solid var(--fixed-error)':'1px solid #767C76'});
+    const st=f=>S.st[f]||'idle',btn=(f,l)=>st(f)==='sending'?'Sending…':l;
+    const B=S.bk,svcs=Object.values(svcById),bs=B.svc?svcById[B.svc]:null,bt=B.tech!=='any'?T.TECHS.find(x=>x.id===B.tech):null;
+    const days=[0,1,2,3,4,5].map(i=>{const dt=new Date();dt.setDate(dt.getDate()+i);const l=i===0?'Today':i===1?'Tomorrow':dt.toLocaleDateString('en-GB',{weekday:'short',day:'numeric'});return {i,l,on:String(B.day===i),bd:B.day===i?'var(--ink)':'#C9CEC6',bg:B.day===i?'var(--paper)':'var(--surface)'}});
+    const bkSlots=['10:00','10:45','11:30','12:15','13:30','14:15','15:00','15:45','16:30','17:15'].map((s,i)=>{const tk=((i*5+B.day*3+(B.tech||'').length)%4)===0;const on=B.time===s;return {s,dis:tk,lbl:tk?s+' taken':s,bd:on?'var(--ink)':'#C9CEC6',bg:on?'var(--ink)':tk?'var(--paper)':'var(--surface)',fg:on?'var(--on-ink)':tk?'#6E6A72':'var(--ink)',td:tk?'line-through':'none'}});
+    const dayL=days[B.day]?days[B.day].l:'';
+    const sumT=[bs?bs.n+' ('+bs.min+' min, '+$(bs.p)+')':null,B.shade?'shade '+B.shade:null,B.step>2||B.tech!=='any'?(bt?'with '+bt.n:'first free technician'):null,B.time?dayL+' '+B.time:null].filter(Boolean).join(' · ');
+    const long=bs&&(bs.min>=60),patch=bs&&['biab','biab-infill','press'].includes(bs.id);
+    const posts=T.POSTS.map(x=>({...x,dateT:new Date(x.date).toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'}),bg:x.img?'#C9CEC6 url("'+x.img+'") center/cover':'var(--accent-soft)',noImg:x.img?'none':'block',alt:x.alt||'No photo for this post'}));
+    return {hasPageHead:!!pk,head:{h:hd[0],p:hd[1]},crumb:{show:!!cr,go:cr?cr[0]:'',l:cr?cr[1]:''},
+      isServices:p==='services',isTreat:p==='treatment',isTeam:p==='team',isPerson:p==='person',isGallery:p==='gallery',isGift:p==='vouchers',isBook:p==='book',isAbout:p==='about',isContact:p==='contact',isPolicies:p==='policies',isCareers:p==='careers',isJournal:p==='journal',isPost:p==='post',isPrivacy:p==='privacy',is404:pk==='notfound',
+      cats,tr,pr,gtags,galList:gl.map((g,i)=>({...g,i})),galCount:gl.length+(gl.length===1?' photo':' photos')+(S.gtag==='All'?'':' tagged '+S.gtag),galEmpty:!gl.length,
+      gfTo:(fv.gf_to||'').trim()||'someone',gfFrom:(fv.gf_from||'').trim()||'you',giftDone:st('gift')==='done',giftForm:st('gift')!=='done',giftBtn:btn('gift','Send gift request'),
+      giftFields:[field('gf_to','For'),field('gf_from','From'),field('gf_email','Send to email','email')],fv,
+      bkSteps:[['1','Treatment'],['2','Technician'],['3','Day and time'],['4','Your details']].map(([v,l])=>({v,l,dis:+v>B.step||(+v>1&&!B.svc),cur:+v===B.step?'step':'false',line:+v===B.step?'var(--accent)':'transparent',fg:+v<=B.step?'var(--ink)':'#6E6A72'})),
+      bkSummary:{show:!!sumT,t:sumT},bk1:B.step===1,bk2:B.step===2,bk3:B.step===3,bk4:B.step===4,
+      bkSvcs:svcs.map(s=>({...s,price:$(s.p),bd:B.svc===s.id?'var(--ink)':'#C9CEC6'})),
+      bkTechs:[{id:'any',n:'First free technician',mono:'LR',sub:'Quickest',dis:false,op:1}].concat(T.TECHS.map(x=>({id:x.id,n:x.n,mono:x.mono,sub:x.leave?'On leave':x.role,dis:!!x.leave,op:x.leave?0.45:1}))).map(x=>({...x,bd:B.tech===x.id?'var(--ink)':'#C9CEC6'})),
+      bkDays:days,bkSlots,bkDone:st('bk')==='done',bkForm:st('bk')!=='done',bkBtn:btn('bk','Send booking request'),
+      bkFields:[field('bk_name','Name'),field('bk_phone','Phone','tel'),field('bk_email','Email (optional)','email')],
+      bkNote:{dep:long?'A $10 deposit (Sample) is taken for treatments of 60 minutes or more, off your bill.':'No deposit for this treatment.',patch:patch?'BIAB and press-on glue: tell us about any past reaction. We offer a patch test 48 hours before.':'Tell us about any allergy in the notes.'},
+      values:[{t:'Hand files only',d:'No e-file on the natural nail. Ever.',bg:'var(--accent)',fg:'#FFFFFF'},{t:'Thin layers',d:'Lighter sets that bend with your nail and soak off cleanly.',bg:'var(--accent-soft)',fg:'var(--ink)'},{t:'Honest advice',d:'If a design will chip in a week, we say so before we start.',bg:'var(--ink)',fg:'var(--on-ink)'}],
+      ctDone:st('ct')==='done',ctForm:st('ct')!=='done',ctBtn:btn('ct','Send message'),ctFields:[field('ct_name','Name'),field('ct_email','Email','email')],ctMsg:field('ct_msg','Message'),
+      policies:T.POLICIES,roles:T.ROLES,apDone:st('ap')==='done',apForm:st('ap')!=='done',apBtn:btn('ap','Send application'),apFields:[field('ap_name','Name'),field('ap_email','Email','email')],apMsg:field('ap_msg','Experience'),
+      posts,post:{...postK,hasImg:!!postK.img,bodyL:postK.body.map(x=>({x}))},
+      privacy:[{t:'What we keep',d:'Your name, phone, email and treatment notes (including allergies) so we can book and treat you safely.'},{t:'How long',d:'Booking records for two years after your last visit, then deleted.'},{t:'Who sees it',d:'Your technician and the booking system provider. We never sell or share it for marketing.'},{t:'Your rights',d:'Ask us for a copy or deletion at hello@lacquerroom.example. Sample text — replace with your own policy.'}]};}
+}
+</script>
+</body>
+</html>

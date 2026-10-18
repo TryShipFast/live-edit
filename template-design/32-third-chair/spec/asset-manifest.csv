@@ -1,0 +1,13 @@
+asset_id,local_path,source_url,licence,photographer,identifiable_person,notes
+IMG-01,assets/32/chair-brick.jpg,https://unsplash.com/photos/EW_rqoSdDes,Unsplash License,Nathon Oski,No,small bottles on counter — Phase 2 check
+IMG-02,assets/32/cut-scissors.jpg,https://unsplash.com/photos/tgPrIYnW3g4,Unsplash License,Nate Johnston,Yes (side),demo image — replace before publishing
+IMG-03,assets/32/man-chair.jpg,https://unsplash.com/photos/IvQeAVeJULw,Unsplash License,Allef Vinicius,Yes (partial),shave scene; demo image
+IMG-04,assets/32/chairs-dim.jpg,https://unsplash.com/photos/fa0DqQ91dWU,Unsplash License,T,No,
+IMG-05,assets/32/shop-classic.jpg,https://unsplash.com/photos/aM2VSVn8ktg,Unsplash License,Barney Goodman,Yes (far),b/w
+IMG-06,assets/32/chair-silver.jpg,https://unsplash.com/photos/dU6eE_j2My8,Unsplash License,Joshua Lawrence,No,
+IMG-07,assets/32/pendant-salon.jpg,https://unsplash.com/photos/2seUdPQNy_I,Unsplash License,Jason Leung,No,bottles on counter small — Phase 2 check
+REJECTED,barbers-modern,https://unsplash.com/photos/BX8OTlmHOaI,—,Chaps & Co,—,shop name sign
+REJECTED,clippers-slate,https://unsplash.com/photos/MNu0n-3BIKs,—,Andrea Donato,—,product labels
+REJECTED,razor-tattoo,https://unsplash.com/photos/1Pmp9uxK8X8,—,Agustin Fernandez,—,text on razor
+REJECTED,blowdry-denim,https://unsplash.com/photos/wJoB8D3hnzc,—,delfina pan,—,logo on cape and apron
+REJECTED,shop-empty,https://unsplash.com/photos/AXurvQTtO3Y,—,Barney Goodman,—,emblem on ceiling

@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<meta name="design_doc_mode" content="canvas">
+<link href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;600;700&display=swap" rel="stylesheet">
+<style>body{margin:0;background:#ECEAE6;font-family:Figtree,sans-serif;color:#1F1F1F}a{color:#1F1F1F}a:hover{color:#6B4E3D}</style>
+</helmet>
+<section style="padding:48px;display:flex;flex-direction:column;gap:32px">
+  <div id="0" style="background:#FFFFFF;border-radius:8px;padding:24px;display:flex;flex-direction:column;gap:18px;max-width:1100px">
+    <div style="display:flex;gap:10px;align-items:center"><span style="background:#1E1A17;color:#FFFFFF;font-weight:700;font-size:14px;padding:4px 10px;border-radius:6px">Step 1</span><h2 style="margin:0;font-size:22px">Brand first</h2></div>
+    <div style="display:flex;flex-wrap:wrap;gap:24px;align-items:center">
+      <div style="height:48px;width:200px;background:url(&quot;assets/31/logo-lockup-light.svg&quot;) left center/contain no-repeat" role="img" aria-label="Maren logo"></div>
+      <div style="width:48px;height:48px;background:url(&quot;assets/31/logo-mark.svg&quot;) center/contain no-repeat" role="img" aria-label="Maren mark"></div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <div style="display:flex;flex-direction:column;gap:4px;font-size:12px"><span style="width:56px;height:40px;border-radius:6px;background:#1E1A17"></span>Ink</div>
+        <div style="display:flex;flex-direction:column;gap:4px;font-size:12px"><span style="width:56px;height:40px;border-radius:6px;background:#9A4A2C"></span>Clay</div>
+        <div style="display:flex;flex-direction:column;gap:4px;font-size:12px"><span style="width:56px;height:40px;border-radius:6px;background:#F4EEE8;border:1px solid #E2D9D1"></span>Raised</div>
+        <div style="display:flex;flex-direction:column;gap:4px;font-size:12px"><span style="width:56px;height:40px;border-radius:6px;background:#3B3430"></span>Body</div>
+        <div style="display:flex;flex-direction:column;gap:4px;font-size:12px"><span style="width:56px;height:40px;border-radius:6px;background:#6B625C"></span>Muted</div>
+      </div>
+    </div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:16px;font-size:14px;line-height:1.5">
+      <div><strong>Type</strong><br>Bodoni Moda 500 — display 64/40, H2 44/30 (never under 28px)<br>Figtree — H3 600 22, body 17/16, price 600 tabular</div>
+      <div><strong>Voice</strong><br>Plain, warm, “you”. Time and price up front. No hype words, no exclamation marks.</div>
+      <div><strong>Imagery</strong><br>Real work in natural light — hands, tools, finished hair. No logos or signs.</div>
+    </div>
+    <span style="font-size:13px;color:#5A5650">Full spec: rev1/brand.md, tokens.json, logo-system.md</span>
+  </div>
+  <div style="display:flex;flex-direction:column;gap:10px;max-width:1100px">
+    <h1 style="margin:0;font-size:36px">Step 2 — plan + wireframes</h1>
+    <p style="margin:0;font-size:17px;line-height:1.55;text-wrap:pretty">Low-fi structure built on the brand above. Each block says who it is for and what it earns. Design continues from this; feedback welcome anytime.</p>
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:12px">
+      <sc-for list="{{ plan }}" as="p" hint-placeholder-count="4">
+        <div style="background:#FFFFFF;border-radius:8px;padding:16px;display:flex;flex-direction:column;gap:6px"><strong style="font-size:15px">{{ p.t }}</strong><span style="font-size:14px;line-height:1.5;color:#4A4A4A">{{ p.d }}</span></div>
+      </sc-for>
+    </div>
+  </div>
+  <div style="display:flex;flex-wrap:wrap;gap:40px;align-items:flex-start">
+    <sc-for list="{{ screens }}" as="s" hint-placeholder-count="6">
+      <div id="{{ s.id }}" style="width:{{ s.w }};display:flex;flex-direction:column;gap:12px">
+        <div style="display:flex;gap:10px;align-items:center"><span style="background:#1F1F1F;color:#FFFFFF;font-weight:700;font-size:14px;padding:4px 10px;border-radius:6px">{{ s.id }}</span><strong style="font-size:18px">{{ s.t }}</strong></div>
+        <span style="font-size:14px;color:#4A4A4A;line-height:1.5">{{ s.who }}</span>
+        <div style="background:#FFFFFF;border:1px solid #BDB8B0;border-radius:6px;padding:12px;display:flex;flex-direction:column;gap:10px">
+          <sc-for list="{{ s.blocks }}" as="b" hint-placeholder-count="6">
+            <div style="display:flex;flex-direction:column;gap:6px">
+              <div style="display:flex;gap:8px;min-height:{{ b.h }}">
+                <sc-for list="{{ b.cells }}" as="c" hint-placeholder-count="2">
+                  <div style="flex:{{ c.f }};background:{{ c.bg }};border:1px dashed #9C968D;border-radius:4px;padding:10px;display:flex;align-items:center;justify-content:center;text-align:center;font-size:13px;color:#3A3A3A;line-height:1.4">{{ c.t }}</div>
+                </sc-for>
+              </div>
+              <div style="display:flex;gap:6px;font-size:12px;line-height:1.45;color:#5A5650"><strong style="color:#1F1F1F;flex:0 0 auto">{{ b.n }}</strong><span>{{ b.why }}</span></div>
+            </div>
+          </sc-for>
+        </div>
+      </div>
+    </sc-for>
+  </div>
+  <div style="background:#FFFFFF;border-radius:8px;padding:24px;display:flex;flex-direction:column;gap:12px;max-width:1100px">
+    <h2 style="margin:0;font-size:22px">Task walk-through (taps from landing, desktop)</h2>
+    <sc-for list="{{ tasks }}" as="k" hint-placeholder-count="5">
+      <div style="display:grid;grid-template-columns:minmax(0,2fr) 70px minmax(0,3fr);gap:16px;padding:10px 0;border-top:1px solid #E5E2DD;font-size:14px;line-height:1.5"><strong>{{ k.t }}</strong><span>{{ k.n }} taps</span><span style="color:#4A4A4A">{{ k.risk }}</span></div>
+    </sc-for>
+    <p style="margin:0;font-size:13px;color:#5A5650">Not tested with real visitors — these are walk-throughs, not usability results. README will say so.</p>
+  </div>
+</section>
+</x-dc>
+<script type="text/x-dc" data-dc-script>
+class Component extends DCLogic {
+  renderVals(){
+    const G='#F1EFEB',D='#D9D5CE',X='#C9C3B9';
+    const c=(t,f=1,bg=G)=>({t,f,bg});
+    const B=(n,why,h,...cells)=>({n,why,h:h+'px',cells});
+    const head=B('Header','Book always one tap away on every page.',44,c('Logo',1),c('Services · Team · Gallery · Vouchers',4),c('[ Book ]',1,X));
+    const foot=B('Footer','Hours, address, policies, rebook sign-up; names the business as fictional.',90,c('Hours + address',1),c('Links',1),c('Rebook reminder sign-up',1),c('Sample · fictional business',1,D));
+    const screens=[
+      {id:'1a',t:'Home 1 — first visit',w:'560px',who:'New client: is this place for me, what will it cost, can I book now?',blocks:[head,
+        B('Hero','Headline + one big salon photo; two CTAs (Book / See prices).',220,c('Headline · 1 line promise · [Book] [See prices]',1),c('Large salon photo',1,D)),
+        B('Price by level','3 tier cards, Senior centred + highlighted (middle-option upsell); cuts “how much?” calls.',150,c('Junior $',1),c('Senior $$ ★',1.2,X),c('Director $$$',1)),
+        B('First visit','Consultation, patch test, aftercare — removes first-visit worry.',90,c('1 Consult',1),c('2 Patch test',1),c('3 Aftercare',1)),
+        B('Team','Pick a stylist → person page (each shows level + price).',120,c('Portrait',1,D),c('Portrait',1,D),c('Portrait',1,D),c('Portrait',1,D)),
+        B('Reviews','3 short Sample quotes + rating; trust before booking.',80,c('Quote',1),c('Quote',1),c('Quote',1)),
+        B('Find us','Hours + map placeholder + [Book].',90,c('Hours · parking',1),c('Map placeholder',1.4,D)),foot]},
+      {id:'1b',t:'Home 2 — colour client',w:'560px',who:'Colour client (highest spend): what will happen for 3 hours, who does it, is it safe?',blocks:[head,
+        B('Hero','Tall stylist-at-work photo; one CTA: book a colour consultation.',240,c('Tall photo — stylist at work',1.2,D),c('Headline · [Book colour consultation]',1)),
+        B('Colour menu','Cards in 3 shapes (feature / tall / small) — not a price table.',160,c('Balayage (feature)',1.6,X),c('Gloss (tall)',1),c('Toner · Roots (small)',1)),
+        B('3-hour timeline','Answers “what happens for 3 hours?” before a $190 booking.',70,c('Consult',1),c('Apply',1),c('Process',1),c('Tone',1),c('Finish',1)),
+        B('Patch-test band','48h rule shown before booking — fewer wasted slots.',50,c('Patch test 48h before · [How it works]',1,D)),
+        B('Colour gallery','Filtered strip → full gallery + lightbox.',110,c('Work',1,D),c('Work',1,D),c('Work',1,D)),
+        B('Voucher picker','Amount chips → vouchers page; gift sales.',70,c('$50 · $100 · $150 · Custom → [Buy]',1)),foot]},
+      {id:'1c',t:'Home 3 — regular',w:'560px',who:'Returning client: rebook my usual fast; check late hours.',blocks:[head,
+        B('Hero','Book-your-usual panel with the next 3 free times; photo strip behind.',200,c('Scrolling work strip',1.4,D),c('Book your usual: service · stylist · 3 next times',1,X)),
+        B('Owner note','Short note + portrait; keeps the relationship personal.',110,c('Owner portrait',1,D),c('Note from the owner',2)),
+        B('Late Thursday','Band: open till 9pm Thursdays → [Book Thursday].',50,c('Late Thursdays · [Book]',1,D)),
+        B('Aftercare journal','3 posts → post pages; repeat visits to site.',110,c('Post',1),c('Post',1),c('Post',1)),
+        B('Rebook reminder','“Remind me in 6 weeks” sign-up; rebooking rate.',60,c('Email · [Remind me]',1)),foot]},
+      {id:'1d',t:'Book (4 steps)',w:'560px',who:'All visitors: request a time without phoning.',blocks:[head,
+        B('Steps','Service → Stylist → Time → Details; always see where you are.',40,c('1 Service',1,X),c('2 Stylist',1),c('3 Time',1),c('4 Details',1)),
+        B('Step body + summary','Choice on the left, running price + time on the right.',220,c('Current step choices',2),c('Summary: service, stylist, price, length',1,D)),
+        B('Patch-test check','Colour only: confirm a test 48h before, or book one.',50,c('☐ I had a patch test in the last 6 months',1)),
+        B('States','Error per field, sending, request sent (not confirmed).',50,c('Error',1),c('Sending',1),c('Request sent',1)),foot]},
+      {id:'1e',t:'Services',w:'560px',who:'Comparers: what do you offer and at what level?',blocks:[head,
+        B('Intro + level switch','Junior / Senior / Director re-prices every card.',70,c('Title',2),c('Level: J · S · D',1,X)),
+        B('Category cards','Cut · Colour · Treatments · Bridal — different card sizes.',170,c('Cut',1),c('Colour (large)',1.5,X),c('Treatments',1)),
+        B('Signature treatments','4 → treatment pages.',90,c('Arch-top photo',1,D),c('Arch-top photo',1,D),c('Arch-top photo',1,D),c('Arch-top photo',1,D)),
+        B('Policies teaser','Cancellation + deposit in plain words → policies.',50,c('24h cancellation · deposit · lateness',1)),foot]},
+      {id:'1f',t:'Home 1 — mobile 390',w:'300px',who:'Most salon traffic is on phones.',blocks:[
+        B('Header','Logo + menu; Book lives in the sticky bar.',40,c('Logo',2),c('☰',1)),
+        B('Hero','Photo first, headline, 2 CTAs stacked.',200,c('Photo',1,D)),
+        B('Tiers','Swipe cards, Senior first in view.',110,c('Senior ★',1,X)),
+        B('Team','2-up portraits.',100,c('Portrait',1,D),c('Portrait',1,D)),
+        B('Sticky bar','Always visible: Book · Call.',44,c('[ Book ]',1,X),c('[ Call ]',1))]}
+    ];
+    return {screens,
+      plan:[{t:'Who visits',d:'New clients, colour clients (highest spend), regulars rebooking, gift buyers.'},
+        {t:'What the business needs',d:'More first bookings, upsell to senior levels, rebooking, voucher sales, fewer phone calls.'},
+        {t:'Proof of success (Phase 2)',d:'Book clicks per home, booking completion, voucher clicks, rebook sign-ups.'},
+        {t:'Rules kept',d:'No real places, one editable currency ($), cards over tables, Sample labels, fictional footer.'}],
+      tasks:[{t:'First booking (cut with a Senior)',n:6,risk:'Stylist step could confuse if levels are unclear — tier cards explain them first.'},
+        {t:'Book a balayage (colour)',n:7,risk:'Patch-test check adds a step; worth it to avoid wasted 3-hour slots.'},
+        {t:'Rebook my usual',n:2,risk:'Needs remembered details; in the template the “usual” is a Sample.'},
+        {t:'Buy a $100 voucher',n:4,risk:'Delivery date field easy to miss — placed directly under the amount.'},
+        {t:'Find Thursday late hours',n:1,risk:'Only on Home 3 + footer; also add to contact page.'}]};
+  }
+}
+</script>
+</body>
+</html>

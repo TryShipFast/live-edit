@@ -1,0 +1,11 @@
+# Maren — logo system
+- **Mark:** a salon mirror arch with one clay stroke down the middle (the parting). It reads at 16px.
+- **Files:**
+  - `logo-mark.svg` and `favicon.svg`: ink tile
+  - `logo-mono.svg`: one colour
+  - `logo-lockup-light.svg`: for light grounds
+  - `logo-lockup-dark.svg`: for ink grounds
+- **Clear space:** the width of the arch stroke × 4.
+- **Minimum size:** mark 16px; lockup 112px wide.
+- **Don't:** fill the arch, rotate it, recolour the arch in clay, or add a tagline.
+- **Buyer swap:** header, mobile menu, footer and 404 each use one `<img data-logo>`. Replace `logo-lockup-light.svg` and `logo-lockup-dark.svg` with SVGs, or with PNGs at 2× the shown height (32px). Wide, square and tall logos are all held by max-height 32px / max-width 180px with object-fit contain.
