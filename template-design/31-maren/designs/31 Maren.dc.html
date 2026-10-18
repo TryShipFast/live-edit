@@ -1,0 +1,894 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bodoni+Moda:ital,opsz,wght@0,6..96,400..700;1,6..96,400..600&family=Figtree:wght@400;500;600;700&display=swap">
+<link rel="icon" href="assets/31/favicon.svg">
+<script src="31-maren-data.js"></script>
+<style>
+html,body{margin:0;background:#E9E4DE}
+*{box-sizing:border-box}
+h1,h2,h3,h4,p,figure,blockquote,dl,dd,ul,ol{margin:0}
+h1,h2,h3,h4{color:inherit;font-variant-numeric:normal;overflow-wrap:break-word;hyphens:auto}
+a{color:#7A3A22;text-decoration:none}a:hover{color:#1E1A17;text-decoration:underline}
+button,input,select,textarea{font:inherit;color:inherit}
+:focus-visible{outline:3px solid currentColor;outline-offset:3px}
+input::placeholder,textarea::placeholder{color:#6B625C}
+.m31-strip::-webkit-scrollbar{height:6px}.m31-strip::-webkit-scrollbar-thumb{background:#CFC4BA;border-radius:3px}
+@media (prefers-reduced-motion: reduce){*{transition:none!important;animation:none!important;scroll-behavior:auto!important}}
+</style>
+</helmet>
+<div data-v31="root" onClick="{{ onClick }}" onKeyDown="{{ onKey }}" style="min-height:100vh;display:flex;justify-content:center;padding:{{ framePad }}">
+<div data-v31="frame" ref="{{ frameRef }}" style="--brand-ink:#1E1A17;--brand-accent:#9A4A2C;--brand-surface:#FFFFFF;--brand-raised:#F4EEE8;--brand-body:#3B3430;--brand-muted:#6B625C;--brand-line:#E2D9D1;--font-display:'Bodoni Moda',Didot,'Bodoni 72',Georgia,serif;--font-body:Figtree,system-ui,-apple-system,'Segoe UI',sans-serif;--fixed-error:#B42318;--fixed-scrim:#000000;width:{{ frameW }};max-width:100%;background:var(--brand-surface);color:var(--brand-body);font-family:var(--font-body);font-size:{{ r.body }};line-height:1.6;font-variant-numeric:tabular-nums;position:relative;box-shadow:{{ frameShadow }}">
+
+<header style="position:sticky;top:0;z-index:40;background:var(--brand-surface);border-bottom:1px solid var(--brand-line);padding:0 {{ r.px }}">
+  <div style="max-width:1296px;margin:0 auto;height:76px;display:flex;align-items:center;justify-content:space-between;gap:24px">
+    <a href="#" data-go="home" aria-label="Maren, home" style="display:flex;align-items:center;flex:0 0 auto"><img data-logo="header" src="assets/31/logo-lockup-light.svg" alt="Maren" style="height:32px;width:auto;max-width:180px;object-fit:contain;display:block"></a>
+    <nav aria-label="Main" style="display:{{ navD }};align-items:center;gap:28px;font-size:15px;font-weight:500">
+      <sc-for list="{{ nav }}" as="n" hint-placeholder-count="6"><a href="#" data-go="{{ n.go }}" aria-current="{{ n.cur }}" style="color:var(--brand-ink);padding:10px 0;border-bottom:2px solid {{ n.bd }};text-decoration:none">{{ n.t }}</a></sc-for>
+    </nav>
+    <div style="display:flex;align-items:center;gap:10px;flex:0 0 auto">
+      <a href="#" data-go="book" style="height:44px;padding:0 22px;display:inline-flex;align-items:center;background:var(--brand-ink);color:var(--brand-surface);font-weight:600;font-size:15px;border-radius:999px;text-decoration:none;white-space:nowrap">Book</a>
+      <button type="button" data-act="menu" aria-label="Open menu" aria-expanded="{{ menu }}" style="display:{{ burgerD }};width:44px;height:44px;border:1px solid var(--brand-line);background:transparent;border-radius:999px;cursor:pointer;align-items:center;justify-content:center"><span style="display:block;width:18px;height:2px;background:var(--brand-ink);box-shadow:0 -6px 0 var(--brand-ink),0 6px 0 var(--brand-ink)"></span></button>
+    </div>
+  </div>
+</header>
+
+<sc-if value="{{ menu }}" hint-placeholder-val="{{ false }}">
+<div role="dialog" aria-modal="true" aria-label="Menu" style="position:fixed;inset:0;z-index:80;background:var(--brand-ink);color:var(--brand-raised);display:flex;flex-direction:column;padding:20px {{ r.px }} 32px;overflow:auto">
+  <div style="display:flex;justify-content:space-between;align-items:center;height:56px">
+    <img data-logo="menu" src="assets/31/logo-lockup-dark.svg" alt="Maren" style="height:32px;width:auto;max-width:180px;object-fit:contain">
+    <button type="button" data-act="menu" aria-label="Close menu" style="width:44px;height:44px;border:1px solid rgba(244,238,232,.4);border-radius:999px;background:transparent;color:var(--brand-raised);font-size:22px;cursor:pointer">×</button>
+  </div>
+  <nav aria-label="Menu" style="display:flex;flex-direction:column;margin-top:28px">
+    <sc-for list="{{ menuNav }}" as="n" hint-placeholder-count="9"><a href="#" data-go="{{ n.go }}" style="color:var(--brand-raised);font-family:var(--font-display);font-size:32px;line-height:1.2;padding:10px 0;border-bottom:1px solid rgba(244,238,232,.18);text-decoration:none">{{ n.t }}</a></sc-for>
+  </nav>
+  <div style="margin-top:auto;padding-top:32px;display:flex;flex-direction:column;gap:6px;font-size:15px"><span>{{ addr }}</span><span>Thursday until 9pm · Monday closed</span></div>
+</div>
+</sc-if>
+
+<main>
+
+<sc-if value="{{ isHome1 }}" hint-placeholder-val="{{ true }}">
+<section aria-label="Introduction" style="padding:{{ r.heroTop }} {{ r.px }} 0">
+  <div style="max-width:1296px;margin:0 auto;display:flex;flex-direction:column;gap:{{ r.gap }}">
+    <h1 style="font-family:var(--font-display);font-weight:500;font-size:{{ r.disp }};line-height:.98;letter-spacing:-.02em;color:var(--brand-ink);max-width:14ch">Hair you can wear on a <em style="font-style:italic;color:var(--brand-accent)">Tuesday.</em></h1>
+    <div style="display:grid;grid-template-columns:{{ r.hero1 }};gap:{{ r.gap }};align-items:start">
+      <div style="display:flex;flex-direction:column;gap:24px;padding-top:4px">
+        <p style="font-size:{{ r.lead }};line-height:1.5;color:var(--brand-body);max-width:34ch">Cuts, colour and blow-dries in Old Town since 2014. Every appointment starts with a proper talk, and every price is on the menu.</p>
+        <div style="display:flex;flex-wrap:wrap;gap:12px">
+          <a href="#" data-go="book" style="height:52px;padding:0 28px;display:inline-flex;align-items:center;background:var(--brand-accent);color:var(--brand-surface);font-weight:600;border-radius:999px;text-decoration:none">Book an appointment</a>
+          <a href="#" data-go="services" style="height:52px;padding:0 24px;display:inline-flex;align-items:center;color:var(--brand-ink);font-weight:600;border:1px solid var(--brand-ink);border-radius:999px;text-decoration:none">See prices</a>
+        </div>
+        <p style="font-size:14px;color:var(--brand-muted)">Next free chair: Thursday 4:30pm with Hana · Sample</p>
+      </div>
+      <div data-hero-media="images" style="position:relative;border-radius:4px;overflow:hidden;height:{{ r.heroImgH }}">
+        <img data-edit="image" src="assets/31/blow-adam.jpg" alt="Stylist blow-drying a client's hair with a round brush" style="width:100%;height:100%;object-fit:cover;display:block">
+      </div>
+    </div>
+  </div>
+</section>
+
+<section aria-labelledby="h1-prices" style="padding:{{ r.sec }} {{ r.px }} 0">
+  <div style="max-width:1296px;margin:0 auto;display:flex;flex-direction:column;gap:40px">
+    <div style="display:flex;flex-direction:column;gap:12px;max-width:640px">
+      <h2 id="h1-prices" style="font-family:var(--font-display);font-weight:500;font-size:{{ r.h2 }};line-height:1.08;color:var(--brand-ink)">Prices, by who does your hair</h2>
+      <p style="color:var(--brand-muted)">The same service costs more with more years behind the chair. Pick the level that fits the job.</p>
+    </div>
+    <div style="display:grid;grid-template-columns:{{ tierCols }};gap:{{ r.gap }};align-items:stretch">
+      <sc-for list="{{ tiers }}" as="l" hint-placeholder-count="3">
+        <div style="display:flex;flex-direction:column;gap:20px;padding:32px;border-radius:24px;border:1px solid {{ l.bd }};background:{{ l.bg }}">
+          <div style="display:flex;flex-direction:column;gap:8px">
+            <h3 style="font-family:var(--font-display);font-size:28px;font-weight:600;color:var(--brand-ink);line-height:1.1">{{ l.n }}</h3>
+            <p style="font-size:15px;color:var(--brand-muted);min-height:3em">{{ l.d }}</p>
+          </div>
+          <div style="display:flex;align-items:baseline;gap:8px;padding-bottom:20px;border-bottom:1px solid var(--brand-line)"><span style="font-size:15px;color:var(--brand-muted)">Cut and blow-dry from</span><span style="font-family:var(--font-display);font-size:44px;font-weight:600;color:var(--brand-ink);line-height:1;font-variant-numeric:normal">{{ l.lead }}</span></div>
+          <dl style="display:flex;flex-direction:column;gap:12px;flex:1">
+            <sc-for list="{{ l.items }}" as="i" hint-placeholder-count="3"><div style="display:flex;justify-content:space-between;gap:16px"><dt style="display:flex;flex-direction:column;gap:2px;color:var(--brand-body)"><span>{{ i.n }}</span><span style="color:var(--brand-muted);font-size:14px">{{ i.minT }}</span></dt><dd style="font-weight:600;color:var(--brand-ink)">{{ i.price }}</dd></div></sc-for>
+          </dl>
+          <a href="#" data-go="book" style="min-height:48px;display:flex;align-items:center;justify-content:center;border-radius:999px;font-weight:600;background:{{ l.btnBg }};color:{{ l.btnFg }};border:1px solid var(--brand-ink);text-decoration:none">{{ l.btn }}</a>
+        </div>
+      </sc-for>
+    </div>
+    <p style="font-size:14px;color:var(--brand-muted)">Prices are from, and Sample. Colour over {{ depositOver }} takes a 20% deposit. <a href="#" data-go="services">Full menu</a> · <a href="#" data-go="policies">Booking policies</a></p>
+  </div>
+</section>
+
+
+<section aria-labelledby="h1-first" style="padding:{{ r.sec }} {{ r.px }} 0">
+  <div style="max-width:1296px;margin:0 auto;display:grid;grid-template-columns:{{ r.split }};gap:{{ r.gapL }};align-items:start">
+    <div style="display:flex;flex-direction:column;gap:18px"><h2 id="h1-first" style="font-family:var(--font-display);font-weight:500;font-size:{{ r.h2 }};line-height:1.08;color:var(--brand-ink)">Your first visit, without surprises</h2><p style="max-width:40ch">New here? Three things happen before anyone picks up scissors. Nothing is charged until you agree the plan.</p><a href="#" data-go="policies" style="font-weight:600">Read our policies</a></div>
+    <dl style="display:flex;flex-direction:column;margin:0">
+      <div style="display:grid;grid-template-columns:minmax(0,1fr) minmax(0,2fr);gap:20px;padding:22px 0;border-top:1px solid var(--brand-line)"><dt style="font-weight:600;font-size:{{ r.h3 }};color:var(--brand-ink)">A 15-minute consultation</dt><dd style="margin:0">Your stylist looks at your hair in daylight, asks how you wear it, and gives you a price before starting.</dd></div>
+      <div style="display:grid;grid-template-columns:minmax(0,1fr) minmax(0,2fr);gap:20px;padding:22px 0;border-top:1px solid var(--brand-line)"><dt style="font-weight:600;font-size:{{ r.h3 }};color:var(--brand-ink)">A patch test for colour</dt><dd style="margin:0">A small test 48 hours before any colour. It takes five minutes and is free.</dd></div>
+      <div style="display:grid;grid-template-columns:minmax(0,1fr) minmax(0,2fr);gap:20px;padding:22px 0;border-top:1px solid var(--brand-line);border-bottom:1px solid var(--brand-line)"><dt style="font-weight:600;font-size:{{ r.h3 }};color:var(--brand-ink)">Aftercare you can keep</dt><dd style="margin:0">A written note of what was used and how to look after it until next time.</dd></div>
+    </dl>
+  </div>
+</section>
+
+<section aria-labelledby="h1-team" style="padding:{{ r.sec }} {{ r.px }} 0">
+  <div style="max-width:1296px;margin:0 auto;display:flex;flex-direction:column;gap:28px">
+    <h2 id="h1-team" style="font-family:var(--font-display);font-weight:500;font-size:{{ r.h2 }};line-height:1.08;color:var(--brand-ink)">Who's on the floor this week</h2>
+    <div style="display:grid;grid-template-columns:{{ r.c4 }};gap:{{ r.gapS }}">
+      <sc-for list="{{ team4 }}" as="p" hint-placeholder-count="4">
+        <div style="display:flex;flex-direction:column;gap:12px">
+          <a href="#" data-go="person" data-arg="{{ p.id }}" aria-label="{{ p.n }}, {{ p.r }}" style="display:block;aspect-ratio:4/5;border-radius:4px;background:#D9D0C7 url(&quot;{{ p.img }}&quot;) center/cover"></a>
+          <div style="display:flex;flex-direction:column;gap:2px"><a href="#" data-go="person" data-arg="{{ p.id }}" style="font-family:var(--font-display);font-size:22px;font-weight:600;color:var(--brand-ink)">{{ p.n }}</a><span style="font-size:15px">{{ p.r }}</span><span style="font-size:14px;color:var(--brand-muted)">{{ p.spec }}</span></div>
+          <a href="#" data-go="book" data-who="{{ p.id }}" style="font-weight:600;font-size:15px">Book with {{ p.first }}</a>
+        </div>
+      </sc-for>
+    </div>
+  </div>
+</section>
+
+<section aria-label="Client reviews" style="padding:{{ r.sec }} {{ r.px }} 0">
+  <div style="max-width:1296px;margin:0 auto;display:flex;flex-direction:column;gap:32px">
+    <div style="display:grid;grid-template-columns:{{ r.c2 }};gap:{{ r.gapL }}">
+      <sc-for list="{{ reviews }}" as="v" hint-placeholder-count="2"><figure style="display:flex;flex-direction:column;gap:16px"><blockquote style="font-family:var(--font-display);font-size:{{ r.quote }};line-height:1.3;color:var(--brand-ink)">“{{ v.q }}”</blockquote><figcaption style="font-size:15px;color:var(--brand-muted)">{{ v.n }} · {{ v.s }} · Sample</figcaption></figure></sc-for>
+    </div>
+    <p style="font-size:15px;color:var(--brand-body);padding-top:20px;border-top:1px solid var(--brand-line)">Rated 4.9 out of 5 from 212 reviews on our booking platform · Sample</p>
+  </div>
+</section>
+
+<section aria-labelledby="h1-visit" style="padding:{{ r.sec }} 0 0">
+  <div style="display:grid;grid-template-columns:{{ r.visit }};background:var(--brand-raised)">
+    <div role="img" aria-label="The salon floor with chairs and round mirrors" style="min-height:{{ r.visitH }};background:#D9D0C7 url(&quot;assets/31/salon-window.jpg&quot;) center/cover"></div>
+    <div style="padding:{{ r.secS }} {{ r.px }};display:flex;flex-direction:column;gap:20px;justify-content:center">
+      <h2 id="h1-visit" style="font-family:var(--font-display);font-weight:500;font-size:{{ r.h2 }};line-height:1.08;color:var(--brand-ink)">Find us on Alder Row</h2>
+      <p>{{ addr }} · Sample. Two minutes from the Old Town tram stop, step-free from the street.</p>
+      <dl style="display:grid;grid-template-columns:auto 1fr;column-gap:24px;row-gap:6px;font-size:15px"><sc-for list="{{ hours }}" as="h" hint-placeholder-count="7"><dt style="font-weight:600;color:var(--brand-ink)">{{ h.d }}</dt><dd>{{ h.t }}</dd></sc-for></dl>
+      <div style="display:flex;gap:12px;flex-wrap:wrap"><a href="#" data-go="contact" style="height:48px;padding:0 22px;display:inline-flex;align-items:center;border:1px solid var(--brand-ink);border-radius:999px;color:var(--brand-ink);font-weight:600;text-decoration:none">Directions and parking</a></div>
+    </div>
+  </div>
+</section>
+</sc-if>
+
+<sc-if value="{{ isHome2 }}" hint-placeholder-val="{{ false }}">
+<section aria-label="Introduction" style="display:grid;grid-template-columns:{{ r.hero2 }};min-height:{{ r.hero2H }}">
+  <div style="background:var(--brand-raised);padding:{{ r.secS }} {{ r.px }};display:flex;flex-direction:column;justify-content:flex-end;gap:24px;order:{{ r.h2Order }}">
+    <h1 style="font-family:var(--font-display);font-weight:500;font-size:{{ r.h1x }};line-height:1;letter-spacing:-.015em;color:var(--brand-ink);max-width:11ch">Colour that grows out softly.</h1>
+    <p style="font-size:{{ r.lead }};line-height:1.5;max-width:36ch">Balayage, glosses and colour correction from two creative directors who will tell you honestly how many visits it takes.</p>
+    <div style="display:flex;flex-wrap:wrap;gap:12px"><a href="#" data-go="book" data-svc="balayage" style="height:52px;padding:0 26px;display:inline-flex;align-items:center;background:var(--brand-ink);color:var(--brand-surface);font-weight:600;border-radius:999px;text-decoration:none">Book a colour consultation</a><a href="#" data-go="treatment" data-arg="balayage" style="height:52px;padding:0 22px;display:inline-flex;align-items:center;color:var(--brand-ink);font-weight:600;text-decoration:underline;text-underline-offset:4px">How balayage works</a></div>
+  </div>
+  <div data-hero-media="images" style="position:relative;min-height:{{ r.hero2ImgH }};background:#D9D0C7"><img data-edit="image" src="assets/31/dryer-adam.jpg" alt="Stylist smiling as she blow-dries a client's bob" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:60% 30%"></div>
+</section>
+
+<section aria-labelledby="h2-bal" style="padding:{{ r.sec }} {{ r.px }} 0">
+  <div style="max-width:1296px;margin:0 auto;display:grid;grid-template-columns:{{ r.feat }};gap:{{ r.gapL }};align-items:center">
+    <div role="img" aria-label="Colour being worked through long hair by a bright window" style="aspect-ratio:4/5;border-radius:4px;background:#D9D0C7 url(&quot;assets/31/hairdone-daniel.jpg&quot;) center/cover"></div>
+    <div style="display:flex;flex-direction:column;gap:20px;max-width:56ch">
+      <h2 id="h2-bal" style="font-family:var(--font-display);font-weight:500;font-size:{{ r.h2 }};line-height:1.08;color:var(--brand-ink)">Balayage, painted where the light would land</h2>
+      <p>We paint lightness by hand, section by section, so there is no hard line when it grows. Most clients come back every four to five months, with a gloss in between.</p>
+      <p>Every colour starts with a consultation in daylight and a patch test at least 48 hours before. We agree the price before anything is mixed.</p>
+      <p style="font-size:15px;color:var(--brand-muted)">About 3 hours · from {{ balFrom }} · Sample</p>
+      <a href="#" data-go="treatment" data-arg="balayage" style="font-weight:600">Read about the appointment</a>
+    </div>
+  </div>
+</section>
+
+<section aria-labelledby="h2-menu" style="padding:{{ r.sec }} {{ r.px }} 0">
+  <div style="max-width:1296px;margin:0 auto;display:flex;flex-direction:column;gap:36px">
+    <div style="display:flex;flex-direction:column;gap:10px;max-width:640px"><h2 id="h2-menu" style="font-family:var(--font-display);font-weight:500;font-size:{{ r.h2 }};line-height:1.08;color:var(--brand-ink)">The colour menu</h2><p style="color:var(--brand-muted);font-size:15px">Prices from, with a stylist. Senior and creative director prices on the <a href="#" data-go="services">full menu</a>.</p></div>
+    <div style="display:grid;grid-template-columns:{{ r.c3 }};gap:{{ r.gapS }};align-items:start">
+      <sc-for list="{{ colourMenu }}" as="i" hint-placeholder-count="6">
+        <a href="#" data-go="book" data-svc="{{ i.id }}" style="margin-top:{{ i.mt }};display:flex;flex-direction:column;justify-content:space-between;gap:28px;min-height:240px;padding:{{ i.pad }};border-radius:{{ i.rad }};background:{{ i.bg }};color:{{ i.fg }};text-decoration:none">
+          <span style="display:flex;flex-direction:column;gap:6px"><span style="font-family:var(--font-display);font-size:28px;font-weight:600;line-height:1.1">{{ i.n }}</span><span style="font-size:15px;opacity:.9">{{ i.note }}</span></span>
+          <span style="display:flex;justify-content:space-between;align-items:baseline;gap:12px"><span style="font-size:15px">{{ i.minT }}</span><span style="font-family:var(--font-display);font-size:44px;font-weight:600;line-height:1">{{ i.price }}</span></span>
+        </a>
+      </sc-for>
+    </div>
+  </div>
+</section>
+
+<section aria-labelledby="h2-time" style="padding:{{ r.sec }} {{ r.px }} 0">
+  <div style="max-width:1296px;margin:0 auto;display:flex;flex-direction:column;gap:36px">
+    <div style="display:grid;grid-template-columns:{{ r.split }};gap:{{ r.gap }};align-items:end"><h2 id="h2-time" style="font-family:var(--font-display);font-weight:500;font-size:{{ r.h2 }};line-height:1.08;color:var(--brand-ink)">Your three hours, roughly</h2><p style="max-width:44ch">Bring a book or headphones. Coffee, tea and wifi are on us, and there is a quiet room if you need to take a call.</p></div>
+    <ol style="list-style:none;padding:0;display:grid;grid-template-columns:{{ r.time }};gap:{{ r.gapS }};position:relative">
+      <sc-for list="{{ timeline }}" as="t" hint-placeholder-count="5"><li style="display:flex;flex-direction:column;gap:8px;padding-top:18px;border-top:2px solid var(--brand-ink)"><span style="font-family:var(--font-display);font-size:30px;font-weight:500;color:var(--brand-accent)">{{ t.at }}</span><span style="font-weight:600;color:var(--brand-ink)">{{ t.t }}</span><span style="font-size:15px">{{ t.d }}</span></li></sc-for>
+    </ol>
+    <div role="note" style="background:var(--brand-raised);border-radius:12px;padding:20px 24px;display:flex;flex-wrap:wrap;gap:12px 24px;align-items:center;justify-content:space-between"><p style="max-width:60ch;color:var(--brand-ink)"><strong>Patch test 48 hours before.</strong> Every colour needs one, even if you have coloured before. It is free, takes five minutes and keeps your three hours safe.</p><a href="#" data-go="policies" style="font-weight:600">How the patch test works</a></div>
+  </div>
+</section>
+
+<section aria-labelledby="h2-rail" style="padding:{{ r.sec }} 0 0">
+  <div style="max-width:1296px;margin:0 auto;padding:0 {{ r.px }};display:flex;justify-content:space-between;align-items:baseline;gap:16px;flex-wrap:wrap"><h2 id="h2-rail" style="font-family:var(--font-display);font-weight:500;font-size:{{ r.h2 }};line-height:1.08;color:var(--brand-ink)">Choose who does your colour</h2><a href="#" data-go="team" style="font-weight:600">The whole team</a></div>
+  <div class="m31-strip" style="display:flex;gap:16px;overflow-x:auto;scroll-snap-type:x mandatory;padding:28px {{ r.px }} 12px">
+    <sc-for list="{{ teamRail }}" as="p" hint-placeholder-count="5">
+      <a href="#" data-go="person" data-arg="{{ p.id }}" style="flex:0 0 {{ r.railW }};scroll-snap-align:start;display:flex;flex-direction:column;gap:12px;color:var(--brand-body);text-decoration:none">
+        <span style="display:flex;align-items:center;justify-content:center;aspect-ratio:3/4;border-radius:4px;background:{{ p.bg }};font-family:var(--font-display);font-size:48px;color:var(--brand-accent)">{{ p.mono }}</span>
+        <span style="font-family:var(--font-display);font-size:22px;font-weight:600;color:var(--brand-ink)">{{ p.n }}</span>
+        <span style="font-size:15px">{{ p.spec }}</span>
+        <span style="font-size:14px;color:var(--brand-muted)">{{ p.q }} · Sample</span>
+      </a>
+    </sc-for>
+  </div>
+</section>
+
+<section aria-labelledby="h2-gift" style="padding:{{ r.sec }} {{ r.px }} 0">
+  <div style="max-width:1296px;margin:0 auto;display:grid;grid-template-columns:{{ r.feat }};gap:{{ r.gapL }};align-items:center">
+    <div style="display:flex;flex-direction:column;gap:20px;order:{{ r.giftOrder }}">
+      <h2 id="h2-gift" style="font-family:var(--font-display);font-weight:500;font-size:{{ r.h2 }};line-height:1.08;color:var(--brand-ink)">Give someone an afternoon in the chair</h2>
+      <p>Gift vouchers are valid for twelve months and can be spent on anything on the menu.</p>
+      <div role="radiogroup" aria-label="Voucher amount" style="display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px">
+        <sc-for list="{{ amts }}" as="a" hint-placeholder-count="4"><button type="button" role="radio" aria-checked="{{ a.on }}" data-act="amt" data-v="{{ a.v }}" style="min-height:52px;border:0;border-bottom:2px solid {{ a.bg }};background:transparent;color:{{ a.fg }};font-weight:600;font-size:17px;cursor:pointer">{{ a.t }}</button></sc-for>
+      </div>
+      <a href="#" data-go="vouchers" style="align-self:flex-start;height:52px;padding:0 26px;display:inline-flex;align-items:center;background:var(--brand-ink);color:var(--brand-surface);font-weight:600;border-radius:999px;text-decoration:none">Send a {{ amtLabel }} voucher</a>
+    </div>
+    <div role="img" aria-label="A warm-lit corner of the salon with a basin" style="aspect-ratio:4/3;border-radius:4px;background:#D9D0C7 url(&quot;assets/31/room-light.jpg&quot;) center/cover"></div>
+  </div>
+</section>
+</sc-if>
+
+<sc-if value="{{ isHome3 }}" hint-placeholder-val="{{ false }}">
+<section aria-label="Introduction" style="padding:{{ r.heroTop }} 0 0">
+  <div style="max-width:1296px;margin:0 auto;padding:0 {{ r.px }};display:grid;grid-template-columns:{{ r.split }};gap:{{ r.gap }};align-items:end">
+    <h1 style="font-family:var(--font-display);font-weight:500;font-size:{{ r.h1x }};line-height:1;letter-spacing:-.015em;color:var(--brand-ink)">Book your usual, in two taps.</h1>
+    <div style="display:flex;flex-direction:column;gap:20px"><p style="font-size:{{ r.lead }};line-height:1.5">The same chair, the same stylist, the same coffee order remembered. New this month: late Thursdays until 9pm.</p><div style="display:flex;flex-wrap:wrap;gap:12px"><a href="#" data-go="book" style="height:52px;padding:0 26px;display:inline-flex;align-items:center;background:var(--brand-accent);color:var(--brand-surface);font-weight:600;border-radius:999px;text-decoration:none">Book again</a><a href="#" data-go="gallery" style="height:52px;padding:0 22px;display:inline-flex;align-items:center;border:1px solid var(--brand-ink);color:var(--brand-ink);font-weight:600;border-radius:999px;text-decoration:none">See recent work</a></div></div>
+  </div>
+  <div data-hero-media="images" class="m31-strip" style="display:flex;gap:12px;overflow-x:auto;scroll-snap-type:x mandatory;padding:36px {{ r.px }} 12px">
+    <sc-for list="{{ film }}" as="f" hint-placeholder-count="5"><img data-edit="image" src="{{ f.img }}" alt="{{ f.alt }}" style="flex:0 0 {{ r.filmW }};height:{{ r.filmH }};object-fit:cover;border-radius:4px;scroll-snap-align:start;display:block"></sc-for>
+  </div>
+</section>
+
+<section aria-label="A note from Ines" style="padding:{{ r.sec }} {{ r.px }} 0">
+  <figure style="max-width:960px;margin:0 auto;display:grid;grid-template-columns:{{ r.note }};gap:{{ r.gap }};align-items:center">
+    <div role="img" aria-label="Ines curling a client's hair" style="aspect-ratio:1;border-radius:50%;background:#D9D0C7 url(&quot;assets/31/curl-giorgio.jpg&quot;) center/cover;max-width:220px;width:100%"></div>
+    <div style="display:flex;flex-direction:column;gap:16px"><blockquote style="font-family:var(--font-display);font-size:{{ r.quote }};line-height:1.35;color:var(--brand-ink)">“Twelve years on, the rule hasn't changed: we talk before we cut, we patch test before we colour, and we tell you the price before we start.”</blockquote><figcaption style="font-size:15px;color:var(--brand-muted)">Ines Varga, owner · <a href="#" data-go="about">Our story</a></figcaption></div>
+  </figure>
+</section>
+
+<section aria-labelledby="h3-usual" style="padding:{{ r.sec }} {{ r.px }} 0">
+  <div style="max-width:1296px;margin:0 auto;display:flex;flex-direction:column;gap:24px">
+    <h2 id="h3-usual" style="font-family:var(--font-display);font-weight:500;font-size:{{ r.h2 }};line-height:1.08;color:var(--brand-ink)">Your usual, and the next free time</h2>
+    <div style="display:flex;flex-direction:column;border-top:1px solid var(--brand-ink)">
+      <sc-for list="{{ usual }}" as="u" hint-placeholder-count="5">
+        <a href="#" data-go="book" data-svc="{{ u.id }}" style="display:grid;grid-template-columns:{{ r.usual }};gap:8px 24px;align-items:center;padding:22px 0;border-bottom:1px solid var(--brand-line);color:var(--brand-body);text-decoration:none;min-height:72px">
+          <span style="font-family:var(--font-display);font-size:{{ r.h3 }};font-weight:600;color:var(--brand-ink)">{{ u.n }}</span>
+          <span style="font-size:15px">{{ u.min }} min · from {{ u.price }}</span>
+          <span style="font-size:15px;color:var(--brand-muted)">Next: {{ u.next }} · Sample</span>
+          <span style="font-weight:600;color:var(--brand-accent)">Book →</span>
+        </a>
+      </sc-for>
+    </div>
+  </div>
+</section>
+
+<section aria-labelledby="h3-care" style="padding:{{ r.sec }} {{ r.px }} 0">
+  <div style="max-width:1296px;margin:0 auto;display:flex;flex-direction:column;gap:32px">
+    <h2 id="h3-care" style="font-family:var(--font-display);font-weight:500;font-size:{{ r.h2 }};line-height:1.08;color:var(--brand-ink);max-width:20ch">What every appointment includes</h2>
+    <div style="display:grid;grid-template-columns:{{ r.c3 }};gap:{{ r.gapL }}">
+      <sc-for list="{{ care }}" as="c" hint-placeholder-count="3"><div style="display:flex;flex-direction:column;gap:10px"><h3 style="font-size:18px;font-weight:600;color:var(--brand-ink);line-height:1.35">{{ c.t }}</h3><p style="font-size:16px">{{ c.d }}</p></div></sc-for>
+    </div>
+  </div>
+</section>
+
+<section aria-labelledby="h3-journal" style="padding:{{ r.sec }} {{ r.px }} 0">
+  <div style="max-width:1296px;margin:0 auto;display:flex;flex-direction:column;gap:28px">
+    <div style="display:flex;justify-content:space-between;align-items:baseline;gap:16px;flex-wrap:wrap"><h2 id="h3-journal" style="font-family:var(--font-display);font-weight:500;font-size:{{ r.h2 }};line-height:1.08;color:var(--brand-ink)">From the salon</h2><a href="#" data-go="journal" style="font-weight:600">All notes</a></div>
+    <div style="display:grid;grid-template-columns:{{ r.c3 }};gap:{{ r.gapS }}">
+      <sc-for list="{{ journal }}" as="j" hint-placeholder-count="3">
+        <a href="#" data-go="post" data-arg="{{ j.id }}" style="display:flex;flex-direction:column;gap:12px;color:var(--brand-body);text-decoration:none">
+          <span style="display:{{ j.imgD }};aspect-ratio:3/2;border-radius:4px;background:#D9D0C7 url(&quot;{{ j.img }}&quot;) center/cover"></span>
+          <span style="font-size:14px;color:var(--brand-muted)">{{ j.date }}</span>
+          <span style="font-family:var(--font-display);font-size:22px;line-height:1.25;font-weight:600;color:var(--brand-ink)">{{ j.t }}</span>
+          <span style="font-size:15px">{{ j.ex }}</span>
+        </a>
+      </sc-for>
+    </div>
+  </div>
+</section>
+
+<section aria-labelledby="h3-late" style="margin-top:{{ r.sec }};background:var(--brand-ink);color:var(--brand-raised);padding:{{ r.secS }} {{ r.px }}">
+  <div style="max-width:1296px;margin:0 auto;display:grid;grid-template-columns:{{ r.split }};gap:{{ r.gap }};align-items:end">
+    <div style="display:flex;flex-direction:column;gap:18px"><h2 id="h3-late" style="font-family:var(--font-display);font-weight:500;font-size:{{ r.h1x }};line-height:1;color:var(--brand-surface)">Open until 9pm on Thursdays.</h2><p style="max-width:40ch">Three stylists on, the last appointment at 7:30pm. Walk-ins only if a chair is free.</p><a href="#" data-go="book" style="align-self:flex-start;height:52px;padding:0 26px;display:inline-flex;align-items:center;background:var(--brand-surface);color:var(--brand-ink);font-weight:600;border-radius:999px;text-decoration:none">Book a Thursday</a></div>
+    <dl style="display:grid;grid-template-columns:auto 1fr;column-gap:24px;row-gap:6px;font-size:15px"><sc-for list="{{ hours }}" as="h" hint-placeholder-count="7"><dt style="font-weight:600;color:var(--brand-surface)">{{ h.d }}</dt><dd>{{ h.t }}</dd></sc-for></dl>
+  </div>
+</section>
+<section aria-labelledby="h3-remind" style="padding:{{ r.sec }} {{ r.px }} 0">
+  <div style="max-width:880px;margin:0 auto;display:flex;flex-direction:column;gap:18px;align-items:center;text-align:center">
+    <h2 id="h3-remind" style="font-family:var(--font-display);font-weight:500;font-size:{{ r.h2 }};line-height:1.08;color:var(--brand-ink)">Want a nudge in six weeks?</h2>
+    <p style="max-width:46ch">Most cuts hold their shape for six to eight weeks. Leave your email and we will send one reminder with the next free times. Nothing else.</p>
+    <form onSubmit="{{ rbSubmit }}" novalidate="" style="display:{{ rbFormShow }};flex-direction:column;gap:8px;width:100%;max-width:520px">
+      <div style="display:flex;flex-wrap:wrap;gap:10px"><label for="rb-email" style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)">Email</label><input id="rb-email" name="email" type="email" value="{{ rbVal }}" onChange="{{ rbOn }}" placeholder="name@example.com" aria-describedby="rb-err" style="flex:1 1 240px;min-width:0;height:52px;border-radius:8px;border:{{ rbBd }};padding:0 16px;font-size:16px;background:var(--brand-surface);color:var(--brand-ink)"><button type="submit" style="flex:0 0 auto;height:52px;padding:0 26px;border:0;border-radius:999px;background:var(--brand-ink);color:var(--brand-surface);font-weight:600;font-size:16px;cursor:pointer">{{ rbBtn }}</button></div>
+      <span id="rb-err" role="alert" style="display:{{ rbErrShow }};color:#B42318;font-size:14px;text-align:left">{{ rbErr }}</span>
+    </form>
+    <div role="status" style="display:{{ rbDoneShow }};flex-direction:column;gap:8px;align-items:center"><strong style="color:var(--brand-ink)">Done. We will remind you in six weeks.</strong><button type="button" onClick="{{ rbReset }}" style="background:none;border:0;padding:8px;font-weight:600;color:var(--brand-accent);cursor:pointer;font-size:15px">Use a different email</button></div>
+  </div>
+</section>
+</sc-if>
+
+<sc-if value="{{ is_services }}" hint-placeholder-val="{{ false }}">
+<section aria-labelledby="sv-h" style="padding:{{ r.heroTop }} {{ r.px }} 0">
+  <div style="max-width:1296px;margin:0 auto;display:grid;grid-template-columns:{{ r.split }};gap:{{ r.gap }};align-items:end">
+    <div style="display:flex;flex-direction:column;gap:16px"><h1 id="sv-h" style="font-family:var(--font-display);font-weight:500;font-size:{{ r.h1 }};line-height:1.02;color:var(--brand-ink)">Services and prices</h1><p style="font-size:{{ r.lead }};line-height:1.5;max-width:40ch">Every price, every duration. Prices change with the stylist's level, so pick one and the menu updates.</p></div>
+    <div style="display:flex;flex-direction:column;gap:12px">
+      <div role="radiogroup" aria-label="Stylist level" style="display:flex;flex-wrap:wrap;gap:8px"><sc-for list="{{ levels }}" as="l" hint-placeholder-count="3"><button type="button" role="radio" aria-checked="{{ l.on }}" data-act="level" data-v="{{ l.id }}" style="min-height:44px;padding:0 4px;border:0;border-bottom:2px solid {{ l.bg }};background:transparent;color:{{ l.fg }};font-weight:600;font-size:15px;cursor:pointer">{{ l.n }}</button></sc-for></div>
+      <p style="font-size:15px;color:var(--brand-muted)">{{ levelNote }}</p>
+    </div>
+  </div>
+</section>
+<section aria-label="Menu" style="padding:56px {{ r.px }} 0">
+  <div style="max-width:1296px;margin:0 auto;display:flex;flex-direction:column;gap:{{ r.gapS }}">
+    <sc-for list="{{ menuAll }}" as="g" hint-placeholder-count="4">
+      <div style="display:grid;grid-template-columns:{{ menuGrid }};gap:{{ r.gap }};padding:{{ menuPad }};border-radius:28px;background:var(--brand-raised)">
+        <div style="display:flex;flex-direction:column;gap:10px"><h2 style="font-family:var(--font-display);font-size:30px;font-weight:500;color:var(--brand-ink);line-height:1.1">{{ g.cat }}</h2><p style="font-size:15px;color:var(--brand-muted)">{{ g.count }} services · from {{ g.from }}</p></div>
+        <div style="display:grid;grid-template-columns:{{ r.c2 }};gap:12px">
+          <sc-for list="{{ g.items }}" as="i" hint-placeholder-count="4">
+            <div style="display:flex;flex-direction:column;gap:10px;padding:20px;border-radius:16px;background:var(--brand-surface)">
+              <div style="display:flex;justify-content:space-between;align-items:baseline;gap:12px"><span style="font-weight:600;color:var(--brand-ink);font-size:17px">{{ i.n }}</span><span style="font-family:var(--font-display);font-size:22px;font-weight:600;color:var(--brand-ink)">{{ i.price }}</span></div>
+              <p style="font-size:14px;color:var(--brand-muted);flex:1">{{ i.note }}</p>
+              <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;font-size:14px"><span style="color:var(--brand-muted)">{{ i.minT }}</span><a href="#" data-go="book" data-svc="{{ i.id }}" aria-label="Book {{ i.n }}" style="font-weight:600;min-height:44px;display:flex;align-items:center">Book</a></div>
+            </div>
+          </sc-for>
+        </div>
+      </div>
+    </sc-for>
+  </div>
+</section>
+
+<section aria-labelledby="sv-sig" style="padding:{{ r.sec }} {{ r.px }} 0">
+  <div style="max-width:1296px;margin:0 auto;display:flex;flex-direction:column;gap:28px">
+    <h2 id="sv-sig" style="font-family:var(--font-display);font-weight:500;font-size:{{ r.h2 }};line-height:1.08;color:var(--brand-ink)">Signature appointments</h2>
+    <div style="display:grid;grid-template-columns:{{ r.c4 }};gap:{{ r.gapS }}">
+      <sc-for list="{{ treats }}" as="t" hint-placeholder-count="4"><a href="#" data-go="treatment" data-arg="{{ t.id }}" style="display:flex;flex-direction:column;gap:10px;color:var(--brand-body);text-decoration:none"><span style="aspect-ratio:3/4;border-radius:999px 999px 20px 20px;background:#D9D0C7 url(&quot;{{ t.img }}&quot;) center/cover"></span><span style="font-family:var(--font-display);font-size:22px;font-weight:600;color:var(--brand-ink)">{{ t.n }}</span><span style="font-size:15px;color:var(--brand-muted)">{{ t.time }} · from {{ t.from }}</span></a></sc-for>
+    </div>
+    <p style="font-size:15px;padding-top:20px;border-top:1px solid var(--brand-line)">Before colour: a patch test at least 48 hours before. Over {{ depositOver }}: a 20% deposit. Cancellation: 24 hours' notice. Details on our <a href="#" data-go="policies">policies page</a>. All prices Sample.</p>
+  </div>
+</section>
+</sc-if>
+
+<sc-if value="{{ is_treatment }}" hint-placeholder-val="{{ false }}">
+<section aria-labelledby="tr-h" style="padding:{{ r.heroTop }} {{ r.px }} 0">
+  <div style="max-width:1296px;margin:0 auto;display:grid;grid-template-columns:{{ r.detail }};gap:{{ r.gapL }};align-items:center">
+    <div style="display:flex;flex-direction:column;gap:20px">
+      <a href="#" data-go="services" style="font-size:15px;font-weight:600">← Services and prices</a>
+      <h1 id="tr-h" style="font-family:var(--font-display);font-weight:500;font-size:{{ r.h1 }};line-height:1.02;color:var(--brand-ink)">{{ tr.n }}</h1>
+      <p style="font-size:{{ r.lead }};line-height:1.5">{{ tr.lead }}</p>
+      <p style="font-size:15px;color:var(--brand-muted)">{{ tr.time }}</p>
+      <ul style="list-style:none;padding:0;display:flex;flex-wrap:wrap;gap:8px 28px;font-size:15px"><sc-for list="{{ tr.levels }}" as="l" hint-placeholder-count="3"><li><span style="color:var(--brand-muted)">{{ l.n }}</span> <strong style="color:var(--brand-ink)">{{ l.p }}</strong></li></sc-for></ul>
+      <div style="display:flex;gap:12px;flex-wrap:wrap"><a href="#" data-go="book" data-svc="{{ tr.svc }}" style="height:52px;padding:0 26px;display:inline-flex;align-items:center;background:var(--brand-accent);color:var(--brand-surface);font-weight:600;border-radius:999px;text-decoration:none">Book {{ tr.n }}</a></div>
+    </div>
+    <div role="img" aria-label="{{ tr.alt }}" style="aspect-ratio:4/5;border-radius:4px;background:#D9D0C7 url(&quot;{{ tr.img }}&quot;) center/cover"></div>
+  </div>
+</section>
+<section aria-labelledby="tr-what" style="padding:{{ r.sec }} {{ r.px }} 0">
+  <div style="max-width:1296px;margin:0 auto;display:grid;grid-template-columns:{{ r.side }};gap:{{ r.gapL }}">
+    <div style="display:flex;flex-direction:column;gap:32px">
+      <h2 id="tr-what" style="font-family:var(--font-display);font-weight:500;font-size:{{ r.h2 }};line-height:1.08;color:var(--brand-ink)">What happens in the chair</h2>
+      <sc-for list="{{ tr.steps }}" as="s" hint-placeholder-count="4"><div style="display:flex;flex-direction:column;gap:6px;max-width:60ch"><h3 style="font-size:18px;font-weight:600;color:var(--brand-ink)">{{ s.t }}</h3><p>{{ s.d }}</p></div></sc-for>
+    </div>
+    <aside style="display:flex;flex-direction:column;gap:20px;background:var(--brand-raised);padding:32px;border-radius:4px;align-self:start">
+      <h2 style="font-family:var(--font-display);font-size:28px;font-weight:500;color:var(--brand-ink)">Aftercare</h2><p>{{ tr.care }}</p>
+      <div style="display:{{ tr.patchD }}"><h3 style="font-size:17px;font-weight:600;color:var(--brand-ink);margin-bottom:6px">Patch test first</h3><p style="font-size:15px">We need to see you at least 48 hours before, for five minutes. <a href="#" data-go="policies">Why</a></p></div>
+    </aside>
+  </div>
+</section>
+<section aria-labelledby="tr-more" style="padding:{{ r.sec }} {{ r.px }} 0">
+  <div style="max-width:1296px;margin:0 auto;display:flex;flex-direction:column;gap:24px">
+    <h2 id="tr-more" style="font-family:var(--font-display);font-weight:500;font-size:30px;color:var(--brand-ink)">Other signature appointments</h2>
+    <div style="display:grid;grid-template-columns:{{ r.c3 }};gap:{{ r.gapS }}"><sc-for list="{{ trOther }}" as="t" hint-placeholder-count="3"><a href="#" data-go="treatment" data-arg="{{ t.id }}" style="display:flex;flex-direction:column;gap:10px;color:var(--brand-body);text-decoration:none"><span style="aspect-ratio:3/2;border-radius:4px;background:#D9D0C7 url(&quot;{{ t.img }}&quot;) center/cover"></span><span style="font-family:var(--font-display);font-size:22px;font-weight:600;color:var(--brand-ink)">{{ t.n }}</span><span style="font-size:15px;color:var(--brand-muted)">from {{ t.from }}</span></a></sc-for></div>
+  </div>
+</section>
+</sc-if>
+
+<sc-if value="{{ is_team }}" hint-placeholder-val="{{ false }}">
+<section aria-labelledby="tm-h" style="padding:{{ r.heroTop }} {{ r.px }} 0">
+  <div style="max-width:1296px;margin:0 auto;display:flex;flex-direction:column;gap:16px"><h1 id="tm-h" style="font-family:var(--font-display);font-weight:500;font-size:{{ r.h1 }};line-height:1.02;color:var(--brand-ink)">The team</h1><p style="font-size:{{ r.lead }};max-width:46ch">Five people, three levels. Book with someone by name, or take the first free chair.</p></div>
+</section>
+<section aria-label="Creative director" style="padding:48px {{ r.px }} 0">
+  <div style="max-width:1296px;margin:0 auto;display:grid;grid-template-columns:{{ r.detail }};gap:{{ r.gapL }};align-items:center">
+    <a href="#" data-go="person" data-arg="{{ teamLead.id }}" aria-label="{{ teamLead.n }}" style="display:block;aspect-ratio:4/3;border-radius:4px;background:{{ teamLead.bg }}"></a>
+    <div style="display:flex;flex-direction:column;gap:14px"><h2 style="font-family:var(--font-display);font-size:{{ r.h2 }};font-weight:500;color:var(--brand-ink);line-height:1.08">{{ teamLead.n }}</h2><p style="font-weight:600">{{ teamLead.r }} · {{ teamLead.spec }}</p><p style="font-size:15px;color:var(--brand-muted)">{{ teamLead.q }} · Sample</p><p>{{ teamLead.bio }}</p><div style="display:flex;gap:20px;flex-wrap:wrap"><a href="#" data-go="person" data-arg="{{ teamLead.id }}" style="font-weight:600">About {{ teamLead.first }}</a><a href="#" data-go="book" data-who="{{ teamLead.id }}" style="font-weight:600">Book with {{ teamLead.first }}</a></div></div>
+  </div>
+</section>
+<section aria-label="Stylists" style="padding:{{ r.sec }} {{ r.px }} 0">
+  <div style="max-width:1296px;margin:0 auto;display:grid;grid-template-columns:{{ r.c4 }};gap:{{ r.gapS }}">
+    <sc-for list="{{ teamRest }}" as="p" hint-placeholder-count="4">
+      <div style="display:flex;flex-direction:column;gap:12px">
+        <a href="#" data-go="person" data-arg="{{ p.id }}" aria-label="{{ p.n }}" style="display:flex;align-items:center;justify-content:center;aspect-ratio:4/5;border-radius:4px;background:{{ p.bg }};font-family:var(--font-display);font-size:48px;color:var(--brand-accent);text-decoration:none">{{ p.mono }}</a>
+        <a href="#" data-go="person" data-arg="{{ p.id }}" style="font-family:var(--font-display);font-size:22px;font-weight:600;color:var(--brand-ink);line-height:1.25">{{ p.n }}</a>
+        <span style="font-size:15px">{{ p.r }} · {{ p.spec }}</span><span style="font-size:14px;color:var(--brand-muted)">{{ p.q }} · Sample</span>
+        <a href="#" data-go="book" data-who="{{ p.id }}" style="font-weight:600;font-size:15px">Book with {{ p.first }}</a>
+      </div>
+    </sc-for>
+  </div>
+</section>
+</sc-if>
+
+<sc-if value="{{ is_person }}" hint-placeholder-val="{{ false }}">
+<section aria-labelledby="ps-h" style="padding:{{ r.heroTop }} {{ r.px }} 0">
+  <div style="max-width:1296px;margin:0 auto;display:grid;grid-template-columns:{{ r.detail }};gap:{{ r.gapL }};align-items:center">
+    <div role="img" aria-label="{{ pr.alt }}" style="display:flex;align-items:center;justify-content:center;aspect-ratio:4/5;border-radius:4px;background:{{ pr.bg }};font-family:var(--font-display);font-size:96px;color:var(--brand-accent)">{{ pr.mono }}</div>
+    <div style="display:flex;flex-direction:column;gap:16px">
+      <a href="#" data-go="team" style="font-size:15px;font-weight:600">← The team</a>
+      <h1 id="ps-h" style="font-family:var(--font-display);font-weight:500;font-size:{{ r.h1 }};line-height:1.02;color:var(--brand-ink)">{{ pr.n }}</h1>
+      <p style="font-weight:600">{{ pr.r }}</p>
+      <p style="font-size:15px;color:var(--brand-muted)">{{ pr.q }} · Sample</p>
+      <p>{{ pr.bio }}</p>
+      <p style="font-size:15px"><strong style="color:var(--brand-ink)">Best for:</strong> {{ pr.spec }}</p>
+      <blockquote style="font-family:var(--font-display);font-size:{{ r.quote }};line-height:1.3;color:var(--brand-ink);padding-top:12px">“{{ pr.quote }}”</blockquote>
+      <a href="#" data-go="book" data-who="{{ pr.id }}" style="align-self:flex-start;height:52px;padding:0 26px;display:inline-flex;align-items:center;background:var(--brand-accent);color:var(--brand-surface);font-weight:600;border-radius:999px;text-decoration:none">Book with {{ pr.first }}</a>
+    </div>
+  </div>
+</section>
+<section aria-labelledby="ps-more" style="padding:{{ r.sec }} {{ r.px }} 0">
+  <div style="max-width:1296px;margin:0 auto;display:flex;flex-direction:column;gap:24px">
+    <h2 id="ps-more" style="font-family:var(--font-display);font-weight:500;font-size:30px;color:var(--brand-ink)">Also on the team</h2>
+    <div style="display:grid;grid-template-columns:{{ r.c4 }};gap:{{ r.gapS }}"><sc-for list="{{ prOther }}" as="p" hint-placeholder-count="4"><a href="#" data-go="person" data-arg="{{ p.id }}" style="display:flex;flex-direction:column;gap:8px;color:var(--brand-body);text-decoration:none"><span style="display:flex;align-items:center;justify-content:center;aspect-ratio:1;border-radius:4px;background:{{ p.bg }};font-family:var(--font-display);font-size:44px;color:var(--brand-accent)">{{ p.mono }}</span><span style="font-family:var(--font-display);font-size:20px;font-weight:600;color:var(--brand-ink);line-height:1.25">{{ p.n }}</span><span style="font-size:14px;color:var(--brand-muted)">{{ p.r }}</span></a></sc-for></div>
+  </div>
+</section>
+</sc-if>
+
+<sc-if value="{{ is_gallery }}" hint-placeholder-val="{{ false }}">
+<section aria-labelledby="gl-h" style="padding:{{ r.heroTop }} {{ r.px }} 0">
+  <div style="max-width:1296px;margin:0 auto;display:flex;flex-direction:column;gap:24px">
+    <div style="display:flex;flex-direction:column;gap:14px"><h1 id="gl-h" style="font-family:var(--font-display);font-weight:500;font-size:{{ r.h1 }};line-height:1.02;color:var(--brand-ink)">Gallery</h1><p style="font-size:{{ r.lead }};max-width:46ch">Recent work and the salon itself. Photos of clients are shared with their permission.</p></div>
+    <div role="group" aria-label="Filter photos" style="display:flex;flex-wrap:wrap;gap:8px;align-items:center">
+      <sc-for list="{{ gcats }}" as="c" hint-placeholder-count="6"><button type="button" data-act="gcat" data-v="{{ c.c }}" aria-pressed="{{ c.on }}" style="min-height:44px;padding:0 4px;border:0;border-bottom:2px solid {{ c.bg }};background:transparent;color:{{ c.fg }};font-weight:600;font-size:15px;cursor:pointer">{{ c.c }} <span style="font-weight:400">{{ c.n }}</span></button></sc-for>
+    </div>
+    <div style="display:flex;gap:16px;align-items:center;font-size:15px"><span aria-live="polite">{{ galCount }}</span><button type="button" data-act="gcat" data-v="All" style="display:{{ galResetD }};min-height:44px;align-items:center;border:0;background:none;color:var(--brand-accent);font-weight:600;cursor:pointer;padding:0">Show all</button></div>
+    <div style="display:grid;grid-template-columns:{{ r.gal }};gap:12px">
+      <sc-for list="{{ gal }}" as="g" hint-placeholder-count="9"><button type="button" data-act="lb" data-v="{{ g.i }}" aria-label="Open photo: {{ g.t }}" style="display:flex;flex-direction:column;gap:8px;padding:0;border:0;background:none;text-align:left;cursor:pointer;color:var(--brand-body)"><span style="display:block;width:100%;aspect-ratio:4/5;border-radius:4px;background:#D9D0C7 url(&quot;{{ g.img }}&quot;) center/cover"></span><span style="font-size:15px">{{ g.t }} · <span style="color:var(--brand-muted)">{{ g.c }}</span></span></button></sc-for>
+    </div>
+    <div style="display:{{ galEmptyD }};flex-direction:column;gap:12px;align-items:flex-start;padding:48px 0;border-top:1px solid var(--brand-line)"><h2 style="font-family:var(--font-display);font-size:30px;font-weight:500;color:var(--brand-ink)">No bridal photos yet</h2><p>Our first bridal shoot is this autumn. Until then, Ines is happy to show you her portfolio at a free trial consultation.</p><button type="button" data-act="gcat" data-v="All" style="min-height:44px;padding:0 20px;border-radius:999px;border:1px solid var(--brand-ink);background:transparent;font-weight:600;cursor:pointer">Show all photos</button></div>
+  </div>
+</section>
+</sc-if>
+
+<sc-if value="{{ is_vouchers }}" hint-placeholder-val="{{ false }}">
+<section aria-labelledby="vc-h" style="padding:{{ r.heroTop }} {{ r.px }} 0">
+  <div style="max-width:1296px;margin:0 auto;display:grid;grid-template-columns:{{ r.detail }};gap:{{ r.gapL }};align-items:start">
+    <div style="display:flex;flex-direction:column;gap:20px">
+      <h1 id="vc-h" style="font-family:var(--font-display);font-weight:500;font-size:{{ r.h1 }};line-height:1.02;color:var(--brand-ink)">Gift vouchers</h1>
+      <p style="font-size:{{ r.lead }};line-height:1.5">Any amount, spent on anything on the menu, valid for twelve months.</p>
+      <div role="img" aria-label="A warm-lit corner of the salon" style="aspect-ratio:4/3;border-radius:4px;background:#D9D0C7 url(&quot;assets/31/room-light.jpg&quot;) center/cover"></div>
+      <p style="font-size:14px;color:var(--brand-muted)">Vouchers are issued and paid for through our booking system. This form sends the request; you will get a payment link by email. Sample.</p>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:24px">
+      <form onSubmit="{{ noop }}" style="display:{{ vFormD }};flex-direction:column;gap:22px" novalidate="true">
+        <fieldset style="border:0;padding:0;margin:0;display:flex;flex-direction:column;gap:10px"><legend style="font-weight:600;color:var(--brand-ink);margin-bottom:10px">Amount</legend>
+          <div style="display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px"><sc-for list="{{ vAmts }}" as="a" hint-placeholder-count="4"><button type="button" data-act="vamt" data-v="{{ a.v }}" aria-pressed="{{ a.on }}" style="min-height:52px;border:0;border-bottom:2px solid {{ a.bg }};background:transparent;color:{{ a.fg }};font-weight:600;font-size:17px;cursor:pointer">{{ a.t }}</button></sc-for></div>
+          <label style="display:flex;flex-direction:column;gap:6px;font-size:15px">Or another amount<input name="amount" data-f="v.custom" value="{{ v.custom }}" onChange="{{ onF }}" inputmode="numeric" placeholder="e.g. 75" style="height:52px;border:{{ vB.amt }};border-radius:4px;padding:0 14px;background:#fff"></label>
+          <p role="alert" style="display:{{ vD.amt }};color:var(--fixed-error);font-size:14px">{{ vErr.amt }}</p>
+        </fieldset>
+        <fieldset style="border:0;padding:0;margin:0"><legend style="font-weight:600;color:var(--brand-ink);margin-bottom:10px">How to send it</legend><div style="display:flex;gap:8px;flex-wrap:wrap"><sc-for list="{{ vKinds }}" as="k" hint-placeholder-count="2"><button type="button" data-act="vkind" data-v="{{ k.k }}" aria-pressed="{{ k.on }}" style="min-height:44px;padding:0 4px;border:0;border-bottom:2px solid {{ k.bg }};background:transparent;color:{{ k.fg }};font-weight:600;cursor:pointer">{{ k.t }}</button></sc-for></div></fieldset>
+        <div style="display:grid;grid-template-columns:{{ r.form2 }};gap:16px">
+          <label style="display:flex;flex-direction:column;gap:6px;font-size:15px">To<input name="recipient_name" data-f="v.to" value="{{ v.to }}" onChange="{{ onF }}" autocomplete="off" style="height:52px;border:{{ vB.to }};border-radius:4px;padding:0 14px;background:#fff"><span role="alert" style="display:{{ vD.to }};color:var(--fixed-error);font-size:14px">{{ vErr.to }}</span></label>
+          <label style="display:flex;flex-direction:column;gap:6px;font-size:15px">From<input name="sender_name" data-f="v.from" value="{{ v.from }}" onChange="{{ onF }}" autocomplete="name" style="height:52px;border:{{ vB.from }};border-radius:4px;padding:0 14px;background:#fff"><span role="alert" style="display:{{ vD.from }};color:var(--fixed-error);font-size:14px">{{ vErr.from }}</span></label>
+        </div>
+        <label style="display:{{ vEmailD }};flex-direction:column;gap:6px;font-size:15px">Their email<input name="recipient_email" data-f="v.email" value="{{ v.email }}" onChange="{{ onF }}" type="email" autocomplete="off" style="height:52px;border:{{ vB.email }};border-radius:4px;padding:0 14px;background:#fff"><span role="alert" style="display:{{ vD.email }};color:var(--fixed-error);font-size:14px">{{ vErr.email }}</span></label>
+        <label style="display:flex;flex-direction:column;gap:6px;font-size:15px">Message (optional)<textarea name="message" data-f="v.msg" value="{{ v.msg }}" onChange="{{ onF }}" rows="3" style="border:{{ vB.msg }};border-radius:4px;padding:12px 14px;background:#fff;resize:vertical"></textarea><span style="font-size:14px;color:var(--brand-muted)">{{ vMsgLen }}</span><span role="alert" style="display:{{ vD.msg }};color:var(--fixed-error);font-size:14px">{{ vErr.msg }}</span></label>
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:16px;flex-wrap:wrap;padding-top:16px;border-top:1px solid var(--brand-line)"><span style="font-family:var(--font-display);font-size:30px;color:var(--brand-ink)">{{ vTotal }}</span><button type="button" data-act="vsend" disabled="{{ vSending }}" style="height:52px;padding:0 26px;border:0;border-radius:999px;background:var(--brand-ink);color:var(--brand-surface);font-weight:600;cursor:pointer">{{ vBtn }}</button></div>
+      </form>
+      <div role="status" style="display:{{ vDoneD }};flex-direction:column;gap:14px;padding:32px;background:var(--brand-raised);border-radius:4px">
+        <h2 style="font-family:var(--font-display);font-size:30px;font-weight:500;color:var(--brand-ink)">Request sent</h2><p>We will email a payment link for your {{ vTotal }} voucher within one working day. Sample: on your site this goes to your booking system.</p>
+        <button type="button" data-act="vreset" style="align-self:flex-start;min-height:44px;padding:0 20px;border-radius:999px;border:1px solid var(--brand-ink);background:transparent;font-weight:600;cursor:pointer">Send another voucher</button>
+      </div>
+    </div>
+  </div>
+</section>
+</sc-if>
+
+<sc-if value="{{ is_book }}" hint-placeholder-val="{{ false }}">
+<section aria-labelledby="bk-h" style="padding:{{ r.heroTop }} {{ r.px }} 0">
+  <div style="max-width:960px;margin:0 auto;display:flex;flex-direction:column;gap:28px">
+    <div style="display:flex;flex-direction:column;gap:12px"><h1 id="bk-h" style="font-family:var(--font-display);font-weight:500;font-size:{{ r.h1 }};line-height:1.02;color:var(--brand-ink)">Book an appointment</h1><p style="font-size:{{ r.lead }};max-width:48ch">Choose a service and a time and we will confirm by email. Bookings are managed in our booking system; this sends a request.</p></div>
+    <ol aria-label="Booking progress" style="list-style:none;padding:0;display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;font-size:14px">
+      <sc-for list="{{ bkSteps }}" as="s" hint-placeholder-count="4"><li aria-current="{{ s.cur }}" style="padding-top:10px;border-top:3px solid {{ s.bd }};color:{{ s.c }};font-weight:{{ s.w }}">{{ s.t }}</li></sc-for>
+    </ol>
+
+    <div style="display:{{ bkS.s1 }};flex-direction:column;gap:20px">
+      <label style="display:flex;flex-direction:column;gap:6px;font-weight:600;color:var(--brand-ink)">Service
+        <select name="service" data-f="bk.svc" value="{{ bk.svc }}" onChange="{{ onF }}" style="height:52px;border:{{ bkB.svc }};border-radius:4px;padding:0 12px;background:#fff;font-weight:400;color:var(--brand-body)">
+          <option value="">Choose a service</option>
+          <sc-for list="{{ bkGroups }}" as="g" hint-placeholder-count="4"><optgroup label="{{ g.cat }}"><sc-for list="{{ g.items }}" as="i" hint-placeholder-count="4"><option value="{{ i.id }}">{{ i.label }}</option></sc-for></optgroup></sc-for>
+        </select>
+      </label>
+      <p role="alert" style="display:{{ bkD.svc }};color:var(--fixed-error);font-size:14px">{{ bkErr.svc }}</p>
+      <p style="display:{{ bkSvcD }};font-size:15px;color:var(--brand-muted)">{{ bkSvcMeta }} · Sample</p>
+      <label style="display:flex;flex-direction:column;gap:6px;font-weight:600;color:var(--brand-ink)">With
+        <select name="stylist" data-f="bk.who" value="{{ bk.who }}" onChange="{{ onF }}" style="height:52px;border:1px solid #8A8079;border-radius:4px;padding:0 12px;background:#fff;font-weight:400;color:var(--brand-body)"><sc-for list="{{ bkWho }}" as="w" hint-placeholder-count="6"><option value="{{ w.id }}">{{ w.n }}</option></sc-for></select>
+      </label>
+    </div>
+
+    <div style="display:{{ bkS.s2 }};flex-direction:column;gap:20px">
+      <fieldset style="border:0;padding:0;margin:0"><legend style="font-weight:600;color:var(--brand-ink);margin-bottom:10px">Day</legend>
+        <div style="display:grid;grid-template-columns:{{ r.days }};gap:8px"><sc-for list="{{ bkDays }}" as="d" hint-placeholder-count="8"><button type="button" data-act="day" data-v="{{ d.i }}" disabled="{{ d.dis }}" aria-pressed="{{ d.on }}" style="min-height:64px;border:0;border-bottom:2px solid {{ d.bg }};background:transparent;text-decoration:{{ d.dec }};color:{{ d.fg }};font-weight:600;font-size:15px;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px">{{ d.lab }}<span style="font-size:13px;font-weight:400">{{ d.sub }}</span></button></sc-for></div>
+        <p role="alert" style="display:{{ bkD.day }};color:var(--fixed-error);font-size:14px;margin-top:8px">{{ bkErr.day }}</p>
+      </fieldset>
+      <fieldset style="display:{{ bkSlotsD }};flex-direction:column;border:0;padding:0;margin:0"><legend style="font-weight:600;color:var(--brand-ink);margin-bottom:10px">Time</legend>
+        <div style="display:grid;grid-template-columns:{{ r.slots }};gap:8px"><sc-for list="{{ bkSlots }}" as="s" hint-placeholder-count="6"><button type="button" data-act="slot" data-v="{{ s.t }}" disabled="{{ s.taken }}" aria-pressed="{{ s.on }}" style="min-height:52px;border:0;border-bottom:2px solid {{ s.bg }};background:transparent;color:{{ s.fg }};font-weight:600;cursor:pointer;text-decoration:{{ s.dec }}">{{ s.t }}</button></sc-for></div>
+        <p role="alert" style="display:{{ bkD.slot }};color:var(--fixed-error);font-size:14px;margin-top:8px">{{ bkErr.slot }}</p>
+        <p style="font-size:14px;color:var(--brand-muted);margin-top:8px">Availability is Sample. Your booking system shows real times.</p>
+      </fieldset>
+    </div>
+
+    <div style="display:{{ bkS.s3 }};flex-direction:column;gap:18px">
+      <div style="display:grid;grid-template-columns:{{ r.form2 }};gap:16px">
+        <label style="display:flex;flex-direction:column;gap:6px;font-size:15px">Name<input name="name" data-f="bk.name" value="{{ bk.name }}" onChange="{{ onF }}" autocomplete="name" style="height:52px;border:{{ bkB.name }};border-radius:4px;padding:0 14px;background:#fff"><span role="alert" style="display:{{ bkD.name }};color:var(--fixed-error);font-size:14px">{{ bkErr.name }}</span></label>
+        <label style="display:flex;flex-direction:column;gap:6px;font-size:15px">Phone<input name="phone" data-f="bk.phone" value="{{ bk.phone }}" onChange="{{ onF }}" type="tel" autocomplete="tel" style="height:52px;border:{{ bkB.phone }};border-radius:4px;padding:0 14px;background:#fff"><span role="alert" style="display:{{ bkD.phone }};color:var(--fixed-error);font-size:14px">{{ bkErr.phone }}</span></label>
+      </div>
+      <label style="display:flex;flex-direction:column;gap:6px;font-size:15px">Email<input name="email" data-f="bk.email" value="{{ bk.email }}" onChange="{{ onF }}" type="email" autocomplete="email" style="height:52px;border:{{ bkB.email }};border-radius:4px;padding:0 14px;background:#fff"><span role="alert" style="display:{{ bkD.email }};color:var(--fixed-error);font-size:14px">{{ bkErr.email }}</span></label>
+      <label style="display:flex;gap:12px;align-items:flex-start;font-size:15px;min-height:44px"><input type="checkbox" name="first_visit" data-f="bk.first" checked="{{ bk.first }}" onChange="{{ onF }}" style="width:22px;height:22px;margin-top:2px;accent-color:#1E1A17">This is my first visit to Maren</label>
+      <div style="display:{{ bkPatchD }};flex-direction:column;gap:6px">
+        <label style="display:flex;gap:12px;align-items:flex-start;font-size:15px;min-height:44px"><input type="checkbox" name="patch_test" data-f="bk.patch" checked="{{ bk.patch }}" onChange="{{ onF }}" style="width:22px;height:22px;margin-top:2px;accent-color:#1E1A17">I can come in for a five-minute patch test at least 48 hours before</label>
+        <span role="alert" style="display:{{ bkD.patch }};color:var(--fixed-error);font-size:14px">{{ bkErr.patch }}</span>
+      </div>
+      <label style="display:flex;flex-direction:column;gap:6px;font-size:15px">Anything we should know? (optional)<textarea name="notes" data-f="bk.notes" value="{{ bk.notes }}" onChange="{{ onF }}" rows="3" placeholder="Allergies, access needs, a photo you will bring" style="border:1px solid #8A8079;border-radius:4px;padding:12px 14px;background:#fff;resize:vertical"></textarea></label>
+    </div>
+
+    <div style="display:{{ bkS.s4 }};flex-direction:column;gap:6px;padding:28px;background:var(--brand-raised);border-radius:4px">
+      <h2 style="font-family:var(--font-display);font-size:28px;font-weight:500;color:var(--brand-ink);margin-bottom:8px">{{ bkSvcName }}</h2>
+      <p>{{ bkDayName }} at {{ bk.slot }} · with {{ bkWhoName }}</p><p>{{ bk.name }} · {{ bk.email }} · {{ bk.phone }}</p>
+      <p style="font-size:14px;color:var(--brand-muted);margin-top:8px">By sending you agree to our <a href="#" data-go="policies">cancellation and deposit policy</a>.</p>
+    </div>
+
+    <div style="display:{{ bkNavD }};justify-content:space-between;gap:12px;flex-wrap:wrap;padding-top:20px;border-top:1px solid var(--brand-line)">
+      <button type="button" data-act="bkback" style="display:{{ bkBackD }};min-height:52px;padding:0 22px;border-radius:999px;border:1px solid var(--brand-ink);background:transparent;font-weight:600;cursor:pointer;align-items:center">Back</button>
+      <button type="button" data-act="bknext" style="margin-left:auto;min-height:52px;padding:0 28px;border:0;border-radius:999px;background:var(--brand-accent);color:var(--brand-surface);font-weight:600;cursor:pointer">{{ bkNextT }}</button>
+    </div>
+
+    <div role="status" style="display:{{ bkDoneD }};flex-direction:column;gap:14px;padding:36px;background:var(--brand-raised);border-radius:4px">
+      <h2 style="font-family:var(--font-display);font-size:36px;font-weight:500;color:var(--brand-ink)">Request sent</h2>
+      <p>{{ bkSvcName }}, {{ bkDayName }} at {{ bk.slot }}. We will confirm by email within a few working hours. Sample: on your site this goes to your booking system.</p>
+      <div style="display:flex;gap:12px;flex-wrap:wrap"><button type="button" data-act="bkreset" style="min-height:44px;padding:0 20px;border-radius:999px;border:1px solid var(--brand-ink);background:transparent;font-weight:600;cursor:pointer">Book something else</button><a href="#" data-go="policies" style="min-height:44px;display:inline-flex;align-items:center;font-weight:600">Read our policies</a></div>
+    </div>
+  </div>
+</section>
+</sc-if>
+
+<sc-if value="{{ is_about }}" hint-placeholder-val="{{ false }}">
+<section aria-labelledby="ab-h" style="padding:{{ r.heroTop }} {{ r.px }} 0">
+  <div style="max-width:1296px;margin:0 auto;display:flex;flex-direction:column;gap:32px">
+    <h1 id="ab-h" style="font-family:var(--font-display);font-weight:500;font-size:{{ r.h1 }};line-height:1.02;color:var(--brand-ink);max-width:16ch">One room, five chairs, twelve years on Alder Row</h1>
+    <div role="img" aria-label="Arched mirrors and salon chairs in a pale room" style="aspect-ratio:21/9;border-radius:4px;background:#D9D0C7 url(&quot;assets/31/salon-modern.jpg&quot;) center/cover"></div>
+  </div>
+</section>
+<section aria-labelledby="ab-story" style="padding:{{ r.sec }} {{ r.px }} 0">
+  <div style="max-width:1296px;margin:0 auto;display:grid;grid-template-columns:{{ r.side }};gap:{{ r.gapL }}">
+    <div style="display:flex;flex-direction:column;gap:18px;max-width:62ch"><h2 id="ab-story" style="font-family:var(--font-display);font-weight:500;font-size:{{ r.h2 }};line-height:1.08;color:var(--brand-ink)">Why Maren</h2><p>Ines Varga opened Maren in 2014 after twelve years in busy city salons where appointments ran to the minute. She wanted the opposite: a consultation before every service, prices you could read before you sat down, and stylists who were paid well enough to stay.</p><p>Twelve years on there are five of us. We close on Mondays so the whole team can train together, we patch test every colour client, and we will tell you if what you want will take more than one visit.</p><p>Maren is a fictional salon used to show this template. Names, prices, reviews and qualifications are Sample content.</p></div>
+    <div style="display:flex;flex-direction:column;gap:16px"><div role="img" aria-label="Black salon chairs facing round mirrors" style="aspect-ratio:4/3;border-radius:4px;background:#D9D0C7 url(&quot;assets/31/laptop-chairs.jpg&quot;) center/cover"></div><div role="img" aria-label="A row of wash basins" style="aspect-ratio:4/3;border-radius:4px;background:#D9D0C7 url(&quot;assets/31/sinks-bw.jpg&quot;) center/cover"></div></div>
+  </div>
+</section>
+<section aria-labelledby="ab-how" style="padding:{{ r.sec }} {{ r.px }} 0">
+  <div style="max-width:1296px;margin:0 auto;display:flex;flex-direction:column;gap:28px">
+    <h2 id="ab-how" style="font-family:var(--font-display);font-weight:500;font-size:{{ r.h2 }};line-height:1.08;color:var(--brand-ink)">How we work</h2>
+    <div style="display:grid;grid-template-columns:{{ r.c3 }};gap:{{ r.gapL }}"><sc-for list="{{ care }}" as="c" hint-placeholder-count="3"><div style="display:flex;flex-direction:column;gap:10px"><h3 style="font-size:18px;font-weight:600;color:var(--brand-ink);line-height:1.35">{{ c.t }}</h3><p style="font-size:16px">{{ c.d }}</p></div></sc-for></div>
+    <div style="display:flex;gap:16px;flex-wrap:wrap"><a href="#" data-go="team" style="font-weight:600">Meet the team</a><a href="#" data-go="careers" style="font-weight:600">Work with us</a></div>
+  </div>
+</section>
+</sc-if>
+
+<sc-if value="{{ is_contact }}" hint-placeholder-val="{{ false }}">
+<section aria-labelledby="ct-h" style="padding:{{ r.heroTop }} {{ r.px }} 0">
+  <div style="max-width:1296px;margin:0 auto;display:grid;grid-template-columns:{{ r.detail }};gap:{{ r.gapL }}">
+    <div style="display:flex;flex-direction:column;gap:22px">
+      <h1 id="ct-h" style="font-family:var(--font-display);font-weight:500;font-size:{{ r.h1 }};line-height:1.02;color:var(--brand-ink)">Contact and directions</h1>
+      <p style="font-size:{{ r.lead }}">{{ addr }} · Sample</p>
+      <div style="display:flex;flex-direction:column;gap:4px"><a href="tel:+000000000314" style="font-weight:600;font-size:18px">{{ phone }}</a><a href="mailto:hello@maren-salon.example" style="font-weight:600">{{ email }}</a></div>
+      <div role="img" aria-label="Location map placeholder: replace with your map embed" style="aspect-ratio:16/10;border-radius:4px;background:#D9D0C7 url(&quot;assets/31/salon-window.jpg&quot;) center/cover;display:flex;align-items:flex-end"><span style="margin:14px;padding:8px 12px;background:var(--brand-surface);font-size:14px;border-radius:4px">Map: add your embed here · Sample</span></div>
+      <div style="display:grid;grid-template-columns:{{ r.c2 }};gap:24px">
+        <div style="display:flex;flex-direction:column;gap:8px"><h2 style="font-size:18px;font-weight:600;color:var(--brand-ink)">Opening hours</h2><dl style="display:grid;grid-template-columns:auto 1fr;column-gap:18px;row-gap:4px;font-size:15px"><sc-for list="{{ hours }}" as="h" hint-placeholder-count="7"><dt style="font-weight:600;color:var(--brand-ink)">{{ h.d }}</dt><dd>{{ h.t }}</dd></sc-for></dl></div>
+        <div style="display:flex;flex-direction:column;gap:12px;font-size:15px"><h2 style="font-size:18px;font-weight:600;color:var(--brand-ink)">Getting here</h2><p>Two minutes from the Old Town tram stop. Pay-and-display parking on Mill Lane, free after 6pm.</p><h2 style="font-size:18px;font-weight:600;color:var(--brand-ink)">Access</h2><p>Step-free entrance, one ground-floor room, an accessible toilet. Tell us if you need a quieter time.</p></div>
+      </div>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:20px">
+      <form onSubmit="{{ noop }}" novalidate="true" style="display:{{ cFormD }};flex-direction:column;gap:18px;padding:32px;background:var(--brand-raised);border-radius:4px">
+        <h2 style="font-family:var(--font-display);font-size:30px;font-weight:500;color:var(--brand-ink)">Send us a message</h2>
+        <p style="font-size:15px">To book, it is quicker to <a href="#" data-go="book">use the booking page</a>. We reply to messages within one working day.</p>
+        <label style="display:flex;flex-direction:column;gap:6px;font-size:15px">Topic<select name="topic" data-f="c.topic" value="{{ c.topic }}" onChange="{{ onF }}" style="height:52px;border:1px solid #8A8079;border-radius:4px;padding:0 12px;background:#fff"><sc-for list="{{ cTopics }}" as="t" hint-placeholder-count="4"><option value="{{ t.t }}">{{ t.t }}</option></sc-for></select></label>
+        <label style="display:flex;flex-direction:column;gap:6px;font-size:15px">Name<input name="name" data-f="c.name" value="{{ c.name }}" onChange="{{ onF }}" autocomplete="name" style="height:52px;border:{{ cB.name }};border-radius:4px;padding:0 14px;background:#fff"><span role="alert" style="display:{{ cD.name }};color:var(--fixed-error);font-size:14px">{{ cErr.name }}</span></label>
+        <label style="display:flex;flex-direction:column;gap:6px;font-size:15px">Email<input name="email" data-f="c.email" value="{{ c.email }}" onChange="{{ onF }}" type="email" autocomplete="email" style="height:52px;border:{{ cB.email }};border-radius:4px;padding:0 14px;background:#fff"><span role="alert" style="display:{{ cD.email }};color:var(--fixed-error);font-size:14px">{{ cErr.email }}</span></label>
+        <label style="display:flex;flex-direction:column;gap:6px;font-size:15px">Message<textarea name="message" data-f="c.msg" value="{{ c.msg }}" onChange="{{ onF }}" rows="5" style="border:{{ cB.msg }};border-radius:4px;padding:12px 14px;background:#fff;resize:vertical"></textarea><span role="alert" style="display:{{ cD.msg }};color:var(--fixed-error);font-size:14px">{{ cErr.msg }}</span></label>
+        <button type="button" data-act="csend" style="align-self:flex-start;height:52px;padding:0 26px;border:0;border-radius:999px;background:var(--brand-ink);color:var(--brand-surface);font-weight:600;cursor:pointer">{{ cBtn }}</button>
+      </form>
+      <div role="status" style="display:{{ cDoneD }};flex-direction:column;gap:14px;padding:32px;background:var(--brand-raised);border-radius:4px"><h2 style="font-family:var(--font-display);font-size:30px;font-weight:500;color:var(--brand-ink)">Thanks, {{ c.name }}</h2><p>We will reply to {{ c.email }} within one working day.</p><button type="button" data-act="creset" style="align-self:flex-start;min-height:44px;padding:0 20px;border-radius:999px;border:1px solid var(--brand-ink);background:transparent;font-weight:600;cursor:pointer">Send another message</button></div>
+    </div>
+  </div>
+</section>
+</sc-if>
+
+<sc-if value="{{ is_policies }}" hint-placeholder-val="{{ false }}">
+<section aria-labelledby="po-h" style="padding:{{ r.heroTop }} {{ r.px }} 0">
+  <div style="max-width:1296px;margin:0 auto;display:grid;grid-template-columns:{{ r.side }};gap:{{ r.gapL }}">
+    <div style="display:flex;flex-direction:column;gap:36px;max-width:64ch">
+      <div style="display:flex;flex-direction:column;gap:14px"><h1 id="po-h" style="font-family:var(--font-display);font-weight:500;font-size:{{ r.h1 }};line-height:1.02;color:var(--brand-ink)">Booking policies</h1><p style="font-size:{{ r.lead }}">Plain rules, so nobody is surprised on the day.</p></div>
+      <sc-for list="{{ policies }}" as="p" hint-placeholder-count="7"><div id="pol-{{ p.id }}" style="display:flex;flex-direction:column;gap:8px;padding-top:20px;border-top:1px solid var(--brand-line)"><h2 style="font-family:var(--font-display);font-size:28px;font-weight:500;color:var(--brand-ink)">{{ p.t }}</h2><p>{{ p.d }}</p></div></sc-for>
+      <p style="font-size:14px;color:var(--brand-muted)">These policies are Sample text for a fictional salon. Adjust them to your own business before publishing.</p>
+    </div>
+    <div role="img" aria-label="A row of wash basins" style="aspect-ratio:3/4;border-radius:4px;background:#D9D0C7 url(&quot;assets/31/sinks-bw.jpg&quot;) center/cover;align-self:start;position:sticky;top:100px"></div>
+  </div>
+</section>
+</sc-if>
+
+<sc-if value="{{ is_careers }}" hint-placeholder-val="{{ false }}">
+<section aria-labelledby="cr-h" style="padding:{{ r.heroTop }} {{ r.px }} 0">
+  <div style="max-width:1296px;margin:0 auto;display:grid;grid-template-columns:{{ r.detail }};gap:{{ r.gapL }};align-items:center">
+    <div style="display:flex;flex-direction:column;gap:18px"><h1 id="cr-h" style="font-family:var(--font-display);font-weight:500;font-size:{{ r.h1 }};line-height:1.02;color:var(--brand-ink)">Work at Maren</h1><p style="font-size:{{ r.lead }}">Paid training every Monday, a full booking system, and no commission targets.</p></div>
+    <div role="img" aria-label="A single styling chair beside a white brick wall" style="aspect-ratio:4/3;border-radius:4px;background:#D9D0C7 url(&quot;assets/31/chair-white.jpg&quot;) center/cover"></div>
+  </div>
+</section>
+<section aria-labelledby="cr-roles" style="padding:{{ r.sec }} {{ r.px }} 0">
+  <div style="max-width:1296px;margin:0 auto;display:grid;grid-template-columns:{{ r.detail }};gap:{{ r.gapL }}">
+    <div style="display:flex;flex-direction:column;gap:28px"><h2 id="cr-roles" style="font-family:var(--font-display);font-weight:500;font-size:{{ r.h2 }};line-height:1.08;color:var(--brand-ink)">Open now</h2>
+      <sc-for list="{{ roles }}" as="o" hint-placeholder-count="2"><div style="display:flex;flex-direction:column;gap:8px;padding-top:20px;border-top:1px solid var(--brand-line)"><h3 style="font-size:20px;font-weight:600;color:var(--brand-ink)">{{ o.t }}</h3><p>{{ o.d }}</p></div></sc-for>
+    </div>
+    <div>
+      <form onSubmit="{{ noop }}" novalidate="true" style="display:{{ apFormD }};flex-direction:column;gap:16px;padding:32px;background:var(--brand-raised);border-radius:4px">
+        <h2 style="font-family:var(--font-display);font-size:28px;font-weight:500;color:var(--brand-ink)">Apply</h2>
+        <label style="display:flex;flex-direction:column;gap:6px;font-size:15px">Role<select name="role" data-f="ap.role" value="{{ ap.role }}" onChange="{{ onF }}" style="height:52px;border:1px solid #8A8079;border-radius:4px;padding:0 12px;background:#fff"><sc-for list="{{ apRoles }}" as="o" hint-placeholder-count="2"><option value="{{ o.id }}">{{ o.t }}</option></sc-for></select></label>
+        <label style="display:flex;flex-direction:column;gap:6px;font-size:15px">Name<input name="name" data-f="ap.name" value="{{ ap.name }}" onChange="{{ onF }}" autocomplete="name" style="height:52px;border:{{ apB.name }};border-radius:4px;padding:0 14px;background:#fff"><span role="alert" style="display:{{ apD.name }};color:var(--fixed-error);font-size:14px">{{ apErr.name }}</span></label>
+        <label style="display:flex;flex-direction:column;gap:6px;font-size:15px">Email<input name="email" data-f="ap.email" value="{{ ap.email }}" onChange="{{ onF }}" type="email" autocomplete="email" style="height:52px;border:{{ apB.email }};border-radius:4px;padding:0 14px;background:#fff"><span role="alert" style="display:{{ apD.email }};color:var(--fixed-error);font-size:14px">{{ apErr.email }}</span></label>
+        <label style="display:flex;flex-direction:column;gap:6px;font-size:15px">Years cutting hair<input name="years_experience" data-f="ap.years" value="{{ ap.years }}" onChange="{{ onF }}" inputmode="numeric" style="height:52px;border:{{ apB.years }};border-radius:4px;padding:0 14px;background:#fff"><span role="alert" style="display:{{ apD.years }};color:var(--fixed-error);font-size:14px">{{ apErr.years }}</span></label>
+        <label style="display:flex;flex-direction:column;gap:6px;font-size:15px">A link to your work (optional)<input name="portfolio_url" data-f="ap.msg" value="{{ ap.msg }}" onChange="{{ onF }}" placeholder="Portfolio or social profile" style="height:52px;border:1px solid #8A8079;border-radius:4px;padding:0 14px;background:#fff"></label>
+        <button type="button" data-act="apsend" style="align-self:flex-start;height:52px;padding:0 26px;border:0;border-radius:999px;background:var(--brand-ink);color:var(--brand-surface);font-weight:600;cursor:pointer">{{ apBtn }}</button>
+      </form>
+      <div role="status" style="display:{{ apDoneD }};flex-direction:column;gap:14px;padding:32px;background:var(--brand-raised);border-radius:4px"><h2 style="font-family:var(--font-display);font-size:30px;font-weight:500;color:var(--brand-ink)">Application sent</h2><p>Ines reads every application and replies within a week.</p><button type="button" data-act="apreset" style="align-self:flex-start;min-height:44px;padding:0 20px;border-radius:999px;border:1px solid var(--brand-ink);background:transparent;font-weight:600;cursor:pointer">Start again</button></div>
+    </div>
+  </div>
+</section>
+</sc-if>
+
+<sc-if value="{{ is_journal }}" hint-placeholder-val="{{ false }}">
+<section aria-labelledby="jn-h" style="padding:{{ r.heroTop }} {{ r.px }} 0">
+  <div style="max-width:1296px;margin:0 auto;display:flex;flex-direction:column;gap:36px">
+    <div style="display:flex;flex-direction:column;gap:14px"><h1 id="jn-h" style="font-family:var(--font-display);font-weight:500;font-size:{{ r.h1 }};line-height:1.02;color:var(--brand-ink)">Journal</h1><p style="font-size:{{ r.lead }};max-width:44ch">Short notes from the salon: news, hair advice, and the occasional change to how we work.</p></div>
+    <div style="display:grid;grid-template-columns:{{ r.c3 }};gap:{{ r.gapS }}">
+      <sc-for list="{{ journal }}" as="j" hint-placeholder-count="3"><a href="#" data-go="post" data-arg="{{ j.id }}" style="display:flex;flex-direction:column;gap:12px;color:var(--brand-body);text-decoration:none"><span style="display:{{ j.imgD }};aspect-ratio:3/2;border-radius:4px;background:#D9D0C7 url(&quot;{{ j.img }}&quot;) center/cover"></span><span style="font-size:14px;color:var(--brand-muted)">{{ j.date }}</span><span style="font-family:var(--font-display);font-size:24px;line-height:1.25;font-weight:600;color:var(--brand-ink)">{{ j.t }}</span><span style="font-size:15px">{{ j.ex }}</span></a></sc-for>
+    </div>
+  </div>
+</section>
+</sc-if>
+
+<sc-if value="{{ is_post }}" hint-placeholder-val="{{ false }}">
+<article aria-labelledby="pt-h" style="padding:{{ r.heroTop }} {{ r.px }} 0">
+  <div style="max-width:1296px;margin:0 auto;display:flex;flex-direction:column;gap:24px">
+    <a href="#" data-go="journal" style="font-size:15px;font-weight:600">← Journal</a>
+    <p style="font-size:15px;color:var(--brand-muted)">{{ post.date }}</p>
+    <h1 id="pt-h" style="font-family:var(--font-display);font-weight:500;font-size:{{ r.h1 }};line-height:1.05;color:var(--brand-ink);max-width:22ch">{{ post.t }}</h1>
+    <div role="img" aria-label="{{ post.alt }}" style="display:{{ post.imgD }};aspect-ratio:21/9;border-radius:4px;background:#D9D0C7 url(&quot;{{ post.img }}&quot;) center/cover"></div>
+    <div style="display:flex;flex-direction:column;gap:18px;max-width:64ch;font-size:{{ r.lead }};line-height:1.6"><sc-for list="{{ post.paras }}" as="p" hint-placeholder-count="2"><p>{{ p.p }}</p></sc-for></div>
+    <div style="display:flex;flex-direction:column;gap:16px;padding-top:32px;margin-top:24px;border-top:1px solid var(--brand-line)"><h2 style="font-family:var(--font-display);font-size:28px;font-weight:500;color:var(--brand-ink)">More from the journal</h2><sc-for list="{{ postOther }}" as="j" hint-placeholder-count="2"><a href="#" data-go="post" data-arg="{{ j.id }}" style="font-weight:600;font-size:18px">{{ j.t }}</a></sc-for></div>
+  </div>
+</article>
+</sc-if>
+
+<sc-if value="{{ is_privacy }}" hint-placeholder-val="{{ false }}">
+<section aria-labelledby="pv-h" style="padding:{{ r.heroTop }} {{ r.px }} 0">
+  <div style="max-width:1296px;margin:0 auto;display:flex;flex-direction:column;gap:20px">
+    <h1 id="pv-h" style="font-family:var(--font-display);font-weight:500;font-size:{{ r.h1 }};line-height:1.02;color:var(--brand-ink)">Privacy notice</h1>
+    <div style="display:flex;flex-direction:column;gap:16px;max-width:64ch">
+      <p>Maren is a fictional salon and this is Sample text. Replace it with your own notice before publishing.</p>
+      <h2 style="font-size:20px;font-weight:600;color:var(--brand-ink);margin-top:12px">What we collect</h2><p>When you send a booking request, a voucher request, a message or a job application, we receive what you type into the form: your name, email, phone number and anything you add. Booking requests also include the service, stylist and time you chose.</p>
+      <h2 style="font-size:20px;font-weight:600;color:var(--brand-ink);margin-top:12px">What we do with it</h2><p>We use it to reply to you and to manage your appointment. Booking and voucher details are passed to our booking system, which has its own privacy notice. We do not sell your details, and this website does not use analytics or advertising cookies.</p>
+      <h2 style="font-size:20px;font-weight:600;color:var(--brand-ink);margin-top:12px">How long we keep it</h2><p>Messages and applications for twelve months. Client records, including patch test results, for as long as you are a client and two years after.</p>
+      <h2 style="font-size:20px;font-weight:600;color:var(--brand-ink);margin-top:12px">Your choices</h2><p>Ask to see, correct or delete your details at any time: <a href="mailto:hello@maren-salon.example">{{ email }}</a>.</p>
+    </div>
+  </div>
+</section>
+</sc-if>
+
+<sc-if value="{{ is_notfound }}" hint-placeholder-val="{{ false }}">
+<section aria-labelledby="nf-h" style="padding:{{ r.sec }} {{ r.px }} 0">
+  <div style="max-width:1296px;margin:0 auto;display:grid;grid-template-columns:{{ r.detail }};gap:{{ r.gapL }};align-items:center">
+    <div style="display:flex;flex-direction:column;gap:18px"><img data-logo="404" src="assets/31/logo-lockup-light.svg" alt="Maren" style="height:32px;width:auto;max-width:180px;object-fit:contain;align-self:flex-start"><h1 id="nf-h" style="font-family:var(--font-display);font-weight:500;font-size:{{ r.h1 }};line-height:1.02;color:var(--brand-ink)">This page has been swept up.</h1><p>The link may be old, or the page has moved. Try one of these:</p><div style="display:flex;gap:16px;flex-wrap:wrap;font-weight:600"><a href="#" data-go="home">Home</a><a href="#" data-go="services">Services and prices</a><a href="#" data-go="book">Book</a><a href="#" data-go="contact">Contact</a></div></div>
+    <div role="img" aria-label="An empty styling chair" style="aspect-ratio:4/3;border-radius:4px;background:#D9D0C7 url(&quot;assets/31/chair-white.jpg&quot;) center/cover"></div>
+  </div>
+</section>
+</sc-if>
+
+</main>
+
+<footer style="margin-top:{{ r.sec }};background:var(--brand-ink);color:#D8CEC5;padding:{{ r.secS }} {{ r.px }} {{ footPadB }};font-size:15px">
+  <div style="max-width:1296px;margin:0 auto;display:flex;flex-direction:column;gap:40px">
+    <div style="display:grid;grid-template-columns:{{ r.foot }};gap:32px">
+      <div style="display:flex;flex-direction:column;gap:14px"><img data-logo="footer" src="assets/31/logo-lockup-dark.svg" alt="Maren" style="height:32px;width:auto;max-width:180px;object-fit:contain;align-self:flex-start"><p>{{ addr }}</p><a href="tel:+000000000314" style="color:var(--brand-raised)">{{ phone }}</a><a href="mailto:hello@maren-salon.example" style="color:var(--brand-raised)">{{ email }}</a></div>
+      <div style="display:flex;flex-direction:column;gap:6px"><h2 style="font-size:15px;font-weight:600;color:var(--brand-surface);margin-bottom:6px">Opening hours</h2><span>Tuesday, Wednesday 9am to 6pm</span><span>Thursday 9am to 9pm</span><span>Friday 9am to 7pm</span><span>Saturday 8am to 5pm</span><span>Sunday 10am to 4pm</span><span>Monday closed</span></div>
+      <nav aria-label="Salon" style="display:flex;flex-direction:column;gap:6px"><h2 style="font-size:15px;font-weight:600;color:var(--brand-surface);margin-bottom:6px">Salon</h2><sc-for list="{{ footA }}" as="l" hint-placeholder-count="6"><a href="#" data-go="{{ l.go }}" style="color:#D8CEC5;min-height:28px">{{ l.t }}</a></sc-for></nav>
+      <nav aria-label="Information" style="display:flex;flex-direction:column;gap:6px"><h2 style="font-size:15px;font-weight:600;color:var(--brand-surface);margin-bottom:6px">Information</h2><sc-for list="{{ footB }}" as="l" hint-placeholder-count="5"><a href="#" data-go="{{ l.go }}" style="color:#D8CEC5;min-height:28px">{{ l.t }}</a></sc-for></nav>
+    </div>
+    <div style="display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap;padding-top:24px;border-top:1px solid rgba(244,238,232,.18);font-size:14px"><p>Maren is a fictional business. Names, prices, reviews, qualifications and addresses are Sample content.</p><p>© 2026 Maren · Photos: Unsplash, see credits</p></div>
+  </div>
+</footer>
+
+<div style="display:{{ stickyD }};position:sticky;bottom:0;z-index:30;background:var(--brand-surface);border-top:1px solid var(--brand-line);padding:10px {{ r.px }};gap:10px">
+  <a href="#" data-go="book" style="flex:1;height:48px;display:flex;align-items:center;justify-content:center;background:var(--brand-accent);color:var(--brand-surface);font-weight:600;border-radius:999px;text-decoration:none">Book</a>
+  <a href="tel:+000000000314" style="flex:0 0 auto;height:48px;padding:0 22px;display:flex;align-items:center;border:1px solid var(--brand-ink);color:var(--brand-ink);font-weight:600;border-radius:999px;text-decoration:none">Call</a>
+</div>
+
+<sc-if value="{{ lbOpen }}" hint-placeholder-val="{{ false }}">
+<div role="dialog" aria-modal="true" aria-label="Photo viewer" style="position:fixed;inset:0;z-index:90;background:rgba(20,17,15,.94);display:flex;flex-direction:column;align-items:center;justify-content:center;padding:24px;gap:16px">
+  <button type="button" data-act="lbclose" aria-label="Close" style="position:absolute;top:16px;right:16px;width:48px;height:48px;border-radius:999px;border:1px solid rgba(255,255,255,.5);background:transparent;color:#fff;font-size:24px;cursor:pointer">×</button>
+  <img src="{{ lbItem.img }}" alt="{{ lbItem.alt }}" style="max-width:100%;max-height:76vh;object-fit:contain;border-radius:4px">
+  <div style="display:flex;align-items:center;gap:20px;color:#F4EEE8;font-size:15px"><button type="button" data-act="lbstep" data-v="-1" aria-label="Previous photo" style="width:48px;height:48px;border-radius:999px;border:1px solid rgba(255,255,255,.5);background:transparent;color:#fff;font-size:20px;cursor:pointer">←</button><span>{{ lbItem.t }} · {{ lbItem.pos }}</span><button type="button" data-act="lbstep" data-v="1" aria-label="Next photo" style="width:48px;height:48px;border-radius:999px;border:1px solid rgba(255,255,255,.5);background:transparent;color:#fff;font-size:20px;cursor:pointer">→</button></div>
+</div>
+</sc-if>
+
+<div data-demo-bar="true" style="display:{{ demoD }};position:fixed;left:50%;bottom:16px;transform:translateX(-50%);z-index:70;background:#1E1A17;color:#F4EEE8;border-radius:999px;padding:6px;gap:4px;align-items:center;font-size:13px;box-shadow:0 6px 20px rgba(0,0,0,.18);max-width:calc(100vw - 24px);overflow-x:auto">
+  <sc-for list="{{ demoHomes }}" as="h" hint-placeholder-count="3"><button type="button" data-act="home" data-v="{{ h.v }}" aria-pressed="{{ h.on }}" style="height:36px;padding:0 14px;border-radius:999px;border:0;background:{{ h.bg }};color:{{ h.fg }};font-weight:600;cursor:pointer;white-space:nowrap">{{ h.t }}</button></sc-for>
+  <span aria-hidden="true" style="width:1px;height:20px;background:rgba(244,238,232,.3);margin:0 4px"></span>
+  <sc-for list="{{ demoDevs }}" as="h" hint-placeholder-count="4"><button type="button" data-act="dev" data-v="{{ h.v }}" aria-pressed="{{ h.on }}" style="height:36px;padding:0 12px;border-radius:999px;border:0;background:{{ h.bg }};color:{{ h.fg }};font-weight:600;cursor:pointer;white-space:nowrap">{{ h.t }}</button></sc-for>
+</div>
+</div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;homeLayout&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[1,2,3],&quot;default&quot;:1,&quot;tsType&quot;:&quot;1|2|3&quot;,&quot;section&quot;:&quot;Layout&quot;},&quot;showDemoBar&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:true,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;Layout&quot;},&quot;currency&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;$&quot;,&quot;£&quot;,&quot;€&quot;,&quot;₦&quot;,&quot;R&quot;,&quot;KSh&quot;],&quot;default&quot;:&quot;$&quot;,&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;Content&quot;}}">
+class Component extends DCLogic {
+  constructor(p){super(p);
+    let home=+(this.props.homeLayout||0)||+(localStorage.getItem('mr31-home')||1)||1;
+    const dev=localStorage.getItem('mr31-device')||'fit';
+    this.state={page:'home',arg:null,home,dev,w:1440,menu:false,level:'stylist',gcat:'All',lb:-1,amt:100,
+      bk:{svc:'',who:'any',day:-1,slot:'',name:'',email:'',phone:'',first:false,patch:false,notes:''},bkStep:1,bkErr:{},bkStatus:'idle',
+      v:{amt:100,custom:'',kind:'email',to:'',from:'',email:'',msg:''},vErr:{},vStatus:'idle',
+      c:{name:'',email:'',topic:'Booking',msg:''},cErr:{},cStatus:'idle',
+      ap:{name:'',email:'',role:'chair',years:'',msg:''},apErr:{},apStatus:'idle'};
+    this.frameRef=React.createRef();
+  }
+  componentDidMount(){
+    const el=this.frameRef.current;if(el&&window.ResizeObserver){this.ro=new ResizeObserver(es=>{const w=Math.round(es[0].contentRect.width);if(w&&w!==this.state.w)this.setState({w})});this.ro.observe(el)}
+    window.__mr31={go:(p,a)=>this.go(p,a),set:o=>this.setState(o),get:()=>this.state};
+  }
+  componentWillUnmount(){this.ro&&this.ro.disconnect()}
+  go(page,arg){this.setState({page,arg:arg??null,menu:false,lb:-1});const f=this.frameRef.current;try{(f&&f.closest('[data-v31="root"]')?.parentElement||window).scrollTo?window.scrollTo(0,0):0}catch(e){}window.scrollTo&&window.scrollTo(0,0)}
+  money(n){const C=this.props.currency||'$';return C+n}
+  price(p,lvl){const m=(window.MR31.LEVELS.find(l=>l.id===lvl)||{m:1}).m;return Math.round(p*m/5)*5}
+  days(){const out=[],base=new Date();base.setHours(0,0,0,0);const D=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'],M=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    for(let i=1;i<=8;i++){const d=new Date(base);d.setDate(base.getDate()+i);out.push({i,lab:D[d.getDay()]+' '+d.getDate()+' '+M[d.getMonth()],closed:d.getDay()===1,thu:d.getDay()===4})}return out}
+  slots(day){if(!day||day.closed)return[];const s=['9:00','10:30','12:00','13:30','15:00','16:30'];if(day.thu)s.push('18:00','19:30');return s.map((t,k)=>({t,taken:(day.i*5+k)%4===0}))}
+  onClick=e=>{const t=e.target.closest&&e.target.closest('[data-go],[data-act]');if(!t)return;
+    if(t.tagName==='A'||t.dataset.go)e.preventDefault();
+    const S=this.state,D=t.dataset;
+    if(D.go){const extra={};if(D.go==='book'){const bk={...S.bk};if(D.svc)bk.svc=D.svc;if(D.who)bk.who=D.who;if(D.svc||D.who){bk.day=-1;bk.slot=''};extra.bk=bk;extra.bkStep=1;extra.bkStatus='idle';extra.bkErr={}}
+      if(D.go==='vouchers'&&S.page==='home')extra.v={...S.v,amt:S.amt};
+      this.setState(extra);this.go(D.go,D.arg);return}
+    const a=D.act,v=D.v;
+    if(a==='menu')this.setState({menu:!S.menu});
+    else if(a==='level')this.setState({level:v});
+    else if(a==='amt')this.setState({amt:+v});
+    else if(a==='vamt')this.setState({v:{...S.v,amt:+v,custom:''}});
+    else if(a==='vkind')this.setState({v:{...S.v,kind:v}});
+    else if(a==='gcat')this.setState({gcat:v,lb:-1});
+    else if(a==='lb')this.setState({lb:+v});
+    else if(a==='lbclose')this.setState({lb:-1});
+    else if(a==='lbstep'){const n=this.galList().length;this.setState({lb:(S.lb+(+v)+n)%n})}
+    else if(a==='home'){localStorage.setItem('mr31-home',v);this.setState({home:+v,page:'home',menu:false})}
+    else if(a==='dev'){localStorage.setItem('mr31-device',v);this.setState({dev:v})}
+    else if(a==='day')this.setState({bk:{...S.bk,day:+v,slot:''}});
+    else if(a==='slot')this.setState({bk:{...S.bk,slot:v}});
+    else if(a==='bknext')this.bkNext();
+    else if(a==='bkback')this.setState({bkStep:Math.max(1,S.bkStep-1),bkErr:{}});
+    else if(a==='bkreset')this.setState({bkStep:1,bkStatus:'idle',bkErr:{},bk:{svc:'',who:'any',day:-1,slot:'',name:'',email:'',phone:'',first:false,patch:false,notes:''}});
+    else if(a==='vsend')this.vSend();
+    else if(a==='vreset')this.setState({vStatus:'idle',vErr:{},v:{amt:100,custom:'',kind:'email',to:'',from:'',email:'',msg:''}});
+    else if(a==='csend')this.cSend();
+    else if(a==='creset')this.setState({cStatus:'idle',cErr:{},c:{name:'',email:'',topic:'Booking',msg:''}});
+    else if(a==='apsend')this.apSend();
+    else if(a==='apreset')this.setState({apStatus:'idle',apErr:{},ap:{name:'',email:'',role:'chair',years:'',msg:''}});
+  };
+  onKey=e=>{if(e.key==='Escape'){if(this.state.lb>=0)this.setState({lb:-1});else if(this.state.menu)this.setState({menu:false})}
+    if(this.state.lb>=0&&(e.key==='ArrowRight'||e.key==='ArrowLeft')){const n=this.galList().length;this.setState({lb:(this.state.lb+(e.key==='ArrowRight'?1:-1)+n)%n})}};
+  onF=e=>{const t=e.target,[o,k]=(t.dataset.f||'').split('.');if(!o)return;const val=t.type==='checkbox'?t.checked:t.value;this.setState(s=>({[o]:{...s[o],[k]:val}}))};
+  em(x){return /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test((x||'').trim())}
+  svcById(id){for(const g of window.MR31.MENU)for(const i of g.items)if(i.id===id)return{...i,cat:g.cat};return null}
+  bkNext(){const S=this.state,b=S.bk,err={};
+    if(S.bkStep===1){if(!b.svc)err.svc='Choose a service to continue.'}
+    if(S.bkStep===2){if(b.day<0)err.day='Choose a day.';else if(!b.slot)err.slot='Choose a time.'}
+    if(S.bkStep===3){if(!b.name.trim())err.name='Enter your name.';if(!this.em(b.email))err.email='Enter an email address like name@example.com.';if((b.phone||'').replace(/\D/g,'').length<7)err.phone='Enter a phone number we can call.';const sv=this.svcById(b.svc);if(sv&&sv.cat==='Colour'&&!b.patch)err.patch='Colour needs a patch test at least 48 hours before. Tick to confirm you can come in.'}
+    if(Object.keys(err).length){this.setState({bkErr:err});return}
+    if(S.bkStep<4)this.setState({bkStep:S.bkStep+1,bkErr:{}});
+    else{this.setState({bkStatus:'sending'});setTimeout(()=>this.setState({bkStatus:'done'}),900)}}
+  vSend(){const v=this.state.v,err={};const amt=v.custom?+v.custom:v.amt;if(!(amt>=20&&amt<=1000))err.amt='Choose an amount between 20 and 1000.';if(!v.to.trim())err.to='Who is it for?';if(!v.from.trim())err.from='Who is it from?';if(v.kind==='email'&&!this.em(v.email))err.email='Enter the email address to send it to.';if((v.msg||'').length>200)err.msg='Keep the message under 200 characters.';
+    if(Object.keys(err).length){this.setState({vErr:err});return}this.setState({vErr:{},vStatus:'sending'});setTimeout(()=>this.setState({vStatus:'done'}),900)}
+  cSend(){const c=this.state.c,err={};if(!c.name.trim())err.name='Enter your name.';if(!this.em(c.email))err.email='Enter an email address like name@example.com.';if((c.msg||'').trim().length<10)err.msg='Tell us a little more (10 characters or more).';
+    if(Object.keys(err).length){this.setState({cErr:err});return}this.setState({cErr:{},cStatus:'sending'});setTimeout(()=>this.setState({cStatus:'done'}),900)}
+  apSend(){const a=this.state.ap,err={};if(!a.name.trim())err.name='Enter your name.';if(!this.em(a.email))err.email='Enter an email address like name@example.com.';if(a.years===''||isNaN(+a.years))err.years='How many years have you been cutting hair?';
+    if(Object.keys(err).length){this.setState({apErr:err});return}this.setState({apErr:{},apStatus:'sending'});setTimeout(()=>this.setState({apStatus:'done'}),900)}
+  galList(){const G=window.MR31.GAL,c=this.state.gcat;return c==='All'?G:G.filter(g=>g.c===c)}
+  renderVals(){const base=this.renderBase();const S=this.state,st=S.rbStatus||'idle';
+    return Object.assign(base,{rbVal:S.rbEmail||'',rbOn:e=>this.setState({rbEmail:e.target.value,rbErr:''}),
+      rbErr:S.rbErr||'',rbErrShow:S.rbErr?'block':'none',rbBd:S.rbErr?'2px solid #B42318':'1px solid #6B625C',
+      rbFormShow:st==='done'?'none':'flex',rbDoneShow:st==='done'?'flex':'none',rbBtn:st==='sending'?'Saving…':'Remind me',
+      rbSubmit:e=>{e.preventDefault();const v=(S.rbEmail||'').trim();if(!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(v)){this.setState({rbErr:v?'Enter an email like name@example.com':'Enter your email so we can remind you'});return}
+        this.setState({rbStatus:'sending'});setTimeout(()=>this.setState({rbStatus:'done'}),900)},
+      rbReset:()=>this.setState({rbStatus:'idle',rbEmail:''})});}
+  renderBase(){
+    const W=window.MR31;if(!W)return{};
+    const S=this.state,bp=S.w<640?'m':S.w<1024?'t':'d',d=bp==='d',t=bp==='t',m=bp==='m';
+    const pick=(a,b,c)=>d?a:t?b:c;
+    const r={px:pick('48px','36px','20px'),sec:pick('112px','88px','64px'),secS:pick('88px','72px','56px'),heroTop:pick('56px','40px','28px'),gap:pick('48px','32px','24px'),gapL:pick('72px','40px','32px'),gapS:pick('24px','20px','24px'),
+      body:pick('17px','16px','16px'),lead:pick('20px','18px','18px'),disp:pick('124px','76px','44px'),h1x:pick('76px','60px','44px'),h1:pick('60px','48px','44px'),h2:pick('44px','44px','30px'),h3:pick('22px','20px','18px'),quote:pick('30px','28px','24px'),
+      split:pick('minmax(0,1.05fr) minmax(0,.95fr)','minmax(0,1fr)','minmax(0,1fr)'),c2:pick('repeat(2,minmax(0,1fr))','repeat(2,minmax(0,1fr))','minmax(0,1fr)'),c3:pick('repeat(3,minmax(0,1fr))','repeat(3,minmax(0,1fr))','minmax(0,1fr)'),c4:pick('repeat(4,minmax(0,1fr))','repeat(2,minmax(0,1fr))','minmax(0,1fr)'),
+      hero1:pick('minmax(0,.8fr) minmax(0,1.2fr)','minmax(0,1fr)','minmax(0,1fr)'),heroImgH:pick('500px','440px','300px'),
+      mosaicCols:pick('repeat(4,minmax(0,1fr))','repeat(2,minmax(0,1fr))','repeat(2,minmax(0,1fr))'),mosaicRow:pick('240px','220px','150px'),
+      visit:pick('minmax(0,1.2fr) minmax(0,1fr)','minmax(0,1fr)','minmax(0,1fr)'),visitH:pick('560px','420px','300px'),
+      hero2:pick('minmax(0,1fr) minmax(0,1fr)','minmax(0,1fr)','minmax(0,1fr)'),hero2H:pick('720px','auto','auto'),hero2ImgH:pick('720px','560px','440px'),h2Order:0,
+      feat:pick('minmax(0,1fr) minmax(0,1fr)','minmax(0,1fr)','minmax(0,1fr)'),giftOrder:pick(0,1,1),time:pick('repeat(5,minmax(0,1fr))','minmax(0,1fr)','minmax(0,1fr)'),railW:pick('260px','240px','220px'),
+      filmW:pick('420px','340px','260px'),filmH:pick('520px','440px','340px'),note:pick('220px minmax(0,1fr)','200px minmax(0,1fr)','minmax(0,1fr)'),usual:pick('minmax(0,1.4fr) minmax(0,1fr) minmax(0,1fr) auto','minmax(0,1fr) auto','minmax(0,1fr)'),
+      pageH:pick('64px','52px','40px'),detail:pick('minmax(0,1fr) minmax(0,1fr)','minmax(0,1fr)','minmax(0,1fr)'),side:pick('minmax(0,1.5fr) minmax(0,1fr)','minmax(0,1fr)','minmax(0,1fr)'),gal:pick('repeat(3,minmax(0,1fr))','repeat(3,minmax(0,1fr))','minmax(0,1fr)'),form2:pick('repeat(2,minmax(0,1fr))','repeat(2,minmax(0,1fr))','minmax(0,1fr)'),days:pick('repeat(8,minmax(0,1fr))','repeat(4,minmax(0,1fr))','repeat(2,minmax(0,1fr))'),slots:pick('repeat(8,minmax(0,1fr))','repeat(4,minmax(0,1fr))','repeat(2,minmax(0,1fr))'),foot:pick('minmax(0,1.4fr) repeat(3,minmax(0,1fr))','repeat(2,minmax(0,1fr))','minmax(0,1fr)')};
+    const P=S.page,cur=g=>P===g||(g==='services'&&P==='treatment')||(g==='team'&&P==='person');
+    const NAV=[['services','Services'],['team','Team'],['gallery','Gallery'],['vouchers','Gift vouchers'],['about','About'],['contact','Contact']];
+    const lvl=W.LEVELS.find(l=>l.id===S.level);
+    const mapItem=(i,L)=>({...i,price:this.money(this.price(i.p,L||S.level)),min:i.min,minT:i.min+' min'});
+    const menuAll=W.MENU.map(g=>{const it=g.items.map(i=>mapItem(i));return {cat:g.cat,items:it,count:it.length,from:this.money(Math.min(...g.items.map(i=>this.price(i.p,S.level||'stylist'))))}});
+    const hrs=W.HOURS.map(([dd,tt])=>({d:dd,t:tt}));
+    const team=W.TEAM.map(p=>({...p,first:p.n.split(' ')[0],mono:p.n.split(' ').map(x=>x[0]).slice(0,2).join(''),bg:p.img?`#D9D0C7 url("${p.img}") center/cover`:'var(--brand-raised)',imgD:p.img?'block':'none',monoD:p.img?'none':'flex'}));
+    team.forEach(p=>{if(p.img)p.mono=''});
+    const fmtD=s=>{const [y,mo,da]=s.split('-');return `${+da} ${['January','February','March','April','May','June','July','August','September','October','November','December'][+mo-1]} ${y}`};
+    const journal=W.JOURNAL.map(j=>({...j,date:fmtD(j.d),ex:j.x[0].slice(0,110)+'…',imgD:j.img?'block':'none'}));
+    const vals={noop:e=>e.preventDefault(),frameRef:this.frameRef,onClick:this.onClick,onKey:this.onKey,onF:this.onF,r,menu:S.menu,addr:W.ADDR,phone:W.PHONE,email:W.EMAIL,
+      frameW:{fit:'100%',d:'1440px',t:'768px',m:'390px'}[S.dev]||'100%',framePad:S.dev==='fit'?'0':'24px 0 96px',frameShadow:S.dev==='fit'?'none':'0 0 0 1px rgba(30,26,23,.08)',
+      navD:d?'flex':'none',burgerD:d?'none':'inline-flex',
+      nav:NAV.map(([g,tt])=>({go:g,t:tt,cur:cur(g)?'page':'false',bd:cur(g)?'var(--brand-accent)':'transparent'})),
+      menuNav:[['home','Home'],...NAV,['journal','Journal'],['policies','Policies'],['careers','Careers']].map(([g,tt])=>({go:g,t:tt})),
+      isHome:P==='home',isHome1:P==='home'&&S.home===1,isHome2:P==='home'&&S.home===2,isHome3:P==='home'&&S.home===3,
+      menuGrid:pick('minmax(0,.7fr) minmax(0,2fr)','minmax(0,1fr)','minmax(0,1fr)'),menuPad:pick('40px','32px','20px'),tierCols:pick('repeat(3,minmax(0,1fr))','minmax(0,1fr)','minmax(0,1fr)'),tiers:W.LEVELS.map(l=>{const all=W.MENU.flatMap(g=>g.items);const pk=['restyle','blow-dry','roots','balayage'].map(id=>all.find(x=>x.id===id)).filter(Boolean);const cb=all.find(x=>x.id==='cut-blow');const f=l.id==='senior';return {n:l.n,d:l.d,btn:'Book with a '+(l.id==='director'?'creative director':l.n.toLowerCase()),lead:this.money(this.price(cb.p,l.id)),items:pk.map(x=>({n:x.n,minT:x.min+' min',price:this.money(this.price(x.p,l.id))})),bg:f?'var(--brand-raised)':'var(--brand-surface)',bd:f?'var(--brand-ink)':'var(--brand-line)',btnBg:f?'var(--brand-ink)':'transparent',btnFg:f?'var(--brand-surface)':'var(--brand-ink)'}}),levels:W.LEVELS.map(l=>({...l,on:l.id===S.level?'true':'false',bg:l.id===S.level?'var(--brand-ink)':'transparent',fg:l.id===S.level?'var(--brand-ink)':'var(--brand-muted)',bd:l.id===S.level?'var(--brand-ink)':'var(--brand-line)'})),
+      levelNote:lvl.d,menuAll,menuHome:menuAll,depositOver:this.money(150),hours:hrs,
+      mosaic:[{img:W.A+'salon-brick.jpg',alt:'The salon floor',gc:d?'1 / span 2':'1 / span 2',gr:d?'1 / span 2':'span 2'},{img:W.A+'curl-giorgio.jpg',alt:'Loose curls being set'},{img:W.A+'scissors-farhad.jpg',alt:'Precision cut'},{img:W.A+'sinks-bw.jpg',alt:'The wash room'},{img:W.A+'curler-baylee.jpg',alt:'Wand curls'}].map((x,i)=>({...x,gc:x.gc||'auto',gr:x.gr||'auto'})),
+      team4:team.slice(0,4),teamRail:team,reviews:W.REVIEWS,
+      balFrom:this.money(this.price(190,'stylist')),
+      colourMenu:W.MENU.find(g=>g.cat==='Colour').items.concat(W.MENU.find(g=>g.cat==='Treatments').items.filter(i=>i.id==='bond')).map(i=>mapItem(i,'stylist')).map((x,k)=>({...x,mt:d&&k%3===1?'48px':'0px',rad:['28px 28px 28px 4px','140px 140px 28px 28px','28px 4px 28px 28px'][k%3],pad:k%3===1?'72px 32px 28px':'28px',bg:k%3===1?'var(--brand-accent)':k%3===2?'var(--brand-ink)':'var(--brand-raised)',fg:k%3===0?'var(--brand-ink)':'#FFFFFF'})),
+      timeline:[{at:'0:00',t:'Consultation',d:'Daylight, a look at your history, the price agreed.'},{at:'0:20',t:'Painting',d:'Freehand sections, open or in paper.'},{at:'1:40',t:'Rinse and tone',d:'A gloss sets the shade and takes out brass.'},{at:'2:20',t:'Cut',d:'If booked. A tidy-up is included.'},{at:'2:40',t:'Blow-dry',d:'Finished the way you can do it at home.'}],
+      amts:[50,100,150,250].map(a=>({v:a,t:this.money(a),on:S.amt===a?'true':'false',bg:S.amt===a?'var(--brand-ink)':'transparent',fg:S.amt===a?'var(--brand-ink)':'var(--brand-muted)',bd:S.amt===a?'var(--brand-ink)':'var(--brand-line)'})),amtLabel:this.money(S.amt),
+      film:[['scissors-farhad','Hands cutting wet hair with scissors'],['curl-giorgio','Stylist setting loose curls with an iron'],['hairdone-daniel','Colour being worked through by a bright window'],['curler-baylee','Long hair wrapped around a curling wand'],['cut-lindsay','Client relaxing at the wash basin']].map(([f,a])=>({img:W.A+f+'.jpg',alt:a})),
+      usual:['cut-blow','blow-dry','roots','gloss','fringe'].map((id,k)=>{const s=this.svcById(id);return{id,n:s.n,min:s.min,price:this.money(s.p),next:['Thu 4:30pm','Wed 12:00pm','Fri 9:00am','Thu 7:30pm','Today 3:00pm'][k]}}),
+      care:[{t:'A consultation before every cut and colour',d:'Ten minutes, longer for big changes. We agree what we are doing and what it costs before we start.'},{t:'A patch test 48 hours before colour',d:'For every colour client, every time, and again if it has been six months since your last colour.'},{t:'A certified team, trained every Monday',d:'Salon closed on Mondays so the whole team can train together. Qualifications are on each stylist\'s page.'}],
+      journal
+    };
+    const on=x=>x?{bg:'#F4EEE8',fg:'#1E1A17',on:'true'}:{bg:'transparent',fg:'#F4EEE8',on:'false'};
+    Object.assign(vals,{demoD:this.props.showDemoBar===false?'none':'flex',
+      demoHomes:[1,2,3].map(n=>({v:n,t:'Home '+n,...on(S.home===n&&P==='home')})),
+      demoDevs:[['fit','Fit'],['d','Desktop'],['t','Tablet'],['m','Mobile']].map(([k,tt])=>({v:k,t:tt,...on(S.dev===k)})),
+      stickyD:m?'flex':'none',footPadB:m?'40px':'40px',
+      footA:[['services','Services and prices'],['team','Team'],['gallery','Gallery'],['vouchers','Gift vouchers'],['journal','Journal'],['careers','Careers']].map(([g,tt])=>({go:g,t:tt})),
+      footB:[['book','Book'],['contact','Contact and directions'],['policies','Policies'],['privacy','Privacy'],['about','About']].map(([g,tt])=>({go:g,t:tt}))});
+    Object.assign(vals,this.pageVals(S,W,r,team,menuAll,journal,hrs,bp,mapItem));
+    return vals;
+  }
+  pageVals(S,W,r,team,menuAll,journal,hrs,bp,mapItem){
+    const P=S.page,o={};
+    ['services','treatment','team','person','gallery','vouchers','book','about','contact','policies','careers','journal','post','privacy','notfound'].forEach(k=>o['is_'+k]=P===k);
+    const known=['home','services','treatment','team','person','gallery','vouchers','book','about','contact','policies','careers','journal','post','privacy','notfound'];if(!known.includes(P))o.is_notfound=true;
+    o.treats=W.TREAT.map(t=>({...t,from:this.money(this.price((this.svcById(t.svc)||{p:0}).p,'stylist'))}));
+    const T=W.TREAT.find(t=>t.id===S.arg)||W.TREAT[0],ts=this.svcById(T.svc);
+    o.tr={...T,steps:T.steps.map(([a,b])=>({t:a,d:b})),patchD:T.patch?'block':'none',min:ts.min,levels:W.LEVELS.map(l=>({n:l.n,p:this.money(this.price(ts.p,l.id))}))};
+    o.trOther=o.treats.filter(t=>t.id!==T.id);
+    const pr=team.find(p=>p.id===S.arg)||team[0];o.pr=pr;o.prWork=W.GAL.filter(g=>g.img===pr.img).concat(W.GAL.filter(g=>g.c==='Styling')).slice(0,2);o.prOther=team.filter(p=>p.id!==pr.id).slice(0,4);
+    o.teamLead=team[0];o.teamRest=team.slice(1);
+    const gl=this.galList();o.gcats=W.GCATS.map(c=>({c,on:S.gcat===c?'true':'false',bg:S.gcat===c?'var(--brand-ink)':'transparent',fg:S.gcat===c?'var(--brand-ink)':'var(--brand-muted)',n:c==='All'?W.GAL.length:W.GAL.filter(g=>g.c===c).length}));
+    o.gal=gl.map((g,i)=>({...g,i}));o.galCount=gl.length===1?'1 photo':gl.length+' photos';o.galEmptyD=gl.length?'none':'flex';o.galResetD=S.gcat==='All'?'none':'inline-flex';
+    o.lbOpen=S.lb>=0&&gl.length>0;const L=gl[S.lb]||gl[0]||{};o.lbItem={...L,pos:(S.lb+1)+' of '+gl.length};
+    const v=S.v;o.v=v;o.vErr=S.vErr;o.vAmts=[50,100,150,250].map(a=>({v:a,t:this.money(a),on:(!v.custom&&v.amt===a)?'true':'false',bg:(!v.custom&&v.amt===a)?'var(--brand-ink)':'transparent',fg:(!v.custom&&v.amt===a)?'var(--brand-ink)':'var(--brand-muted)'}));
+    o.vKinds=[['email','By email'],['print','Print at home']].map(([k,tt])=>({k,t:tt,on:v.kind===k?'true':'false',bg:v.kind===k?'var(--brand-ink)':'transparent',fg:v.kind===k?'var(--brand-ink)':'var(--brand-muted)'}));
+    o.vEmailD=v.kind==='email'?'flex':'none';o.vTotal=this.money(v.custom?+v.custom||0:v.amt);o.vFormD=S.vStatus==='done'?'none':'flex';o.vDoneD=S.vStatus==='done'?'flex':'none';o.vSending=S.vStatus==='sending';o.vBtn=S.vStatus==='sending'?'Sending…':'Send voucher request';
+    const eb=(e,k)=>e[k]?'2px solid var(--fixed-error)':'1px solid #8A8079';const ed=(e,k)=>e[k]?'block':'none';
+    o.vB={amt:ed(S.vErr,'amt'),to:eb(S.vErr,'to'),from:eb(S.vErr,'from'),email:eb(S.vErr,'email'),msg:eb(S.vErr,'msg')};o.vD={amt:ed(S.vErr,'amt'),to:ed(S.vErr,'to'),from:ed(S.vErr,'from'),email:ed(S.vErr,'email'),msg:ed(S.vErr,'msg')};o.vMsgLen=(v.msg||'').length+' / 200';
+    const b=S.bk,sv=this.svcById(b.svc);o.bk=b;o.bkErr=S.bkErr;o.bkStep=S.bkStep;
+    o.bkSteps=['Service','When','Your details','Check and send'].map((tt,i)=>({t:tt,cur:S.bkStep===i+1?'step':'false',c:S.bkStep===i+1?'var(--brand-ink)':S.bkStep>i+1?'var(--brand-accent)':'var(--brand-muted)',w:S.bkStep===i+1?'700':'500',bd:S.bkStep===i+1?'var(--brand-ink)':'var(--brand-line)'}));
+    o.bkS=[1,2,3,4].reduce((a,n)=>(a['s'+n]=S.bkStatus!=='done'&&S.bkStep===n?'flex':'none',a),{});o.bkDoneD=S.bkStatus==='done'?'flex':'none';o.bkNavD=S.bkStatus==='done'?'none':'flex';o.bkBackD=S.bkStep>1?'inline-flex':'none';
+    o.bkNextT=S.bkStep<4?'Continue':S.bkStatus==='sending'?'Sending…':'Send booking request';
+    o.bkGroups=W.MENU.map(g=>({cat:g.cat,items:g.items.map(i=>({...i,label:`${i.n} · ${i.min} min · from ${this.money(i.p)}`,sel:b.svc===i.id}))}));
+    o.bkWho=[{id:'any',n:'First available'},...W.TEAM.map(p=>({id:p.id,n:p.n+' · '+p.r}))].map(x=>({...x,sel:b.who===x.id}));
+    const days=this.days();o.bkDays=days.map(dd=>({...dd,on:b.day===dd.i?'true':'false',dis:dd.closed,bg:b.day===dd.i?'var(--brand-ink)':'transparent',fg:b.day===dd.i?'var(--brand-ink)':'var(--brand-muted)',dec:dd.closed?'line-through':'none',sub:dd.closed?'Closed':dd.thu?'Late':''}));
+    const day=days.find(dd=>dd.i===b.day);o.bkSlots=this.slots(day).map(s=>({...s,on:b.slot===s.t?'true':'false',bg:b.slot===s.t?'var(--brand-ink)':'transparent',fg:b.slot===s.t?'var(--brand-ink)':'var(--brand-muted)',sub:s.taken?'Taken':'',dec:s.taken?'line-through':'none'}));
+    o.bkSlotsD=day?'flex':'none';o.bkSvcName=sv?sv.n:'—';o.bkSvcMeta=sv?`${sv.min} min · from ${this.money(sv.p)} · ${sv.note}`:'';o.bkSvcD=sv?'block':'none';
+    o.bkPatchD=sv&&sv.cat==='Colour'?'flex':'none';o.bkWhoName=(W.TEAM.find(p=>p.id===b.who)||{n:'First available'}).n;o.bkDayName=day?day.lab:'—';
+    o.bkB={svc:eb(S.bkErr,'svc'),name:eb(S.bkErr,'name'),email:eb(S.bkErr,'email'),phone:eb(S.bkErr,'phone')};o.bkD={svc:ed(S.bkErr,'svc'),day:ed(S.bkErr,'day'),slot:ed(S.bkErr,'slot'),name:ed(S.bkErr,'name'),email:ed(S.bkErr,'email'),phone:ed(S.bkErr,'phone'),patch:ed(S.bkErr,'patch')};
+    const c=S.c;o.c=c;o.cErr=S.cErr;o.cB={name:eb(S.cErr,'name'),email:eb(S.cErr,'email'),msg:eb(S.cErr,'msg')};o.cD={name:ed(S.cErr,'name'),email:ed(S.cErr,'email'),msg:ed(S.cErr,'msg')};o.cFormD=S.cStatus==='done'?'none':'flex';o.cDoneD=S.cStatus==='done'?'flex':'none';o.cBtn=S.cStatus==='sending'?'Sending…':'Send message';
+    o.cTopics=['Booking','Colour question','Gift vouchers','Something else'].map(tt=>({t:tt,sel:c.topic===tt}));
+    const a=S.ap;o.ap=a;o.apErr=S.apErr;o.apB={name:eb(S.apErr,'name'),email:eb(S.apErr,'email'),years:eb(S.apErr,'years')};o.apD={name:ed(S.apErr,'name'),email:ed(S.apErr,'email'),years:ed(S.apErr,'years')};o.apFormD=S.apStatus==='done'?'none':'flex';o.apDoneD=S.apStatus==='done'?'flex':'none';o.apBtn=S.apStatus==='sending'?'Sending…':'Send application';
+    o.apRoles=W.ROLES.map(x=>({...x,sel:a.role===x.id}));o.roles=W.ROLES;
+    const J=journal.find(j=>j.id===S.arg)||journal[0];o.post={...J,paras:J.x.map(p=>({p})),imgD:J.img?'block':'none'};o.postOther=journal.filter(j=>j.id!==J.id);
+    o.policies=[{id:'cancel',t:'Cancellations',d:'Please give us 24 hours\' notice to cancel or move an appointment. Inside 24 hours we charge 50% of the booked service; if you do not arrive, 100%.'},{id:'late',t:'Late arrival',d:'If you are more than 15 minutes late we may need to shorten your service or move it, so the next client is not kept waiting. We will always ask you first.'},{id:'deposit',t:'Deposits',d:'Colour appointments over '+this.money(150)+' and all bridal bookings take a 20% deposit when you book. It comes off your bill on the day.'},{id:'patch',t:'Patch tests',d:'Every colour client has a patch test at least 48 hours before the appointment: new clients, returning clients after six months, and anyone who has changed medication or had a reaction since. We cannot colour without one.'},{id:'consult',t:'Consultations',d:'Free and fifteen minutes, in person or by video. Required before colour correction, smoothing treatments and big changes.'},{id:'children',t:'Children',d:'Under-12s are welcome for cuts with a parent present. We do not colour or smooth hair for under-16s.'},{id:'refunds',t:'If you are not happy',d:'Tell us within seven days and we will put it right free of charge. We do not give refunds on services that have been completed, but we will always fix it.'}];
+    return o;
+  }
+}
+</script>
+</body>
+</html>
