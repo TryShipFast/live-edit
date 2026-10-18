@@ -271,9 +271,14 @@ a.le-mark:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
    page each section comes from, because that is how the owner knows it. */
 .le-sitemap-intro { margin: 0; font-size: 13px; line-height: 1.5; }
 .le-sitemap { display: flex; flex-direction: column; gap: 2px; max-height: 38vh; overflow: auto; margin: 0 -6px; }
-.le-sitemap-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 12px; border-radius: 10px; text-decoration: none; color: inherit; }
-.le-sitemap-row:hover { background: var(--le-soft); }
-.le-sitemap-row[aria-current="page"] { background: var(--le-soft); }
+.le-sitemap-row { display: flex; align-items: center; gap: 8px; border-radius: 10px; }
+.le-sitemap-row:hover, .le-sitemap-row:has([aria-current="page"]) { background: var(--le-soft); }
+.le-sitemap-open { flex: 1; min-width: 0; display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 12px; border-radius: 10px; text-decoration: none; color: inherit; }
+.le-sitemap-open:focus-visible, .le-sitemap-menu:focus-visible { outline: none; box-shadow: 0 0 0 3px var(--le-accent-soft); }
+.le-sitemap-menu { flex: none; margin-right: 8px; cursor: pointer; border: 1px solid var(--le-field); background: #fff; color: var(--le-body); border-radius: 999px; padding: 5px 11px; font-size: 11px; font-weight: 600; }
+.le-sitemap-menu:hover { border-color: var(--le-accent); color: var(--le-accent); }
+.le-sitemap-menu[aria-pressed="true"] { background: var(--le-accent-soft); border-color: transparent; color: var(--le-ink); }
+.le-in-menu { margin-top: -4px; font-size: 13px; color: var(--le-body); }
 .le-sitemap-words { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
 .le-sitemap-title { font-size: 14px; font-weight: 600; color: var(--le-ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .le-sitemap-address { font-size: 12px; color: var(--le-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

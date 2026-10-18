@@ -363,8 +363,8 @@ window.liveEditPages = {
   library: [                              // the sections the design has, named by its designer
     { from: 'about.leadership', label: 'Leadership team', page: 'About the school' },
   ],
-  pagesKey: 'structure:pages',            // the owner's pages: [{ id, title }]
-  made: [{ id: 'open-days', title: 'Open days' }],
+  pagesKey: 'structure:pages',            // the owner's pages: [{ id, title, menu }]
+  made: [{ id: 'open-days', title: 'Open days', menu: true }],
   structureKey: 'structure:page:about',   // this page's additions: { added: { <id>: <from> } }
   added: { 'add-k3x9q2pa': 'admissions.apply' },
 };
@@ -373,6 +373,11 @@ window.liveEditPages = {
 - **Add a page:** a title (the address follows it until edited), an address,
   and one or more sections from the library. Creating saves
   `structure:page:<address>` then `pagesKey`, and opens the new page.
+- **Menus:** a new page is put in the site's menus unless **Show it in the menu**
+  is unticked, and each of the owner's pages has an **In the menu** / **Add to
+  menu** switch in the list. Both save `pagesKey` with the page's `menu` flag;
+  the host draws the entries (each a copy of an entry the design marked, with
+  its words editable like any menu entry).
 - **Add a section:** in the panel of a page's sections (a list of kind
   `sections`), **+ Add a section below** opens the library. Choosing one saves
   this page's `structureKey` with the new section (`add-` and eight base-36
