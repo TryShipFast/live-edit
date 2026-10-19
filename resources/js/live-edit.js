@@ -4737,10 +4737,43 @@ const bootLiveEdit = () => {
             hideHandle();
         });
 
+        /*
+         * Pressing the words while not editing used to do nothing at all.
+         *
+         * No panel, no outline, no word: the page simply did not answer. It is
+         * the first thing anybody tries on an editor, and the product's reply
+         * was silence, which reads as broken rather than as off. It caught me
+         * twice on a site I had been editing all day.
+         *
+         * So it says where the switch is, and points at it. Only for things
+         * that are not links or buttons: pressing a link while not editing is
+         * somebody looking around their own site, and the site should take
+         * them there rather than lecture them. Once every few seconds, because
+         * a nudge that repeats on every press is worse than the silence.
+         */
+        let nudgedAt = 0;
+        const sayHowToEdit = (event) => {
+            if (Date.now() - nudgedAt < 6000) return;
+            if (event.target === ui.root || ui.root.contains(event.target)) return;
+            if (event.target.closest?.('a[href], button, input, select, textarea, [data-live-create]')) return;
+
+            const target = resolveTarget(event.target);
+            if (!target) return;
+
+            nudgedAt = Date.now();
+            ui.toast('Press “Edit site” to change anything on this page.', 5000);
+            toggleButton?.classList.add('is-asked');
+            setTimeout(() => toggleButton?.classList.remove('is-asked'), 2200);
+        };
+
         document.addEventListener(
             'click',
             (event) => {
-                if (!document.body.classList.contains('editing')) return;
+                if (!document.body.classList.contains('editing')) {
+                    sayHowToEdit(event);
+
+                    return;
+                }
                 // A control was asked to run itself; leave this click alone.
                 if (passingThrough) return;
                 // Clicks inside the overlay retarget to its shadow host.

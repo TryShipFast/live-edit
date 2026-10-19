@@ -117,6 +117,11 @@ a.le-mark:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
 }
 .le-bar-btn:hover { background: #2A2C31; }
 .le-bar-btn.is-on { background: #2A2C31; }
+/* Pointed at when somebody presses the page while editing is off, so the
+   message beside it has somewhere to send them. Still, not flashing: motion
+   that repeats is an alarm, and nothing is wrong. */
+.le-bar-btn.is-asked { background: var(--le-accent); color: #fff; box-shadow: 0 0 0 4px var(--le-accent-soft); }
+@media (prefers-reduced-motion: no-preference) { .le-bar-btn.is-asked { transition: background .15s ease, box-shadow .15s ease; } }
 /* The site's other pages, so editing one does not mean hunting for the next.
    A segmented track rather than separate buttons, because these are one
    choice with several answers and only one of them can be true. */
