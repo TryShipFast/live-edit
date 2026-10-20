@@ -1,5 +1,12 @@
 # ShipFast Live Edit for WordPress
 
+## 0.15.25
+
+Licence status is now checked against the hostname serving the current request.
+Its cached answer and outage grace are scoped to that hostname, so a valid
+answer for the canonical domain cannot turn editing on for an unlisted
+subdomain served by the same WordPress installation.
+
 ## 0.15.13
 
 The shared editor runtime now waits for the page's editor marker before

@@ -137,14 +137,15 @@ class Licence
     /** @return array<string, mixed> */
     public static function status(): array
     {
-        $cached = get_transient(self::ANSWER);
+        $answerKey = self::answerKey();
+        $cached = get_transient($answerKey);
 
         if (is_array($cached)) {
             return $cached;
         }
 
         $answer = self::ask();
-        set_transient(self::ANSWER, $answer, self::TTL);
+        set_transient($answerKey, $answer, self::TTL);
 
         return $answer;
     }
@@ -152,7 +153,7 @@ class Licence
     /** Forget what we were told, so the next check really asks. */
     public static function forget(): void
     {
-        delete_transient(self::ANSWER);
+        delete_transient(self::answerKey());
     }
 
     /**
@@ -213,7 +214,7 @@ class Licence
          * the licensed one is exactly the thing worth knowing about, and in
          * silence we would never hear it.
          */
-        $home = (string) wp_parse_url(home_url('/'), PHP_URL_HOST);
+        $home = self::requestDomain();
 
         $probe = Api::probe(
             '/licence'.($home !== '' ? '?domain='.rawurlencode($home) : ''),
@@ -234,7 +235,7 @@ class Licence
             if ($answer['valid']) {
                 // Kept apart from the cached answer and for far longer: its
                 // job is to survive that answer expiring during an outage.
-                set_transient(self::LAST_GOOD, $answer, self::GRACE);
+                set_transient(self::lastGoodKey(), $answer, self::GRACE);
             }
 
             return $answer;
@@ -262,10 +263,79 @@ class Licence
             return ['valid' => false, 'reason' => $reason, 'expires_at' => null, 'days_remaining' => null];
         }
 
-        $lastGood = get_transient(self::LAST_GOOD);
+        $lastGood = get_transient(self::lastGoodKey());
 
-        return is_array($lastGood)
-            ? $lastGood
-            : ['valid' => true, 'reason' => 'unreachable', 'expires_at' => null, 'days_remaining' => null];
+        if (is_array($lastGood)) {
+            return $lastGood;
+        }
+
+        // The deliberate fail-open for a first-time outage only applies to
+        // the site's registered hostname (and local development). An alias
+        // with no successful check must not get the canonical host's pass by
+        // waiting for the licence service to be unavailable.
+        if (! self::isCanonicalOrLocalRequestHost()) {
+            return ['valid' => false, 'reason' => 'domain_mismatch', 'expires_at' => null, 'days_remaining' => null];
+        }
+
+        return ['valid' => true, 'reason' => 'unreachable', 'expires_at' => null, 'days_remaining' => null];
+    }
+
+    /**
+     * A WordPress installation can answer on more than one hostname.
+     *
+     * `home_url()` is the canonical address, not necessarily the address in
+     * the browser bar. On a mapped site or an alias, checking only that value
+     * lets the canonical domain's licence authorize every hostname that
+     * reaches the same WordPress install. Use the current request host when
+     * there is one; cron and CLI have no browser-facing host, so they retain
+     * the canonical URL as their answer.
+     */
+    private static function requestDomain(): string
+    {
+        $requestHost = trim((string) ($_SERVER['HTTP_HOST'] ?? ''));
+        $host = $requestHost !== ''
+            ? (string) wp_parse_url('https://'.$requestHost, PHP_URL_HOST)
+            : '';
+
+        if ($host === '') {
+            $host = (string) wp_parse_url(home_url('/'), PHP_URL_HOST);
+        }
+
+        return self::normaliseHost($host);
+    }
+
+    private static function homeDomain(): string
+    {
+        return self::normaliseHost((string) wp_parse_url(home_url('/'), PHP_URL_HOST));
+    }
+
+    private static function normaliseHost(string $host): string
+    {
+        $host = strtolower(rtrim(trim($host), '.'));
+
+        return str_starts_with($host, 'www.') ? substr($host, 4) : $host;
+    }
+
+    private static function isCanonicalOrLocalRequestHost(): bool
+    {
+        $request = self::requestDomain();
+
+        return $request === self::homeDomain()
+            || $request === 'localhost'
+            || $request === '127.0.0.1'
+            || str_ends_with($request, '.test')
+            || str_ends_with($request, '.localhost');
+    }
+
+    /** Keep a successful answer from one hostname out of another hostname's cache. */
+    private static function answerKey(): string
+    {
+        return self::ANSWER.'_'.hash('sha256', self::requestDomain());
+    }
+
+    /** Keep outage grace scoped to the hostname that earned it. */
+    private static function lastGoodKey(): string
+    {
+        return self::LAST_GOOD.'_'.hash('sha256', self::requestDomain());
     }
 }
