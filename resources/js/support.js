@@ -695,7 +695,7 @@ export const stylePropsFor = (element, declared) => {
     } else if (tag === 'A' || tag === 'BUTTON') {
         allowed = ['background', 'textColor', 'fontSize', 'radius', 'hidden'];
     } else if (/^(H[1-6]|P|SPAN|LI|BLOCKQUOTE|FIGCAPTION|DT|DD|TD|TH|CAPTION|CITE|Q|LABEL|STRONG|EM)$/.test(tag)) {
-        allowed = ['textColor', 'fontSize', 'hidden'];
+        allowed = ['textColor', 'fontSize', 'fontWeight', 'lineHeight', 'textAlign', 'hidden'];
     } else {
         allowed = ['background', 'backgroundImage', 'paddingY', 'paddingX', 'radius', 'hidden'];
     }
