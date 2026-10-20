@@ -105,6 +105,9 @@ class StylePolicy
         return match ($type) {
             'color' => (bool) preg_match('/^#[0-9A-Fa-f]{3,8}$/', $value),
             'px' => ctype_digit($value) && (int) $value <= 400,
+            'weight' => in_array($value, ['100', '200', '300', '400', '500', '600', '700', '800', '900'], true),
+            'lineHeight' => (bool) preg_match('/^(?:1(?:\.[0-9]{1,2})?|2(?:\.[0-9]{1,2})?|3(?:\.0{1,2})?)$/', $value),
+            'align' => in_array($value, ['left', 'center', 'right', 'justify'], true),
             'toggle' => $value === '1',
             // An image URL rendered into CSS url(): http(s) or a site-root
             // path only, and no character that could close the url() and

@@ -507,6 +507,9 @@ const bootLiveEdit = () => {
             backgroundImage: 'Background image',
             textColor: 'Text colour',
             fontSize: 'Text size',
+            fontWeight: 'Font weight',
+            lineHeight: 'Line height',
+            textAlign: 'Text alignment',
             paddingY: 'Space above and below',
             paddingX: 'Space left and right',
             radius: 'Corner rounding',
@@ -699,11 +702,31 @@ const bootLiveEdit = () => {
                 upload.hidden = true;
 
                 wrap.append(ways, input, upload, thumb, caption);
+            } else if (type === 'weight' || type === 'align') {
+                const input = document.createElement('select');
+                input.className = 'le-input';
+                input.dataset.styleProp = name;
+                const choices = type === 'weight'
+                    ? [['', 'Default'], ['300', 'Light'], ['400', 'Regular'], ['500', 'Medium'], ['600', 'Semi bold'], ['700', 'Bold'], ['800', 'Extra bold']]
+                    : [['', 'Default'], ['left', 'Left'], ['center', 'Center'], ['right', 'Right'], ['justify', 'Justify']];
+                choices.forEach(([v, label]) => {
+                    const option = document.createElement('option');
+                    option.value = v;
+                    option.textContent = label;
+                    input.append(option);
+                });
+                input.value = value ?? '';
+                wrap.append(input);
             } else {
                 const input = document.createElement('input');
                 input.type = 'number';
                 input.min = 0;
                 input.max = 400;
+                if (type === 'lineHeight') {
+                    input.min = 1;
+                    input.max = 3;
+                    input.step = 0.1;
+                }
                 input.value = value ?? '';
                 input.placeholder = 'default';
                 input.dataset.styleProp = name;
@@ -725,6 +748,9 @@ const bootLiveEdit = () => {
             backgroundImage: 'url',
             textColor: 'color',
             fontSize: 'px',
+            fontWeight: 'weight',
+            lineHeight: 'lineHeight',
+            textAlign: 'align',
             paddingX: 'px',
             paddingY: 'px',
             radius: 'px',
@@ -787,6 +813,9 @@ const bootLiveEdit = () => {
                         background: `background:${value} !important;`,
                         textColor: `color:${value} !important;`,
                         fontSize: `font-size:${value}px !important;`,
+                        fontWeight: `font-weight:${value} !important;`,
+                        lineHeight: `line-height:${value} !important;`,
+                        textAlign: `text-align:${value} !important;`,
                         radius: `border-radius:${value}px !important;`,
                         paddingX: `padding-left:${value}px !important;padding-right:${value}px !important;`,
                         paddingY: `padding-top:${value}px !important;padding-bottom:${value}px !important;`,
@@ -1162,6 +1191,12 @@ const bootLiveEdit = () => {
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({ key, value }),
                     });
+                },
+                upload: async (file) => {
+                    const body = new FormData();
+                    body.append('file', file);
+                    const response = await request('/live-edit/upload', { method: 'POST', body });
+                    return (await response.json()).url;
                 },
                 done: (message) => {
                     if (message) reloadWithToast(message);

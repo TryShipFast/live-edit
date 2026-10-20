@@ -135,7 +135,7 @@ export const madeHardToRead = (before, after) => {
  *
  * @param {{ container: HTMLElement, config: object, save: (key: string, value: string) => Promise<void>, done: (message: string) => void, notify: (message: string) => void, doc?: Document }} options
  */
-export const renderBrandPanel = ({ container, config, save, done, notify, doc = document }) => {
+export const renderBrandPanel = ({ container, config, save, upload, done, notify, doc = document }) => {
     const html = doc.documentElement;
     const win = doc.defaultView;
     const block = doc.getElementById(config.styleId);
@@ -152,6 +152,48 @@ export const renderBrandPanel = ({ container, config, save, done, notify, doc = 
     const baseline = readability(doc);
     if (block) block.disabled = false;
     const pending = {}; // key -> value ('' = back to the design's own)
+    const identity = config.identity ?? {};
+    const identityOriginal = new Map();
+    doc.querySelectorAll('[data-brand-name], [data-logo]').forEach((node) => identityOriginal.set(node, {
+        text: node.textContent, src: node.getAttribute('src'), alt: node.getAttribute('alt'), aria: node.getAttribute('aria-label'),
+    }));
+    const brandHeaderNodes = () => {
+        const nodes = new Set(doc.querySelectorAll('[data-brand-header]'));
+        doc.querySelectorAll('header').forEach((header) => {
+            const link = header.querySelector('a');
+            if (link) nodes.add(link);
+        });
+        return [...nodes];
+    };
+    const brandHeaderOriginal = new Map(brandHeaderNodes().map((node) => [node, [...node.childNodes].map((child) => child.cloneNode(true))]));
+    const identityValue = (key) => key in pending ? pending[key] : (key === identity.nameKey ? identity.name : identity.logo) || '';
+    const previewIdentity = () => {
+        const name = identity.nameKey ? identityValue(identity.nameKey) : '';
+        const logo = identity.logoKey ? identityValue(identity.logoKey) : '';
+        brandHeaderOriginal.forEach((children, node) => node.replaceChildren(...children.map((child) => child.cloneNode(true))));
+        identityOriginal.forEach((original, node) => {
+            if (node.hasAttribute('data-brand-name')) node.textContent = original.text;
+            for (const [attr, value] of [['src', original.src], ['alt', original.alt], ['aria-label', original.aria]]) {
+                if (value === null) node.removeAttribute(attr); else node.setAttribute(attr, value);
+            }
+        });
+        if (name || logo) brandHeaderNodes().forEach((node) => {
+            if (logo) {
+                const image = doc.createElement('img');
+                image.src = logo;
+                image.alt = name || 'Business logo';
+                image.style.cssText = 'height:32px;width:auto;max-width:180px;object-fit:contain;display:block';
+                node.replaceChildren(image);
+            } else {
+                node.textContent = name;
+            }
+        });
+        if (name) {
+            doc.querySelectorAll('[data-brand-name]').forEach((node) => { node.textContent = name; });
+            doc.querySelectorAll('[data-logo]').forEach((node) => { node.setAttribute('aria-label', name); if (node.tagName === 'IMG') node.alt = name; });
+        }
+        if (logo) doc.querySelectorAll('img[data-logo]').forEach((node) => { node.src = logo; });
+    };
 
     const current = (token) => (token.key in pending ? pending[token.key] : (chosen[token.key] ?? ''));
     const colourShown = (token) => {
@@ -186,10 +228,20 @@ export const renderBrandPanel = ({ container, config, save, done, notify, doc = 
                 html.style.setProperty(token.property, value);
             }
         }
+        previewIdentity();
         check();
     };
 
-    const unpreview = () => config.tokens.forEach((token) => html.style.removeProperty(token.property));
+    const unpreview = () => {
+        config.tokens.forEach((token) => html.style.removeProperty(token.property));
+        identityOriginal.forEach((original, node) => {
+            if (node.hasAttribute('data-brand-name')) node.textContent = original.text;
+            for (const [attr, value] of [['src', original.src], ['alt', original.alt], ['aria-label', original.aria]]) {
+                if (value === null) node.removeAttribute(attr); else node.setAttribute(attr, value);
+            }
+        });
+        brandHeaderOriginal.forEach((children, node) => node.replaceChildren(...children.map((child) => child.cloneNode(true))));
+    };
 
     const el = (tag, className, text) => {
         const node = doc.createElement(tag);
@@ -200,7 +252,7 @@ export const renderBrandPanel = ({ container, config, save, done, notify, doc = 
     };
 
     container.replaceChildren();
-    container.append(el('p', 'le-hint le-brand-intro', 'Your colours and type, across the whole website. The page changes as you choose; nothing goes live until you publish.'));
+    container.append(el('p', 'le-hint le-brand-intro', 'Set your business name for every page header, or upload a logo to use instead. Your colours and type also apply across the website; nothing goes live until you publish.'));
 
     const swatches = el('div', 'le-brand-grid');
     const rows = new Map();
@@ -257,6 +309,35 @@ export const renderBrandPanel = ({ container, config, save, done, notify, doc = 
     }
     container.append(el('div', 'le-section-heading', 'Type'), type);
 
+    if (identity.nameKey || identity.logoKey) {
+        container.append(el('div', 'le-section-heading', 'Business identity'));
+        const fields = el('div', 'le-brand-type');
+        if (identity.nameKey) {
+            const row = el('label', 'le-brand-face');
+            row.append(el('span', 'le-brand-label', 'Business name'));
+            const input = el('input', 'le-input'); input.maxLength = 120; input.value = identityValue(identity.nameKey); input.placeholder = 'Business name';
+            input.addEventListener('input', () => { pending[identity.nameKey] = input.value; changed(); });
+            row.append(input); fields.append(row);
+        }
+        if (identity.logoKey) {
+            const row = el('label', 'le-brand-face'); row.append(el('span', 'le-brand-label', 'Logo'));
+            const input = el('input', 'le-input'); input.type = 'url'; input.value = identityValue(identity.logoKey); input.placeholder = 'Paste a logo URL';
+            input.addEventListener('input', () => { pending[identity.logoKey] = input.value.trim(); changed(); });
+            row.append(input);
+            if (upload) {
+                const file = el('input', 'le-input'); file.type = 'file'; file.accept = 'image/*'; file.setAttribute('aria-label', 'Upload logo');
+                file.addEventListener('change', async () => {
+                    if (!file.files?.[0]) return;
+                    try { input.value = await upload(file.files[0]); pending[identity.logoKey] = input.value; changed(); }
+                    catch (error) { notify(error?.message || 'Your logo could not be uploaded.'); }
+                });
+                row.append(file);
+            }
+            fields.append(row);
+        }
+        container.append(fields);
+    }
+
     // The verdict and the buttons stay in view however long the list gets.
     const dock = el('div', 'le-brand-dock');
     const warning = el('div', 'le-brand-warning');
@@ -296,7 +377,7 @@ export const renderBrandPanel = ({ container, config, save, done, notify, doc = 
     };
 
     const changed = () => {
-        apply.disabled = Object.keys(pending).every((key) => pending[key] === (chosen[key] ?? ''));
+        apply.disabled = Object.keys(pending).every((key) => pending[key] === (chosen[key] ?? (key === identity.nameKey ? identity.name : key === identity.logoKey ? identity.logo : '')));
         preview();
     };
 
@@ -307,7 +388,7 @@ export const renderBrandPanel = ({ container, config, save, done, notify, doc = 
     });
 
     apply.addEventListener('click', async () => {
-        const keys = Object.keys(pending).filter((key) => pending[key] !== (chosen[key] ?? ''));
+        const keys = Object.keys(pending).filter((key) => pending[key] !== (chosen[key] ?? (key === identity.nameKey ? identity.name : key === identity.logoKey ? identity.logo : '')));
         if (!keys.length) return;
         apply.disabled = true;
         apply.textContent = 'Saving…';

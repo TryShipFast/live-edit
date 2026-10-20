@@ -30,7 +30,7 @@ input::placeholder,textarea::placeholder{color:#6B625C}
 
 <header style="position:sticky;top:0;z-index:40;background:var(--brand-surface);border-bottom:1px solid var(--brand-line);padding:0 {{ r.px }}">
   <div style="max-width:1296px;margin:0 auto;height:76px;display:flex;align-items:center;justify-content:space-between;gap:24px">
-    <a href="#" data-go="home" aria-label="Maren, home" style="display:flex;align-items:center;flex:0 0 auto"><img data-logo="header" src="assets/31/logo-lockup-light.svg" alt="Maren" style="height:32px;width:auto;max-width:180px;object-fit:contain;display:block"></a>
+    <a href="#" data-go="home" data-brand-header aria-label="Maren, home" style="display:flex;align-items:center;gap:10px;flex:0 0 auto"><img data-logo="header" src="assets/31/logo-lockup-light.svg" alt="Maren" style="height:32px;width:auto;max-width:180px;object-fit:contain;display:block"><span data-brand-name>Maren</span></a>
     <nav aria-label="Main" style="display:{{ navD }};align-items:center;gap:28px;font-size:15px;font-weight:500">
       <sc-for list="{{ nav }}" as="n" hint-placeholder-count="6"><a href="#" data-go="{{ n.go }}" aria-current="{{ n.cur }}" style="color:var(--brand-ink);padding:10px 0;border-bottom:2px solid {{ n.bd }};text-decoration:none">{{ n.t }}</a></sc-for>
     </nav>
