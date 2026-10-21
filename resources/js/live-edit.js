@@ -4594,8 +4594,6 @@ const bootLiveEdit = () => {
             if (drawing) return { element: drawing, kind: 'svg' };
             const text = node.closest('[data-edit]');
             if (text) return { element: text, kind: 'text' };
-            const link = node.closest('[data-edit-href]:not([data-edit])');
-            if (link) return { element: link, kind: 'link' };
             /*
              * A background you click INSIDE, so it must lose to anything
              * nearer — the same rule as a styleable box below, and for the
@@ -4607,9 +4605,11 @@ const bootLiveEdit = () => {
              * words they wanted to change got an image uploader instead, with
              * nothing to say why. Which is close to the worst thing this
              * product can do to somebody who has never used it before.
-             */
+            */
             const background = node.closest('[data-edit-bg]');
             if (background) return { element: background, kind: 'image' };
+            const link = node.closest('[data-edit-href]:not([data-edit])');
+            if (link) return { element: link, kind: 'link' };
             // Any styleable box, checked last so content wins over its container.
             const box = node.closest('[data-style]:not([data-style-edit])');
             if (box) return { element: box, kind: 'style' };
@@ -4685,13 +4685,16 @@ const bootLiveEdit = () => {
         bgHandle.addEventListener('click', (event) => {
             event.preventDefault();
             event.stopPropagation();
-            if (bgTarget) editStyle(bgTarget);
+            if (bgTarget) {
+                if (bgTarget.hasAttribute('data-edit-bg')) editImage(bgTarget);
+                else editStyle(bgTarget);
+            }
             hideBgHandle();
         });
 
         document.addEventListener('pointerover', (event) => {
             if (!document.body.classList.contains('editing')) return;
-            const withBackground = event.target.closest?.('[data-has-bg]');
+            const withBackground = event.target.closest?.('[data-edit-bg], [data-has-bg]');
             if (withBackground && (mayEditLocked === true || !withBackground.closest('[data-live-lock]'))) showBgHandle(withBackground);
             const anchor = editableAnchor(event.target);
             if (anchor && navigable(anchor)) {

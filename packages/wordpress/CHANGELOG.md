@@ -1,5 +1,9 @@
 # ShipFast Live Edit for WordPress
 
+## 0.15.38
+
+When a clickable element also has a background image, clicking the image now opens its image editor. Separate image and link handles let the customer replace the image or edit the destination.
+
 ## 0.15.37
 
 The shared asset server now includes `seo.js` in its safe file allow-list. This fixes module loading for deployments serving the editor's source modules instead of the bundled runtime.
