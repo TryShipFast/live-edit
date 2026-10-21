@@ -1,5 +1,9 @@
 # ShipFast Live Edit for WordPress
 
+## 0.15.34
+
+The site icon picker previews light and dark SVGs against a split light and dark surface, keeping fixed-color marks visible while choosing.
+
 ## 0.15.31
 
 The Laravel fallback now reads and mutates only its own installation drafts. Drafts belonging to registered API sites stay private to their site, including when an edit is reverted, published or discarded.

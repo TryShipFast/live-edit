@@ -417,7 +417,7 @@ a.le-mark:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
     place-items: center;
     font-size: 19px;
     color: var(--le-ink);
-    background: #fff;
+    background: linear-gradient(135deg, #fff 0 50%, #334155 50% 100%);
     border: 1px solid var(--le-field);
     border-radius: 8px;
     cursor: pointer;
