@@ -1595,9 +1595,19 @@ class MarkupScanner
             // A background image — inline or a slider-style data-* attribute —
             // is itself editable.
             $bgUrl = $this->backgroundImageUrl($el);
-            if ($bgUrl !== null && ! $el->hasAttribute('data-edit-bg')) {
-                $el->setAttribute('data-edit-bg', 'setting:auto:'.$this->autoKey($el, '#bg'));
-                $el->setAttribute('data-edit-preview', $bgUrl);
+            if ($bgUrl !== null || $el->hasAttribute('data-edit-bg')) {
+                // Some templates mark the background with an empty attribute.
+                // Presence alone used to make this pass think it was already
+                // keyed, leaving the image picker with nowhere to save. Keep
+                // explicit setting keys; give empty designer markers an
+                // adapter-owned key, including when the background starts empty.
+                $marker = trim($el->getAttribute('data-edit-bg'));
+                if (! str_starts_with($marker, 'setting:')) {
+                    $el->setAttribute('data-edit-bg', 'setting:auto:'.$this->autoKey($el, '#bg'));
+                }
+                if ($bgUrl !== null && ! $el->hasAttribute('data-edit-preview')) {
+                    $el->setAttribute('data-edit-preview', $bgUrl);
+                }
                 $el->setAttribute('data-edit-kind', 'background');
             }
         }

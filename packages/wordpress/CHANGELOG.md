@@ -1,5 +1,9 @@
 # ShipFast Live Edit for WordPress
 
+## 0.15.36
+
+The shared mapper now assigns save keys to empty background markers, so a marked video poster or other background can be replaced across adapters. SVG controls are exposed to assistive technology while focused in edit mode, avoiding hidden-focus warnings.
+
 ## 0.15.35
 
 Hosted sites now have a page-specific SEO drawer for editing the browser/search title and search description. Saved descriptions are included in published page metadata and social descriptions.

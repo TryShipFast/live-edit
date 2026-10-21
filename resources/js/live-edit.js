@@ -2020,14 +2020,36 @@ const bootLiveEdit = () => {
             });
         };
 
+        const svgEditingAccessibility = new WeakMap();
         const setEditing = (on) => {
             // Before anything counts an element as editable, since this decides
             // which of them are icons at all.
             if (on) markRealIcons();
             document.body.classList.toggle('editing', on);
             editables().forEach((el) => {
-                if (on) el.setAttribute('tabindex', '0');
-                else el.removeAttribute('tabindex');
+                if (on) {
+                    el.setAttribute('tabindex', '0');
+                    if (el.tagName === 'SVG') {
+                        if (!svgEditingAccessibility.has(el)) {
+                            svgEditingAccessibility.set(el, {
+                                ariaHidden: el.getAttribute('aria-hidden'),
+                                focusable: el.getAttribute('focusable'),
+                            });
+                        }
+                        if (el.getAttribute('aria-hidden') === 'true') el.setAttribute('aria-hidden', 'false');
+                        if (el.getAttribute('focusable') === 'false') el.setAttribute('focusable', 'true');
+                    }
+                } else {
+                    el.removeAttribute('tabindex');
+                    const original = svgEditingAccessibility.get(el);
+                    if (original) {
+                        if (original.ariaHidden === null) el.removeAttribute('aria-hidden');
+                        else el.setAttribute('aria-hidden', original.ariaHidden);
+                        if (original.focusable === null) el.removeAttribute('focusable');
+                        else el.setAttribute('focusable', original.focusable);
+                        svgEditingAccessibility.delete(el);
+                    }
+                }
             });
             sessionStorage.setItem('tb_editing', on ? '1' : '0');
             // Nothing to say when not editing — the button already says it.
@@ -4030,7 +4052,7 @@ const bootLiveEdit = () => {
             // title fields (a background isn't a content image).
             const isBackground = element.dataset.editKind === 'background';
             current = { kind: 'image', target: element.dataset.editImg ?? element.dataset.editBg, element };
-            drawerTitle.textContent = element.dataset.editLabel ?? (isBackground ? 'Background image' : 'Image');
+            drawerTitle.textContent = element.dataset.editLabel ?? (element.hasAttribute('data-video-open') ? 'Video poster' : (isBackground ? 'Background image' : 'Image'));
             drawerFields.replaceChildren();
             drawerDelete.classList.add('le-hidden');
             const slide = element.closest?.('[data-slide][data-edit-slide-caption]');
