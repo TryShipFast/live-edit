@@ -156,22 +156,27 @@ test('history shows twenty recent versions and pages older ones', async ({ page,
     expect(key).not.toBeNull();
     await openDrawer(page, `[data-edit="${key}"]`);
 
-    const versions = Array.from({ length: 20 }, (_, index) => ({
-        number: 25 - index,
-        changes: 1,
-        published_at: new Date(Date.now() - index * 60_000).toISOString(),
-        url: `/v${25 - index}.json`,
-    }));
-    await page.route('**/live-edit/versions*', (route) => route.fulfill({
-        status: 200,
-        contentType: 'application/json',
-        body: JSON.stringify({
-            current: 25,
-            pointer: '/current.json',
-            pagination: { page: 1, per_page: 20, total: 25, last_page: 2 },
-            versions,
-        }),
-    }));
+    await page.route('**/api/live-edit/v1/*/versions*', (route) => {
+        const pageNumber = Number(new URL(route.request().url()).searchParams.get('page') ?? 1);
+        const allVersions = Array.from({ length: 25 }, (_, index) => ({
+            number: 25 - index,
+            changes: 1,
+            published_at: new Date(Date.now() - index * 60_000).toISOString(),
+            url: `/v${25 - index}.json`,
+        }));
+        const versions = allVersions.slice((pageNumber - 1) * 20, pageNumber * 20);
+
+        return route.fulfill({
+            status: 200,
+            contentType: 'application/json',
+            body: JSON.stringify({
+                current: 25,
+                pointer: '/current.json',
+                pagination: { page: pageNumber, per_page: 20, total: 25, last_page: 2 },
+                versions,
+            }),
+        });
+    });
 
     await panel(page).locator('.le-tab[data-tab="History"]').click();
     await expect(panel(page).locator('.le-version')).toHaveCount(20);
