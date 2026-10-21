@@ -435,9 +435,9 @@ test('an item added to a list is on the page, and can be taken off again', async
     await asEditor(page, request);
 
     // A list a client can actually reach. The controls live in the panel of an
-    // item, so something inside one has to open on a click — and a link does
-    // not: in editing mode a link still navigates, deliberately, so that the
-    // whole site can be browsed, and it is edited from a handle instead.
+    // item, so something inside one has to open on a click. Links open their
+    // text and destination fields in edit mode; dropdown triggers keep opening
+    // their menus so those items remain reachable too.
     const list = await page.evaluate(() => {
         const opens = (el) => el && el.tagName !== 'A';
         const visible = (el) => {

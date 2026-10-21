@@ -342,9 +342,10 @@ export function renderLibrary({ container, library, pick, multiple = false, fetc
 }
 
 /**
- * The Pages tab: every page of the website, and a way to make another.
+ * The Pages tab creates a page from the design's existing sections.
+ * Existing pages stay in the website navigation, not in this panel.
  *
- * `save(key, value)` saves one setting; `go(href)` opens a page in the editor.
+ * `save(key, value)` saves one setting; `go(href)` opens the page just created.
  */
 export function renderPagesPanel({ container, config, save, go, notify }) {
     container.replaceChildren();

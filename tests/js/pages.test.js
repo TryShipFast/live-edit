@@ -69,16 +69,17 @@ describe('the Pages tab', () => {
         ],
     };
 
-    it('lists the pages, marks this one and the owner\'s, and makes a page from chosen sections', async () => {
+    it('shows only the create-page flow, then creates a page from chosen sections', async () => {
         const container = document.createElement('div');
         const saved = [];
         let went = null;
         renderPagesPanel({ container, config, save: async (key, value) => saved.push([key, value]), go: (href) => (went = href), notify: () => {} });
 
-        const rows = [...container.querySelectorAll('.le-sitemap-open')].map((row) => row.textContent);
-        expect(rows).toEqual(['Home/', 'About/aboutThis page', 'Open days/open-daysYours']);
-        // only the owner's own page can go in or out of the menu
-        expect([...container.querySelectorAll('.le-sitemap-menu')].map((b) => b.textContent)).toEqual(['Add to menu']);
+        expect(container.querySelectorAll('.le-sitemap-open, .le-sitemap-menu')).toHaveLength(0);
+        expect(container.textContent).toContain('Add a page');
+        expect(container.textContent).not.toContain('Home');
+        expect(container.textContent).not.toContain('About/about');
+        expect(container.textContent).not.toContain('Open days/open-days');
 
         const create = container.querySelector('.le-create-page');
         expect(create.disabled).toBe(true);
@@ -99,18 +100,6 @@ describe('the Pages tab', () => {
         expect(Object.values(JSON.parse(saved[0][1]).added)).toEqual(['about.team']);
         expect(saved[1]).toEqual(['structure:pages', JSON.stringify([{ id: 'open-days', title: 'Open days', menu: false }, { id: 'admissions-events', title: 'Admissions events', menu: true }])]);
         expect(went).toBe('/sites/trial/edit/admissions-events');
-    });
-
-    it('puts a page the owner made in the menu with one press', async () => {
-        const container = document.createElement('div');
-        const saved = [];
-        renderPagesPanel({ container, config, save: async (key, value) => saved.push([key, value]), go: () => {}, notify: () => {} });
-
-        container.querySelector('.le-sitemap-menu').click();
-        await new Promise((resolve) => setTimeout(resolve, 0));
-
-        expect(saved).toEqual([['structure:pages', JSON.stringify([{ id: 'open-days', title: 'Open days', menu: true }])]]);
-        expect(withMenu([{ id: 'a', title: 'A', menu: true }], 'a', false)).toEqual([{ id: 'a', title: 'A', menu: false }]);
     });
 
     it('shows a section before it is chosen, and pressing See it does not choose it', async () => {

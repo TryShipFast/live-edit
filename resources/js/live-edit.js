@@ -1,6 +1,7 @@
 import { createChrome } from './chrome.js';
 import { renderBrandPanel } from './brand.js';
 import { addedWith, describeStructure, newAddedId, orderWith, renderLibrary, renderPagesPanel } from './pages.js';
+import { dropdownTriggerFrom } from './dropdown-trigger.js';
 import { biggestThatFits, howMuchSurvives, inSourcePixels, movedWithin, whatIsThereNow } from './fitting.js';
 import { attrsWorthSending, creditWorthSending } from './only-what-changed.js';
 import { confirm as confirmChange, expectChange, takeExpected } from './verify.js';
@@ -4576,10 +4577,8 @@ const bootLiveEdit = () => {
             finishPanel(element);
         };
 
-        // A floating pencil handle edits links without hijacking their click:
-        // in edit mode a link still navigates (so you browse the whole site while
-        // editing — edit mode persists across the page load), and this handle,
-        // shown on hover, opens the link's editor instead.
+        // Links are content while editing. Their click opens the text and URL
+        // fields; only an explicit dropdown control may run its menu behavior.
         const editableAnchor = (target) => {
             const anchor = target?.closest?.('a[data-edit], a[data-edit-href]') ?? null;
 
@@ -4817,6 +4816,13 @@ const bootLiveEdit = () => {
 
                 const target = resolveTarget(event.target);
                 const anchor = event.target.closest?.('a[href]');
+                const dropdown = dropdownTriggerFrom(event.target);
+                if (dropdown) {
+                    // Keep menu toggles usable in edit mode, while suppressing
+                    // an anchor's destination. Its own handler can open the menu.
+                    if (dropdown.matches('a[href]')) event.preventDefault();
+                    return;
+                }
                 if (anchor && navigable(anchor)) {
                     event.preventDefault();
                     event.stopImmediatePropagation();
