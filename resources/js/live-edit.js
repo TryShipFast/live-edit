@@ -4740,11 +4740,17 @@ const bootLiveEdit = () => {
                 if (anchor && navigable(anchor)) {
                     event.preventDefault();
                     event.stopImmediatePropagation();
+                    // A link can contain independently editable content such as
+                    // an SVG icon. Keep that nearer target actionable; only use
+                    // the anchor as a text target when the click did not land on
+                    // a separate editable element.
                     const linkText = target?.kind === 'text'
                         ? target.element
-                        : anchor.matches('[data-edit]')
-                            ? anchor
-                            : null;
+                        : target
+                            ? null
+                            : anchor.matches('[data-edit]')
+                                ? anchor
+                                : null;
                     if (linkText) editText(linkText, anchor);
                     else if (target) openTarget(target);
                     else if (anchor.dataset.editHref !== undefined) editLink(anchor);
