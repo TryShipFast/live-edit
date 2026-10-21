@@ -1,5 +1,9 @@
 # ShipFast Live Edit for WordPress
 
+## 0.15.44
+
+The shared editor now recognizes the menu and disclosure tags used by ShipFast templates, including mega-menu, dropdown, mobile-menu and close controls. This release lets existing hosted, Laravel, WordPress, React and Next.js sites receive the editor fix from the shared runtime.
+
 ## 0.15.38
 
 When a clickable element also has a background image, clicking the image now opens its image editor. Separate image and link handles let the customer replace the image or edit the destination.
