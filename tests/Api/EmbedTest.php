@@ -208,11 +208,16 @@ class EmbedTest extends TestCase
         // this endpoint will actually hand them.
         $paths = glob(__DIR__.'/../../resources/js/*.js') ?: [];
 
-        // The built bundle as well as the sources. It is not in that directory
+        // The built bundle and serving controller as well as the sources.
+        // The controller's allow-list determines which runtime modules exist
+        // at their versioned URLs, so a route fix must also produce a fresh
+        // URL that cannot hit a cached 404.
+        // The bundle is not in the source directory
         // and it is the only file most installs ever load, so a version taken
         // from the sources alone can stand still while the thing being served
         // changes underneath it.
         $paths[] = __DIR__.'/../../resources/dist/live-edit.js';
+        $paths[] = (new \ReflectionClass(EmbedController::class))->getFileName();
         sort($paths);
 
         $this->assertNotSame([], $paths, 'the runtime this test fingerprints has moved');

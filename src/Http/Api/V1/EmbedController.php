@@ -103,6 +103,12 @@ class EmbedController
     {
         $hash = hash_init('sha256');
 
+        // Callers may reach the same file through different relative paths.
+        // Canonicalizing first also gives duplicate basenames (the source
+        // module and dist bundle are both live-edit.js) a stable order.
+        $paths = array_map(static fn (string $path): string => realpath($path) ?: $path, $paths);
+        sort($paths);
+
         foreach ($paths as $path) {
             // The name is hashed too, so files swapping content is a change.
             hash_update($hash, basename($path));
@@ -113,13 +119,19 @@ class EmbedController
     }
 
     /**
-     * Over everything in the runtime directory, not over the served list.
+     * Over everything in the runtime directory and the code that serves it,
+     * not just the JavaScript bytes.
      *
      * The two are nearly the same and the difference is the trap: a module
      * that exists but is not yet listed still changes how the editor behaves,
      * and a version that ignored it would hand browsers a stale build under a
      * name that claimed to be current. Reading the directory means adding a
      * file is enough.
+     *
+     * The serving controller belongs in the fingerprint too: changing its
+     * asset allow-list can fix a cached 404 without changing a single JS byte.
+     * Without that, a CDN can keep the broken asset address for a year after
+     * the server has been fixed.
      *
      * And the built bundle, which the directory does not contain and which is
      * the only thing most installs ever load. Leaving it out undid the whole
@@ -133,6 +145,7 @@ class EmbedController
     {
         $files = glob(self::path('*.js')) ?: [];
         $files[] = self::path('bundle.js');
+        $files[] = __FILE__;
         sort($files);
 
         return self::fingerprintOf($files);
