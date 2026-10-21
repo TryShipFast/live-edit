@@ -238,13 +238,26 @@ class ContentController
         $store = new SiteStore($site);
         $snapshot = new SiteSnapshot($store);
 
+        $validated = $request->validate(['page' => ['sometimes', 'integer', 'min:1']]);
+        $perPage = 20;
+        $query = Version::query()->where('site_id', $site->id);
+        $total = (clone $query)->count();
+        $lastPage = max(1, (int) ceil($total / $perPage));
+        $page = min((int) ($validated['page'] ?? 1), $lastPage);
+
         return response()->json([
             'current' => $store->version(),
             'pointer' => $snapshot->url(),
-            'versions' => Version::query()
-                ->where('site_id', $site->id)
+            'pagination' => [
+                'page' => $page,
+                'per_page' => $perPage,
+                'total' => $total,
+                'last_page' => $lastPage,
+            ],
+            'versions' => $query
                 ->orderByDesc('number')
-                ->limit(50)
+                ->offset(($page - 1) * $perPage)
+                ->limit($perPage)
                 ->get()
                 ->map(fn (Version $v) => [
                     'number' => $v->number,

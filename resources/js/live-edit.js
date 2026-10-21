@@ -1227,7 +1227,13 @@ const bootLiveEdit = () => {
             tab.addEventListener('click', () => {
                 // Moving away from a half-typed edit would lose it silently.
                 if (name === 'Edit') {
-                    showTab(name);
+                    // Restore the selected field after Changes or History has
+                    // replaced the drawer contents with its own list.
+                    if (drawerTab !== 'Edit' && lastOpened?.isConnected) {
+                        openNode(lastOpened);
+                    } else {
+                        showTab(name);
+                    }
 
                     return;
                 }
@@ -1527,10 +1533,11 @@ const bootLiveEdit = () => {
                 const response = await request('/live-edit/changes', { method: 'GET' });
                 payload = await response.json();
             } catch (error) {
-                drawerFields.replaceChildren(note(plainly(error, 'show your changes')));
+                if (drawerTab === 'Changes') drawerFields.replaceChildren(note(plainly(error, 'show your changes')));
 
                 return;
             }
+            if (drawerTab !== 'Changes') return;
 
             const changes = payload?.changes ?? [];
 
@@ -1803,21 +1810,26 @@ const bootLiveEdit = () => {
             return line;
         };
 
+        let historyPage = 1;
+
         const renderHistory = async () => {
             drawerFields.replaceChildren(note('Loading…'));
 
             let payload;
 
             try {
-                const response = await request('/live-edit/versions', { method: 'GET' });
+                const response = await request(`/live-edit/versions?page=${historyPage}`, { method: 'GET' });
                 payload = await response.json();
             } catch (error) {
-                drawerFields.replaceChildren(note(plainly(error, 'show what has been published')));
+                if (drawerTab === 'History') drawerFields.replaceChildren(note(plainly(error, 'show what has been published')));
 
                 return;
             }
+            if (drawerTab !== 'History') return;
 
             const versions = payload?.versions ?? [];
+            const pagination = payload?.pagination ?? { page: historyPage, per_page: 20, total: versions.length, last_page: 1 };
+            historyPage = pagination.page ?? historyPage;
 
             if (versions.length === 0) {
                 drawerFields.replaceChildren(note('Nothing published yet. Your first publish will appear here.'));
@@ -1835,7 +1847,7 @@ const bootLiveEdit = () => {
                 row.className = 'le-version';
 
                 const dot = document.createElement('span');
-                dot.className = index === 0 ? 'le-version-dot is-latest' : 'le-version-dot';
+                dot.className = pagination.page === 1 && index === 0 ? 'le-version-dot is-latest' : 'le-version-dot';
 
                 const text = document.createElement('div');
                 const what = document.createElement('p');
@@ -1852,6 +1864,33 @@ const bootLiveEdit = () => {
                 row.append(dot, text);
                 drawerFields.append(row);
             });
+
+            if (pagination.last_page > 1) {
+                const pager = document.createElement('div');
+                pager.className = 'le-pagination';
+                const previous = document.createElement('button');
+                previous.type = 'button';
+                previous.className = 'le-chip-btn';
+                previous.textContent = 'Newer';
+                previous.disabled = pagination.page <= 1;
+                previous.addEventListener('click', () => {
+                    historyPage = pagination.page - 1;
+                    void renderHistory();
+                });
+                const pageLabel = document.createElement('span');
+                pageLabel.textContent = `Page ${pagination.page} of ${pagination.last_page}`;
+                const next = document.createElement('button');
+                next.type = 'button';
+                next.className = 'le-chip-btn';
+                next.textContent = 'Older';
+                next.disabled = pagination.page >= pagination.last_page;
+                next.addEventListener('click', () => {
+                    historyPage = pagination.page + 1;
+                    void renderHistory();
+                });
+                pager.append(previous, pageLabel, next);
+                drawerFields.append(pager);
+            }
 
             const stamp = engineLine();
             if (stamp) drawerFields.append(stamp);
@@ -3525,6 +3564,7 @@ const bootLiveEdit = () => {
          * Adding an aspect later means adding it once.
          */
         const finishPanel = (element, { styleKey = null, styleOn = element, linkElement = element } = {}) => {
+            lastOpened = element;
             if (linkElement?.dataset.editHref !== undefined) {
                 appendLinkFields(linkElement);
             }

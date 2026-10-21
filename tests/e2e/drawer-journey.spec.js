@@ -129,6 +129,58 @@ test('words changed in the panel are on the page afterwards', async ({ page, req
     expect(await shown(page, `[data-edit="${key}"]`)).toContain(words);
 });
 
+test('returns to the selected text field after checking Changes', async ({ page, request }) => {
+    await asEditor(page, request);
+
+    const key = await page.evaluate(() => {
+        const element = [...document.querySelectorAll('[data-edit^="setting:"]')]
+            .find((candidate) => (candidate.textContent ?? '').trim().length > 8);
+
+        return element?.getAttribute('data-edit') ?? null;
+    });
+    expect(key, 'no editable words on this page').not.toBeNull();
+
+    await openDrawer(page, `[data-edit="${key}"]`);
+    const input = panel(page).locator('textarea').first();
+    const original = await input.inputValue();
+    await panel(page).locator('.le-tab[data-tab="Changes"]').click();
+    await panel(page).locator('.le-tab[data-tab="Edit"]').click();
+
+    await expect(panel(page).locator('textarea').first()).toHaveValue(original);
+});
+
+test('history shows twenty recent versions and pages older ones', async ({ page, request }) => {
+    await asEditor(page, request);
+
+    const key = await page.evaluate(() => document.querySelector('[data-edit^="setting:"]')?.getAttribute('data-edit') ?? null);
+    expect(key).not.toBeNull();
+    await openDrawer(page, `[data-edit="${key}"]`);
+
+    const versions = Array.from({ length: 20 }, (_, index) => ({
+        number: 25 - index,
+        changes: 1,
+        published_at: new Date(Date.now() - index * 60_000).toISOString(),
+        url: `/v${25 - index}.json`,
+    }));
+    await page.route('**/live-edit/versions*', (route) => route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+            current: 25,
+            pointer: '/current.json',
+            pagination: { page: 1, per_page: 20, total: 25, last_page: 2 },
+            versions,
+        }),
+    }));
+
+    await panel(page).locator('.le-tab[data-tab="History"]').click();
+    await expect(panel(page).locator('.le-version')).toHaveCount(20);
+    await expect(panel(page).locator('.le-pagination')).toContainText('Page 1 of 2');
+    await panel(page).locator('.le-pagination button', { hasText: 'Older' }).click();
+    await expect(panel(page).locator('.le-version')).toHaveCount(5);
+    await expect(panel(page).locator('.le-pagination')).toContainText('Page 2 of 2');
+});
+
 test('an edit does not take the picture beside it', async ({ page, request }) => {
     // Replacing an element's whole contents to change its words destroyed a
     // picture floated inside a paragraph, and the markup that held it was gone

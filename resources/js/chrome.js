@@ -344,6 +344,8 @@ a.le-mark:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
 .le-version { display: flex; gap: 12px; align-items: flex-start; padding-bottom: 14px; }
 .le-version-dot { width: 8px; height: 8px; margin-top: 6px; border-radius: 999px; background: #DADCE0; flex: none; }
 .le-version-dot.is-latest { background: var(--le-ink); }
+.le-pagination { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 4px 0 12px; color: var(--le-muted); font-size: 12px; }
+.le-pagination button:disabled { opacity: .45; cursor: default; }
 
 /* What the panel is editing, under the tabs rather than beside them. */
 .le-subject { padding: 18px 20px 0; }

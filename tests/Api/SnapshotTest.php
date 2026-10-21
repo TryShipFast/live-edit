@@ -238,6 +238,23 @@ class SnapshotTest extends TestCase
         $this->assertSame('https://cdn.test/content/sites/acme/v1/en.json', $response->json('versions.0.url'));
     }
 
+    public function test_versions_are_paginated_twenty_at_a_time_and_keep_the_newest_first(): void
+    {
+        for ($i = 0; $i < 25; $i++) {
+            $this->publish();
+        }
+
+        $first = $this->getJson($this->url('/versions'), $this->editor())->assertOk();
+        $second = $this->getJson($this->url('/versions?page=2'), $this->editor())->assertOk();
+
+        $this->assertSame(25, $first->json('pagination.total'));
+        $this->assertSame(2, $first->json('pagination.last_page'));
+        $this->assertCount(20, $first->json('versions'));
+        $this->assertCount(5, $second->json('versions'));
+        $this->assertSame(25, $first->json('versions.0.number'));
+        $this->assertSame(5, $second->json('versions.0.number'));
+    }
+
     public function test_removing_a_site_removes_its_published_files(): void
     {
         $this->publish();
