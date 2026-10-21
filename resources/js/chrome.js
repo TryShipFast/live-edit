@@ -318,15 +318,15 @@ a.le-mark:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
 .le-brand-hint { font-size: 12px; color: #6B6F76; }
 .le-link-btn { border: 0; background: none; padding: 4px 2px; font: inherit; font-size: 12px; color: #4A4D55; text-decoration: underline; text-underline-offset: 2px; cursor: pointer; }
 .le-link-btn:hover { color: #0B0C0F; }
-.le-brand-type { display: grid; grid-template-columns: 1fr; gap: 12px; }
-.le-brand-face { display: flex; flex-direction: column; gap: 6px; }
-.le-brand-logo-fields { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: stretch; gap: 8px; }
-.le-brand-logo-fields > .le-input { min-width: 0; width: 100%; }
-.le-brand-logo-fields .le-upload { min-width: 112px; justify-content: center; gap: 0; padding: 6px 8px; border-radius: 10px; }
-.le-brand-logo-fields .le-upload-inner { min-width: 0; justify-content: center; gap: 6px; }
+.le-brand-type { display: grid; grid-template-columns: minmax(0, 1fr); gap: 12px; min-width: 0; }
+.le-brand-face { display: flex; flex-direction: column; gap: 6px; min-width: 0; width: 100%; }
+.le-brand-logo-fields { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 112px); align-items: stretch; gap: 8px; min-width: 0; width: 100%; }
+.le-brand-logo-fields > .le-input { box-sizing: border-box; min-width: 0; width: 100%; }
+.le-brand-logo-fields .le-upload { box-sizing: border-box; min-width: 0; max-width: 100%; width: 100%; justify-content: center; gap: 0; padding: 6px 8px; border-radius: 10px; overflow: hidden; }
+.le-brand-logo-fields .le-upload-inner { min-width: 0; width: 100%; justify-content: center; gap: 6px; overflow: hidden; }
 .le-brand-logo-fields .le-upload-icon { width: 24px; height: 24px; border-radius: 7px; font-size: 13px; }
 .le-brand-logo-fields .le-upload-text { display: none; }
-.le-brand-logo-fields .le-upload-btn { min-width: 0; max-width: 100%; margin-left: 0; padding: 6px 8px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.le-brand-logo-fields .le-upload-btn { flex: 1 1 auto; min-width: 0; max-width: 100%; margin-left: 0; padding: 6px 8px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .le-brand-warning { display: block; padding: 12px 14px; border-radius: 10px; background: #FFF4F2; color: #8C1D18; font-size: 13px; line-height: 1.45; }
 .le-brand-warning strong { font-weight: 600; }
 .le-brand-dock { position: sticky; bottom: -22px; display: flex; flex-direction: column; gap: 10px; margin: 4px -24px -22px; padding: 14px 24px 20px; background: #fff; border-top: 1px solid rgba(11,12,15,.08); }
