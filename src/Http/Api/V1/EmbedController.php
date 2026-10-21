@@ -48,6 +48,7 @@ class EmbedController
         'verify.js' => 'verify.js',
         'icon-library.js' => 'icon-library.js',
         'brand.js' => 'brand.js',
+        'seo.js' => 'seo.js',
         'pages.js' => 'pages.js',
         'dropdown-trigger.js' => 'dropdown-trigger.js',
         // The built bundle, resolved to resources/dist rather than to a

@@ -1,5 +1,9 @@
 # ShipFast Live Edit for WordPress
 
+## 0.15.37
+
+The shared asset server now includes `seo.js` in its safe file allow-list. This fixes module loading for deployments serving the editor's source modules instead of the bundled runtime.
+
 ## 0.15.36
 
 The shared mapper now assigns save keys to empty background markers, so a marked video poster or other background can be replaced across adapters. SVG controls are exposed to assistive technology while focused in edit mode, avoiding hidden-focus warnings.
