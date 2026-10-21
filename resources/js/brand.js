@@ -323,20 +323,23 @@ export const renderBrandPanel = ({ container, config, save, upload, done, notify
         }
         if (identity.logoKey) {
             const row = el('div', 'le-brand-face'); row.append(el('span', 'le-brand-label', 'Logo'));
+            const logoFields = el('div', 'le-brand-logo-fields');
             const input = el('input', 'le-input'); input.type = 'url'; input.value = identityValue(identity.logoKey); input.placeholder = 'Paste a logo URL';
             input.addEventListener('input', () => { pending[identity.logoKey] = input.value.trim(); changed(); });
-            row.append(input);
+            logoFields.append(input);
             if (upload) {
                 const picker = uploadWidget({
-                    hint: 'PNG, JPG, SVG or WEBP, or drag one here',
+                    hint: 'Choose an image file',
+                    compact: true,
                     onFile: async (file) => {
                         try { input.value = await upload(file); pending[identity.logoKey] = input.value; changed(); }
                         catch (error) { notify(error?.message || 'Your logo could not be uploaded.'); }
                     },
                 });
                 picker.setAttribute('aria-label', 'Upload logo');
-                row.append(picker);
+                logoFields.append(picker);
             }
+            row.append(logoFields);
             fields.append(row);
         }
         container.append(fields);

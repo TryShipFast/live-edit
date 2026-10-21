@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { contrast, madeHardToRead, needs, over, parseColour, toHex } from '../../resources/js/brand.js';
+import { contrast, madeHardToRead, needs, over, parseColour, renderBrandPanel, toHex } from '../../resources/js/brand.js';
 
 describe('the Brand tab reads colours the way a browser reports them', () => {
     it('reads hex, rgb, rgba and srgb colour()', () => {
@@ -27,5 +27,22 @@ describe('the Brand tab reads colours the way a browser reports them', () => {
         const after = new Map([[a, { ratio: 3.9, needs: 4.5 }], [b, { ratio: 2, needs: 4.5 }], [c, { ratio: 8, needs: 4.5 }]]);
         // b was already hard to read in the design: not this brand's doing
         expect(madeHardToRead(before, after).map((x) => x.el)).toEqual([a]);
+    });
+
+    it('keeps the styled logo picker beside the URL field in a compact row', () => {
+        const container = document.createElement('div');
+        renderBrandPanel({
+            container,
+            config: { tokens: [], identity: { logoKey: 'brand.logo' } },
+            save: async () => {},
+            upload: async () => 'https://example.test/logo.png',
+            done: () => {},
+            notify: () => {},
+        });
+
+        const controls = container.querySelector('.le-brand-logo-fields');
+        expect(controls.querySelector('input[type="url"]')).not.toBeNull();
+        expect(controls.querySelector('.le-upload-compact')).not.toBeNull();
+        expect(controls.children).toHaveLength(2);
     });
 });

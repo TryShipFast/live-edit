@@ -1,7 +1,7 @@
 /** A styled image picker shared by image and brand uploads. */
-export const uploadWidget = ({ hint = 'PNG, JPG or WEBP, or drag one here', onFile } = {}) => {
+export const uploadWidget = ({ hint = 'PNG, JPG or WEBP, or drag one here', onFile, compact = false } = {}) => {
     const wrap = document.createElement('label');
-    wrap.className = 'le-upload';
+    wrap.className = `le-upload${compact ? ' le-upload-compact' : ''}`;
 
     const inner = document.createElement('div');
     inner.className = 'le-upload-inner';
@@ -29,6 +29,7 @@ export const uploadWidget = ({ hint = 'PNG, JPG or WEBP, or drag one here', onFi
     const accept = (file) => {
         if (!file) return;
         hintEl.textContent = file.name;
+        if (compact) button.textContent = file.name;
         onFile?.(file);
     };
     input.addEventListener('change', () => accept(input.files[0]));

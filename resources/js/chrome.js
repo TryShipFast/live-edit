@@ -320,6 +320,13 @@ a.le-mark:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
 .le-link-btn:hover { color: #0B0C0F; }
 .le-brand-type { display: grid; grid-template-columns: 1fr; gap: 12px; }
 .le-brand-face { display: flex; flex-direction: column; gap: 6px; }
+.le-brand-logo-fields { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: stretch; gap: 8px; }
+.le-brand-logo-fields > .le-input { min-width: 0; width: 100%; }
+.le-brand-logo-fields .le-upload { min-width: 112px; justify-content: center; gap: 0; padding: 6px 8px; border-radius: 10px; }
+.le-brand-logo-fields .le-upload-inner { min-width: 0; justify-content: center; gap: 6px; }
+.le-brand-logo-fields .le-upload-icon { width: 24px; height: 24px; border-radius: 7px; font-size: 13px; }
+.le-brand-logo-fields .le-upload-text { display: none; }
+.le-brand-logo-fields .le-upload-btn { min-width: 0; max-width: 100%; margin-left: 0; padding: 6px 8px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .le-brand-warning { display: block; padding: 12px 14px; border-radius: 10px; background: #FFF4F2; color: #8C1D18; font-size: 13px; line-height: 1.45; }
 .le-brand-warning strong { font-weight: 600; }
 .le-brand-dock { position: sticky; bottom: -22px; display: flex; flex-direction: column; gap: 10px; margin: 4px -24px -22px; padding: 14px 24px 20px; background: #fff; border-top: 1px solid rgba(11,12,15,.08); }
