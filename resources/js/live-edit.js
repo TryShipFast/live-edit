@@ -3018,89 +3018,6 @@ const bootLiveEdit = () => {
             nothing_to_work_with: 'Describe the picture you want first.',
         }[reason] ?? 'Could not make a picture just now. You have not been charged.');
 
-        /*
-         * The page changing as the words are typed.
-         *
-         * Every style control previewed live and the words did not, so a
-         * client corrected their own headline blind: type, guess, press Save,
-         * wait for the page to come back, and only then find out it was too
-         * long for the space the designer left. On a hero that is three
-         * round trips to fix a sentence.
-         *
-         * Written with the same applier the save uses, rather than something
-         * that looks close enough. Two ways of putting words into an element
-         * is how a preview comes to show something the save will not produce
-         * -- and a preview that lies is worse than no preview, because it is
-         * believed.
-         *
-         * The content guard stands down while editing, so it does not fight
-         * this.
-         */
-        let putWords = null;
-
-        const previewWordsWhileTyping = (element, box) => {
-            if (!box) return;
-
-            const was = ownTextOf(element);
-
-            /*
-             * What the page said, run by run, kept so every keystroke is
-             * applied to that rather than to what the last keystroke left.
-             *
-             * A sentence with a bold phrase in it is two runs of text. Typing
-             * replaces the whole box, so the first character shares almost
-             * nothing with the sentence on the page — and applying that
-             * directly collapsed the runs, after which the phrase had already
-             * lost its place and no later keystroke could put it back.
-             */
-            const runsOf = (node) => [...node.childNodes].filter((child) => child.nodeType === 3);
-            const original = runsOf(element).map((node) => node.nodeValue);
-
-            const putBackWhatThePageSaid = () => {
-                const now = runsOf(element);
-
-                if (now.length !== original.length) {
-                    return false;
-                }
-
-                now.forEach((node, index) => {
-                    node.nodeValue = original[index];
-                });
-
-                return true;
-            };
-
-            let shown = false;
-
-            // Put back what the page said, for Cancel and for the × — and for
-            // switching to another element, which is the same thing from the
-            // page's point of view.
-            current.restore = () => {
-                if (!shown || !putWords) return;
-
-                if (!putBackWhatThePageSaid()) {
-                    putWords(element, was);
-                }
-            };
-
-            box.addEventListener('input', () => {
-                if (!putWords) return;
-
-                shown = true;
-                putBackWhatThePageSaid();
-                putWords(element, box.value, { keepRuns: true });
-            });
-
-            // Fetched once and kept. The first keystroke may land before it
-            // arrives, which costs that one keystroke its preview and nothing
-            // else.
-            if (putWords === null) {
-                import('./content.js')
-                    .then((m) => (putWords = m.applyValue))
-                    .catch((error) => console.warn('[live-edit] could not preview words as you type:', error.message));
-            }
-        };
-
         const appendLinkFields = (element) => {
             current.hrefKey = element.dataset.editHref;
             current.targetKey = element.dataset.editTarget;
@@ -3251,9 +3168,6 @@ const bootLiveEdit = () => {
                 // words: there is nothing to say about an icon.
                 if (!asIcon) appendAssist(element, drawerFields.querySelector('textarea'));
 
-                if (!asIcon && !richSetting) {
-                    previewWordsWhileTyping(element, drawerFields.querySelector('textarea'));
-                }
             } else {
                 const [type, id] = rest;
                 current = { kind: 'record', type, id: Number(id) };
