@@ -63,7 +63,7 @@ class EmbedTest extends TestCase
 
     public function test_the_editor_files_are_all_reachable(): void
     {
-        foreach (['content.js', 'session.js', 'live-edit.js', 'chrome.js', 'support.js'] as $file) {
+        foreach (['content.js', 'session.js', 'live-edit.js', 'chrome.js', 'support.js', 'upload.js'] as $file) {
             $this->get('/live-edit/assets/'.$file)->assertOk();
         }
     }
