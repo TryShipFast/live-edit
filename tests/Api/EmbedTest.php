@@ -91,6 +91,19 @@ class EmbedTest extends TestCase
         $this->assertSame([], $missing, 'the runtime imports files this endpoint will not serve');
     }
 
+    public function test_dropdown_trigger_module_is_reachable_at_the_versioned_runtime_address(): void
+    {
+        $version = EmbedController::assetVersion();
+
+        $response = $this->get('/live-edit/assets/'.$version.'/dropdown-trigger.js')
+            ->assertOk();
+
+        $this->assertStringContainsString(
+            'dropdown',
+            $response->streamedContent() ?: $response->getContent(),
+        );
+    }
+
     public function test_a_host_can_ask_which_build_of_the_editor_is_current(): void
     {
         // A host that renders its own content and wants only the overlay — the
