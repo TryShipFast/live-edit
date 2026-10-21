@@ -1,3 +1,5 @@
+import { uploadWidget } from './upload.js';
+
 /**
  * The Brand tab: a customer's colours and type, set on their own website while
  * they watch it change.
@@ -320,18 +322,20 @@ export const renderBrandPanel = ({ container, config, save, upload, done, notify
             row.append(input); fields.append(row);
         }
         if (identity.logoKey) {
-            const row = el('label', 'le-brand-face'); row.append(el('span', 'le-brand-label', 'Logo'));
+            const row = el('div', 'le-brand-face'); row.append(el('span', 'le-brand-label', 'Logo'));
             const input = el('input', 'le-input'); input.type = 'url'; input.value = identityValue(identity.logoKey); input.placeholder = 'Paste a logo URL';
             input.addEventListener('input', () => { pending[identity.logoKey] = input.value.trim(); changed(); });
             row.append(input);
             if (upload) {
-                const file = el('input', 'le-input'); file.type = 'file'; file.accept = 'image/*'; file.setAttribute('aria-label', 'Upload logo');
-                file.addEventListener('change', async () => {
-                    if (!file.files?.[0]) return;
-                    try { input.value = await upload(file.files[0]); pending[identity.logoKey] = input.value; changed(); }
-                    catch (error) { notify(error?.message || 'Your logo could not be uploaded.'); }
+                const picker = uploadWidget({
+                    hint: 'PNG, JPG, SVG or WEBP, or drag one here',
+                    onFile: async (file) => {
+                        try { input.value = await upload(file); pending[identity.logoKey] = input.value; changed(); }
+                        catch (error) { notify(error?.message || 'Your logo could not be uploaded.'); }
+                    },
                 });
-                row.append(file);
+                picker.setAttribute('aria-label', 'Upload logo');
+                row.append(picker);
             }
             fields.append(row);
         }
