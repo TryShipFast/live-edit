@@ -387,7 +387,7 @@ class LiveEditController extends Controller
 
         $published = ($this->settingModel())::query()->pluck('value', 'key');
 
-        $changes = Draft::query()
+        $changes = DraftStore::drafts()
             ->orderByDesc('updated_at')
             ->get()
             ->map(fn (Draft $draft) => [
@@ -427,7 +427,7 @@ class LiveEditController extends Controller
             'kind' => ['nullable', 'string', 'max:40'],
         ]);
 
-        Draft::query()
+        DraftStore::drafts()
             ->where('kind', $validated['kind'] ?? 'setting')
             ->where('subject', $validated['key'])
             ->delete();

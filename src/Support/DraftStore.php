@@ -48,19 +48,29 @@ class DraftStore
         return MayEdit::check() || (bool) session(self::PREVIEW_SESSION_KEY, false);
     }
 
-    /** Record a change as unpublished. */
+    /** Record a change as unpublished for this installation's own content. */
     public static function put(string $kind, string $subject, array $payload): void
     {
-        Draft::query()->updateOrCreate(
+        self::drafts()->updateOrCreate(
             ['kind' => $kind, 'subject' => $subject],
-            ['payload' => $payload]
+            ['site_id' => null, 'payload' => $payload]
         );
+    }
+
+    /**
+     * This Laravel fallback owns only rows without a registered API site.
+     * API-backed customer content has a non-null site_id and must never enter
+     * this installation-wide editor path.
+     */
+    public static function drafts(): \Illuminate\Database\Eloquent\Builder
+    {
+        return Draft::query()->whereNull('site_id');
     }
 
     /** @return array<string, string> subject => value, for settings */
     public static function settings(): array
     {
-        return Draft::query()->where('kind', 'setting')->get()
+        return self::drafts()->where('kind', 'setting')->get()
             ->mapWithKeys(fn (Draft $d) => [$d->subject => (string) ($d->payload['value'] ?? '')])
             ->all();
     }
@@ -68,14 +78,14 @@ class DraftStore
     /** @return array<string, array<string, string>> subject => props, for styles */
     public static function styles(): array
     {
-        return Draft::query()->where('kind', 'style')->get()
+        return self::drafts()->where('kind', 'style')->get()
             ->mapWithKeys(fn (Draft $d) => [$d->subject => (array) ($d->payload['props'] ?? [])])
             ->all();
     }
 
     public static function pending(): int
     {
-        return Draft::query()->count();
+        return self::drafts()->count();
     }
 
     /**
@@ -85,7 +95,7 @@ class DraftStore
      */
     public static function publish(): int
     {
-        $drafts = Draft::query()->get();
+        $drafts = self::drafts()->get();
         $model = config('live-edit.setting_model');
 
         foreach ($drafts as $draft) {
@@ -102,7 +112,7 @@ class DraftStore
         }
 
         $count = $drafts->count();
-        Draft::query()->delete();
+        self::drafts()->delete();
 
         // What just went live is written as a version, so there is a record of
         // the state rather than only of the changes that produced it.
@@ -143,7 +153,7 @@ class DraftStore
 
         // Pending work is not what was asked for: restoring is a decision about
         // what is live, and leaving drafts on top would immediately undo it.
-        Draft::query()->delete();
+        self::drafts()->delete();
         Snapshot::publish($changed, $number);
 
         return $changed;
@@ -152,8 +162,8 @@ class DraftStore
     /** Throw the held changes away, leaving the published site as it was. */
     public static function discard(): int
     {
-        $count = Draft::query()->count();
-        Draft::query()->delete();
+        $count = self::drafts()->count();
+        self::drafts()->delete();
 
         return $count;
     }

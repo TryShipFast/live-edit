@@ -1,5 +1,9 @@
 # ShipFast Live Edit for WordPress
 
+## 0.15.31
+
+The Laravel fallback now reads and mutates only its own installation drafts. Drafts belonging to registered API sites stay private to their site, including when an edit is reverted, published or discarded.
+
 ## 0.15.25
 
 Licence status is now checked against the hostname serving the current request.
