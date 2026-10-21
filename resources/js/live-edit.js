@@ -1,5 +1,6 @@
 import { createChrome } from './chrome.js';
 import { renderBrandPanel } from './brand.js';
+import { renderSeoPanel } from './seo.js';
 import { addedWith, describeStructure, newAddedId, orderWith, renderLibrary, renderPagesPanel } from './pages.js';
 import { dropdownTriggerFrom } from './dropdown-trigger.js';
 import { biggestThatFits, howMuchSurvives, inSourcePixels, movedWithin, whatIsThereNow } from './fitting.js';
@@ -1148,6 +1149,8 @@ const bootLiveEdit = () => {
             if (name === 'History') void renderHistory();
             if (name === 'Brand') renderBrand();
             else brandPanel?.unpreview();
+            if (name === 'SEO') renderSeo();
+            else seoPanel?.unpreview();
             if (name === 'Pages') renderPages();
         };
 
@@ -1182,6 +1185,19 @@ const bootLiveEdit = () => {
         };
 
         let brandPanel = null;
+        let seoPanel = null;
+        const renderSeo = () => {
+            seoPanel = renderSeoPanel({
+                container: drawerFields,
+                config: window.liveEditSeo,
+                save: saveSetting,
+                done: (message) => {
+                    if (message) reloadWithToast(message);
+                    else closeDrawer(true);
+                },
+                notify,
+            });
+        };
         const renderBrand = () => {
             brandPanel = renderBrandPanel({
                 container: drawerFields,

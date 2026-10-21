@@ -233,6 +233,11 @@ a.le-mark:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
   font-size: 11px; font-weight: 500; line-height: 16px; text-align: center;
 }
 .le-tab.is-on .le-tab-count { background: #0B0C0F; color: #fff; }
+.le-seo-preview { display: grid; gap: 5px; padding: 14px; border: 1px solid var(--le-line); border-radius: 10px; color: #202124; font: 13px/1.45 Arial, sans-serif; }
+.le-seo-preview-title { color: #1a0dab; font-size: 16px; font-weight: 400; }
+.le-seo-preview-address { color: #188038; font-size: 12px; }
+.le-seo-preview-description { color: #4d5156; }
+.le-seo-actions { justify-content: flex-end; }
 /* ---- AI assist ---- */
 .le-assist-head { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
 .le-assist-balance { font-size: 12px; color: #9A9DA5; }
@@ -1097,6 +1102,7 @@ export function createChrome() {
     const tabNames = ['Edit', 'Changes', 'History'];
     if (window.liveEditPages) tabNames.push('Pages');
     if (window.liveEditBrand?.tokens?.length) tabNames.push('Brand');
+    if (window.liveEditSeo?.title?.key || window.liveEditSeo?.descriptionKey) tabNames.push('SEO');
     tabNames.forEach((name) => {
         const tab = el('button', 'le-tab', name);
         tab.type = 'button';

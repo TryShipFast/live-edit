@@ -1,5 +1,9 @@
 # ShipFast Live Edit for WordPress
 
+## 0.15.35
+
+Hosted sites now have a page-specific SEO drawer for editing the browser/search title and search description. Saved descriptions are included in published page metadata and social descriptions.
+
 ## 0.15.34
 
 The site icon picker previews light and dark SVGs against a split light and dark surface, keeping fixed-color marks visible while choosing.
