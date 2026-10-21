@@ -122,22 +122,6 @@ a.le-mark:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
    that repeats is an alarm, and nothing is wrong. */
 .le-bar-btn.is-asked { background: var(--le-accent); color: #fff; box-shadow: 0 0 0 4px var(--le-accent-soft); }
 @media (prefers-reduced-motion: no-preference) { .le-bar-btn.is-asked { transition: background .15s ease, box-shadow .15s ease; } }
-/* The site's other pages, so editing one does not mean hunting for the next.
-   A segmented track rather than separate buttons, because these are one
-   choice with several answers and only one of them can be true. */
-.le-pages {
-  display: flex; align-items: center; gap: 2px; flex: none;
-  background: #1B1D22; border-radius: 999px; padding: 3px;
-}
-.le-page-btn {
-  cursor: pointer; border: 0; background: none; color: #fff;
-  border-radius: 999px; padding: 5px 12px; font-size: 12px; font-weight: 500;
-  white-space: nowrap; transition: background .15s ease;
-}
-.le-page-btn:hover { background: #2A2C31; }
-.le-page-btn.is-on { background: #fff; color: #0B0C0F; font-weight: 600; }
-.le-page-btn.is-on:hover { background: #fff; }
-
 /* Which language is being edited. A native select, so it works with a
    keyboard, a screen reader and a phone without any of that being rebuilt
    here - styled to sit in the bar rather than replaced by something that only
@@ -274,21 +258,6 @@ a.le-mark:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
 /* Pages: the website's pages as rows you can open, then a new page from the
    design's own sections. The library is a list you search, grouped under the
    page each section comes from, because that is how the owner knows it. */
-.le-sitemap-intro { margin: 0; font-size: 13px; line-height: 1.5; }
-.le-sitemap { display: flex; flex-direction: column; gap: 2px; max-height: 38vh; overflow: auto; margin: 0 -6px; }
-.le-sitemap-row { display: flex; align-items: center; gap: 8px; border-radius: 10px; }
-.le-sitemap-row:hover, .le-sitemap-row:has([aria-current="page"]) { background: var(--le-soft); }
-.le-sitemap-open { flex: 1; min-width: 0; display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 12px; border-radius: 10px; text-decoration: none; color: inherit; }
-.le-sitemap-open:focus-visible, .le-sitemap-menu:focus-visible { outline: none; box-shadow: 0 0 0 3px var(--le-accent-soft); }
-.le-sitemap-menu { flex: none; margin-right: 8px; cursor: pointer; border: 1px solid var(--le-field); background: #fff; color: var(--le-body); border-radius: 999px; padding: 5px 11px; font-size: 11px; font-weight: 600; }
-.le-sitemap-menu:hover { border-color: var(--le-accent); color: var(--le-accent); }
-.le-sitemap-menu[aria-pressed="true"] { background: var(--le-accent-soft); border-color: transparent; color: var(--le-ink); }
-.le-in-menu { margin-top: -4px; font-size: 13px; color: var(--le-body); }
-.le-sitemap-words { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
-.le-sitemap-title { font-size: 14px; font-weight: 600; color: var(--le-ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.le-sitemap-address { font-size: 12px; color: var(--le-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.le-sitemap-tag { flex: none; font-size: 11px; font-weight: 600; color: var(--le-muted); padding: 3px 9px; border-radius: 999px; border: 1px solid var(--le-line); }
-.le-sitemap-tag--yours { color: var(--le-accent); border-color: var(--le-accent-soft); background: var(--le-accent-soft); }
 .le-address { display: flex; align-items: center; border: 1px solid var(--le-field); border-radius: 12px; background: #fff; transition: border-color .15s ease, box-shadow .15s ease; }
 .le-address:focus-within { border-color: var(--le-accent); box-shadow: 0 0 0 4px var(--le-accent-soft); }
 .le-address .le-input { border: 0; box-shadow: none; padding-left: 2px; }
@@ -1011,13 +980,6 @@ export function createChrome() {
     redoButton.setAttribute('aria-label', 'Redo');
     redoButton.innerHTML = arrow(true);
 
-    // Filled in once the page has been read for its own navigation, and left
-    // out entirely on a site with only one page.
-    const pageSwitcher = el('div', 'le-pages');
-    pageSwitcher.hidden = true;
-    pageSwitcher.setAttribute('role', 'group');
-    pageSwitcher.setAttribute('aria-label', 'Pages');
-
     /*
      * Which language is being edited.
      *
@@ -1041,8 +1003,13 @@ export function createChrome() {
 
     const pagesButton = el('button', 'le-bar-btn le-when-roomy', 'Pages');
     pagesButton.type = 'button';
-    pagesButton.title = 'Every page of your website, and a way to add one';
+    pagesButton.title = 'Open the page creation form';
     pagesButton.hidden = !window.liveEditPages;
+
+    const createPageButton = el('button', 'le-bar-btn le-when-roomy', 'Create page');
+    createPageButton.type = 'button';
+    createPageButton.title = 'Add a page to your website';
+    createPageButton.hidden = !window.liveEditPages;
 
     const changesButton = el('button', 'le-bar-btn le-when-roomy', 'Changes');
     changesButton.type = 'button';
@@ -1072,9 +1039,9 @@ export function createChrome() {
         undoButton,
         redoButton,
         el("span", "le-sep"),
-        pageSwitcher,
         languagePicker,
         pagesButton,
+        createPageButton,
         brandButton,
         changesButton,
         previewButton,
@@ -1294,7 +1261,6 @@ export function createChrome() {
         toggleButton,
         undoButton,
         redoButton,
-        pageSwitcher,
         languagePicker,
         statusText,
         dot,

@@ -3135,7 +3135,7 @@ const bootLiveEdit = () => {
             finishPanel(element);
         };
 
-        const editText = (element) => {
+        const editText = (element, linkElement = element) => {
             const { kind, key, parts: rest } = parseEditKey(element.dataset.edit);
             drawerFields.replaceChildren();
             drawerDelete.classList.add('le-hidden');
@@ -3307,7 +3307,7 @@ const bootLiveEdit = () => {
                 moveRow.append(moveLabel, moveButton('up', '\u2191 Move up'), moveButton('down', '\u2193 Move down'));
                 drawerFields.prepend(moveRow);
             }
-            finishPanel(element);
+            finishPanel(element, { linkElement });
         };
 
         /**
@@ -3568,9 +3568,9 @@ const bootLiveEdit = () => {
          * here, where each remaining aspect is offered if the element has it.
          * Adding an aspect later means adding it once.
          */
-        const finishPanel = (element, { styleKey = null, styleOn = element } = {}) => {
-            if (element.dataset.editHref !== undefined) {
-                appendLinkFields(element);
+        const finishPanel = (element, { styleKey = null, styleOn = element, linkElement = element } = {}) => {
+            if (linkElement?.dataset.editHref !== undefined) {
+                appendLinkFields(linkElement);
             }
 
             appendVisitLink(element);
@@ -4816,6 +4816,21 @@ const bootLiveEdit = () => {
                 if (event.target.closest('[data-live-create]')) return;
 
                 const target = resolveTarget(event.target);
+                const anchor = event.target.closest?.('a[href]');
+                if (anchor && navigable(anchor)) {
+                    event.preventDefault();
+                    event.stopImmediatePropagation();
+                    const linkText = target?.kind === 'text'
+                        ? target.element
+                        : anchor.matches('[data-edit]')
+                            ? anchor
+                            : null;
+                    if (linkText) editText(linkText, anchor);
+                    else if (target) openTarget(target);
+                    else if (anchor.dataset.editHref !== undefined) editLink(anchor);
+
+                    return;
+                }
                 if (!target) return;
                 event.preventDefault();
                 /*
@@ -4876,6 +4891,13 @@ const bootLiveEdit = () => {
         });
 
         ui.pagesButton?.addEventListener('click', () => {
+            if (!document.body.classList.contains('editing')) setEditing(true);
+
+            showTab('Pages');
+            openDrawer();
+        });
+
+        ui.createPageButton?.addEventListener('click', () => {
             if (!document.body.classList.contains('editing')) setEditing(true);
 
             showTab('Pages');
@@ -5217,97 +5239,6 @@ const bootLiveEdit = () => {
 
             ui.previewButton.addEventListener('click', enterPreview);
         });
-
-        /* \u2500\u2500 The site's other pages \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
-         *
-         * Read off the site's own navigation rather than configured, for the
-         * same reason everything else here is read off the page: the client
-         * bought a template and nobody is going to sit down and list its pages
-         * for us. Whatever the theme put in its menu IS the list of pages,
-         * and it is already in the document.
-         *
-         * Switching is a navigation, because this editor runs inside the real
-         * page rather than in a frame around it. Edit mode is remembered
-         * across that, and unpublished work lives on the server, so arriving
-         * at the next page looks exactly like staying on this one.
-         */
-        const sitePages = () => {
-            const menus = document.querySelectorAll('nav, [role="navigation"], header ul');
-            const seen = new Map();
-
-            // The admin's own furniture is a navigation too, and a very
-            // prominent one. Without this the switcher offered "Plugins",
-            // "Themes" and "Get Involved" as pages of the client's website.
-            const isHostChrome = (node) => node.closest(
-                '#wpadminbar, #adminmenu, #wp-toolbar, #live-edit-ui, [data-no-edit], [data-live-edit-chrome]'
-            ) !== null;
-
-            menus.forEach((menu) => {
-                if (isHostChrome(menu)) return;
-
-                menu.querySelectorAll('a[href]').forEach((link) => {
-                    if (isHostChrome(link)) return;
-
-                    let url;
-
-                    try {
-                        url = new URL(link.getAttribute('href'), window.location.href);
-                    } catch {
-                        return;
-                    }
-
-                    // Another website, a jump down this page, a mailto, a
-                    // file: none of them is a page of this site to edit.
-                    if (url.origin !== window.location.origin) return;
-                    if (/\.(pdf|zip|jpe?g|png|gif|svg|webp|mp4|mp3)$/i.test(url.pathname)) return;
-                    if (url.pathname === window.location.pathname && url.hash) return;
-
-                    const label = (link.textContent ?? '').replace(/\s+/g, ' ').trim();
-
-                    // A menu is full of links that are pictures, icons and
-                    // empty wrappers. A page needs a name to be offered as one.
-                    if (label === '' || label.length > 22) return;
-                    if (seen.has(url.pathname)) return;
-
-                    seen.set(url.pathname, { label, href: url.href });
-                });
-            });
-
-            return [...seen.values()].slice(0, 6);
-        };
-
-        const drawPages = () => {
-            const pages = sitePages();
-
-            // One page is not a choice, and a row with a single item in it
-            // just takes room from the controls that do something.
-            if (pages.length < 2) return;
-
-            const here = window.location.pathname.replace(/\/$/, '');
-
-            pages.forEach((page) => {
-                const button = el('button', 'le-page-btn', page.label);
-                button.type = 'button';
-                button.title = page.href;
-
-                if (new URL(page.href).pathname.replace(/\/$/, '') === here) {
-                    button.classList.add('is-on');
-                } else {
-                    button.addEventListener('click', () => {
-                        // Kept on, so the next page opens ready to edit
-                        // rather than as a visitor.
-                        sessionStorage.setItem('tb_editing', '1');
-                        window.location.href = page.href;
-                    });
-                }
-
-                ui.pageSwitcher.append(button);
-            });
-
-            ui.pageSwitcher.hidden = false;
-        };
-
-        drawPages();
 
         /* \u2500\u2500 Languages \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
          *

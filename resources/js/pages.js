@@ -349,48 +349,8 @@ export function renderLibrary({ container, library, pick, multiple = false, fetc
 export function renderPagesPanel({ container, config, save, go, notify }) {
     container.replaceChildren();
 
-    const intro = el('p', 'le-hint le-sitemap-intro', 'Every page of your website. A new page is built from sections your design already has, so it looks like the rest of the site.');
-    container.append(intro);
-
-    const list = el('div', 'le-sitemap');
-    for (const page of config.pages ?? []) {
-        const row = el('div', 'le-sitemap-row');
-        const open = el('a', 'le-sitemap-open');
-        open.href = page.href;
-        if (page.id === config.page) open.setAttribute('aria-current', 'page');
-        const words = el('span', 'le-sitemap-words');
-        words.append(el('span', 'le-sitemap-title', page.title), el('span', 'le-sitemap-address', `/${page.id}`));
-        open.append(words);
-        if (page.id === config.page) open.append(el('span', 'le-sitemap-tag', 'This page'));
-        else if (page.made) open.append(el('span', 'le-sitemap-tag le-sitemap-tag--yours', 'Yours'));
-        open.addEventListener('click', (event) => {
-            event.preventDefault();
-            go(page.href);
-        });
-        row.append(open);
-
-        // A page the owner made goes in the site's menus, or comes out, with one press.
-        const mine = (config.made ?? []).find((made) => made.id === page.id);
-        if (mine) {
-            const menu = el('button', 'le-sitemap-menu', mine.menu ? 'In the menu' : 'Add to menu');
-            menu.type = 'button';
-            menu.setAttribute('aria-pressed', mine.menu ? 'true' : 'false');
-            menu.title = mine.menu ? 'Take this page out of the menu' : 'Show this page in the menu';
-            menu.addEventListener('click', async () => {
-                menu.disabled = true;
-                try {
-                    await save(config.pagesKey, JSON.stringify(withMenu(config.made, page.id, !mine.menu)));
-                    go(window.location.href);
-                } catch (error) {
-                    notify(error.message);
-                    menu.disabled = false;
-                }
-            });
-            row.append(menu);
-        }
-        list.append(row);
-    }
-    container.append(list);
+    // Keep this panel focused on creating a page. Existing pages
+    // remain available from the customer website navigation.
 
     // ---- a new page --------------------------------------------------------
     container.append(el('div', 'le-section-heading', 'Add a page'));
