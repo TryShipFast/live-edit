@@ -2903,7 +2903,10 @@ const bootLiveEdit = () => {
                     ),
                 );
 
-                const where = window.liveEditEditor?.console ?? null;
+                const where = window.liveEditEditor?.billing
+                    ?? (window.liveEditEditor?.console
+                        ? `${window.liveEditEditor.console.replace(/\/$/, '')}/billing`
+                        : null);
 
                 if (where) {
                     const buy = el('button', 'le-btn-publish', 'Buy credits');
@@ -2912,7 +2915,7 @@ const bootLiveEdit = () => {
                     buy.addEventListener('click', () => {
                         // Their account, in its own tab: whatever they were
                         // editing is still here when they come back.
-                        window.open(`${where.replace(/\/$/, '')}/billing`, '_blank', 'noopener');
+                        window.open(where, '_blank', 'noopener');
                     });
                     panel.append(buy);
                 }
