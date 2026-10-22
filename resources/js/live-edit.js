@@ -3071,7 +3071,7 @@ const bootLiveEdit = () => {
                 });
 
                 go.disabled = false;
-                go.textContent = 'Make four more · 5 credits';
+                go.textContent = 'Make two more · 5 credits';
             });
         };
 
@@ -3552,6 +3552,26 @@ const bootLiveEdit = () => {
          */
         const finishPanel = (element, { styleKey = null, styleOn = element, linkElement = element } = {}) => {
             lastOpened = element;
+
+            // The edit key belongs to a field, but customers think in whole
+            // cards. Name the repeated item above the fields so they know
+            // which product, project or section this drawer belongs to.
+            const item = element.closest?.('[data-edit-item]');
+            if (item) {
+                const list = item.parentElement;
+                const items = list ? [...list.children].filter((child) => child.hasAttribute('data-edit-item')) : [item];
+                const index = Math.max(0, items.indexOf(item)) + 1;
+                const kind = list?.dataset.editListKind === 'sections' ? 'Section' : 'Item';
+                const name = item.dataset.editItemLabel
+                    || item.dataset.editSectionLabel
+                    || item.querySelector('h1, h2, h3, h4, h5, h6')?.textContent
+                    || item.getAttribute('aria-label');
+                const context = document.createElement('div');
+                context.className = 'le-section-heading';
+                context.textContent = `${kind} ${index} of ${items.length}${name ? ` · ${String(name).replace(/\s+/g, ' ').trim().slice(0, 40)}` : ''}`;
+                drawerFields.prepend(context);
+            }
+
             if (linkElement?.dataset.editHref !== undefined) {
                 appendLinkFields(linkElement);
             }
@@ -4802,9 +4822,10 @@ const bootLiveEdit = () => {
                 const target = resolveTarget(event.target);
                 const anchor = event.target.closest?.('a[href]');
                 const dropdown = dropdownTriggerFrom(event.target);
-                if (dropdown) {
+                if (dropdown && !dropdown.matches('a[data-edit], a[data-edit-href]')) {
                     // Keep menu toggles usable in edit mode, while suppressing
-                    // an anchor's destination. Its own handler can open the menu.
+                    // an uneditable control's destination. A tagged anchor is
+                    // still content: clicking its words must open the editor.
                     if (dropdown.matches('a[href]')) event.preventDefault();
                     return;
                 }

@@ -1,5 +1,9 @@
 # ShipFast Live Edit for WordPress
 
+## 0.15.50
+
+- The edit drawer identifies the repeated item being edited, including its position and visible heading, so customers can tell which product, project or section the fields belong to.
+
 ## 0.15.49
 
 - Image generation now returns two options per request and times out before the service gateway, preventing long generation calls from surfacing as gateway 504 errors. Failed generations remain refunded.
