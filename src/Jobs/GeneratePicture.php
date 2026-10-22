@@ -25,17 +25,18 @@ class GeneratePicture implements ShouldQueue
 
     public function handle(ImagineAPicture $imagine, Credits $credits): void
     {
-        $generation = ImageGeneration::query()->find($this->generationId);
+        // Read from the primary: a worker can hit a lagging replica immediately after dispatch.
+        $generation = ImageGeneration::query()->useWritePdo()->find($this->generationId);
 
         if (! $generation || $generation->status !== 'queued') {
             return;
         }
 
-        if (ImageGeneration::query()->whereKey($generation->id)->where('status', 'queued')->update(['status' => 'processing']) !== 1) {
+        if (ImageGeneration::query()->useWritePdo()->whereKey($generation->id)->where('status', 'queued')->update(['status' => 'processing']) !== 1) {
             return;
         }
 
-        $site = Site::query()->find($generation->site_id);
+        $site = Site::query()->useWritePdo()->find($generation->site_id);
 
         if (! $site) {
             $this->failGeneration($credits, 'site_missing');
@@ -72,13 +73,13 @@ class GeneratePicture implements ShouldQueue
     private function failGeneration(Credits $credits, string $reason): void
     {
         DB::transaction(function () use ($credits, $reason): void {
-            $generation = ImageGeneration::query()->whereKey($this->generationId)->lockForUpdate()->first();
+            $generation = ImageGeneration::query()->useWritePdo()->whereKey($this->generationId)->lockForUpdate()->first();
 
             if (! $generation || in_array($generation->status, ['completed', 'failed'], true)) {
                 return;
             }
 
-            $site = Site::query()->find($generation->site_id);
+            $site = Site::query()->useWritePdo()->find($generation->site_id);
             $balance = $site
                 ? $credits->refund($site, 'generate_image', ['generation' => $generation->uuid])
                 : (int) ($generation->balance ?? 0);

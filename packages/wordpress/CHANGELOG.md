@@ -1,5 +1,9 @@
 # ShipFast Live Edit for WordPress
 
+## 0.15.55
+
+- Image-generation workers now read new jobs and refund state from the primary database, preventing replica lag from leaving queued jobs stuck and credits reserved.
+
 ## 0.15.54
 
 - Retry brief “generation not found” replies while polling the same queued image request, so transient visibility gaps do not interrupt image generation.
