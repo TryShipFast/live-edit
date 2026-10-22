@@ -1,5 +1,9 @@
 # ShipFast Live Edit for WordPress
 
+## 0.15.54
+
+- Retry brief “generation not found” replies while polling the same queued image request, so transient visibility gaps do not interrupt image generation.
+
 ## 0.15.53
 
 - Image-generation status and idempotent retry lookups now read from the primary database, preventing false 404s while replicas catch up.

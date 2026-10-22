@@ -18,5 +18,5 @@ namespace ShipFast\LiveEdit;
  */
 final class LiveEdit
 {
-    public const VERSION = '0.15.53';
+    public const VERSION = '0.15.54';
 }

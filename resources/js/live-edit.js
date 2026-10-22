@@ -3030,11 +3030,24 @@ const bootLiveEdit = () => {
                     // provider renders the image in the background.
                     if (activeGenerationId) {
                         const deadline = Date.now() + 180_000;
+                        let missingStatusReplies = 0;
                         while (Date.now() < deadline) {
                             await new Promise((resolve) => setTimeout(resolve, 6500));
-                            const response = await request(`/live-edit/imagine/${activeGenerationId}`, { method: 'GET' });
-                            payload = await response.json();
-                            if (typeof payload?.balance === 'number') credits = { ...(credits ?? {}), balance: payload.balance };
+                            try {
+                                const response = await request(`/live-edit/imagine/${activeGenerationId}`, { method: 'GET' });
+                                payload = await response.json();
+                                missingStatusReplies = 0;
+                                if (typeof payload?.balance === 'number') credits = { ...(credits ?? {}), balance: payload.balance };
+                            } catch (error) {
+                                // A queued record may not be visible to every
+                                // app instance immediately. Retry brief 404s;
+                                // a later poll for the same ID can find the job.
+                                if (/^Generation not found\.?$/i.test(error?.message ?? '') && ++missingStatusReplies < 4) {
+                                    continue;
+                                }
+
+                                throw error;
+                            }
                             if (payload?.status === 'completed' || payload?.status === 'failed') break;
                         }
                     }
