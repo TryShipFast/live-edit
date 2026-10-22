@@ -35,7 +35,7 @@ class ImagineAPicture
     /**
      * @return array{images: array<int, string>, balance: int, reason?: string}
      */
-    public function __invoke(Site $site, string $prompt, int $count = 4): array
+    public function __invoke(Site $site, string $prompt, int $count = 2): array
     {
         if (trim($prompt) === '') {
             return ['images' => [], 'balance' => $this->credits->balance($site), 'reason' => 'nothing_to_work_with'];
@@ -80,7 +80,7 @@ class ImagineAPicture
      * with a response carrying a url, which this provider does not send.
      *
      * Stored here rather than in the browser because the browser is the worst
-     * place for it: four generated pictures is eight megabytes of base64 to
+     * place for it: two generated pictures is four megabytes of base64 to
      * ship, hold in memory and re-upload, and doing it here fixes the same
      * fault for every adapter at once. A URL is what the rest of the pipeline
      * has always expected.
@@ -139,11 +139,20 @@ class ImagineAPicture
     {
         try {
             $response = Http::withToken(config('live-edit.ai.api_key'))
-                ->timeout((int) config('live-edit.ai.image_timeout', 90))
+                // The API sits behind a gateway with a shorter request limit.
+                // Letting image generation run for 90 seconds means the
+                // gateway can return 504 while PHP is still waiting, leaving
+                // the editor unable to tell the customer that no credits were
+                // charged. Keep the upstream call below the gateway limit;
+                // slow generations are refunded by __invoke() as usual.
+                ->connectTimeout((int) config('live-edit.ai.image_connect_timeout', 10))
+                ->timeout((int) config('live-edit.ai.image_timeout', 50))
                 ->post(config('live-edit.ai.image_endpoint'), [
                     'model' => config('live-edit.ai.image_model'),
-                    // Four, because one is a verdict and four is a choice.
-                    'n' => max(1, min($count, 4)),
+                    // Two options balance choice against provider latency.
+                    // Asking for four at once made the provider call slow
+                    // enough to hit the service gateway's request timeout.
+                    'n' => max(1, min($count, 2)),
                     'size' => '1024x1024',
                     'prompt' => $this->frame($prompt),
                 ]);

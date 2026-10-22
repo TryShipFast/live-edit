@@ -483,7 +483,7 @@ class ContentController
             'prompt' => ['required', 'string', 'max:600'],
         ]);
 
-        return response()->json($imagine(ApiContext::site($request), $validated['prompt']))
+        return response()->json($imagine(ApiContext::site($request), $validated['prompt'], 2))
             ->withHeaders(['Cache-Control' => 'no-store, private']);
     }
 

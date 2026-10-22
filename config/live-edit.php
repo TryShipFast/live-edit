@@ -248,7 +248,8 @@ return [
         // images.
         'image_endpoint' => env('LIVE_EDIT_AI_IMAGE_ENDPOINT', 'https://api.openai.com/v1/images/generations'),
         'image_model' => env('LIVE_EDIT_AI_IMAGE_MODEL', 'gpt-image-1'),
-        'image_timeout' => 90,
+        'image_connect_timeout' => (int) env('LIVE_EDIT_AI_IMAGE_CONNECT_TIMEOUT', 10),
+        'image_timeout' => (int) env('LIVE_EDIT_AI_IMAGE_TIMEOUT', 50),
     ],
 
     /*

@@ -3005,8 +3005,8 @@ const bootLiveEdit = () => {
                 go.textContent = 'Making…';
                 grid.style.display = '';
                 grid.replaceChildren();
-                // Four, because one is a verdict and four is a choice.
-                for (let i = 0; i < 4; i += 1) grid.append(el('div', 'le-shimmer'));
+                // Two options balance choice against provider latency.
+                grid.append(el('div', 'le-shimmer'), el('div', 'le-shimmer'));
 
                 let payload;
 

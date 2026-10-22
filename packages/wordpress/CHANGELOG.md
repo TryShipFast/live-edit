@@ -1,5 +1,9 @@
 # ShipFast Live Edit for WordPress
 
+## 0.15.49
+
+- Image generation now returns two options per request and times out before the service gateway, preventing long generation calls from surfacing as gateway 504 errors. Failed generations remain refunded.
+
 ## 0.15.48
 
 - Treat `data-code` fields as atomic text in the editor and hosted renderer, so syntax-highlighted code can be edited without leaving the old content behind.

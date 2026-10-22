@@ -165,7 +165,7 @@ class PicturesTest extends TestCase
 
         $made = app(ImagineAPicture::class)($this->site, 'a clinic waiting room in Lagos');
 
-        $this->assertCount(4, $made['images'], 'one picture is a verdict; four is a choice');
+        $this->assertCount(2, $made['images'], 'two options keep the provider call within the service gateway limit');
         $this->assertSame(5, $made['balance']);
     }
 
