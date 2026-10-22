@@ -5,12 +5,12 @@ namespace ShipFast\LiveEdit\Application\Api;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Str;
-use ShipFast\LiveEdit\Jobs\GeneratePicture;
-use ShipFast\LiveEdit\Models\ImageGeneration;
 use ShipFast\LiveEdit\Domain\Content\ImageStore;
 use ShipFast\LiveEdit\Domain\Content\SiteStore;
 use ShipFast\LiveEdit\Domain\Credits\Credits;
 use ShipFast\LiveEdit\Domain\Site\Site;
+use ShipFast\LiveEdit\Jobs\GeneratePicture;
+use ShipFast\LiveEdit\Models\ImageGeneration;
 
 /**
  * Making a picture when no photograph will do.
