@@ -232,12 +232,41 @@ const bootLiveEdit = () => {
          * the page is refreshed after all rather than silently keeping the old
          * text on screen.
          */
-        const settle = (message, key = null, value = null) => {
+        const settle = async (message, key = null, value = null) => {
             const bridge = window.__liveEditReact;
 
             if (!bridge) {
-                reloadWithToast(message);
+                const contentConfig = window.liveEditContent;
 
+                // Keep hosted editing sessions open after a draft is saved.
+                // The content API returns all saved drafts, so each new value
+                // can be applied without reloading or losing the place.
+                if (contentConfig?.base && contentConfig?.site && contentConfig?.key && current?.kind !== "record") {
+                    try {
+                        const { fetchContent, applyContent, applyStyles } = await import("./content.js");
+                        const payload = await fetchContent(contentConfig);
+                        closeDrawer(true);
+                        applyContent(document, payload.settings ?? {});
+                        applyStyles(document, payload.styles ?? {});
+                        window.liveEditStyles = payload.styles ?? {};
+
+                        if (typeof payload.pending === "number") {
+                            window.liveEditPublishing = {
+                                ...(window.liveEditPublishing ?? {}),
+                                pending: payload.pending,
+                                version: payload.version ?? null,
+                            };
+                            document.dispatchEvent(new CustomEvent("live-edit:pending", { detail: window.liveEditPublishing }));
+                        }
+
+                        ui.toast(message);
+                        return;
+                    } catch (error) {
+                        console.warn("[live-edit] could not refresh saved drafts in place; reloading:", error.message);
+                    }
+                }
+
+                reloadWithToast(message);
                 return;
             }
 
@@ -2033,7 +2062,7 @@ const bootLiveEdit = () => {
             });
             sessionStorage.setItem('tb_editing', on ? '1' : '0');
             // Nothing to say when not editing — the button already says it.
-            statusText.textContent = on ? 'Click any outlined text or image' : '';
+            statusText.textContent = on ? 'Select text, images or links to edit' : '';
             statusText.parentElement?.classList.toggle('is-saying', on);
             if (!on && typeof hideHandle === 'function') hideHandle();
             ui.toolbar.classList.toggle('is-editing', on);
@@ -2484,8 +2513,17 @@ const bootLiveEdit = () => {
                     });
                 }
                 await tellTheBuilder(current);
-                expectChange(expectationFor(current, drawerFields));
-                settle('Saved \u2713', current.key ?? null, current.savedValue ?? null);
+                const canRefreshDrafts = !window.__liveEditReact
+                    && window.liveEditContent?.base
+                    && window.liveEditContent?.site
+                    && window.liveEditContent?.key
+                    && current.kind !== 'record';
+
+                if (!canRefreshDrafts) {
+                    expectChange(expectationFor(current, drawerFields));
+                }
+
+                await settle('Saved \u2713', current.key ?? null, current.savedValue ?? null);
             } catch (error) {
                 restoreButton();
                 notify(error.message);
@@ -2843,6 +2881,11 @@ const bootLiveEdit = () => {
         }[reason] ?? `Nothing found for "${query}". Try fewer words.`);
 
         const drawImagine = (panel, element, chosen) => {
+            if (credits?.imagine === false) {
+                panel.append(note("AI picture making is not set up on ShipFast yet. Your credits have not been used."));
+                return;
+            }
+
             const suggestion = imagePrompt(element);
 
             const card = el('div', 'le-suggest');
@@ -3088,6 +3131,9 @@ const bootLiveEdit = () => {
                 current = { kind, key, element };
                 drawerTitle.textContent = element.dataset.editLabel ?? describeElement(element);
                 const richSetting = (window.liveEditRich?.settings ?? []).includes(rest[0]);
+                const separatedWords = !richSetting
+                    ? wordsEditedElsewhere(element).map((words) => `“${words}”`)
+                    : [];
                 // Theme markup is full of tabs and newlines; collapse them so the
                 // field shows the sentence the editor actually sees on the page.
                 const raw = displayedValue({
@@ -3117,9 +3163,10 @@ const bootLiveEdit = () => {
                 // of the content rather than the furniture can be chosen the
                 // same way.
                 const asIcon = element.dataset.editAs === 'icon';
-                drawerFields.append(asIcon
+                const textField = asIcon
                     ? fieldInput('icon', 'Icon', element.dataset.editValue ?? '', 1, false)
-                    : fieldInput('value', 'Text', text, 6, richSetting));
+                    : fieldInput('value', separatedWords.length ? 'Text around formatted words' : 'Text', text, 6, richSetting);
+                drawerFields.append(textField);
 
                 /*
                  * Say why a word on the page is not in the box.
@@ -3152,7 +3199,7 @@ const bootLiveEdit = () => {
                      * than silence: it is read, acted on, found to be false,
                      * and then the next one is not believed either.
                      */
-                    const elsewhere = wordsEditedElsewhere(element).map((words) => `“${words}”`);
+                    const elsewhere = separatedWords;
 
                     if (elsewhere.length > 0) {
                         /*
@@ -3176,12 +3223,11 @@ const bootLiveEdit = () => {
                          * retype anything.
                          */
                         const note = document.createElement('p');
-                        note.className = 'le-hint';
+                        note.className = 'le-hint le-hint--callout';
                         note.textContent = `${elsewhere.join(', ')} `
-                            + `${elsewhere.length === 1 ? 'sits' : 'sit'} inside their own formatting`
-                            + ' and stay on the page — click the words themselves to change them.'
-                            + ' This box rewrites only what is around them, so there is no need to type them again.';
-                        drawerFields.append(note);
+                            + `${elsewhere.length === 1 ? 'stays' : 'stay'} as it is. Click those words on the page to edit them.`
+                            + ' This box edits only the surrounding text; do not type those words here.';
+                        drawerFields.insertBefore(note, textField);
                     }
                 }
 
@@ -4864,6 +4910,184 @@ const bootLiveEdit = () => {
             openDrawer();
         });
 
+        ui.helpButton?.addEventListener('click', () => {
+            // A guided walk through the real editor. There is no overlay: each
+            // step opens the panel or control the customer will actually use.
+            if (!document.body.classList.contains('editing')) setEditing(true);
+
+            const steps = [
+                { tab: 'Brand', title: 'Set your brand', copy: 'Add your business name or logo here. Save your brand to keep it as a draft.' },
+                { tab: 'SEO', title: 'Set your page title', copy: 'Update the title and search description, then save them as a draft.' },
+                { tab: 'content', title: 'Make a page edit', copy: 'Choose this text or image, make a change, and save it.' },
+                { tab: 'Changes', title: 'Review your edits', copy: 'Your saved changes are listed here. You can keep editing before you publish.' },
+                { tab: 'Publish', title: 'Publish your changes', copy: 'Publish sends your saved changes live. You can then preview the live page.' },
+            ];
+            const card = document.createElement('section');
+            card.className = 'le-walkthrough';
+            card.setAttribute('role', 'region');
+            card.setAttribute('aria-label', 'Getting started walkthrough');
+            const progress = document.createElement('div');
+            progress.className = 'le-walkthrough-progress';
+            const heading = document.createElement('h2');
+            const copy = document.createElement('p');
+            const actions = document.createElement('div');
+            actions.className = 'le-walkthrough-actions';
+            const finish = el('button', 'le-walkthrough-end', 'End tour');
+            finish.type = 'button';
+            const back = el('button', 'le-btn-outline', 'Back');
+            back.type = 'button';
+            const next = el('button', 'le-btn', 'Next');
+            next.type = 'button';
+            actions.append(finish, back, next);
+            card.append(progress, heading, copy, actions);
+            ui.shadow.append(card);
+            let index = 0;
+            let target = null;
+            let positionFrame = 0;
+            const positionCard = () => {
+                if (!target?.isConnected) return;
+                const rect = target.getBoundingClientRect();
+                const cardRect = card.getBoundingClientRect();
+                const gap = 14;
+                const margin = 12;
+                const width = cardRect.width || Math.min(340, window.innerWidth - margin * 2);
+                const height = cardRect.height || 170;
+                const clamp = (value, minimum, maximum) => Math.min(Math.max(value, minimum), Math.max(minimum, maximum));
+                let left;
+                let top;
+
+                if (drawer.contains(target)) {
+                    // Keep the coach beside the drawer control it describes.
+                    const drawerRect = drawer.getBoundingClientRect();
+                    left = drawerRect.left - width - gap;
+                    top = rect.top;
+                    if (left < margin) {
+                        left = margin;
+                        top = rect.bottom + gap;
+                    }
+                } else if (ui.toolbar.contains(target)) {
+                    // Publish is at the bottom edge, so its guidance sits just above it.
+                    left = rect.left + rect.width / 2 - width / 2;
+                    top = rect.top - height - gap;
+                } else {
+                    left = rect.left;
+                    top = rect.bottom + gap;
+                    if (top + height > window.innerHeight - margin) top = rect.top - height - gap;
+                    if (top < margin) top = rect.bottom + gap;
+                }
+
+                card.style.left = `${clamp(left, margin, window.innerWidth - width - margin)}px`;
+                card.style.top = `${clamp(top, margin, window.innerHeight - height - margin)}px`;
+            };
+            const schedulePosition = () => {
+                if (positionFrame) cancelAnimationFrame(positionFrame);
+                positionFrame = requestAnimationFrame(positionCard);
+            };
+            window.addEventListener('scroll', schedulePosition, { capture: true, passive: true });
+            window.addEventListener('resize', schedulePosition, { passive: true });
+            const clearTarget = () => {
+                target?.removeAttribute('data-live-edit-tour-focus');
+                target = null;
+            };
+            const end = () => {
+                clearTarget();
+                sessionStorage.removeItem('tb_walkthrough_publish_preview');
+                window.removeEventListener('scroll', schedulePosition, true);
+                window.removeEventListener('resize', schedulePosition);
+                if (positionFrame) cancelAnimationFrame(positionFrame);
+                card.remove();
+            };
+            const hasUnsavedPanel = (tab) => {
+                if (tab !== 'Brand' && tab !== 'SEO') return false;
+                const button = drawerFields.querySelector('button.le-btn');
+                return Boolean(button && !button.disabled);
+            };
+            const editableTarget = () => {
+                const text = [...document.querySelectorAll('[data-edit]')].find((node) => node.getClientRects().length && node.textContent.trim() && !node.closest('[data-live-edit-ui]'));
+                if (text) return { node: text, open: () => editText(text) };
+                const image = [...document.querySelectorAll('[data-edit-img], [data-edit-bg]')].find((node) => node.getClientRects().length && !node.closest('[data-live-edit-ui]'));
+                if (image) return { node: image, open: () => editImage(image) };
+                return null;
+            };
+            const show = () => {
+                const step = steps[index];
+                clearTarget();
+                back.disabled = index === 0;
+                next.disabled = false;
+                next.textContent = index === steps.length - 1 ? 'Done' : 'Next';
+                progress.textContent = `Walk-through · Step ${index + 1} of ${steps.length}`;
+                heading.textContent = step.title;
+                copy.textContent = step.copy;
+
+                if (step.tab === 'Brand' || step.tab === 'SEO') {
+                    if (!drawerTabs[step.tab]) {
+                        copy.textContent = `${step.title} is not available on this website. Choose Next to continue.`;
+                        return;
+                    }
+                    if (drawerTab !== step.tab && hasUnsavedPanel(drawerTab)) {
+                        copy.textContent = `Save or cancel your ${drawerTab.toLowerCase()} changes before moving on.`;
+                        return;
+                    }
+                    showTab(step.tab);
+                    openDrawer();
+                    target = drawerTabs[step.tab];
+                } else if (step.tab === 'content') {
+                    if (current?.dirty) {
+                        copy.textContent = `Save or cancel your ${drawerTab === 'Edit' ? 'edit' : drawerTab.toLowerCase()} before moving on. Your changes will stay here.`;
+                        return;
+                    }
+                    closeDrawer(true);
+                    const found = editableTarget();
+                    if (!found) {
+                        copy.textContent = 'No editable text or image is marked on this page. Choose Next to review your changes.';
+                        return;
+                    }
+                    target = found.node;
+                    target.scrollIntoView({ block: 'center', behavior: 'smooth' });
+                    target.setAttribute('data-live-edit-tour-focus', '');
+                    found.open();
+                } else if (step.tab === 'Changes') {
+                    if (current?.dirty || hasUnsavedPanel(drawerTab)) {
+                        copy.textContent = 'Save or cancel your current edit before reviewing changes.';
+                        return;
+                    }
+                    showTab('Changes');
+                    openDrawer();
+                    target = drawerTabs.Changes;
+                } else if (step.tab === 'Publish') {
+                    if (current?.dirty || hasUnsavedPanel(drawerTab)) {
+                        copy.textContent = 'Save or cancel your current edit before publishing.';
+                        return;
+                    }
+                    closeDrawer(true);
+                    target = ui.publishButton;
+                    sessionStorage.setItem('tb_walkthrough_publish_preview', '1');
+                    copy.textContent = 'Click Publish below. After it finishes, the live page will open so you can see your first change.';
+                    next.textContent = 'Finish';
+                }
+                target?.setAttribute('data-live-edit-tour-focus', '');
+                if (target && !ui.toolbar.contains(target)) target.scrollIntoView?.({ block: 'nearest' });
+                schedulePosition();
+            };
+            back.addEventListener('click', () => {
+                if (index > 0 && !current?.dirty && !hasUnsavedPanel(drawerTab)) { index -= 1; show(); }
+                else if (current?.dirty || hasUnsavedPanel(drawerTab)) copy.textContent = 'Save or cancel your current edit before going back.';
+            });
+            next.addEventListener('click', () => {
+                if (index === steps.length - 1) { end(); return; }
+                if (current?.dirty || hasUnsavedPanel(drawerTab)) {
+                    copy.textContent = `Save or cancel your ${drawerTab === 'Edit' ? 'edit' : drawerTab.toLowerCase()} before continuing.`;
+                    return;
+                }
+                index += 1;
+                show();
+            });
+            finish.addEventListener('click', () => {
+                end();
+            });
+            show();
+        });
+
         /*
          * Publishing, where the site holds edits back. The host says so by
          * declaring how many changes are waiting; without that the buttons stay
@@ -4907,6 +5131,11 @@ const bootLiveEdit = () => {
                     ? `Put ${pending} change${pending === 1 ? '' : 's'} live`
                     : 'Nothing is waiting to be published';
             };
+            document.addEventListener('live-edit:pending', (event) => {
+                if (typeof event.detail?.pending !== 'number') return;
+                pending = event.detail.pending;
+                showPending();
+            });
             showPending();
 
             /*
@@ -4985,11 +5214,19 @@ const bootLiveEdit = () => {
                         pending = 0;
                         showPending();
                         sheet.close();
+                        // The customer asked to see the first published edit
+                        // as the final step of the getting-started tour.
+                        // Publishing still requires their explicit click.
+                        if (sessionStorage.getItem('tb_walkthrough_publish_preview') === '1') {
+                            sessionStorage.removeItem('tb_walkthrough_publish_preview');
+                            sessionStorage.setItem('tb_walkthrough_open_live_preview', '1');
+                        }
                         // Where it went, not how many went. The count was on
                         // the button they just pressed; the address is the
                         // thing somebody wants confirmed.
                         reloadWithToast(`Live on ${where} \u2713`);
                     } catch (error) {
+                        sessionStorage.removeItem('tb_walkthrough_publish_preview');
                         sheet.allowDismiss(true);
                         go.disabled = false;
                         keep.disabled = false;
@@ -5189,6 +5426,10 @@ const bootLiveEdit = () => {
             };
 
             ui.previewButton.addEventListener('click', enterPreview);
+            if (sessionStorage.getItem('tb_walkthrough_open_live_preview') === '1') {
+                sessionStorage.removeItem('tb_walkthrough_open_live_preview');
+                enterPreview();
+            }
         });
 
         /* \u2500\u2500 Languages \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500

@@ -634,6 +634,20 @@ select.le-input {
 }
 .le-modal-tab.is-on { color: var(--le-ink); border-bottom-color: var(--le-ink); }
 .le-modal-body { flex: 1; min-height: 0; overflow-y: auto; padding: 22px 24px; }
+.le-walkthrough {
+  position: fixed; z-index: 2147483005; top: 16px; left: 16px;
+  width: min(340px, calc(100vw - 32px)); padding: 18px;
+  border: 1px solid var(--le-line); border-radius: 14px; background: #fff;
+  color: var(--le-body); box-shadow: 0 16px 48px rgba(11,12,15,.2);
+}
+.le-walkthrough-progress { margin-bottom: 7px; color: var(--le-muted); font-size: 11px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; }
+.le-walkthrough h2 { margin: 0; color: var(--le-ink); font-size: 17px; font-weight: 650; line-height: 1.3; }
+.le-walkthrough p { margin: 7px 0 16px; color: var(--le-body); font-size: 13px; line-height: 1.5; }
+.le-walkthrough-actions { display: flex; align-items: center; justify-content: flex-end; gap: 8px; }
+.le-walkthrough-actions .le-walkthrough-end { margin-right: auto; border: 0; background: transparent; color: var(--le-muted); cursor: pointer; font: inherit; font-size: 12px; }
+.le-walkthrough-actions button:disabled { opacity: .45; cursor: not-allowed; }
+.le-tab[data-live-edit-tour-focus], .le-publish[data-live-edit-tour-focus] { outline: 3px solid #1B6EF3; outline-offset: 4px; }
+.le-hint--callout { margin: 0 0 14px; padding: 10px 12px; border: 1px solid var(--le-line); border-radius: 10px; background: var(--le-soft); color: var(--le-body); font-size: 12px; line-height: 1.5; }
 .le-modal-foot {
   display: flex; align-items: center; gap: 10px; justify-content: flex-end;
   padding: 16px 24px; border-top: 1px solid var(--le-line); background: #fff;
@@ -788,6 +802,12 @@ html:has(#live-edit-ui) {
    createChrome), so the clearance is asked for through the root. */
 html:has(#live-edit-ui) > body {
   padding-bottom: 96px;
+}
+body.editing [data-live-edit-tour-focus] {
+  outline: 3px solid #1B6EF3 !important;
+  outline-offset: 5px !important;
+  border-radius: 4px;
+  scroll-margin: 24px;
 }
 /* Sticky footers and cookie bars sit at the bottom too, and two things
    claiming the same corner is how a client ends up unable to reach either.
@@ -1029,6 +1049,11 @@ export function createChrome() {
     changesButton.type = 'button';
     changesButton.title = 'Everything you have changed and not published';
 
+    const helpButton = el('button', 'le-round le-when-roomy', '?');
+    helpButton.type = 'button';
+    helpButton.title = 'Getting started with Live Edit';
+    helpButton.setAttribute('aria-label', 'Getting started with Live Edit');
+
     const previewButton = el('button', 'le-bar-btn le-when-roomy', 'Preview');
     previewButton.type = 'button';
     previewButton.title = 'See the page the way a visitor will';
@@ -1058,6 +1083,7 @@ export function createChrome() {
         createPageButton,
         brandButton,
         changesButton,
+        helpButton,
         previewButton,
         publishButton,
     );
@@ -1295,6 +1321,7 @@ export function createChrome() {
         brandButton,
         pagesButton,
         changesButton,
+        helpButton,
         closeButton,
         cancelButton,
         saveButton,
