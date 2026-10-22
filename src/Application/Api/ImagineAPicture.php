@@ -2,7 +2,11 @@
 
 namespace ShipFast\LiveEdit\Application\Api;
 
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Str;
+use ShipFast\LiveEdit\Jobs\GeneratePicture;
+use ShipFast\LiveEdit\Models\ImageGeneration;
 use ShipFast\LiveEdit\Domain\Content\ImageStore;
 use ShipFast\LiveEdit\Domain\Content\SiteStore;
 use ShipFast\LiveEdit\Domain\Credits\Credits;
@@ -64,6 +68,104 @@ class ImagineAPicture
         }
 
         return ['images' => $images, 'balance' => $balance];
+    }
+
+    /**
+     * Queue a generation so a slow image provider cannot hold the browser
+     * request open until the edge gateway gives up.
+     *
+     * @return array<string, mixed>
+     */
+    public function enqueue(Site $site, string $prompt, int $count = 2, ?string $requestId = null): array
+    {
+        $prompt = trim($prompt);
+        $balance = $this->credits->balance($site);
+
+        if ($requestId !== null) {
+            $existing = ImageGeneration::query()
+                ->where('site_id', $site->id)
+                ->where('uuid', $requestId)
+                ->first();
+
+            if ($existing) {
+                return $this->status($site, $requestId) ?? ['images' => [], 'balance' => $balance, 'reason' => 'queue_unavailable'];
+            }
+        }
+
+        if ($prompt === '') {
+            return ['images' => [], 'balance' => $balance, 'reason' => 'nothing_to_work_with'];
+        }
+
+        if (! $this->available()) {
+            return ['images' => [], 'balance' => $balance, 'reason' => 'not_configured'];
+        }
+
+        // A sync queue would run the provider call inside this HTTP request,
+        // recreating the exact timeout this job exists to prevent.
+        if (config('queue.default') === 'sync') {
+            return ['images' => [], 'balance' => $balance, 'reason' => 'queue_unavailable'];
+        }
+
+        $balance = $this->credits->spend($site, 'generate_image', [
+            'prompt' => mb_substr($prompt, 0, 200),
+        ]);
+
+        if ($balance === null) {
+            return ['images' => [], 'balance' => $this->credits->balance($site), 'reason' => 'not_enough_credits'];
+        }
+
+        try {
+            $generation = DB::transaction(function () use ($site, $prompt, $balance, $requestId): ImageGeneration {
+                $generation = ImageGeneration::query()->create([
+                    'uuid' => $requestId ?? (string) Str::uuid(),
+                    'site_id' => $site->id,
+                    'prompt' => mb_substr($prompt, 0, 600),
+                    'status' => 'queued',
+                    'balance' => $balance,
+                ]);
+
+                GeneratePicture::dispatch($generation->id)->afterCommit();
+
+                return $generation;
+            });
+        } catch (\Throwable) {
+            $this->credits->refund($site, 'generate_image', ['prompt' => mb_substr($prompt, 0, 200)]);
+
+            return ['images' => [], 'balance' => $this->credits->balance($site), 'reason' => 'queue_unavailable'];
+        }
+
+        return [
+            'generation_id' => $generation->uuid,
+            'status' => 'queued',
+            'balance' => $balance,
+        ];
+    }
+
+    /** @return array<string, mixed>|null */
+    public function status(Site $site, string $uuid): ?array
+    {
+        $generation = ImageGeneration::query()
+            ->where('site_id', $site->id)
+            ->where('uuid', $uuid)
+            ->first();
+
+        if (! $generation) {
+            return null;
+        }
+
+        return [
+            'generation_id' => $generation->uuid,
+            'status' => $generation->status,
+            'images' => $generation->images ?? [],
+            'balance' => $generation->balance,
+            'reason' => $generation->reason,
+        ];
+    }
+
+    /** @return array<int, string> */
+    public function generate(Site $site, string $prompt, int $count = 2): array
+    {
+        return $this->keep($site, $this->ask($prompt, $count));
     }
 
     /**
@@ -139,14 +241,12 @@ class ImagineAPicture
     {
         try {
             $response = Http::withToken(config('live-edit.ai.api_key'))
-                // The API sits behind a gateway with a shorter request limit.
-                // Letting image generation run for 90 seconds means the
-                // gateway can return 504 while PHP is still waiting, leaving
-                // the editor unable to tell the customer that no credits were
-                // charged. Keep the upstream call below the gateway limit;
-                // slow generations are refunded by __invoke() as usual.
+                // This runs in a queue worker, outside the browser request.
+                // Give the provider enough time to finish; the editor polls
+                // the generation record and the worker refunds an unusable
+                // result or a provider failure.
                 ->connectTimeout((int) config('live-edit.ai.image_connect_timeout', 10))
-                ->timeout((int) config('live-edit.ai.image_timeout', 50))
+                ->timeout((int) config('live-edit.ai.image_job_timeout', 120))
                 ->post(config('live-edit.ai.image_endpoint'), [
                     'model' => config('live-edit.ai.image_model'),
                     // Two options balance choice against provider latency.

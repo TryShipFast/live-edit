@@ -481,9 +481,26 @@ class ContentController
     {
         $validated = $request->validate([
             'prompt' => ['required', 'string', 'max:600'],
+            'request_id' => ['required', 'uuid'],
         ]);
 
-        return response()->json($imagine(ApiContext::site($request), $validated['prompt'], 2))
+        $result = $imagine->enqueue(ApiContext::site($request), $validated['prompt'], 2, $validated['request_id']);
+
+        return response()->json($result, isset($result['generation_id']) ? 202 : 200)
+            ->withHeaders(['Cache-Control' => 'no-store, private']);
+    }
+
+    /** The progress and result of one generation, scoped to this site's key. */
+    public function imagineStatus(Request $request, string $generation, ImagineAPicture $imagine): JsonResponse
+    {
+        $result = $imagine->status(ApiContext::site($request), $generation);
+
+        if ($result === null) {
+            return response()->json(['message' => 'Generation not found.'], 404)
+                ->withHeaders(['Cache-Control' => 'no-store, private']);
+        }
+
+        return response()->json($result, in_array($result['status'], ['queued', 'processing'], true) ? 202 : 200)
             ->withHeaders(['Cache-Control' => 'no-store, private']);
     }
 

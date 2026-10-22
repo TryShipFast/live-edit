@@ -1,5 +1,10 @@
 # ShipFast Live Edit for WordPress
 
+## 0.15.51
+
+- AI image generation now runs as a queued, site-scoped job. The editor receives progress updates instead of waiting on the image provider until the gateway returns 504; retries reuse the same request ID, and failed jobs refund the reserved credits.
+- Editing text inside top navigation dropdown links remains supported by the shared runtime.
+
 ## 0.15.50
 
 - The edit drawer identifies the repeated item being edited, including its position and visible heading, so customers can tell which product, project or section the fields belong to.

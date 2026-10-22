@@ -162,6 +162,8 @@ Route::prefix(config('live-edit.api.prefix', 'api/live-edit/v1').'/{site}')
 
             // Making one, when no photograph will do.
             Route::post('/imagine', [ContentController::class, 'imagine'])->name('live-edit.api.imagine');
+            Route::get('/imagine/{generation}', [ContentController::class, 'imagineStatus'])
+                ->whereUuid('generation')->name('live-edit.api.imagine.status');
         });
 
         // How a section looks. The same key and the same cost as a word: the

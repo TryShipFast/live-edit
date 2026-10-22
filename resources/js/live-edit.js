@@ -2920,6 +2920,7 @@ const bootLiveEdit = () => {
 
             const grid = el('div', 'le-grid is-square');
             grid.style.display = 'none';
+            let activeGenerationId = null;
 
             panel.append(card, box, go, grid);
 
@@ -2999,8 +3000,6 @@ const bootLiveEdit = () => {
             }
 
             go.addEventListener('click', async () => {
-                const prompt = box.value.trim() || suggestion;
-
                 go.disabled = true;
                 go.textContent = 'Making…';
                 grid.style.display = '';
@@ -3011,16 +3010,48 @@ const bootLiveEdit = () => {
                 let payload;
 
                 try {
-                    const response = await request('/live-edit/imagine', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ prompt }),
-                    });
-                    payload = await response.json();
+                    if (activeGenerationId) {
+                        // Reusing this id makes a retry safe if the previous
+                        // POST reached the server but its response was lost.
+                        const response = await request('/live-edit/imagine', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ prompt: box.value.trim() || suggestion, request_id: activeGenerationId }),
+                        });
+                        payload = await response.json();
+                    } else {
+                        activeGenerationId = crypto.randomUUID();
+                        const response = await request('/live-edit/imagine', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ prompt: box.value.trim() || suggestion, request_id: activeGenerationId }),
+                        });
+                        payload = await response.json();
+                        activeGenerationId = payload?.generation_id ?? activeGenerationId;
+                    }
+
+                    // The service returns as soon as the job is queued. Keep
+                    // checking its site-scoped status endpoint while the
+                    // provider renders the image in the background.
+                    if (activeGenerationId) {
+                        const deadline = Date.now() + 180_000;
+                        while (Date.now() < deadline) {
+                            await new Promise((resolve) => setTimeout(resolve, 6500));
+                            const response = await request(`/live-edit/imagine/${activeGenerationId}`, { method: 'GET' });
+                            payload = await response.json();
+                            if (typeof payload?.balance === 'number') credits = { ...(credits ?? {}), balance: payload.balance };
+                            if (payload?.status === 'completed' || payload?.status === 'failed') break;
+                        }
+                    }
                 } catch (error) {
-                    grid.replaceChildren(note(plainly(error, 'make a picture')));
+                    // A poll can fail while the server job is still running.
+                    // Preserve its ID so the next click checks progress and
+                    // cannot charge the customer for a duplicate generation.
+                    grid.replaceChildren(note(activeGenerationId
+                        ? 'Still making your picture. Your credits are reserved; choose Check progress in a moment.'
+                        : plainly(error, 'start making a picture')));
                     go.disabled = false;
-                    go.textContent = 'Try again · 5 credits';
+                    go.textContent = activeGenerationId ? 'Check progress' : 'Try again · 5 credits';
 
                     return;
                 }
@@ -3030,6 +3061,14 @@ const bootLiveEdit = () => {
                 if (typeof payload?.balance === 'number') credits = { ...(credits ?? {}), balance: payload.balance };
 
                 if (images.length === 0) {
+                    if (payload?.status === 'queued' || payload?.status === 'processing') {
+                        grid.replaceChildren(note('Your picture is still being made. Your credits are reserved. Choose Check progress in a moment.'));
+                        go.disabled = false;
+                        go.textContent = 'Check progress';
+                        return;
+                    }
+
+                    activeGenerationId = null;
                     grid.replaceChildren(note(imagineExcuse(payload?.reason)));
                     go.disabled = false;
                     go.textContent = 'Try again · 5 credits';
@@ -3037,6 +3076,7 @@ const bootLiveEdit = () => {
                     return;
                 }
 
+                activeGenerationId = null;
                 grid.replaceChildren();
 
                 images.forEach((url) => {
@@ -3078,6 +3118,7 @@ const bootLiveEdit = () => {
         const imagineExcuse = (reason) => ({
             not_enough_credits: 'Not enough credits to make a picture. You can buy more from your account.',
             not_configured: 'Making pictures is not switched on for this site yet.',
+            queue_unavailable: 'Picture generation is temporarily unavailable. Your credits have not been used.',
             no_suggestion: 'Nothing usable came back, so you have not been charged. Try describing it differently.',
             nothing_to_work_with: 'Describe the picture you want first.',
         }[reason] ?? 'Could not make a picture just now. You have not been charged.');

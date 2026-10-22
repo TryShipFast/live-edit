@@ -250,6 +250,9 @@ return [
         'image_model' => env('LIVE_EDIT_AI_IMAGE_MODEL', 'gpt-image-1'),
         'image_connect_timeout' => (int) env('LIVE_EDIT_AI_IMAGE_CONNECT_TIMEOUT', 10),
         'image_timeout' => (int) env('LIVE_EDIT_AI_IMAGE_TIMEOUT', 50),
+        // Keep provider work under the queue job timeout; unlike the former
+        // browser request, this can outlast the edge gateway safely.
+        'image_job_timeout' => (int) env('LIVE_EDIT_AI_IMAGE_JOB_TIMEOUT', 70),
     ],
 
     /*

@@ -314,6 +314,7 @@ export const apiRequestFor = (url, options = {}, api) => {
      *
      * Same origin, so the host's own session says who this is.
      */
+    const generationMatch = path.match(/^\/live-edit\/imagine\/([0-9a-f-]{36})$/i);
     const claimed = api?.routes?.[path] ?? (path === '/live-edit/publish' ? api?.publishUrl : null);
 
     if (claimed) {
@@ -327,7 +328,7 @@ export const apiRequestFor = (url, options = {}, api) => {
         };
     }
 
-    const target = routes[path];
+    const target = routes[path] ?? (generationMatch ? `${base}/${api?.site}/imagine/${generationMatch[1]}` : null);
 
     if (!base || !api?.site || !api?.token) {
         throw new Error('The content API is not configured on this page.');
