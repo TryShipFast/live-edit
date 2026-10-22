@@ -220,7 +220,15 @@ const collapse = (text) => String(text ?? '').replace(/\s+/g, ' ').trim();
 const sameWords = (text, value) => collapse(text) === collapse(value);
 
 const applyWords = (element, value, keepRuns = false) => {
-    const runs = [...element.childNodes].filter((node) => node.nodeType === TEXT_NODE);
+    const runs = [];
+    const collect = (parent) => {
+        for (const child of parent.childNodes) {
+            if (child.nodeType === TEXT_NODE) runs.push(child);
+            else if (child.nodeType === 1) collect(child);
+        }
+    };
+    if (element.hasAttribute('data-code')) collect(element);
+    else runs.push(...[...element.childNodes].filter((node) => node.nodeType === TEXT_NODE));
 
     if (runs.length === 0) {
         /*
@@ -406,6 +414,11 @@ const applyWords = (element, value, keepRuns = false) => {
     // A rewrite rather than an edit. Nothing can be inferred about where the
     // elements between the runs belong, so the sentence becomes one run,
     // which loses the arrangement but never a word the person typed.
+    if (element.hasAttribute('data-code')) {
+        element.textContent = value;
+        return;
+    }
+
     writeRun(runs[0], value);
     runs.slice(1).forEach((node) => {
         if (keepRuns) {

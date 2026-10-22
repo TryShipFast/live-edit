@@ -185,13 +185,16 @@ export const displayedValue = ({ editValue, ownText, fullText }) => {
  * wrapper. That is narrow and long-standing, and it is not worth trading a
  * correct clear for.
  */
-export const ownTextOf = (element) =>
-    element.children.length
+export const ownTextOf = (element) => {
+    if (element.hasAttribute('data-code')) return element.textContent;
+
+    return element.children.length
         ? [...element.childNodes]
             .filter((node) => node.nodeType === 3)
             .map((node) => node.textContent)
             .join('')
         : element.textContent;
+};
 
 /**
  * One ordered list of icons from the faces a theme uses.
@@ -535,6 +538,8 @@ export const backgroundImageOf = (element, view = null) => {
  * still tidies the tabs a theme leaves inside a sentence.
  */
 export const shownWords = (element, raw) => {
+    if (element?.hasAttribute('data-code')) return String(raw ?? '');
+
     const runs = [...(element?.childNodes ?? [])].filter((node) => node.nodeType === 3);
 
     if (runs.length < 2) {

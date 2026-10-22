@@ -63,6 +63,19 @@ const page = (html) => {
 };
 
 describe('putting published content into a static page', () => {
+    it('edits syntax highlighted code as one text value without leaving old code behind', () => {
+        const root = page('<pre data-code data-edit="setting:auto:code"><span class="cl"><span class="tok-kw">const</span> daniel = {</span><span class="cl">  name: <span class="tok-str">"Daniel"</span></span><span class="cl">}</span></pre>');
+        const original = 'const daniel = {  name: "Daniel"}';
+
+        expect(applyContent(root, { 'auto:code': original.replace('Daniel', 'Adewale') })).toBe(1);
+        expect(root.querySelector('pre').textContent).toBe(original.replace('Daniel', 'Adewale'));
+        expect(root.querySelector('pre').textContent).not.toContain('Daniel');
+
+        const replacement = 'const daniel = {\n  name: "Temitope",\n  role: "developer"\n}';
+        applyContent(root, { 'auto:code': replacement });
+        expect(root.querySelector('pre').textContent).toBe(replacement);
+    });
+
     it('replaces the words in a tagged element', () => {
         const root = page('<h1 data-edit="setting:auto:abc">Original</h1>');
 

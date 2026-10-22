@@ -41,6 +41,25 @@ class MarkupScannerTest extends TestCase
         $this->assertMatchesRegularExpression('/<p data-edit="setting:auto:[a-f0-9]{12}"/', $applied);
     }
 
+    public function test_syntax_highlighted_code_is_edited_as_one_text_value(): void
+    {
+        $html = '<pre data-code data-edit="setting:code">'
+            .'<span class="cl"><span class="tok-kw">const</span> daniel = {</span>'
+            .'<span class="cl">  name: <span class="tok-str">"Daniel"</span></span>'
+            .'<span class="cl">}</span></pre>';
+        $scanner = new MarkupScanner;
+        $edited = $scanner->applyOverrides($html, ['code' => 'const daniel = {  name: "Adewale"}']);
+
+        $this->assertSame('const daniel = {  name: "Adewale"}', strip_tags($edited));
+        $this->assertStringNotContainsString('Daniel', $edited);
+
+        $replacement = "const daniel = {\n  name: \"Temitope\",\n  role: \"developer\"\n}";
+        $rewritten = $scanner->applyOverrides($html, ['code' => $replacement]);
+
+        $this->assertSame($replacement, strip_tags($rewritten));
+        $this->assertStringNotContainsString('Daniel', $rewritten);
+    }
+
     public function test_explicit_section_regions_become_reorderable_lists(): void
     {
         $html = '<main data-edit-section-region="home.main">'

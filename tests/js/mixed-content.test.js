@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { applyValue } from '../../resources/js/content.js';
-import { ownTextOf } from '../../resources/js/support.js';
+import { ownTextOf, shownWords } from '../../resources/js/support.js';
 
 /**
  * Editing a sentence that has something else inside it.
@@ -30,7 +30,23 @@ const edited = (html, change) => {
 
 const SENTENCE = 'We design for the <strong>street it stands on</strong>, not a photograph.';
 
+const DEVELOPER_CODE = '<pre data-code><span class="cl"><span class="tok-kw">const</span> daniel = {</span>'
+    + '<span class="cl">  name: <span class="tok-str">"Daniel"</span></span><span class="cl">}</span></pre>';
+
 describe('a sentence with an element inside it', () => {
+    it('shows every syntax highlighted code span in the edit field and saves a name change once', () => {
+        const element = document.createElement('div');
+        element.innerHTML = DEVELOPER_CODE;
+        const code = element.querySelector('[data-code]');
+        const shown = shownWords(code, ownTextOf(code));
+
+        expect(shown).toBe('const daniel = {  name: "Daniel"}');
+        applyValue(code, shown.replace('Daniel', 'Adewale'));
+
+        expect(code.textContent).toBe('const daniel = {  name: "Adewale"}');
+        expect(code.textContent).not.toContain('Daniel');
+    });
+
     it('keeps the element where the designer put it when words before it change', () => {
         expect(edited(SENTENCE, (words) => words.replace('design', 'build')))
             .toBe('We build for the <strong>street it stands on</strong>, not a photograph.');

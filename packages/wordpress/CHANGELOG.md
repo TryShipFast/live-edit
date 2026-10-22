@@ -1,5 +1,9 @@
 # ShipFast Live Edit for WordPress
 
+## 0.15.48
+
+- Treat `data-code` fields as atomic text in the editor and hosted renderer, so syntax-highlighted code can be edited without leaving the old content behind.
+
 ## 0.15.47
 
 The walkthrough now excludes the templates' visually hidden Skip to content links and other hidden targets, so customers are guided to content they can see and edit.

@@ -2127,6 +2127,18 @@ class MarkupScanner
             return;
         }
 
+        // A code sample is an atomic text value. If the edited text no longer
+        // maps cleanly to its syntax spans, discard those spans instead of
+        // leaving the old code beside the new value.
+        if ($node->hasAttribute('data-code')) {
+            while ($node->firstChild !== null) {
+                $node->removeChild($node->firstChild);
+            }
+            $node->appendChild($this->doc->createTextNode($value));
+
+            return;
+        }
+
         // A rewrite rather than an edit. Nothing can be inferred about where
         // the elements between the runs belong, so the sentence becomes one
         // run, which loses the arrangement but never a word.
@@ -2308,9 +2320,22 @@ class MarkupScanner
     {
         $runs = [];
 
-        foreach (iterator_to_array($node->childNodes) as $child) {
-            if ($child->nodeType === XML_TEXT_NODE) {
-                $runs[] = $child;
+        if ($node->hasAttribute('data-code')) {
+            $collect = function (DOMNode $parent) use (&$collect, &$runs): void {
+                foreach (iterator_to_array($parent->childNodes) as $child) {
+                    if ($child->nodeType === XML_TEXT_NODE) {
+                        $runs[] = $child;
+                    } elseif ($child instanceof DOMElement) {
+                        $collect($child);
+                    }
+                }
+            };
+            $collect($node);
+        } else {
+            foreach (iterator_to_array($node->childNodes) as $child) {
+                if ($child->nodeType === XML_TEXT_NODE) {
+                    $runs[] = $child;
+                }
             }
         }
 
