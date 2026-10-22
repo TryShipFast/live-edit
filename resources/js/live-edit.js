@@ -4878,7 +4878,11 @@ const bootLiveEdit = () => {
             }
         });
 
-        toggleButton?.addEventListener('click', () => setEditing(!document.body.classList.contains('editing')));
+        toggleButton?.addEventListener('click', () => {
+            const enteringEditMode = !document.body.classList.contains('editing');
+            setEditing(enteringEditMode);
+            if (enteringEditMode) startWalkthrough();
+        });
 
         ui.brandButton?.addEventListener('click', () => {
             if (!document.body.classList.contains('editing')) setEditing(true);
@@ -4910,7 +4914,15 @@ const bootLiveEdit = () => {
             openDrawer();
         });
 
-        ui.helpButton?.addEventListener('click', () => {
+        const walkthroughStorageKey = `live-edit:walkthrough:${window.liveEditApi?.site ?? window.location.host}`;
+        const walkthroughWasCompleted = () => {
+            try { return window.localStorage.getItem(walkthroughStorageKey) === '1'; } catch { return false; }
+        };
+        const completeWalkthrough = () => {
+            try { window.localStorage.setItem(walkthroughStorageKey, '1'); } catch { /* Help remains available if storage is disabled. */ }
+        };
+        const startWalkthrough = (replay = false) => {
+            if ((!replay && walkthroughWasCompleted()) || ui.shadow.querySelector('.le-walkthrough')) return;
             // A guided walk through the real editor. There is no overlay: each
             // step opens the panel or control the customer will actually use.
             if (!document.body.classList.contains('editing')) setEditing(true);
@@ -4992,6 +5004,7 @@ const bootLiveEdit = () => {
             const end = () => {
                 clearTarget();
                 sessionStorage.removeItem('tb_walkthrough_publish_preview');
+                completeWalkthrough();
                 window.removeEventListener('scroll', schedulePosition, true);
                 window.removeEventListener('resize', schedulePosition);
                 if (positionFrame) cancelAnimationFrame(positionFrame);
@@ -5003,7 +5016,11 @@ const bootLiveEdit = () => {
                 return Boolean(button && !button.disabled);
             };
             const editableTarget = () => {
-                const text = [...document.querySelectorAll('[data-edit]')].find((node) => node.getClientRects().length && node.textContent.trim() && !node.closest('[data-live-edit-ui]'));
+                const text = [...document.querySelectorAll('[data-edit]')].find((node) => {
+                    if (!node.getClientRects().length || !node.textContent.trim() || node.closest('[data-live-edit-ui]')) return false;
+                    const label = node.getAttribute('aria-label') ?? node.closest('[aria-label]')?.getAttribute('aria-label') ?? '';
+                    return !/skip\s+to\s+content/i.test(`${label} ${node.textContent}`);
+                });
                 if (text) return { node: text, open: () => editText(text) };
                 const image = [...document.querySelectorAll('[data-edit-img], [data-edit-bg]')].find((node) => node.getClientRects().length && !node.closest('[data-live-edit-ui]'));
                 if (image) return { node: image, open: () => editImage(image) };
@@ -5086,7 +5103,9 @@ const bootLiveEdit = () => {
                 end();
             });
             show();
-        });
+        };
+        // Help stays in the toolbar as the walkthrough replay control.
+        ui.helpButton?.addEventListener('click', () => startWalkthrough(true));
 
         /*
          * Publishing, where the site holds edits back. The host says so by
@@ -5795,6 +5814,7 @@ const bootLiveEdit = () => {
         });
 
         const params = new URLSearchParams(window.location.search);
+        const directPanelOpen = params.has('brand') || params.has('pages');
         // Arriving to set the brand (a host's "Open Brand" link): straight to that tab.
         if (params.has('brand') && window.liveEditBrand?.tokens?.length) {
             params.delete('brand');
@@ -5818,6 +5838,7 @@ const bootLiveEdit = () => {
         } else {
             setEditing(sessionStorage.getItem('tb_editing') === '1');
         }
+        if (!directPanelOpen && document.body.classList.contains('editing')) startWalkthrough();
     }
 
 };

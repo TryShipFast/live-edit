@@ -1,5 +1,9 @@
 # ShipFast Live Edit for WordPress
 
+## 0.15.46
+
+The getting-started walkthrough now opens automatically the first time a customer enters edit mode, and Help remains available to replay it. The content step ignores the accessible Skip to content link and guides the customer to real editable page content.
+
 ## 0.15.45
 
 The shared editor now guides a first edit in place, following the active Brand, SEO, page content, Changes and Publish controls. After publishing, the walkthrough opens the live preview.
