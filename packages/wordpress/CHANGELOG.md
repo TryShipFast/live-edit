@@ -1,5 +1,9 @@
 # ShipFast Live Edit for WordPress
 
+## 0.15.56
+
+- Reordering, adding, duplicating, and deleting repeated items now updates the page in place without a reload.
+
 ## 0.15.55
 
 - Image-generation workers now read new jobs and refund state from the primary database, preventing replica lag from leaving queued jobs stuck and credits reserved.

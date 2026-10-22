@@ -232,7 +232,7 @@ const bootLiveEdit = () => {
          * the page is refreshed after all rather than silently keeping the old
          * text on screen.
          */
-        const settle = async (message, key = null, value = null) => {
+        const settle = async (message, key = null, value = null, forceContentRefresh = false) => {
             const bridge = window.__liveEditReact;
 
             if (!bridge) {
@@ -241,7 +241,7 @@ const bootLiveEdit = () => {
                 // Keep hosted editing sessions open after a draft is saved.
                 // The content API returns all saved drafts, so each new value
                 // can be applied without reloading or losing the place.
-                if (contentConfig?.base && contentConfig?.site && contentConfig?.key && current?.kind !== "record") {
+                if (contentConfig?.base && contentConfig?.site && contentConfig?.key && (forceContentRefresh || current?.kind !== "record")) {
                     try {
                         const { fetchContent, applyContent, applyStyles } = await import("./content.js");
                         const payload = await fetchContent(contentConfig);
@@ -3370,7 +3370,7 @@ const bootLiveEdit = () => {
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({ key: list.dataset.editList, value: JSON.stringify(ids) }),
                     });
-                    reloadWithToast(message);
+                    await settle(message, list.dataset.editList, JSON.stringify(ids), true);
                 } catch (error) {
                     notify(error.message);
                 }
