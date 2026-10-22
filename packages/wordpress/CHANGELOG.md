@@ -1,5 +1,9 @@
 # ShipFast Live Edit for WordPress
 
+## 0.15.47
+
+The walkthrough now excludes the templates' visually hidden Skip to content links and other hidden targets, so customers are guided to content they can see and edit.
+
 ## 0.15.46
 
 The getting-started walkthrough now opens automatically the first time a customer enters edit mode, and Help remains available to replay it. The content step ignores the accessible Skip to content link and guides the customer to real editable page content.

@@ -3,7 +3,7 @@
 /**
  * Plugin Name: ShipFast Live Edit
  * Description: Edit the words and pictures on this site in place, without a dashboard.
- * Version: 0.15.46
+ * Version: 0.15.47
  * Author: ShipFast
  * Author URI: https://tryshipfast.com
  * Requires PHP: 8.1

@@ -5016,13 +5016,27 @@ const bootLiveEdit = () => {
                 return Boolean(button && !button.disabled);
             };
             const editableTarget = () => {
+                const isVisibleOnPage = (node) => {
+                    if (!node.getClientRects().length || node.closest('[data-live-edit-ui], [aria-hidden="true"]')) return false;
+                    const style = window.getComputedStyle(node);
+                    const rect = node.getBoundingClientRect();
+                    return style.display !== 'none'
+                        && style.visibility !== 'hidden'
+                        && Number(style.opacity) > 0
+                        && rect.width > 1
+                        && rect.height > 1
+                        && rect.bottom > 0
+                        && rect.right > 0;
+                };
                 const text = [...document.querySelectorAll('[data-edit]')].find((node) => {
-                    if (!node.getClientRects().length || !node.textContent.trim() || node.closest('[data-live-edit-ui]')) return false;
+                    if (!node.textContent.trim() || !isVisibleOnPage(node)) return false;
+                    if (node.matches('.skip-link, [data-field="link-skip-link"], [data-component="core.skip-link"]')
+                        || node.closest('.skip-link, [data-field="link-skip-link"], [data-component="core.skip-link"]')) return false;
                     const label = node.getAttribute('aria-label') ?? node.closest('[aria-label]')?.getAttribute('aria-label') ?? '';
-                    return !/skip\s+to\s+content/i.test(`${label} ${node.textContent}`);
+                    return !/skip\s+to\s+content/i.test(label + ' ' + node.textContent);
                 });
                 if (text) return { node: text, open: () => editText(text) };
-                const image = [...document.querySelectorAll('[data-edit-img], [data-edit-bg]')].find((node) => node.getClientRects().length && !node.closest('[data-live-edit-ui]'));
+                const image = [...document.querySelectorAll('[data-edit-img], [data-edit-bg]')].find(isVisibleOnPage);
                 if (image) return { node: image, open: () => editImage(image) };
                 return null;
             };
