@@ -1,5 +1,9 @@
 # ShipFast Live Edit for WordPress
 
+## 0.15.52
+
+- Poll image-generation status only after the service confirms it queued a generation. A rejected request no longer leaves the editor polling a made-up ID and showing a false “still generating” state.
+
 ## 0.15.51
 
 - AI image generation now runs as a queued, site-scoped job. The editor receives progress updates instead of waiting on the image provider until the gateway returns 504; retries reuse the same request ID, and failed jobs refund the reserved credits.

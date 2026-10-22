@@ -2921,6 +2921,7 @@ const bootLiveEdit = () => {
             const grid = el('div', 'le-grid is-square');
             grid.style.display = 'none';
             let activeGenerationId = null;
+            let pendingRequestId = null;
 
             panel.append(card, box, go, grid);
 
@@ -3010,25 +3011,19 @@ const bootLiveEdit = () => {
                 let payload;
 
                 try {
-                    if (activeGenerationId) {
-                        // Reusing this id makes a retry safe if the previous
-                        // POST reached the server but its response was lost.
-                        const response = await request('/live-edit/imagine', {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ prompt: box.value.trim() || suggestion, request_id: activeGenerationId }),
-                        });
-                        payload = await response.json();
-                    } else {
-                        activeGenerationId = crypto.randomUUID();
-                        const response = await request('/live-edit/imagine', {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ prompt: box.value.trim() || suggestion, request_id: activeGenerationId }),
-                        });
-                        payload = await response.json();
-                        activeGenerationId = payload?.generation_id ?? activeGenerationId;
-                    }
+                    // A browser-generated request ID is only for safe retries.
+                    // Poll only after the service confirms that it created a
+                    // generation record and returns that record's ID.
+                    pendingRequestId ??= crypto.randomUUID();
+                    const response = await request('/live-edit/imagine', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ prompt: box.value.trim() || suggestion, request_id: pendingRequestId }),
+                    });
+                    payload = await response.json();
+                    activeGenerationId = payload?.generation_id ?? null;
+                    if (activeGenerationId) pendingRequestId = activeGenerationId;
+                    else pendingRequestId = null;
 
                     // The service returns as soon as the job is queued. Keep
                     // checking its site-scoped status endpoint while the
@@ -3049,9 +3044,11 @@ const bootLiveEdit = () => {
                     // cannot charge the customer for a duplicate generation.
                     grid.replaceChildren(note(activeGenerationId
                         ? 'Still making your picture. Your credits are reserved; choose Check progress in a moment.'
-                        : plainly(error, 'start making a picture')));
+                        : pendingRequestId
+                            ? 'Could not confirm the request yet. Choose Try again to safely check whether it started.'
+                            : plainly(error, 'start making a picture')));
                     go.disabled = false;
-                    go.textContent = activeGenerationId ? 'Check progress' : 'Try again · 5 credits';
+                    go.textContent = activeGenerationId ? 'Check progress' : pendingRequestId ? 'Try again' : 'Try again · 5 credits';
 
                     return;
                 }
@@ -3069,6 +3066,7 @@ const bootLiveEdit = () => {
                     }
 
                     activeGenerationId = null;
+                    pendingRequestId = null;
                     grid.replaceChildren(note(imagineExcuse(payload?.reason)));
                     go.disabled = false;
                     go.textContent = 'Try again · 5 credits';
@@ -3077,6 +3075,7 @@ const bootLiveEdit = () => {
                 }
 
                 activeGenerationId = null;
+                pendingRequestId = null;
                 grid.replaceChildren();
 
                 images.forEach((url) => {
