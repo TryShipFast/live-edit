@@ -83,6 +83,7 @@ class ImagineAPicture
 
         if ($requestId !== null) {
             $existing = ImageGeneration::query()
+                ->useWritePdo()
                 ->where('site_id', $site->id)
                 ->where('uuid', $requestId)
                 ->first();
@@ -144,7 +145,13 @@ class ImagineAPicture
     /** @return array<string, mixed>|null */
     public function status(Site $site, string $uuid): ?array
     {
+        // Generation rows are created by a POST and read by a separate poll
+        // request. On read/write-split databases, the poll can reach a replica
+        // before that insert has replicated and falsely report a missing image.
+        // Read this short-lived job state from the primary so a queued request
+        // is visible immediately.
         $generation = ImageGeneration::query()
+            ->useWritePdo()
             ->where('site_id', $site->id)
             ->where('uuid', $uuid)
             ->first();

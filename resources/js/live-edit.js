@@ -3042,13 +3042,16 @@ const bootLiveEdit = () => {
                     // A poll can fail while the server job is still running.
                     // Preserve its ID so the next click checks progress and
                     // cannot charge the customer for a duplicate generation.
-                    grid.replaceChildren(note(activeGenerationId
+                    const generationWasNotFound = activeGenerationId && /generation not found/i.test(error?.message ?? '');
+                    grid.replaceChildren(note(generationWasNotFound
+                        ? 'We lost track of this image request. Choose Try again to reconnect using the same request ID.'
+                        : activeGenerationId
                         ? 'Still making your picture. Your credits are reserved; choose Check progress in a moment.'
                         : pendingRequestId
                             ? 'Could not confirm the request yet. Choose Try again to safely check whether it started.'
                             : plainly(error, 'start making a picture')));
                     go.disabled = false;
-                    go.textContent = activeGenerationId ? 'Check progress' : pendingRequestId ? 'Try again' : 'Try again · 5 credits';
+                    go.textContent = activeGenerationId ? (generationWasNotFound ? 'Try again' : 'Check progress') : pendingRequestId ? 'Try again' : 'Try again · 5 credits';
 
                     return;
                 }
