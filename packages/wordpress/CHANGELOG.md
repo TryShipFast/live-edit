@@ -1,5 +1,9 @@
 # ShipFast Live Edit for WordPress
 
+## 0.15.53
+
+- Image-generation status and idempotent retry lookups now read from the primary database, preventing false 404s while replicas catch up.
+
 ## 0.15.52
 
 - Poll image-generation status only after the service confirms it queued a generation. A rejected request no longer leaves the editor polling a made-up ID and showing a false “still generating” state.
