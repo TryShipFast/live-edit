@@ -1,5 +1,9 @@
 # ShipFast Live Edit for WordPress
 
+## 0.15.45
+
+The shared editor now guides a first edit in place, following the active Brand, SEO, page content, Changes and Publish controls. After publishing, the walkthrough opens the live preview.
+
 ## 0.15.44
 
 The shared editor now recognizes the menu and disclosure tags used by ShipFast templates, including mega-menu, dropdown, mobile-menu and close controls. This release lets existing hosted, Laravel, WordPress, React and Next.js sites receive the editor fix from the shared runtime.
