@@ -2,6 +2,7 @@
 
 namespace ShipFast\LiveEdit\Support;
 
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\Schema;
 use ShipFast\LiveEdit\Models\Draft;
 use ShipFast\LiveEdit\Models\ElementStyle;
@@ -62,7 +63,7 @@ class DraftStore
      * API-backed customer content has a non-null site_id and must never enter
      * this installation-wide editor path.
      */
-    public static function drafts(): \Illuminate\Database\Eloquent\Builder
+    public static function drafts(): Builder
     {
         return Draft::query()->whereNull('site_id');
     }
