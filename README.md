@@ -332,6 +332,15 @@ window.liveEditBrand = {
 };
 ```
 
+- The tab reads top to bottom as an owner thinks: **Name and logo**; **Colours**
+  as ready-made palettes (`PALETTES` in `brand.js`: each a strip of its seven
+  colours beside an "Aa" in its ink on its ground, all readable at 5:1 or more,
+  "The design's own" first), then **Your colours**, the palette in use as one
+  strip whose every colour is pressable; **Type** as pairings (`PAIRINGS`: a
+  heading and a body face, each card set in its own two faces, offered only
+  when the host offers both faces); and **Fine-tune each colour and face**, the
+  colour-by-colour rows and face menus, folded away. Every view shows the same
+  choice wherever it was made.
 - Swatches start at the design's own colours, read from the page with the
   `styleId` block switched off for a moment.
 - Every change previews at once (a custom property on `<html>`), and a face

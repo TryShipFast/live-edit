@@ -397,7 +397,7 @@ a.le-mark:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
 .le-link-btn:hover { color: #0B0C0F; }
 .le-brand-type { display: grid; grid-template-columns: minmax(0, 1fr); gap: 12px; min-width: 0; }
 .le-brand-face { display: flex; flex-direction: column; gap: 6px; min-width: 0; width: 100%; }
-.le-brand-logo-fields { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 112px); align-items: stretch; gap: 8px; min-width: 0; width: 100%; }
+.le-brand-logo-fields { display: grid; grid-template-columns: minmax(0, 1fr); align-items: stretch; gap: 8px; min-width: 0; width: 100%; }
 .le-brand-logo-fields > .le-input { box-sizing: border-box; min-width: 0; width: 100%; }
 .le-brand-logo-fields .le-upload { box-sizing: border-box; min-width: 0; max-width: 100%; width: 100%; justify-content: center; gap: 0; padding: 6px 8px; border-radius: 10px; overflow: hidden; }
 .le-brand-logo-fields .le-upload-inner { min-width: 0; width: 100%; justify-content: center; gap: 6px; overflow: hidden; }
@@ -408,6 +408,36 @@ a.le-mark:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
 .le-brand-warning strong { font-weight: 600; }
 .le-brand-dock { position: sticky; bottom: -22px; display: flex; flex-direction: column; gap: 10px; margin: 4px -24px -22px; padding: 14px 24px 20px; background: #fff; border-top: 1px solid rgba(11,12,15,.08); }
 .le-brand-actions { justify-content: flex-end; }
+/* Palettes: each one a strip of its own seven colours beside an "Aa" set in its
+   ink on its ground, so a palette is chosen by how a page in it reads. */
+.le-palettes { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin: 4px 0 18px; }
+.le-palette { display: flex; flex-direction: column; gap: 8px; padding: 8px; border: 1px solid rgba(11,12,15,.1); border-radius: 12px; background: #fff; text-align: left; cursor: pointer; font: inherit; }
+.le-palette:hover { border-color: rgba(11,12,15,.28); }
+.le-palette.is-on { border-color: var(--le-ink); box-shadow: inset 0 0 0 1px var(--le-ink); }
+.le-palette-top { display: flex; align-items: stretch; gap: 6px; height: 40px; }
+.le-palette-sample { display: grid; place-items: center; width: 40px; flex: none; border-radius: 8px; box-shadow: inset 0 0 0 1px rgba(11,12,15,.08); font: 600 17px/1 Georgia, serif; }
+.le-palette-strip { display: flex; flex: 1; min-width: 0; overflow: hidden; border-radius: 8px; box-shadow: inset 0 0 0 1px rgba(11,12,15,.08); }
+.le-palette-chip { flex: 1; }
+.le-palette-name { font-size: 13px; font-weight: 600; color: var(--le-ink); }
+/* The palette in use: one strip, a colour per role, each one pressable. */
+.le-brand-strip-head { margin: 0 0 8px; }
+.le-brand-strip { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); grid-auto-rows: 54px; overflow: hidden; border-radius: 12px; box-shadow: inset 0 0 0 1px rgba(11,12,15,.1); margin-bottom: 18px; }
+.le-brand-strip-cell { position: relative; display: flex; align-items: flex-end; padding: 6px; color: #0B0C0F; cursor: pointer; }
+.le-brand-strip-cell.is-dark { color: #fff; }
+.le-brand-strip-cell:hover { box-shadow: inset 0 -3px 0 rgba(11,12,15,.35); }
+.le-brand-strip-cell:last-child:nth-child(4n+3) { grid-column: span 2; }
+.le-brand-strip-cell:focus-within { outline: 3px solid var(--le-blue, #1B6EF3); outline-offset: -3px; }
+.le-brand-strip-input { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer; border: 0; padding: 0; }
+.le-brand-strip-name { position: relative; font-size: 12px; line-height: 1.15; font-weight: 600; pointer-events: none; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+/* Type pairs: each card set in its own two faces. */
+.le-pairs { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin: 4px 0 18px; }
+.le-pair { display: flex; flex-direction: column; gap: 2px; padding: 12px; border: 1px solid rgba(11,12,15,.1); border-radius: 12px; background: #fff; text-align: left; cursor: pointer; color: var(--le-ink); font: inherit; }
+.le-pair:hover { border-color: rgba(11,12,15,.28); }
+.le-pair.is-on { border-color: var(--le-ink); box-shadow: inset 0 0 0 1px var(--le-ink); }
+.le-pair-big { font-size: 30px; line-height: 1.1; }
+.le-pair-name { font-size: 13px; font-weight: 600; margin-top: 4px; }
+.le-pair-line { font-size: 12px; color: var(--le-muted); }
+.le-brand-fine { margin-bottom: 8px; }
 /* Struck through, because it is what the page USED to say. Somebody checking
    a change reads these two lines as a before and an after. */
 .le-change-before { font-size: 13px; color: #9A9DA5; text-decoration: line-through; margin: 0; }
