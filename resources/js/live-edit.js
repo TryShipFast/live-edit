@@ -5006,11 +5006,11 @@ const bootLiveEdit = () => {
 
             const guides = {
                 'getting-started': [
+                    { tab: 'content', title: 'Click or tap what you want to edit', copy: 'To edit something on the page, click or tap it. Its editor opens here. Save each item to your draft, then publish all your saved edits together.' },
                     { tab: 'Brand', title: 'Set your brand', copy: 'Add your business name or logo here. Save your brand to keep it as a draft.' },
                     { tab: 'SEO', title: 'Set your page title', copy: 'Update the title and search description, then save them as a draft.' },
-                    { tab: 'content', title: 'Make a page edit', copy: 'Choose this text or image, make a change, and save it.' },
-                    { tab: 'Changes', title: 'Review your edits', copy: 'Your saved changes are listed here. You can keep editing before you publish.' },
-                    { tab: 'Publish', title: 'Publish your changes', copy: 'Publish sends your saved changes live. You can then preview the live page.' },
+                    { tab: 'Changes', title: 'Review your edits', copy: 'Changes to different items are collected here as drafts. Keep editing, then publish them all together.' },
+                    { tab: 'Publish', title: 'Publish your changes', copy: 'Publish sends all your saved changes live. You can then preview the live page.' },
                 ],
                 text: [
                     { tab: 'content', title: 'Edit text or a link', copy: 'Choose the text or link you want to change. Update it in the editor and save.' },
@@ -5021,6 +5021,11 @@ const bootLiveEdit = () => {
                     { tab: 'content', media: 'image', title: 'Replace an image', copy: 'Choose an image on the page to open its image editor. Select or upload a replacement, then save.' },
                     { tab: 'Changes', title: 'Review the image change', copy: 'Your replacement is saved as a draft and listed here.' },
                     { tab: 'Publish', title: 'Publish the replacement', copy: 'Publish when you are ready for visitors to see the new image.' },
+                ],
+                background: [
+                    { tab: 'content', media: 'background', title: 'Edit a background image', copy: 'This opens the section background editor. To find it yourself, hover over a section and choose Replace background. Save your change as a draft.' },
+                    { tab: 'Changes', title: 'Review the background change', copy: 'Your background update is saved as a draft. You can keep editing other items before publishing.' },
+                    { tab: 'Publish', title: 'Publish the background', copy: 'Publish when you are ready for visitors to see all your saved changes.' },
                 ],
                 brand: [
                     { tab: 'Brand', title: 'Update your brand', copy: 'Set your site-wide colors and type here. Save to keep your changes as a draft.' },
@@ -5150,6 +5155,10 @@ const bootLiveEdit = () => {
                     const label = node.getAttribute('aria-label') ?? node.closest('[aria-label]')?.getAttribute('aria-label') ?? '';
                     return !/skip\s+to\s+content/i.test(label + ' ' + node.textContent);
                 };
+                if (media === 'background') {
+                    const background = [...document.querySelectorAll('[data-edit-bg]')].find(isVisibleOnPage);
+                    return background ? { node: background, open: () => editImage(background) } : null;
+                }
                 if (media !== 'image') {
                     const link = [...document.querySelectorAll('a[data-edit], a[data-edit-href]')].find(content);
                     if (link) {
@@ -5194,7 +5203,9 @@ const bootLiveEdit = () => {
                     closeDrawer(true);
                     const found = editableTarget(step.media);
                     if (!found) {
-                        copy.textContent = 'No editable text or image is marked on this page. Choose Next to review your changes.';
+                        copy.textContent = step.media === 'background'
+                            ? 'No editable background image is marked on this page. Choose Next to review your changes.'
+                            : 'No editable text or image is marked on this page. Choose Next to review your changes.';
                         return;
                     }
                     target = found.node;
@@ -5277,6 +5288,7 @@ const bootLiveEdit = () => {
             const available = [
                 { id: 'text', title: 'Edit text or a link', detail: 'Change words and destinations on the page.' },
                 { id: 'image', title: 'Replace an image', detail: 'Choose, upload or generate a replacement image.' },
+                ...(document.querySelector('[data-edit-bg]') ? [{ id: 'background', title: 'Change a background image', detail: 'Find and replace an image behind a section.' }] : []),
                 ...(window.liveEditBrand?.tokens?.length ? [{ id: 'brand', title: 'Set your brand', detail: 'Update site-wide colors and type.' }] : []),
                 ...(drawerTabs.SEO ? [{ id: 'seo', title: 'Update SEO details', detail: 'Edit a page title and search description.' }] : []),
                 ...(window.liveEditPages ? [{ id: 'pages', title: 'Create a page', detail: 'Choose a title, address and starting sections.' }] : []),
