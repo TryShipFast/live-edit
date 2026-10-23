@@ -275,6 +275,7 @@ class ImagineAPicture
             ->map(fn (array $image) => $image['url']
                 ?? (isset($image['b64_json']) ? 'data:image/png;base64,'.$image['b64_json'] : null))
             ->filter()
+            ->take(max(1, min($count, 2)))
             ->values()
             ->all();
     }

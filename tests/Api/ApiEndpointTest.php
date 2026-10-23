@@ -5,6 +5,7 @@ namespace ShipFast\LiveEdit\Tests\Api;
 use ShipFast\LiveEdit\Domain\Site\Ability;
 use ShipFast\LiveEdit\Domain\Site\Site;
 use ShipFast\LiveEdit\Domain\Site\TokenType;
+use ShipFast\LiveEdit\Models\ImageGeneration;
 use ShipFast\LiveEdit\Models\SiteSetting;
 use ShipFast\LiveEdit\Tests\TestCase;
 
@@ -96,6 +97,32 @@ class ApiEndpointTest extends TestCase
             ->assertHeader('Access-Control-Allow-Origin', 'https://client.test');
 
         $this->assertStringContainsString('Origin', $response->headers->get('Vary'));
+    }
+
+    public function test_image_status_returns_a_completed_generation_only_for_its_site(): void
+    {
+        $generation = ImageGeneration::query()->create([
+            'uuid' => '4f0156b7-447b-4112-9069-2af126dc87ea',
+            'site_id' => $this->site->id,
+            'prompt' => 'A natural editorial portrait',
+            'status' => 'completed',
+            'images' => ['https://images.test/generated.png'],
+            'balance' => 44,
+        ]);
+        $response = $this->getJson(
+            $this->url('/imagine/'.$generation->uuid),
+            $this->as($this->session, ['Origin' => 'https://client.test']),
+        );
+        $response->assertOk()
+            ->assertJsonPath('status', 'completed')
+            ->assertJsonPath('images.0', 'https://images.test/generated.png')
+            ->assertHeader('Cache-Control', 'no-store, private');
+
+        $other = Site::query()->create(['slug' => 'other', 'name' => 'Other', 'allowed_origins' => []]);
+        [, $otherToken] = $other->issueToken(TokenType::Session, 'Other editor', [Ability::Read, Ability::Write], now()->addHour());
+
+        $this->getJson('/'.config('live-edit.api.prefix').'/other/imagine/'.$generation->uuid, $this->as($otherToken))
+            ->assertNotFound();
     }
 
     public function test_reading_without_a_key_is_refused(): void

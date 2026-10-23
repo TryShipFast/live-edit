@@ -1,5 +1,10 @@
 # ShipFast Live Edit for WordPress
 
+## 0.15.57
+
+- Fixed image generation status lookups for hosted sites by binding the route's site segment before the generation UUID.
+- Limit generation responses to the two options requested, even if a provider returns more.
+
 ## 0.15.56
 
 - Reordering, adding, duplicating, and deleting repeated items now updates the page in place without a reload.

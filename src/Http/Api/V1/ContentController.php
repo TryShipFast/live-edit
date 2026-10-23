@@ -491,7 +491,7 @@ class ContentController
     }
 
     /** The progress and result of one generation, scoped to this site's key. */
-    public function imagineStatus(Request $request, string $generation, ImagineAPicture $imagine): JsonResponse
+    public function imagineStatus(Request $request, string $site, string $generation, ImagineAPicture $imagine): JsonResponse
     {
         $result = $imagine->status(ApiContext::site($request), $generation);
 
