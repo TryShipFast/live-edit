@@ -2351,27 +2351,40 @@ const bootLiveEdit = () => {
                      */
                     const typed = current.value ?? drawerFields.querySelector('textarea, input[name=icon]')?.value ?? '';
 
-                    if (typeof current.openedWith === 'string' && typed === current.openedWith) {
+                    const wordsUnchanged = typeof current.openedWith === 'string' && typed === current.openedWith;
+
+                    /*
+                     * Unchanged words are not written, but they are not the
+                     * whole panel. A link's panel also holds where it goes,
+                     * and any text panel holds its style: returning here on
+                     * unchanged words skipped both, so changing only a link's
+                     * address (or only a colour) saved nothing and Save asked
+                     * "Discard what you typed?" instead. Closed without a
+                     * write only when nothing in the panel was touched.
+                     */
+                    if (wordsUnchanged && !current.dirty) {
                         restoreButton();
                         closeDrawer();
 
                         return;
                     }
 
-                    await request('/live-edit/setting', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        // Words come from a textarea and an icon from the
-                        // picker's hidden field, but a panel that chooses
-                        // rather than types carries the value itself — a
-                        // drawing picked from the page has no field to read,
-                        // and reading one anyway saved nothing.
-                        body: JSON.stringify({
-                            key: current.key,
-                            value: (current.savedValue = current.value ?? drawerFields.querySelector('textarea, input[name=icon]')?.value ?? ''),
-                            locale: window.liveEditLocale,
-                        }),
-                    });
+                    if (!wordsUnchanged) {
+                        await request('/live-edit/setting', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            // Words come from a textarea and an icon from the
+                            // picker's hidden field, but a panel that chooses
+                            // rather than types carries the value itself — a
+                            // drawing picked from the page has no field to read,
+                            // and reading one anyway saved nothing.
+                            body: JSON.stringify({
+                                key: current.key,
+                                value: (current.savedValue = current.value ?? drawerFields.querySelector('textarea, input[name=icon]')?.value ?? ''),
+                                locale: window.liveEditLocale,
+                            }),
+                        });
+                    }
                 } else if (current.kind === 'record') {
                     const fields = {};
                     drawerFields.querySelectorAll('textarea, select, input[type=hidden][name]').forEach((input) => (fields[input.name] = input.value));
