@@ -92,9 +92,10 @@ button, input, select, textarea { font: inherit; color: inherit; margin: 0; }
   padding-left: 10px; margin-left: 2px; border-left: 1px solid rgba(255,255,255,.14);
 }
 .le-mark {
-  width: 34px; height: 34px; flex: none; border-radius: 999px; background: #fff;
+  width: 34px; height: 34px; flex: none; border-radius: 10px; overflow: hidden;
   display: inline-flex; align-items: center; justify-content: center;
 }
+.le-mark svg { display: block; }
 /* Only when it goes somewhere. A mark that lifts under the pointer and then
    does nothing is a worse lie than one that never moved. */
 a.le-mark { cursor: pointer; transition: transform .12s ease, box-shadow .12s ease; }
@@ -993,8 +994,8 @@ export function createChrome() {
     const toolbar = el('div', 'le-toolbar');
 
     /* The mark, so the bar is plainly ours and not something the theme grew.
-       A white disc on carbon: one shape, no colour, which is the whole idea
-       of this bar. */
+       The ShipFast paper plane on its dark tile: the same mark as the
+       dashboard and the favicon, so the bar is recognisably the product's. */
     /*
      * A link when there is somewhere to go, a plain mark when there is not.
      *
@@ -1008,9 +1009,12 @@ export function createChrome() {
      */
     const consoleUrl = window.liveEditEditor?.console ?? null;
     const mark = el(consoleUrl ? 'a' : 'span', 'le-mark');
-    mark.innerHTML = '<svg width="16" height="16" viewBox="0 0 32 32" aria-hidden="true">'
-        + '<rect x="3" y="3" width="20" height="20" rx="3" fill="none" stroke="#0B0C0F" stroke-width="2.5"/>'
-        + '<path d="M16 15 L16 30 L19.6 26.4 L22.2 31.2 L24.6 30 L22 25.3 L27 25.3 Z" fill="#3148F5" stroke="#fff" stroke-width="1.4" stroke-linejoin="round"/></svg>';
+    // The ShipFast paper plane, as on the dashboard and the favicon. The bar is the
+    // favicon's dark tile already, so the plane stands on it without a second one.
+    mark.innerHTML = '<svg width="28" height="28" viewBox="6 8 54 54" aria-hidden="true">'
+        + '<polygon points="9.14,34.22 56.06,13.52 28.46,39.74" fill="#0EA5E9"/>'
+        + '<polygon points="28.46,39.74 56.06,13.52 39.50,57.68" fill="#0284C7"/>'
+        + '<polygon points="28.46,39.74 31.22,50.78 35.36,46.64" fill="#0369A1"/></svg>';
 
     if (consoleUrl) {
         mark.href = consoleUrl;
