@@ -541,7 +541,7 @@ test('an item added to a list is on the page, and can be taken off again', async
     };
 
     await openItem(items);
-    await panel(page).getByRole('button', { name: /Add another|Add item/ }).click();
+    await panel(page).getByRole('button', { name: /^Duplicate$|Add item/ }).click();
     await settled(page);
     await page.reload();
     await settled(page);

@@ -320,6 +320,14 @@ a.le-mark:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
   .le-name-look { display: none; }
   .le-browser-list .le-library-list { max-height: 30vh; }
 }
+.le-item-actions { display: flex; flex-direction: column; gap: 8px; padding: 12px; margin: 0 0 6px; border-radius: 12px; background: var(--le-soft); }
+.le-item-actions .le-section-heading { margin: 0; }
+.le-style-group { border-top: 1px solid var(--le-line); padding-top: 4px; }
+.le-style-group > summary { cursor: pointer; list-style: none; display: flex; align-items: center; justify-content: space-between; padding: 10px 0; }
+.le-style-group > summary::-webkit-details-marker { display: none; }
+.le-style-group > summary::after { content: ''; width: 8px; height: 8px; border-right: 1.6px solid currentColor; border-bottom: 1.6px solid currentColor; transform: rotate(45deg) translateY(-2px); transition: transform .15s ease; }
+.le-style-group[open] > summary::after { transform: rotate(-135deg) translateY(-2px); }
+.le-style-group[open] { display: flex; flex-direction: column; gap: 14px; padding-bottom: 6px; }
 .le-subtabs { display: flex; gap: 4px; margin: 14px 24px 0; padding: 3px; border-radius: 10px; background: var(--le-soft); }
 .le-subtab { flex: 1; padding: 7px 10px; border: 0; border-radius: 8px; background: none; color: var(--le-muted); font: inherit; font-size: 12px; font-weight: 600; cursor: pointer; }
 .le-subtab.is-on { background: #fff; color: var(--le-ink); box-shadow: 0 1px 2px rgba(11,12,15,.1); }
@@ -994,8 +1002,8 @@ export function createChrome() {
     const toolbar = el('div', 'le-toolbar');
 
     /* The mark, so the bar is plainly ours and not something the theme grew.
-       The ShipFast paper plane on its dark tile: the same mark as the
-       dashboard and the favicon, so the bar is recognisably the product's. */
+       The Live Edit mark (a page, a text cursor, the live dot): the same mark
+       as the dashboard and the sign-in page, so the bar is plainly the product's. */
     /*
      * A link when there is somewhere to go, a plain mark when there is not.
      *
@@ -1009,12 +1017,12 @@ export function createChrome() {
      */
     const consoleUrl = window.liveEditEditor?.console ?? null;
     const mark = el(consoleUrl ? 'a' : 'span', 'le-mark');
-    // The ShipFast paper plane, as on the dashboard and the favicon. The bar is the
-    // favicon's dark tile already, so the plane stands on it without a second one.
-    mark.innerHTML = '<svg width="28" height="28" viewBox="6 8 54 54" aria-hidden="true">'
-        + '<polygon points="9.14,34.22 56.06,13.52 28.46,39.74" fill="#0EA5E9"/>'
-        + '<polygon points="28.46,39.74 56.06,13.52 39.50,57.68" fill="#0284C7"/>'
-        + '<polygon points="28.46,39.74 31.22,50.78 35.36,46.64" fill="#0369A1"/></svg>';
+    // The Live Edit mark, as on the dashboard and the sign-in page: a page with a
+    // text cursor in it and the blue live dot. White on the bar's dark ground.
+    mark.innerHTML = '<svg width="26" height="26" viewBox="0 0 32 32" fill="none" aria-hidden="true">'
+        + '<rect x="2.5" y="2.5" width="27" height="27" rx="7.5" fill="none" stroke="#FFFFFF" stroke-width="3"/>'
+        + '<path d="M13 9.5v13" stroke="#FFFFFF" stroke-width="3" stroke-linecap="round"/>'
+        + '<circle cx="20.5" cy="20.5" r="3.6" fill="#1B6EF3"/></svg>';
 
     if (consoleUrl) {
         mark.href = consoleUrl;

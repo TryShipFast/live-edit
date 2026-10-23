@@ -732,10 +732,20 @@ const bootLiveEdit = () => {
         const addStyleFields = (styleKey, propNames, element) => {
             current.styleKey = styleKey;
             const values = (window.liveEditStyles ?? {})[styleKey] ?? {};
-            const heading = document.createElement('div');
+            /*
+             * Folded away unless it is all there is. Most people open an element to
+             * change its words or its picture; four controls for size, weight and
+             * spacing in between push what they came for (and the item's own Move
+             * and Delete) below the fold, and invite changes a novice did not mean.
+             */
+            const group = document.createElement('details');
+            group.className = 'le-style-group';
+            group.open = !drawerFields.querySelector('textarea, input:not([type=checkbox]), select, .le-image');
+            const heading = document.createElement('summary');
             heading.className = 'le-section-heading';
-            heading.textContent = 'Style';
-            drawerFields.append(heading);
+            heading.textContent = 'Style: colour, size and spacing';
+            group.append(heading);
+            drawerFields.append(group);
             let offered = 0;
             (element ? stylePropsFor(element, propNames) : propNames).forEach((name) => {
                 /*
@@ -756,7 +766,7 @@ const bootLiveEdit = () => {
                  */
                 const type = (window.liveEditStyleProps ?? {})[name] ?? KINDS_OF_STYLE[name];
                 if (!type) return;
-                drawerFields.append(styleField(name, type, values[name], element));
+                group.append(styleField(name, type, values[name], element));
                 offered++;
             });
             if (offered === 0) {
@@ -764,7 +774,7 @@ const bootLiveEdit = () => {
                 const none = document.createElement('div');
                 none.className = 'le-hint';
                 none.textContent = 'Nothing on this element can be restyled.';
-                drawerFields.append(none);
+                group.append(none);
             }
         };
 
@@ -3429,11 +3439,13 @@ const bootLiveEdit = () => {
             const full = Number.isFinite(most) && most > 0 && count >= most;
             const lowest = count <= least;
 
-            if (!sections) {
+            // With an item chosen, "Duplicate" below does exactly this (a copy right after it),
+            // so offering both asked a novice to choose between two names for one thing.
+            if (!sections && !item) {
                 const add = document.createElement('button');
                 add.type = 'button';
                 add.className = 'le-chip-btn';
-                add.textContent = item ? '+ Add another' : '+ Add item';
+                add.textContent = '+ Add item';
                 add.disabled = full;
                 add.addEventListener('click', () => {
                     const ids = currentOrder();
@@ -3507,7 +3519,7 @@ const bootLiveEdit = () => {
                     const duplicate = document.createElement('button');
                     duplicate.type = 'button';
                     duplicate.className = 'le-chip-btn';
-                    duplicate.textContent = sections ? 'Duplicate section' : 'Duplicate item';
+                    duplicate.textContent = sections ? 'Duplicate section' : 'Duplicate';
                     duplicate.disabled = !sections && full;
                     duplicate.addEventListener('click', () => {
                         const reordered = currentOrder();
@@ -3550,16 +3562,27 @@ const bootLiveEdit = () => {
                     row.append(remove);
                 }
             }
-            drawerFields.append(heading, row);
-
+            /*
+             * At the top, under "Item 2 of 16", rather than after everything else.
+             * Duplicating a product, moving it or deleting it is what somebody who
+             * clicked a card most often came to do, and at the bottom of a long
+             * panel it was below the fold, where it read as missing.
+             */
+            const block = document.createElement('div');
+            block.className = 'le-item-actions';
+            block.append(heading, row);
             if (!sections && (full || (item && lowest))) {
                 const why = document.createElement('p');
                 why.className = 'le-hint';
                 why.textContent = full
                     ? `This design holds ${most}. Replace one, or delete one to add another.`
                     : 'Keep at least one, so there is something to add another from.';
-                drawerFields.append(why);
+                block.append(why);
             }
+            const context = item ? drawerFields.querySelector('.le-item-context') : null;
+            if (context) context.after(block);
+            else if (item) drawerFields.prepend(block);
+            else drawerFields.append(block);
         };
 
         /**
@@ -3659,7 +3682,7 @@ const bootLiveEdit = () => {
                     || item.querySelector('h1, h2, h3, h4, h5, h6')?.textContent
                     || item.getAttribute('aria-label');
                 const context = document.createElement('div');
-                context.className = 'le-section-heading';
+                context.className = 'le-section-heading le-item-context';
                 context.textContent = `${kind} ${index} of ${items.length}${name ? ` · ${String(name).replace(/\s+/g, ' ').trim().slice(0, 40)}` : ''}`;
                 drawerFields.prepend(context);
             }
