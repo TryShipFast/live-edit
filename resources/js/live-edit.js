@@ -4998,19 +4998,57 @@ const bootLiveEdit = () => {
         const completeWalkthrough = () => {
             try { window.localStorage.setItem(walkthroughStorageKey, '1'); } catch { /* Help remains available if storage is disabled. */ }
         };
-        const startWalkthrough = (replay = false) => {
+        const startWalkthrough = (replay = false, guideId = 'getting-started') => {
             if ((!replay && walkthroughWasCompleted()) || ui.shadow.querySelector('.le-walkthrough')) return;
             // A guided walk through the real editor. There is no overlay: each
             // step opens the panel or control the customer will actually use.
             if (!document.body.classList.contains('editing')) setEditing(true);
 
-            const steps = [
-                { tab: 'Brand', title: 'Set your brand', copy: 'Add your business name or logo here. Save your brand to keep it as a draft.' },
-                { tab: 'SEO', title: 'Set your page title', copy: 'Update the title and search description, then save them as a draft.' },
-                { tab: 'content', title: 'Make a page edit', copy: 'Choose this text or image, make a change, and save it.' },
-                { tab: 'Changes', title: 'Review your edits', copy: 'Your saved changes are listed here. You can keep editing before you publish.' },
-                { tab: 'Publish', title: 'Publish your changes', copy: 'Publish sends your saved changes live. You can then preview the live page.' },
-            ];
+            const guides = {
+                'getting-started': [
+                    { tab: 'Brand', title: 'Set your brand', copy: 'Add your business name or logo here. Save your brand to keep it as a draft.' },
+                    { tab: 'SEO', title: 'Set your page title', copy: 'Update the title and search description, then save them as a draft.' },
+                    { tab: 'content', title: 'Make a page edit', copy: 'Choose this text or image, make a change, and save it.' },
+                    { tab: 'Changes', title: 'Review your edits', copy: 'Your saved changes are listed here. You can keep editing before you publish.' },
+                    { tab: 'Publish', title: 'Publish your changes', copy: 'Publish sends your saved changes live. You can then preview the live page.' },
+                ],
+                text: [
+                    { tab: 'content', title: 'Edit text or a link', copy: 'Choose the text or link you want to change. Update it in the editor and save.' },
+                    { tab: 'Changes', title: 'Review the draft', copy: 'Your saved edit appears here. You can undo it or keep editing.' },
+                    { tab: 'Publish', title: 'Put your edit live', copy: 'Publish when the change is ready for visitors.' },
+                ],
+                image: [
+                    { tab: 'content', media: 'image', title: 'Replace an image', copy: 'Choose an image on the page to open its image editor. Select or upload a replacement, then save.' },
+                    { tab: 'Changes', title: 'Review the image change', copy: 'Your replacement is saved as a draft and listed here.' },
+                    { tab: 'Publish', title: 'Publish the replacement', copy: 'Publish when you are ready for visitors to see the new image.' },
+                ],
+                brand: [
+                    { tab: 'Brand', title: 'Update your brand', copy: 'Set your site-wide colors and type here. Save to keep your changes as a draft.' },
+                    { tab: 'Changes', title: 'Review your brand changes', copy: 'Your brand updates are saved as a draft and listed here.' },
+                    { tab: 'Publish', title: 'Publish your brand', copy: 'Publish when you are ready to use the new brand on your site.' },
+                ],
+                seo: [
+                    { tab: 'SEO', title: 'Update search details', copy: 'Set this page title and search description, then save them as a draft.' },
+                    { tab: 'Changes', title: 'Review your SEO draft', copy: 'Your saved search details are listed here.' },
+                ],
+                pages: [
+                    { tab: 'Pages', title: 'Start a new page', copy: 'Give the page a title and address, then choose the sections to start with. You can choose whether it appears in the menu.' },
+                    { tab: 'Pages', title: 'Create and open it', copy: 'When the title, address and sections are ready, choose Create page. Live Edit opens the new page so you can edit it.' },
+                ],
+                languages: [
+                    { tab: 'language', title: 'Choose a language', copy: 'Use this menu to choose which language you are editing. Changes are saved for that language.' },
+                    { tab: 'content', title: 'Edit translated content', copy: 'Choose text on the page and save its translation. Switch languages to review each version.' },
+                ],
+                review: [
+                    { tab: 'Changes', title: 'Review saved changes', copy: 'See your saved drafts here. Choose a change to inspect it or undo it.' },
+                    { tab: 'toolbar', control: 'undoButton', title: 'Undo a draft change', copy: 'Undo removes the latest unpublished change. Redo restores it.' },
+                ],
+                preview: [
+                    { tab: 'toolbar', control: 'previewButton', title: 'Preview the page', copy: 'Open a visitor view to check the page before publishing.' },
+                    { tab: 'Publish', title: 'Publish when ready', copy: 'When your review is complete, publish to make the saved changes live.' },
+                ],
+            };
+            const steps = guides[guideId] ?? guides['getting-started'];
             const card = document.createElement('section');
             card.className = 'le-walkthrough';
             card.setAttribute('role', 'region');
@@ -5092,7 +5130,7 @@ const bootLiveEdit = () => {
                 const button = drawerFields.querySelector('button.le-btn');
                 return Boolean(button && !button.disabled);
             };
-            const editableTarget = () => {
+            const editableTarget = (media = 'any') => {
                 const isVisibleOnPage = (node) => {
                     if (!node.getClientRects().length || node.closest('[data-live-edit-ui], [aria-hidden="true"]')) return false;
                     const style = window.getComputedStyle(node);
@@ -5105,14 +5143,23 @@ const bootLiveEdit = () => {
                         && rect.bottom > 0
                         && rect.right > 0;
                 };
-                const text = [...document.querySelectorAll('[data-edit]')].find((node) => {
-                    if (!node.textContent.trim() || !isVisibleOnPage(node)) return false;
+                const content = (node) => {
+                    if (!isVisibleOnPage(node)) return false;
                     if (node.matches('.skip-link, [data-field="link-skip-link"], [data-component="core.skip-link"]')
                         || node.closest('.skip-link, [data-field="link-skip-link"], [data-component="core.skip-link"]')) return false;
                     const label = node.getAttribute('aria-label') ?? node.closest('[aria-label]')?.getAttribute('aria-label') ?? '';
                     return !/skip\s+to\s+content/i.test(label + ' ' + node.textContent);
-                });
-                if (text) return { node: text, open: () => editText(text) };
+                };
+                if (media !== 'image') {
+                    const link = [...document.querySelectorAll('a[data-edit], a[data-edit-href]')].find(content);
+                    if (link) {
+                        const text = link.hasAttribute('data-edit') ? link : link.querySelector('[data-edit]');
+                        if (text) return { node: link, open: () => editText(text, link) };
+                        return { node: link, open: () => editLink(link) };
+                    }
+                    const text = [...document.querySelectorAll('[data-edit]')].find((node) => node.textContent.trim() && content(node));
+                    if (text) return { node: text, open: () => editText(text) };
+                }
                 const image = [...document.querySelectorAll('[data-edit-img], [data-edit-bg]')].find(isVisibleOnPage);
                 if (image) return { node: image, open: () => editImage(image) };
                 return null;
@@ -5127,7 +5174,7 @@ const bootLiveEdit = () => {
                 heading.textContent = step.title;
                 copy.textContent = step.copy;
 
-                if (step.tab === 'Brand' || step.tab === 'SEO') {
+                if (step.tab === 'Brand' || step.tab === 'SEO' || step.tab === 'Pages') {
                     if (!drawerTabs[step.tab]) {
                         copy.textContent = `${step.title} is not available on this website. Choose Next to continue.`;
                         return;
@@ -5145,15 +5192,31 @@ const bootLiveEdit = () => {
                         return;
                     }
                     closeDrawer(true);
-                    const found = editableTarget();
+                    const found = editableTarget(step.media);
                     if (!found) {
                         copy.textContent = 'No editable text or image is marked on this page. Choose Next to review your changes.';
                         return;
                     }
                     target = found.node;
+                    if (!target) {
+                        copy.textContent = 'No editable image is marked on this page. Choose Next to continue.';
+                        return;
+                    }
                     target.scrollIntoView({ block: 'center', behavior: 'smooth' });
                     target.setAttribute('data-live-edit-tour-focus', '');
                     found.open();
+                } else if (step.tab === 'language') {
+                    if (ui.languagePicker.hidden) {
+                        copy.textContent = 'Language switching is available when this site has more than one language.';
+                        return;
+                    }
+                    target = ui.languagePicker;
+                } else if (step.tab === 'toolbar') {
+                    target = ui[step.control];
+                    if (!target || target.hidden) {
+                        copy.textContent = 'This control is not available on this website. Choose Next to continue.';
+                        return;
+                    }
                 } else if (step.tab === 'Changes') {
                     if (current?.dirty || hasUnsavedPanel(drawerTab)) {
                         copy.textContent = 'Save or cancel your current edit before reviewing changes.';
@@ -5195,8 +5258,45 @@ const bootLiveEdit = () => {
             });
             show();
         };
-        // Help stays in the toolbar as the walkthrough replay control.
-        ui.helpButton?.addEventListener('click', () => startWalkthrough(true));
+        // Help is a feature menu for returning editors. The getting-started
+        // tour remains available here without being the only Help destination.
+        const showHelpMenu = () => {
+            if (ui.shadow.querySelector('.le-walkthrough')) return;
+            const card = document.createElement('section');
+            card.className = 'le-walkthrough le-help-menu';
+            card.setAttribute('role', 'dialog');
+            card.setAttribute('aria-label', 'Live Edit help and guides');
+            const progress = el('div', 'le-walkthrough-progress', 'Live Edit help');
+            const heading = el('h2', null, 'What would you like to do?');
+            const copy = el('p', null, 'Choose a feature for a short guided tour.');
+            const options = el('div', 'le-help-options');
+            const finish = el('button', 'le-walkthrough-end', 'Close help');
+            finish.type = 'button';
+            const actions = el('div', 'le-walkthrough-actions');
+            actions.append(finish);
+            const available = [
+                { id: 'text', title: 'Edit text or a link', detail: 'Change words and destinations on the page.' },
+                { id: 'image', title: 'Replace an image', detail: 'Choose, upload or generate a replacement image.' },
+                ...(window.liveEditBrand?.tokens?.length ? [{ id: 'brand', title: 'Set your brand', detail: 'Update site-wide colors and type.' }] : []),
+                ...(drawerTabs.SEO ? [{ id: 'seo', title: 'Update SEO details', detail: 'Edit a page title and search description.' }] : []),
+                ...(window.liveEditPages ? [{ id: 'pages', title: 'Create a page', detail: 'Choose a title, address and starting sections.' }] : []),
+                ...(!ui.languagePicker.hidden ? [{ id: 'languages', title: 'Edit another language', detail: 'Switch languages and update translated content.' }] : []),
+                { id: 'review', title: 'Review or undo changes', detail: 'Inspect draft edits and undo or redo them.' },
+                ...(!ui.previewButton.hidden ? [{ id: 'preview', title: 'Preview and publish', detail: 'Check the visitor view and publish when ready.' }] : []),
+                { id: 'getting-started', title: 'Replay getting started', detail: 'Take the full Live Edit introduction again.' },
+            ];
+            available.forEach((item) => {
+                const button = el('button', 'le-help-option');
+                button.type = 'button';
+                button.append(el('span', 'le-help-option-title', item.title), el('span', 'le-help-option-detail', item.detail));
+                button.addEventListener('click', () => { card.remove(); startWalkthrough(true, item.id); });
+                options.append(button);
+            });
+            card.append(progress, heading, copy, options, actions);
+            ui.shadow.append(card);
+            finish.addEventListener('click', () => card.remove());
+        };
+        ui.helpButton?.addEventListener('click', showHelpMenu);
 
         /*
          * Publishing, where the site holds edits back. The host says so by

@@ -646,6 +646,12 @@ select.le-input {
 .le-walkthrough-actions { display: flex; align-items: center; justify-content: flex-end; gap: 8px; }
 .le-walkthrough-actions .le-walkthrough-end { margin-right: auto; border: 0; background: transparent; color: var(--le-muted); cursor: pointer; font: inherit; font-size: 12px; }
 .le-walkthrough-actions button:disabled { opacity: .45; cursor: not-allowed; }
+.le-help-menu { width: min(390px, calc(100vw - 32px)); max-height: min(620px, calc(100vh - 32px)); overflow-y: auto; }
+.le-help-options { display: grid; gap: 7px; max-height: min(430px, 55vh); overflow-y: auto; margin: 12px 0 16px; }
+.le-help-option { display: flex; flex-direction: column; gap: 3px; width: 100%; padding: 10px 12px; text-align: left; border: 1px solid var(--le-line); border-radius: 10px; background: #fff; color: var(--le-body); cursor: pointer; font: inherit; }
+.le-help-option:hover, .le-help-option:focus-visible { border-color: var(--le-accent); background: var(--le-soft); outline: none; }
+.le-help-option-title { color: var(--le-ink); font-size: 13px; font-weight: 650; }
+.le-help-option-detail { color: var(--le-muted); font-size: 12px; line-height: 1.4; }
 .le-tab[data-live-edit-tour-focus], .le-publish[data-live-edit-tour-focus] { outline: 3px solid #1B6EF3; outline-offset: 4px; }
 .le-hint--callout { margin: 0 0 14px; padding: 10px 12px; border: 1px solid var(--le-line); border-radius: 10px; background: var(--le-soft); color: var(--le-body); font-size: 12px; line-height: 1.5; }
 .le-modal-foot {
@@ -1051,8 +1057,8 @@ export function createChrome() {
 
     const helpButton = el('button', 'le-round le-when-roomy', '?');
     helpButton.type = 'button';
-    helpButton.title = 'Getting started with Live Edit';
-    helpButton.setAttribute('aria-label', 'Getting started with Live Edit');
+    helpButton.title = 'Help with Live Edit';
+    helpButton.setAttribute('aria-label', 'Help with Live Edit');
 
     const previewButton = el('button', 'le-bar-btn le-when-roomy', 'Preview');
     previewButton.type = 'button';
