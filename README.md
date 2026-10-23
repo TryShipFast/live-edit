@@ -344,12 +344,12 @@ window.liveEditBrand = {
   the design's own. The host validates the values and applies the chosen
   brand to the page it renders.
 
-## The page builder (Pages tab)
+## The page builder (New page)
 
-When the host sets `window.liveEditPages` before the editor loads, a **Pages**
-tab appears in the drawer and a **Pages** button in the toolbar. `?pages` in the
-address opens the editor on it. The host builds pages; the editor only says
-what the owner chose, as settings.
+When the host sets `window.liveEditPages` before the editor loads, a **+ New
+page** button appears in the toolbar. It opens a window of two steps; `?pages`
+in the address opens the editor on it. The host builds pages; the editor only
+says what the owner chose, as settings.
 
 ```js
 window.liveEditPages = {
@@ -361,8 +361,11 @@ window.liveEditPages = {
   ],
   taken: ['', 'about', 'open-days'],      // addresses a new page may not have
   library: [                              // the sections the design has, named by its designer
-    { from: 'about.leadership', label: 'Leadership team', page: 'About the school' },
+    { from: 'about.leadership', label: 'Leadership team', page: 'About the school', at: '/sites/trial/edit/about' },
   ],
+  starts: [                               // optional: the design's pages to start a new page from,
+    { id: 'about', title: 'About the school', sections: ['about.head', 'about.leadership'] },
+  ],                                      // each with its library sections in order
   pagesKey: 'structure:pages',            // the owner's pages: [{ id, title, menu }]
   made: [{ id: 'open-days', title: 'Open days', menu: true }],
   structureKey: 'structure:page:about',   // this page's additions: { added: { <id>: <from> } }
@@ -370,16 +373,28 @@ window.liveEditPages = {
 };
 ```
 
-- **Add a page:** a title (the address follows it until edited), an address,
-  and one or more sections from the library. Creating saves
-  `structure:page:<address>` then `pagesKey`, and opens the new page.
+- **New page, step 1: a page like one you have.** The design's pages are shown
+  as small live pictures (`starts`, each drawn from its page's `href`; without
+  `starts`, the library grouped by `page`). Pages made of the same sections are
+  one choice ("Aster Veil, and 15 like it"). **Or choose the sections yourself**
+  opens the section browser instead.
+- **Step 2: name it.** A title; the address follows it and is shown as a line
+  with **Change**; **Show it in the menu** is a switch; the starting sections
+  are chips that can be removed; the page it is copied from is shown beside the
+  form. Creating saves `structure:page:<address>` then `pagesKey`, and opens
+  the new page.
+- **The section browser** (choosing sections yourself, and **+ Add a section**
+  on a page): the library on the left, the section pointed at shown on the
+  right at its real size, on **Desktop** or **Phone**, with the add button under
+  it. Sections are drawn from the page in `at`, fetched once, in a sandboxed
+  frame with the site's stylesheets.
 - **Menus:** a new page is put in the site's menus unless **Show it in the menu**
   is unticked, and each of the owner's pages has an **In the menu** / **Add to
   menu** switch in the list. Both save `pagesKey` with the page's `menu` flag;
   the host draws the entries (each a copy of an entry the design marked, with
   its words editable like any menu entry).
 - **Add a section:** in the panel of a page's sections (a list of kind
-  `sections`), **+ Add a section below** opens the library. Choosing one saves
+  `sections`), **+ Add a section below** opens the section browser. Adding one saves
   this page's `structureKey` with the new section (`add-` and eight base-36
   characters, never the `n` the engine mints for its own copies), then the
   section order with `s-<id>` below the section it was added from.
@@ -389,6 +404,10 @@ window.liveEditPages = {
 - Every save is `POST /live-edit/setting`, so all of it is a draft until
   published and shows under **Changes**. The host validates the values, draws
   the sections, and keys their fields.
+
+The drawer has two tabs, **Edit** and **Changes** (plus **Brand** and **SEO**
+where the host provides them). Changes holds both halves of what was saved:
+**Not published yet** and **Published**, switched just under the tabs.
 
 ## If something is wrong
 

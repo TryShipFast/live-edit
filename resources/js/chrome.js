@@ -260,6 +260,74 @@ a.le-mark:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
 .le-change:last-child { border-bottom: 0; padding-bottom: 0; }
 .le-change-head { justify-content: space-between; align-items: baseline; }
 .le-change-label { font-size: 13px; font-weight: 500; color: #0B0C0F; }
+/* New page: a window of two steps. First the kinds of page the design has, as
+   small pictures of the real pages; then a title, with the address following it. */
+.le-modal.is-wide { max-width: 980px; height: min(760px, 90vh); max-height: min(760px, 90vh); }
+.le-starts-top { display: flex; align-items: center; gap: 14px; margin-bottom: 16px; }
+.le-starts-top .le-starts-search { flex: 1; min-width: 0; }
+.le-starts { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 14px; }
+.le-start { display: flex; flex-direction: column; gap: 0; padding: 0; border: 1px solid var(--le-line); border-radius: 12px; background: #fff; overflow: hidden; text-align: left; cursor: pointer; font: inherit; color: var(--le-body); transition: border-color .15s ease, box-shadow .15s ease, transform .15s ease; }
+.le-start:hover { border-color: var(--le-ink); transform: translateY(-1px); }
+.le-start:focus-visible { outline: none; border-color: var(--le-accent); box-shadow: 0 0 0 3px var(--le-accent-soft); }
+.le-start-thumb { position: relative; height: 128px; overflow: hidden; background: var(--le-soft); border-bottom: 1px solid var(--le-line); }
+.le-start-thumb.is-empty::after { content: ''; position: absolute; inset: 24px 28px; border: 2px dashed var(--le-field); border-radius: 8px; }
+.le-start-frame { position: absolute; top: 0; left: 0; width: 1280px; height: 800px; border: 0; transform: scale(.17); transform-origin: 0 0; pointer-events: none; background: #fff; }
+.le-start-text { display: flex; flex-direction: column; gap: 3px; padding: 11px 13px 13px; }
+.le-start-name { color: var(--le-ink); font-size: 14px; font-weight: 650; }
+.le-start-meta { color: var(--le-muted); font-size: 12px; line-height: 1.4; }
+.le-link-btn { flex: none; padding: 6px 2px; border: 0; background: none; color: var(--le-blue); font: inherit; font-size: 13px; font-weight: 600; cursor: pointer; }
+.le-link-btn:hover { text-decoration: underline; }
+.le-starts-own .le-library-list { max-height: 52vh; }
+.le-name-page { display: flex; flex-direction: column; gap: 14px; max-width: 520px; }
+.le-name-title { font-size: 17px; }
+.le-name-address { display: flex; align-items: center; gap: 10px; margin-top: -6px; font-size: 13px; color: var(--le-muted); }
+.le-switch { display: inline-flex; align-items: center; gap: 10px; cursor: pointer; font-size: 14px; color: var(--le-ink); }
+.le-switch input { position: absolute; opacity: 0; width: 1px; height: 1px; }
+.le-switch-track { position: relative; flex: none; width: 36px; height: 20px; border-radius: 20px; background: var(--le-field); transition: background .15s ease; }
+.le-switch-track::after { content: ''; position: absolute; top: 2px; left: 2px; width: 16px; height: 16px; border-radius: 50%; background: #fff; box-shadow: 0 1px 2px rgba(0,0,0,.2); transition: transform .15s ease; }
+.le-switch input:checked + .le-switch-track { background: var(--le-ink); }
+.le-switch input:checked + .le-switch-track::after { transform: translateX(16px); }
+.le-switch input:focus-visible + .le-switch-track { box-shadow: 0 0 0 3px var(--le-accent-soft); }
+.le-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; text-transform: none; letter-spacing: normal; }
+.le-chip { display: inline-flex; align-items: center; gap: 4px; padding: 5px 6px 5px 11px; border-radius: 999px; background: var(--le-soft); color: var(--le-ink); font-size: 13px; font-weight: 500; }
+.le-chip:not(:has(button)) { padding-right: 11px; }
+.le-chip-x { width: 22px; height: 22px; border: 0; border-radius: 50%; background: none; color: var(--le-muted); font-size: 15px; line-height: 1; cursor: pointer; }
+.le-chip-x:hover { background: #fff; color: var(--le-danger); }
+.le-name-layout { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 32px; align-items: start; }
+.le-name-look .le-start-thumb { height: 300px; border: 1px solid var(--le-line); border-radius: 12px; }
+.le-name-look .le-start-frame { transform: scale(.34); height: 900px; }
+.le-name-look .le-hint { margin-top: 10px; }
+.le-starts-own { height: 100%; }
+.le-browser { display: grid; grid-template-columns: 280px minmax(0, 1fr); gap: 20px; height: 100%; min-height: 0; }
+.le-browser-list { display: flex; flex-direction: column; gap: 10px; min-height: 0; }
+.le-browser-list .le-library-list { flex: 1; max-height: none; }
+.le-library-item.is-looking { background: var(--le-soft); border-color: var(--le-line); }
+.le-browser-stage { display: flex; flex-direction: column; gap: 12px; min-height: 0; }
+.le-browser-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+.le-browser-name { color: var(--le-ink); font-size: 15px; font-weight: 650; }
+.le-browser-from { color: var(--le-muted); font-size: 12px; margin-top: 2px; }
+.le-browser-sizes { display: flex; gap: 2px; padding: 3px; border-radius: 10px; background: var(--le-soft); }
+.le-browser-sizes .le-subtab { flex: none; padding: 5px 12px; }
+.le-browser-view { flex: 1; min-height: 0; overflow: auto; padding: 14px; border-radius: 12px; background: var(--le-soft); }
+.le-browser-shot { position: relative; margin: 0 auto; overflow: hidden; border-radius: 8px; background: #fff; box-shadow: 0 1px 3px rgba(11,12,15,.12); }
+.le-browser-shot.is-phone { border: 6px solid var(--le-ink); border-radius: 22px; }
+.le-browser-frame { position: absolute; top: 0; left: 0; height: 600px; border: 0; transform-origin: 0 0; pointer-events: none; background: #fff; }
+.le-browser-add { align-self: flex-end; }
+.le-browser-add.is-added { background: #fff; color: var(--le-ink); box-shadow: inset 0 0 0 1px var(--le-line); }
+@media (max-width: 760px) {
+  .le-name-layout, .le-browser { grid-template-columns: 1fr; }
+  .le-name-look { display: none; }
+  .le-browser-list .le-library-list { max-height: 30vh; }
+}
+.le-subtabs { display: flex; gap: 4px; margin: 14px 24px 0; padding: 3px; border-radius: 10px; background: var(--le-soft); }
+.le-subtab { flex: 1; padding: 7px 10px; border: 0; border-radius: 8px; background: none; color: var(--le-muted); font: inherit; font-size: 12px; font-weight: 600; cursor: pointer; }
+.le-subtab.is-on { background: #fff; color: var(--le-ink); box-shadow: 0 1px 2px rgba(11,12,15,.1); }
+@media (max-width: 640px) {
+  .le-starts { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+  .le-start-thumb { height: 96px; }
+  .le-start-frame { transform: scale(.125); }
+  .le-starts-top { flex-direction: column; align-items: stretch; }
+}
 /* Pages: the website's pages as rows you can open, then a new page from the
    design's own sections. The library is a list you search, grouped under the
    page each section comes from, because that is how the owner knows it. */
@@ -1041,15 +1109,13 @@ export function createChrome() {
     brandButton.title = 'Your colours and type, across the whole website';
     brandButton.hidden = !window.liveEditBrand?.tokens?.length;
 
-    const pagesButton = el('button', 'le-bar-btn le-when-roomy', 'Pages');
+    /* One way to add a page, named for what it does. There were two buttons
+       here ("Pages" and "Create page") opening the same form, and the second
+       was never wired up, so half the ways in did nothing. */
+    const pagesButton = el('button', 'le-bar-btn le-when-roomy', '+ New page');
     pagesButton.type = 'button';
-    pagesButton.title = 'Open the page creation form';
+    pagesButton.title = 'Add a page to your website';
     pagesButton.hidden = !window.liveEditPages;
-
-    const createPageButton = el('button', 'le-bar-btn le-when-roomy', 'Create page');
-    createPageButton.type = 'button';
-    createPageButton.title = 'Add a page to your website';
-    createPageButton.hidden = !window.liveEditPages;
 
     const changesButton = el('button', 'le-bar-btn le-when-roomy', 'Changes');
     changesButton.type = 'button';
@@ -1086,7 +1152,6 @@ export function createChrome() {
         el("span", "le-sep"),
         languagePicker,
         pagesButton,
-        createPageButton,
         brandButton,
         changesButton,
         helpButton,
@@ -1140,8 +1205,11 @@ export function createChrome() {
     const drawerTabs = {};
     // Brand only where the host hands the editor one (window.liveEditBrand): a site
     // without brand tokens has nothing for it to set.
-    const tabNames = ['Edit', 'Changes', 'History'];
-    if (window.liveEditPages) tabNames.push('Pages');
+    /* Edit, Changes, and the site-wide panels a host provides. History is not
+       a tab of its own: it is the other half of Changes ("waiting to publish"
+       and "already published"), switched just under the tabs. Making a page
+       is a window of its own (pages.js), not a tab in a narrow panel. */
+    const tabNames = ['Edit', 'Changes'];
     if (window.liveEditBrand?.tokens?.length) tabNames.push('Brand');
     if (window.liveEditSeo?.title?.key || window.liveEditSeo?.descriptionKey) tabNames.push('SEO');
     tabNames.forEach((name) => {
@@ -1158,6 +1226,19 @@ export function createChrome() {
     closeButton.type = 'button';
     closeButton.setAttribute('aria-label', 'Close');
     head.append(tabs, closeButton);
+
+    const subtabs = el('div', 'le-subtabs le-hidden');
+    subtabs.setAttribute('role', 'tablist');
+    subtabs.setAttribute('aria-label', 'Which changes');
+    const drawerSubtabs = {};
+    [['Changes', 'Not published yet'], ['History', 'Published']].forEach(([name, label]) => {
+        const sub = el('button', 'le-subtab', label);
+        sub.type = 'button';
+        sub.dataset.tab = name;
+        sub.setAttribute('role', 'tab');
+        drawerSubtabs[name] = sub;
+        subtabs.append(sub);
+    });
 
     // What is being edited, below the tabs.
     const subject = el('div', 'le-subject');
@@ -1176,7 +1257,7 @@ export function createChrome() {
     saveButton.type = 'button';
     foot.append(drawerDelete, cancelButton, saveButton);
 
-    drawer.append(head, subject, drawerFields, foot);
+    drawer.append(head, subtabs, subject, drawerFields, foot);
 
     // ---- floating link handle ---------------------------------------------
     const linkHandle = el('button', 'le-handle');
@@ -1315,6 +1396,8 @@ export function createChrome() {
         drawer,
         drawerFoot: foot,
         drawerTabs,
+        drawerSubtabs,
+        drawerSubtabsBar: subtabs,
         drawerSubject: subject,
         drawerTitle,
         drawerTrail,

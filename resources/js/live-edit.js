@@ -2,7 +2,7 @@ import { createChrome } from './chrome.js';
 import { renderBrandPanel } from './brand.js';
 import { uploadWidget } from './upload.js';
 import { renderSeoPanel } from './seo.js';
-import { addedWith, describeStructure, newAddedId, orderWith, renderLibrary, renderPagesPanel } from './pages.js';
+import { addedWith, describeStructure, newAddedId, orderWith, renderNewPage, renderSectionBrowser } from './pages.js';
 import { dropdownTriggerFrom } from './dropdown-trigger.js';
 import { biggestThatFits, howMuchSurvives, inSourcePixels, movedWithin, whatIsThereNow } from './fitting.js';
 import { attrsWorthSending, creditWorthSending } from './only-what-changed.js';
@@ -1115,13 +1115,22 @@ const bootLiveEdit = () => {
             // already been saved, which is why it is in the list.
             ui.drawerFoot.classList.toggle('le-hidden', name !== 'Edit');
 
+            // Changes and History are one tab with two halves; the switch under
+            // the tabs says which half is showing.
+            const changesTab = name === 'Changes' || name === 'History';
+            ui.drawerSubtabsBar?.classList.toggle('le-hidden', !changesTab);
+            drawerTabs.Changes?.classList.toggle('is-on', changesTab);
+            Object.entries(ui.drawerSubtabs ?? {}).forEach(([label, sub]) => {
+                sub.classList.toggle('is-on', label === name);
+                sub.setAttribute('aria-selected', label === name ? 'true' : 'false');
+            });
+
             if (name === 'Changes') void renderChanges();
             if (name === 'History') void renderHistory();
             if (name === 'Brand') renderBrand();
             else brandPanel?.unpreview();
             if (name === 'SEO') renderSeo();
             else seoPanel?.unpreview();
-            if (name === 'Pages') renderPages();
         };
 
         /*
@@ -1141,9 +1150,14 @@ const bootLiveEdit = () => {
                 body: JSON.stringify({ key, value }),
             });
         };
-        const renderPages = () => {
-            renderPagesPanel({
-                container: drawerFields,
+        // New page: a window of its own (pages.js), opened from the bar.
+        const openNewPage = () => {
+            if (!window.liveEditPages) return null;
+            if (!document.body.classList.contains('editing')) setEditing(true);
+            closeDrawer(true);
+            const handle = ui.modal({ title: 'New page', size: 'is-wide' });
+            renderNewPage({
+                ui: handle,
                 config: window.liveEditPages,
                 save: saveSetting,
                 go: (href) => {
@@ -1152,6 +1166,8 @@ const bootLiveEdit = () => {
                 },
                 notify,
             });
+
+            return handle;
         };
 
         let brandPanel = null;
@@ -1192,6 +1208,11 @@ const bootLiveEdit = () => {
                 notify,
             });
         };
+
+        Object.entries(ui.drawerSubtabs ?? {}).forEach(([name, sub]) => {
+            // Both halves are lists of what was saved, so moving between them loses nothing.
+            sub.addEventListener('click', () => showTab(name));
+        });
 
         Object.entries(drawerTabs).forEach(([name, tab]) => {
             tab.addEventListener('click', () => {
@@ -3436,20 +3457,22 @@ const bootLiveEdit = () => {
                 addSection.className = 'le-chip-btn';
                 addSection.textContent = item ? '+ Add a section below' : '+ Add a section';
                 addSection.addEventListener('click', () => {
-                    drawerFields.replaceChildren();
-                    const back = document.createElement('div');
-                    back.className = 'le-section-heading';
-                    back.textContent = item ? `Add below “${item.dataset.editSectionLabel ?? 'this section'}”` : 'Add a section';
-                    drawerFields.append(back);
-                    const picker = renderLibrary({
-                        container: drawerFields,
+                    // A window with room to see a section at its real size before
+                    // adding it, rather than a list squeezed into the panel.
+                    const below = item ? `below “${item.dataset.editSectionLabel ?? 'this section'}”` : 'to this page';
+                    const handle = ui.modal({ title: 'Add a section', subtitle: `It goes ${below}. Point at one to see it.`, size: 'is-wide' });
+                    const picker = renderSectionBrowser({
+                        container: handle.body,
                         library: builder.library,
-                        pick: async (section) => {
+                        add: async (section) => {
                             const id = newAddedId();
+                            handle.allowDismiss(false);
                             try {
                                 await saveSetting(builder.structureKey, addedWith(builder.added, id, section.from));
+                                handle.close();
                                 await saveOrder(orderWith(currentOrder(), `s-${id}`, item?.dataset.editItem ?? null), `${section.label} added ✓`);
                             } catch (error) {
+                                handle.allowDismiss(true);
                                 notify(error.message);
                             }
                         },
@@ -4981,19 +5004,7 @@ const bootLiveEdit = () => {
             openDrawer();
         });
 
-        ui.pagesButton?.addEventListener('click', () => {
-            if (!document.body.classList.contains('editing')) setEditing(true);
-
-            showTab('Pages');
-            openDrawer();
-        });
-
-        ui.createPageButton?.addEventListener('click', () => {
-            if (!document.body.classList.contains('editing')) setEditing(true);
-
-            showTab('Pages');
-            openDrawer();
-        });
+        ui.pagesButton?.addEventListener('click', () => { openNewPage(); });
 
         ui.changesButton?.addEventListener('click', () => {
             // Somebody asking what they have changed is asking about editing,
@@ -5050,8 +5061,8 @@ const bootLiveEdit = () => {
                     { tab: 'Changes', title: 'Review your SEO draft', copy: 'Your saved search details are listed here.' },
                 ],
                 pages: [
-                    { tab: 'Pages', title: 'Start a new page', copy: 'Give the page a title and address, then choose the sections to start with. You can choose whether it appears in the menu.' },
-                    { tab: 'Pages', title: 'Create and open it', copy: 'When the title, address and sections are ready, choose Create page. Live Edit opens the new page so you can edit it.' },
+                    { tab: 'toolbar', control: 'pagesButton', title: 'Start a new page', copy: 'Choose New page. Pick a page your design already has to start from, like your Contact or About page.' },
+                    { tab: 'toolbar', control: 'pagesButton', title: 'Name it and create it', copy: 'Give it a title (its address follows), choose whether it goes in the menu, and choose Create page. Live Edit opens it so you can change its words and photos.' },
                 ],
                 languages: [
                     { tab: 'language', title: 'Choose a language', copy: 'Use this menu to choose which language you are editing. Changes are saved for that language.' },
@@ -5196,7 +5207,7 @@ const bootLiveEdit = () => {
                 heading.textContent = step.title;
                 copy.textContent = step.copy;
 
-                if (step.tab === 'Brand' || step.tab === 'SEO' || step.tab === 'Pages') {
+                if (step.tab === 'Brand' || step.tab === 'SEO') {
                     if (!drawerTabs[step.tab]) {
                         copy.textContent = `${step.title} is not available on this website. Choose Next to continue.`;
                         return;
@@ -6044,8 +6055,7 @@ const bootLiveEdit = () => {
             const query = params.toString();
             window.history.replaceState(null, '', window.location.pathname + (query ? `?${query}` : ''));
             setEditing(true);
-            showTab('Pages');
-            openDrawer();
+            openNewPage();
         } else if (params.has('edit')) {
             params.delete('edit');
             const query = params.toString();
