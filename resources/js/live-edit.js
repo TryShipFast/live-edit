@@ -4772,6 +4772,10 @@ const bootLiveEdit = () => {
             if (icon) return { element: icon, kind: 'icon' };
             const drawing = node.closest('[data-edit-svg]');
             if (drawing) return { element: drawing, kind: 'svg' };
+            // A number the template works out (data-kit-computed): it is explained,
+            // not typed over, because the next page load would count it again.
+            const computed = node.closest('[data-kit-computed]');
+            if (computed) return { element: computed, kind: 'computed' };
             const text = node.closest('[data-edit]');
             if (text) return { element: text, kind: 'text' };
             /*
@@ -4797,12 +4801,18 @@ const bootLiveEdit = () => {
             return null;
         };
 
+        // What a counted number tells the owner who clicks it.
+        const COMPUTED_SAYS = {
+            count: 'This number counts itself from the products on this page. Add or remove a product and it changes.',
+            collection: 'This counts the products in the collection it links to and shows the lowest price. Change that collection and it follows.',
+        };
         const openTarget = ({ element, kind }) => {
             if (kind === 'image') editImage(element);
             else if (kind === 'icon') void editIcon(element);
             else if (kind === 'svg') editDrawing(element);
             else if (kind === 'text') editText(element);
             else if (kind === 'link') editLink(element);
+            else if (kind === 'computed') ui.toast(COMPUTED_SAYS[element.dataset.kitComputed] ?? COMPUTED_SAYS.count, 7000);
             else editStyle(element);
         };
 
@@ -4824,7 +4834,7 @@ const bootLiveEdit = () => {
                 height: `${rect.height}px`,
             });
             ui.hoverBox.classList.toggle('is-flipped', rect.top < 26);
-            ui.hoverLabel.textContent = element.dataset.editLabel ?? describeElement(element);
+            ui.hoverLabel.textContent = element.dataset.kitComputed ? 'Counted for you' : (element.dataset.editLabel ?? describeElement(element));
             ui.hoverBox.classList.add('is-visible');
         };
 
