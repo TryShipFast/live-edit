@@ -424,6 +424,15 @@ const bootLiveEdit = () => {
             return wrap;
         };
 
+        const FIELD_NAMES = {
+            title: 'Heading', heading: 'Heading', lead: 'Introduction', intro: 'Introduction', text: 'Text', body: 'Text',
+            name: 'Name', notes: 'Notes', family: 'Category', price: 'Price', size: 'Size', label: 'Label',
+            photo: 'Photo', image: 'Photo', logo: 'Logo', caption: 'Caption', quote: 'Quote', source: 'Who said it',
+            cta: 'Button', button: 'Button', link: 'Link', email: 'Email address', phone: 'Phone number',
+            address: 'Address', date: 'Date', time: 'Time', question: 'Question', answer: 'Answer', story: 'Description',
+            description: 'Description', amount: 'Amount', meta: 'Details', note: 'Note', fine: 'Small print',
+        };
+
         /** What this element is, in words a non-technical editor recognises. */
         const describeElement = (element) => {
             const tag = element.tagName;
@@ -441,6 +450,15 @@ const bootLiveEdit = () => {
              * disagreeing is what made the region look like dead output.
              */
             if (element.dataset.editRegion) return element.dataset.editRegion;
+
+            /*
+             * The name the template gave this field (data-field), when it is a word an
+             * owner would use: "Price" or "Notes" says what they clicked; "Paragraph"
+             * says how it was written. Names made for code ("addcheckout") are left to
+             * the tag below.
+             */
+            const named = FIELD_NAMES[element.dataset.field];
+            if (named) return named;
 
             if (tag === 'IMG') return 'Image';
             if (tag === 'BUTTON') return 'Button';
