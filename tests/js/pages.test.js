@@ -272,3 +272,33 @@ describe('the Pages tab', () => {
         expect(whyNotYet({ title: 'Open days', address: 'open-days', chosen: ['x'] })).toBeNull();
     });
 });
+
+describe('a card and its page', () => {
+    it('finds the page a card opens, the longest id first', async () => {
+        const { pageOfLink } = await import('../../resources/js/pages.js');
+        const pages = [{ id: '' }, { id: 'arc' }, { id: 'products/arc' }, { id: 'journal/battery-life' }];
+        expect(pageOfLink('../products/arc/', pages, 'http://x.test/shop/').id).toBe('products/arc');
+        expect(pageOfLink('../../journal/battery-life/index.html', pages, 'http://x.test/a/b/').id).toBe('journal/battery-life');
+        expect(pageOfLink('https://elsewhere.test/', pages, 'http://x.test/')).toBeNull();
+        const a = document.createElement('a'); a.setAttribute('href', '../products/arc/'); a.dataset.linkPage = 'arc';
+        expect(pageOfLink(a, [{ id: 'product-arc' }, { id: 'arc' }], 'http://x.test/shop/').id).toBe('arc');
+        a.dataset.linkPage = 'product-arc';
+        expect(pageOfLink(a, [{ id: 'product-arc' }], 'http://x.test/shop/').id).toBe('product-arc');
+        a.setAttribute('href', '../fig-archive/');
+        expect(pageOfLink(a, [{ id: 'product-arc' }, { id: 'fig-archive' }], 'http://x.test/shop/').id).toBe('fig-archive');
+    });
+    it('names a free address and points the link at it', async () => {
+        const { freeAddress, hrefTo } = await import('../../resources/js/pages.js');
+        expect(freeAddress('Fig Archive', ['fig-archive'])).toBe('fig-archive-2');
+        expect(hrefTo('../products/arc/', 'fig-archive')).toBe('../fig-archive/');
+        expect(hrefTo('products/arc/', 'fig-archive')).toBe('fig-archive/');
+    });
+    it('makes a page like another, out of the menu', async () => {
+        const { makePageLike } = await import('../../resources/js/pages.js');
+        const saved = [];
+        const id = await makePageLike({ config: { pagesKey: 'structure:pages', made: [], taken: [] }, save: async (k, v) => saved.push([k, v]), sections: ['product.detail', 'product.details'], title: 'Fig Archive' });
+        expect(id).toBe('fig-archive');
+        expect(Object.values(JSON.parse(saved[0][1]).added)).toEqual(['product.detail', 'product.details']);
+        expect(JSON.parse(saved[1][1])).toEqual([{ id: 'fig-archive', title: 'Fig Archive', menu: false }]);
+    });
+});

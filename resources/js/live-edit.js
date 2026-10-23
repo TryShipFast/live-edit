@@ -2,7 +2,7 @@ import { createChrome } from './chrome.js';
 import { renderBrandPanel } from './brand.js';
 import { uploadWidget } from './upload.js';
 import { renderSeoPanel } from './seo.js';
-import { addedWith, describeStructure, newAddedId, orderWith, renderNewPage, renderSectionBrowser } from './pages.js';
+import { addedWith, describeStructure, hrefTo, makePageLike, newAddedId, orderWith, pageOfLink, renderNewPage, renderSectionBrowser } from './pages.js';
 import { dropdownTriggerFrom } from './dropdown-trigger.js';
 import { biggestThatFits, howMuchSurvives, inSourcePixels, movedWithin, whatIsThereNow } from './fitting.js';
 import { attrsWorthSending, creditWorthSending } from './only-what-changed.js';
@@ -431,6 +431,7 @@ const bootLiveEdit = () => {
             cta: 'Button', button: 'Button', link: 'Link', email: 'Email address', phone: 'Phone number',
             address: 'Address', date: 'Date', time: 'Time', question: 'Question', answer: 'Answer', story: 'Description',
             description: 'Description', amount: 'Amount', meta: 'Details', note: 'Note', fine: 'Small print',
+            kind: 'Type', type: 'Type', conn: 'Connection', cloth: 'Cloth', cols: 'Colours', colours: 'Colours', k: 'Key numbers',
         };
 
         /** What this element is, in words a non-technical editor recognises. */
@@ -3596,6 +3597,64 @@ const bootLiveEdit = () => {
                     ? `This design holds ${most}. Replace one, or delete one to add another.`
                     : 'Keep at least one, so there is something to add another from.';
                 block.append(why);
+            }
+            /*
+             * The card's own page. A product card, a journal card or a project
+             * card opens a detail page of the design's; the panel offers that
+             * page from the card, so the details are one press away. A card
+             * copied from another still opens the original's page, so it is
+             * offered a page of its own: one made like its siblings', under the
+             * card's name, which the card then opens.
+             */
+            const opens = !sections && item && builder?.pages?.length
+                ? [...item.querySelectorAll('a[href]')].map((a) => [a, pageOfLink(a, builder.pages, window.location.href)]).find(([, page]) => page)
+                : null;
+            if (opens) {
+                const [link, page] = opens;
+                const shared = [...list.children].some((other) => other !== item && other.dataset.editItem
+                    && [...other.querySelectorAll('a[href]')].some((a) => pageOfLink(a, builder.pages, window.location.href)?.id === page.id));
+                const own = document.createElement('div');
+                own.className = 'le-row';
+                const visit = document.createElement('button');
+                visit.type = 'button';
+                visit.className = 'le-chip-btn';
+                visit.textContent = shared ? `Open “${page.title}”` : 'Edit its page →';
+                visit.title = `Opens ${page.title} in the editor`;
+                visit.addEventListener('click', () => { window.location.href = `${builder.editorBase}${page.id}`; });
+                own.append(visit);
+                const like = (builder.starts ?? []).find((start) => start.id === page.id);
+                const editableLink = link.dataset.editHref !== undefined ? link : item.querySelector('a[data-edit-href]');
+                const cardName = (item.dataset.editItemLabel || item.querySelector('h1, h2, h3, h4')?.textContent || '').replace(/\s+/g, ' ').trim();
+                // The copy, not the card it was copied from: an id the editor minted, or a name that is not the page's.
+                const isCopy = /^n[0-9a-z]+$/.test(item.dataset.editItem) || (cardName && cardName.toLowerCase() !== String(page.title).toLowerCase());
+                if (shared && isCopy && like?.sections?.length && editableLink) {
+                    const make = document.createElement('button');
+                    make.type = 'button';
+                    make.className = 'le-btn';
+                    make.textContent = 'Give it its own page';
+                    make.title = `A new page made like ${page.title}, which this card opens`;
+                    make.addEventListener('click', async () => {
+                        const name = cardName || 'New page';
+                        make.disabled = true;
+                        make.textContent = 'Making its page…';
+                        try {
+                            const id = await makePageLike({ config: builder, save: saveSetting, sections: like.sections, title: name });
+                            await saveSetting(editableLink.dataset.editHref, hrefTo(editableLink.getAttribute('href'), id));
+                            window.location.href = `${builder.editorBase}${id}`;
+                        } catch (error) {
+                            notify(error.message);
+                            make.disabled = false;
+                            make.textContent = 'Give it its own page';
+                        }
+                    });
+                    own.append(make);
+                }
+                const said = document.createElement('p');
+                said.className = 'le-hint';
+                said.textContent = shared
+                    ? `This card opens the same page as another card (${page.title}). Give it its own to write its details.`
+                    : `This card opens ${page.title}. Its details, photos and price are edited there.`;
+                block.append(own, said);
             }
             const context = item ? drawerFields.querySelector('.le-item-context') : null;
             if (context) context.after(block);

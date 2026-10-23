@@ -311,6 +311,21 @@ A host that serves pages in its own editor can keep the visitor's address in
 link field always shows and saves the `href`, so the address a customer
 publishes is never the editor's.
 
+## A card and its page
+
+Picking a card in a list (a product, a journal entry, a project) shows the
+page it opens, under the card's actions: **Edit its page →** goes there. The
+page is found from the card's link, by its address or, for the design's own
+pages, by the `data-link-page` the Kit gives it (`pageOfLink` in `pages.js`).
+
+A card copied from another still opens the original's page. The copy (an id
+the editor minted, or a name that is not the page's) is offered **Give it its
+own page**: a page made like that one (its sections, from `starts`), named
+after the card and left out of the menu, which the card's link then opens
+(`makePageLike`, `hrefTo`). The editor goes straight to it, so the next thing
+the owner does is write the new product's, post's or project's details. It is
+the same two settings as New page, plus the link's own setting.
+
 ## The Brand tab
 
 When the host sets `window.liveEditBrand` before the editor loads, a **Brand**

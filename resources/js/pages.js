@@ -816,3 +816,64 @@ export function renderSectionBrowser({ container, library, add, multiple = false
 
     return { chosen: () => [...on], focus: () => search.focus() };
 }
+
+/**
+ * The page a card's link opens: the page whose address the link ends in (the
+ * longest id that fits), or else the one it names (`data-link-page`, the Kit's
+ * record of where the design's link goes). A card on a shop grid, a journal list or
+ * a projects page leads to a detail page this way, and the editor can offer
+ * that page from the card.
+ */
+export function pageOfLink(link, pages = [], base = 'http://localhost/') {
+    // The address first: a card the owner pointed at a page they made opens that
+    // page, whatever page the design's own data-link-page still names.
+    const named = link?.dataset?.linkPage;
+    const byName = named ? pages.find((page) => page.id === named) ?? null : null;
+    let path;
+    try {
+        path = new URL(link?.getAttribute?.('href') ?? link, base).pathname.replace(/index\.html$/, '');
+    } catch {
+        return byName;
+    }
+    if (!path.endsWith('/')) path += '/';
+    let best = null;
+    for (const page of pages) {
+        if (!page.id) continue;
+        if (path.endsWith(`/${page.id}/`) && (!best || page.id.length > best.id.length)) best = page;
+    }
+
+    return best ?? byName;
+}
+
+/** An address not yet taken, from a title: "Fig Archive" → fig-archive, then fig-archive-2. */
+export function freeAddress(title, taken = []) {
+    const first = slugFor(title) || 'new-page';
+    let id = first;
+    for (let n = 2; addressProblem(id, taken); n += 1) id = `${first}-${n}`;
+
+    return id;
+}
+
+/**
+ * A card's link, pointed at a page the owner made: the same way up to the site
+ * root (`../`), then that page's folder, which is where a made page is
+ * published. "../products/arc/" becomes "../fig-archive/".
+ */
+export function hrefTo(oldHref, newId) {
+    return `${(String(oldHref).match(/^(?:\.\.\/)*/) ?? [''])[0]}${newId}/`;
+}
+
+/**
+ * Makes a page like another (its sections, in order) for a card, under the
+ * card's own name, out of the menu: the same two settings a page made from
+ * New page writes. Returns the new page's id.
+ */
+export async function makePageLike({ config, save, sections, title }) {
+    const id = freeAddress(title, config.taken ?? []);
+    const added = {};
+    for (const from of sections) added[newAddedId()] = from;
+    await save(`structure:page:${id}`, JSON.stringify({ added }));
+    await save(config.pagesKey, JSON.stringify([...(config.made ?? []), { id, title: String(title).trim(), menu: false }]));
+
+    return id;
+}
