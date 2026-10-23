@@ -4864,6 +4864,7 @@ const bootLiveEdit = () => {
         const COMPUTED_SAYS = {
             count: 'This number counts itself from the products on this page. Add or remove a product and it changes.',
             collection: 'This counts the products in the collection it links to and shows the lowest price. Change that collection and it follows.',
+            choices: 'These choices come from your products’ own words. Change a product’s type, cloth or colour on its card and the choices follow.',
         };
         const openTarget = ({ element, kind }) => {
             if (kind === 'image') editImage(element);
