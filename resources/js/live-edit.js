@@ -3270,6 +3270,7 @@ const bootLiveEdit = () => {
             not_configured: 'Making pictures is not switched on for this site yet.',
             queue_unavailable: 'Picture generation is temporarily unavailable. Your credits have not been used.',
             no_suggestion: 'Nothing usable came back, so you have not been charged. Try describing it differently.',
+            timed_out: 'That picture took too long and was stopped. Your credits are back. Try again.',
             nothing_to_work_with: 'Describe the picture you want first.',
         }[reason] ?? 'Could not make a picture just now. You have not been charged.');
 

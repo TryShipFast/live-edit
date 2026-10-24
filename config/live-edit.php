@@ -250,9 +250,13 @@ return [
         'image_model' => env('LIVE_EDIT_AI_IMAGE_MODEL', 'gpt-image-1'),
         'image_connect_timeout' => (int) env('LIVE_EDIT_AI_IMAGE_CONNECT_TIMEOUT', 10),
         'image_timeout' => (int) env('LIVE_EDIT_AI_IMAGE_TIMEOUT', 50),
-        // Keep provider work under the queue job timeout; unlike the former
-        // browser request, this can outlast the edge gateway safely.
-        'image_job_timeout' => (int) env('LIVE_EDIT_AI_IMAGE_JOB_TIMEOUT', 70),
+        // How long the provider is given to make two pictures, in the queue
+        // worker. gpt-image-1 often takes longer than a minute for two at
+        // 1024px, and at the old 70 seconds every slow one failed. The job is
+        // allowed 20 seconds more than this, and a generation still unfinished
+        // two minutes after that is given up and refunded (the queue's
+        // retry_after must be longer than the job, or it starts it twice).
+        'image_job_timeout' => (int) env('LIVE_EDIT_AI_IMAGE_JOB_TIMEOUT', 150),
     ],
 
     /*
