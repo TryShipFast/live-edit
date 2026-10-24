@@ -178,7 +178,9 @@ test('history shows twenty recent versions and pages older ones', async ({ page,
         });
     });
 
-    await panel(page).locator('.le-tab[data-tab="History"]').click();
+    // Published changes are the second half of Changes, switched under the tabs.
+    await panel(page).locator('.le-tab[data-tab="Changes"]').click();
+    await panel(page).locator('.le-subtab[data-tab="History"]').click();
     await expect(panel(page).locator('.le-version')).toHaveCount(20);
     await expect(panel(page).locator('.le-pagination')).toContainText('Page 1 of 2');
     await panel(page).locator('.le-pagination button', { hasText: 'Older' }).click();
@@ -539,7 +541,7 @@ test('an item added to a list is on the page, and can be taken off again', async
     };
 
     await openItem(items);
-    await panel(page).getByRole('button', { name: /Add another|Add item/ }).click();
+    await panel(page).getByRole('button', { name: /^Duplicate$|Add item/ }).click();
     await settled(page);
     await page.reload();
     await settled(page);

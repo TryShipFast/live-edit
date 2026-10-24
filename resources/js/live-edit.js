@@ -2,7 +2,7 @@ import { createChrome } from './chrome.js';
 import { renderBrandPanel } from './brand.js';
 import { uploadWidget } from './upload.js';
 import { renderSeoPanel } from './seo.js';
-import { addedWith, describeStructure, newAddedId, orderWith, renderLibrary, renderPagesPanel } from './pages.js';
+import { addedWith, describeStructure, hrefTo, makePageLike, newAddedId, orderWith, pageOfLink, renderNewPage, renderSectionBrowser } from './pages.js';
 import { dropdownTriggerFrom } from './dropdown-trigger.js';
 import { biggestThatFits, howMuchSurvives, inSourcePixels, movedWithin, whatIsThereNow } from './fitting.js';
 import { attrsWorthSending, creditWorthSending } from './only-what-changed.js';
@@ -424,6 +424,16 @@ const bootLiveEdit = () => {
             return wrap;
         };
 
+        const FIELD_NAMES = {
+            title: 'Heading', heading: 'Heading', lead: 'Introduction', intro: 'Introduction', text: 'Text', body: 'Text',
+            name: 'Name', notes: 'Notes', family: 'Category', price: 'Price', size: 'Size', label: 'Label',
+            photo: 'Photo', image: 'Photo', logo: 'Logo', caption: 'Caption', quote: 'Quote', source: 'Who said it',
+            cta: 'Button', button: 'Button', link: 'Link', email: 'Email address', phone: 'Phone number',
+            address: 'Address', date: 'Date', time: 'Time', question: 'Question', answer: 'Answer', story: 'Description',
+            description: 'Description', amount: 'Amount', meta: 'Details', note: 'Note', fine: 'Small print',
+            kind: 'Type', type: 'Type', conn: 'Connection', cloth: 'Cloth', cols: 'Colours', colours: 'Colours', k: 'Key numbers',
+        };
+
         /** What this element is, in words a non-technical editor recognises. */
         const describeElement = (element) => {
             const tag = element.tagName;
@@ -441,6 +451,15 @@ const bootLiveEdit = () => {
              * disagreeing is what made the region look like dead output.
              */
             if (element.dataset.editRegion) return element.dataset.editRegion;
+
+            /*
+             * The name the template gave this field (data-field), when it is a word an
+             * owner would use: "Price" or "Notes" says what they clicked; "Paragraph"
+             * says how it was written. Names made for code ("addcheckout") are left to
+             * the tag below.
+             */
+            const named = FIELD_NAMES[element.dataset.field];
+            if (named) return named;
 
             if (tag === 'IMG') return 'Image';
             if (tag === 'BUTTON') return 'Button';
@@ -732,10 +751,20 @@ const bootLiveEdit = () => {
         const addStyleFields = (styleKey, propNames, element) => {
             current.styleKey = styleKey;
             const values = (window.liveEditStyles ?? {})[styleKey] ?? {};
-            const heading = document.createElement('div');
+            /*
+             * Folded away unless it is all there is. Most people open an element to
+             * change its words or its picture; four controls for size, weight and
+             * spacing in between push what they came for (and the item's own Move
+             * and Delete) below the fold, and invite changes a novice did not mean.
+             */
+            const group = document.createElement('details');
+            group.className = 'le-style-group';
+            group.open = !drawerFields.querySelector('textarea, input:not([type=checkbox]), select, .le-image');
+            const heading = document.createElement('summary');
             heading.className = 'le-section-heading';
-            heading.textContent = 'Style';
-            drawerFields.append(heading);
+            heading.textContent = 'Style: colour, size and spacing';
+            group.append(heading);
+            drawerFields.append(group);
             let offered = 0;
             (element ? stylePropsFor(element, propNames) : propNames).forEach((name) => {
                 /*
@@ -756,7 +785,7 @@ const bootLiveEdit = () => {
                  */
                 const type = (window.liveEditStyleProps ?? {})[name] ?? KINDS_OF_STYLE[name];
                 if (!type) return;
-                drawerFields.append(styleField(name, type, values[name], element));
+                group.append(styleField(name, type, values[name], element));
                 offered++;
             });
             if (offered === 0) {
@@ -764,7 +793,7 @@ const bootLiveEdit = () => {
                 const none = document.createElement('div');
                 none.className = 'le-hint';
                 none.textContent = 'Nothing on this element can be restyled.';
-                drawerFields.append(none);
+                group.append(none);
             }
         };
 
@@ -1115,13 +1144,22 @@ const bootLiveEdit = () => {
             // already been saved, which is why it is in the list.
             ui.drawerFoot.classList.toggle('le-hidden', name !== 'Edit');
 
+            // Changes and History are one tab with two halves; the switch under
+            // the tabs says which half is showing.
+            const changesTab = name === 'Changes' || name === 'History';
+            ui.drawerSubtabsBar?.classList.toggle('le-hidden', !changesTab);
+            drawerTabs.Changes?.classList.toggle('is-on', changesTab);
+            Object.entries(ui.drawerSubtabs ?? {}).forEach(([label, sub]) => {
+                sub.classList.toggle('is-on', label === name);
+                sub.setAttribute('aria-selected', label === name ? 'true' : 'false');
+            });
+
             if (name === 'Changes') void renderChanges();
             if (name === 'History') void renderHistory();
             if (name === 'Brand') renderBrand();
             else brandPanel?.unpreview();
             if (name === 'SEO') renderSeo();
             else seoPanel?.unpreview();
-            if (name === 'Pages') renderPages();
         };
 
         /*
@@ -1141,9 +1179,14 @@ const bootLiveEdit = () => {
                 body: JSON.stringify({ key, value }),
             });
         };
-        const renderPages = () => {
-            renderPagesPanel({
-                container: drawerFields,
+        // New page: a window of its own (pages.js), opened from the bar.
+        const openNewPage = () => {
+            if (!window.liveEditPages) return null;
+            if (!document.body.classList.contains('editing')) setEditing(true);
+            closeDrawer(true);
+            const handle = ui.modal({ title: 'New page', size: 'is-wide' });
+            renderNewPage({
+                ui: handle,
                 config: window.liveEditPages,
                 save: saveSetting,
                 go: (href) => {
@@ -1152,6 +1195,8 @@ const bootLiveEdit = () => {
                 },
                 notify,
             });
+
+            return handle;
         };
 
         let brandPanel = null;
@@ -1161,6 +1206,24 @@ const bootLiveEdit = () => {
                 container: drawerFields,
                 config: window.liveEditSeo,
                 save: saveSetting,
+                // The same chooser as every picture on the site: upload, free photos, or
+                // generate with credits. A generated or uploaded file is stored first, so
+                // what is saved is an address.
+                pickImage: () => new Promise((resolve, reject) => {
+                    const near = document.querySelector('main h1') ?? document.querySelector('h1') ?? document.body;
+                    openImagePicker(near, async (what) => {
+                        try {
+                            if (what?.url) return resolve(what.url);
+                            if (!what?.file) return resolve(null);
+                            const body = new FormData();
+                            body.append('file', what.file);
+                            const response = await request('/live-edit/upload', { method: 'POST', body });
+                            resolve((await response.json()).url);
+                        } catch (error) {
+                            reject(error);
+                        }
+                    }, 'Upload', 'share image', 'Shown when this page is shared');
+                }),
                 done: (message) => {
                     if (message) reloadWithToast(message);
                     else closeDrawer(true);
@@ -1192,6 +1255,11 @@ const bootLiveEdit = () => {
                 notify,
             });
         };
+
+        Object.entries(ui.drawerSubtabs ?? {}).forEach(([name, sub]) => {
+            // Both halves are lists of what was saved, so moving between them loses nothing.
+            sub.addEventListener('click', () => showTab(name));
+        });
 
         Object.entries(drawerTabs).forEach(([name, tab]) => {
             tab.addEventListener('click', () => {
@@ -2682,13 +2750,13 @@ const bootLiveEdit = () => {
          * @param {(chosen: {url?: string, file?: File, credit?: string}) => void} apply
          * @param {string} startOn which tab to open on
          */
-        const openImagePicker = (element, apply, startOn = 'Free photos', calledIt = 'image') => {
+        const openImagePicker = (element, apply, startOn = 'Free photos', calledIt = 'image', saying = null) => {
             const sheet = ui.modal({
                 // Named as the client named it. Somebody who pressed "Replace
                 // background" and lands on a dialog headed "Replace image"
                 // has reason to wonder whether they pressed the right thing.
                 title: `Replace ${calledIt}`,
-                subtitle: element.dataset.editLabel ?? describeElement(element),
+                subtitle: saying ?? element.dataset.editLabel ?? describeElement(element),
             });
 
             const panel = document.createElement('div');
@@ -3408,11 +3476,13 @@ const bootLiveEdit = () => {
             const full = Number.isFinite(most) && most > 0 && count >= most;
             const lowest = count <= least;
 
-            if (!sections) {
+            // With an item chosen, "Duplicate" below does exactly this (a copy right after it),
+            // so offering both asked a novice to choose between two names for one thing.
+            if (!sections && !item) {
                 const add = document.createElement('button');
                 add.type = 'button';
                 add.className = 'le-chip-btn';
-                add.textContent = item ? '+ Add another' : '+ Add item';
+                add.textContent = '+ Add item';
                 add.disabled = full;
                 add.addEventListener('click', () => {
                     const ids = currentOrder();
@@ -3436,20 +3506,22 @@ const bootLiveEdit = () => {
                 addSection.className = 'le-chip-btn';
                 addSection.textContent = item ? '+ Add a section below' : '+ Add a section';
                 addSection.addEventListener('click', () => {
-                    drawerFields.replaceChildren();
-                    const back = document.createElement('div');
-                    back.className = 'le-section-heading';
-                    back.textContent = item ? `Add below “${item.dataset.editSectionLabel ?? 'this section'}”` : 'Add a section';
-                    drawerFields.append(back);
-                    const picker = renderLibrary({
-                        container: drawerFields,
+                    // A window with room to see a section at its real size before
+                    // adding it, rather than a list squeezed into the panel.
+                    const below = item ? `below “${item.dataset.editSectionLabel ?? 'this section'}”` : 'to this page';
+                    const handle = ui.modal({ title: 'Add a section', subtitle: `It goes ${below}. Point at one to see it.`, size: 'is-wide' });
+                    const picker = renderSectionBrowser({
+                        container: handle.body,
                         library: builder.library,
-                        pick: async (section) => {
+                        add: async (section) => {
                             const id = newAddedId();
+                            handle.allowDismiss(false);
                             try {
                                 await saveSetting(builder.structureKey, addedWith(builder.added, id, section.from));
+                                handle.close();
                                 await saveOrder(orderWith(currentOrder(), `s-${id}`, item?.dataset.editItem ?? null), `${section.label} added ✓`);
                             } catch (error) {
+                                handle.allowDismiss(true);
                                 notify(error.message);
                             }
                         },
@@ -3484,7 +3556,7 @@ const bootLiveEdit = () => {
                     const duplicate = document.createElement('button');
                     duplicate.type = 'button';
                     duplicate.className = 'le-chip-btn';
-                    duplicate.textContent = sections ? 'Duplicate section' : 'Duplicate item';
+                    duplicate.textContent = sections ? 'Duplicate section' : 'Duplicate';
                     duplicate.disabled = !sections && full;
                     duplicate.addEventListener('click', () => {
                         const reordered = currentOrder();
@@ -3527,16 +3599,85 @@ const bootLiveEdit = () => {
                     row.append(remove);
                 }
             }
-            drawerFields.append(heading, row);
-
+            /*
+             * At the top, under "Item 2 of 16", rather than after everything else.
+             * Duplicating a product, moving it or deleting it is what somebody who
+             * clicked a card most often came to do, and at the bottom of a long
+             * panel it was below the fold, where it read as missing.
+             */
+            const block = document.createElement('div');
+            block.className = 'le-item-actions';
+            block.append(heading, row);
             if (!sections && (full || (item && lowest))) {
                 const why = document.createElement('p');
                 why.className = 'le-hint';
                 why.textContent = full
                     ? `This design holds ${most}. Replace one, or delete one to add another.`
                     : 'Keep at least one, so there is something to add another from.';
-                drawerFields.append(why);
+                block.append(why);
             }
+            /*
+             * The card's own page. A product card, a journal card or a project
+             * card opens a detail page of the design's; the panel offers that
+             * page from the card, so the details are one press away. A card
+             * copied from another still opens the original's page, so it is
+             * offered a page of its own: one made like its siblings', under the
+             * card's name, which the card then opens.
+             */
+            const opens = !sections && item && builder?.pages?.length
+                ? [...item.querySelectorAll('a[href]')].map((a) => [a, pageOfLink(a, builder.pages, window.location.href)]).find(([, page]) => page)
+                : null;
+            if (opens) {
+                const [link, page] = opens;
+                const shared = [...list.children].some((other) => other !== item && other.dataset.editItem
+                    && [...other.querySelectorAll('a[href]')].some((a) => pageOfLink(a, builder.pages, window.location.href)?.id === page.id));
+                const own = document.createElement('div');
+                own.className = 'le-row';
+                const visit = document.createElement('button');
+                visit.type = 'button';
+                visit.className = 'le-chip-btn';
+                visit.textContent = shared ? `Open “${page.title}”` : 'Edit its page →';
+                visit.title = `Opens ${page.title} in the editor`;
+                visit.addEventListener('click', () => { window.location.href = `${builder.editorBase}${page.id}`; });
+                own.append(visit);
+                const like = (builder.starts ?? []).find((start) => start.id === page.id);
+                const editableLink = link.dataset.editHref !== undefined ? link : item.querySelector('a[data-edit-href]');
+                const cardName = (item.dataset.editItemLabel || item.querySelector('h1, h2, h3, h4')?.textContent || '').replace(/\s+/g, ' ').trim();
+                // The copy, not the card it was copied from: an id the editor minted, or a name that is not the page's.
+                const isCopy = /^n[0-9a-z]+$/.test(item.dataset.editItem) || (cardName && cardName.toLowerCase() !== String(page.title).toLowerCase());
+                if (shared && isCopy && like?.sections?.length && editableLink) {
+                    const make = document.createElement('button');
+                    make.type = 'button';
+                    make.className = 'le-btn';
+                    make.textContent = 'Give it its own page';
+                    make.title = `A new page made like ${page.title}, which this card opens`;
+                    make.addEventListener('click', async () => {
+                        const name = cardName || 'New page';
+                        make.disabled = true;
+                        make.textContent = 'Making its page…';
+                        try {
+                            const id = await makePageLike({ config: builder, save: saveSetting, sections: like.sections, title: name });
+                            await saveSetting(editableLink.dataset.editHref, hrefTo(editableLink.getAttribute('href'), id));
+                            window.location.href = `${builder.editorBase}${id}`;
+                        } catch (error) {
+                            notify(error.message);
+                            make.disabled = false;
+                            make.textContent = 'Give it its own page';
+                        }
+                    });
+                    own.append(make);
+                }
+                const said = document.createElement('p');
+                said.className = 'le-hint';
+                said.textContent = shared
+                    ? `This card opens the same page as another card (${page.title}). Give it its own to write its details.`
+                    : `This card opens ${page.title}. Its details, photos and price are edited there.`;
+                block.append(own, said);
+            }
+            const context = item ? drawerFields.querySelector('.le-item-context') : null;
+            if (context) context.after(block);
+            else if (item) drawerFields.prepend(block);
+            else drawerFields.append(block);
         };
 
         /**
@@ -3636,7 +3777,7 @@ const bootLiveEdit = () => {
                     || item.querySelector('h1, h2, h3, h4, h5, h6')?.textContent
                     || item.getAttribute('aria-label');
                 const context = document.createElement('div');
-                context.className = 'le-section-heading';
+                context.className = 'le-section-heading le-item-context';
                 context.textContent = `${kind} ${index} of ${items.length}${name ? ` · ${String(name).replace(/\s+/g, ' ').trim().slice(0, 40)}` : ''}`;
                 drawerFields.prepend(context);
             }
@@ -4708,6 +4849,10 @@ const bootLiveEdit = () => {
             if (icon) return { element: icon, kind: 'icon' };
             const drawing = node.closest('[data-edit-svg]');
             if (drawing) return { element: drawing, kind: 'svg' };
+            // A number the template works out (data-kit-computed): it is explained,
+            // not typed over, because the next page load would count it again.
+            const computed = node.closest('[data-kit-computed]');
+            if (computed) return { element: computed, kind: 'computed' };
             const text = node.closest('[data-edit]');
             if (text) return { element: text, kind: 'text' };
             /*
@@ -4733,12 +4878,19 @@ const bootLiveEdit = () => {
             return null;
         };
 
+        // What a counted number tells the owner who clicks it.
+        const COMPUTED_SAYS = {
+            count: 'This number counts itself from the products on this page. Add or remove a product and it changes.',
+            collection: 'This counts the products in the collection it links to and shows the lowest price. Change that collection and it follows.',
+            choices: 'These choices come from your products’ own words. Change a product’s type, cloth or colour on its card and the choices follow.',
+        };
         const openTarget = ({ element, kind }) => {
             if (kind === 'image') editImage(element);
             else if (kind === 'icon') void editIcon(element);
             else if (kind === 'svg') editDrawing(element);
             else if (kind === 'text') editText(element);
             else if (kind === 'link') editLink(element);
+            else if (kind === 'computed') ui.toast(COMPUTED_SAYS[element.dataset.kitComputed] ?? COMPUTED_SAYS.count, 7000);
             else editStyle(element);
         };
 
@@ -4760,7 +4912,7 @@ const bootLiveEdit = () => {
                 height: `${rect.height}px`,
             });
             ui.hoverBox.classList.toggle('is-flipped', rect.top < 26);
-            ui.hoverLabel.textContent = element.dataset.editLabel ?? describeElement(element);
+            ui.hoverLabel.textContent = element.dataset.kitComputed ? 'Counted for you' : (element.dataset.editLabel ?? describeElement(element));
             ui.hoverBox.classList.add('is-visible');
         };
 
@@ -4981,19 +5133,7 @@ const bootLiveEdit = () => {
             openDrawer();
         });
 
-        ui.pagesButton?.addEventListener('click', () => {
-            if (!document.body.classList.contains('editing')) setEditing(true);
-
-            showTab('Pages');
-            openDrawer();
-        });
-
-        ui.createPageButton?.addEventListener('click', () => {
-            if (!document.body.classList.contains('editing')) setEditing(true);
-
-            showTab('Pages');
-            openDrawer();
-        });
+        ui.pagesButton?.addEventListener('click', () => { openNewPage(); });
 
         ui.changesButton?.addEventListener('click', () => {
             // Somebody asking what they have changed is asking about editing,
@@ -5050,8 +5190,8 @@ const bootLiveEdit = () => {
                     { tab: 'Changes', title: 'Review your SEO draft', copy: 'Your saved search details are listed here.' },
                 ],
                 pages: [
-                    { tab: 'Pages', title: 'Start a new page', copy: 'Give the page a title and address, then choose the sections to start with. You can choose whether it appears in the menu.' },
-                    { tab: 'Pages', title: 'Create and open it', copy: 'When the title, address and sections are ready, choose Create page. Live Edit opens the new page so you can edit it.' },
+                    { tab: 'toolbar', control: 'pagesButton', title: 'Start a new page', copy: 'Choose New page. Pick a page your design already has to start from, like your Contact or About page.' },
+                    { tab: 'toolbar', control: 'pagesButton', title: 'Name it and create it', copy: 'Give it a title (its address follows), choose whether it goes in the menu, and choose Create page. Live Edit opens it so you can change its words and photos.' },
                 ],
                 languages: [
                     { tab: 'language', title: 'Choose a language', copy: 'Use this menu to choose which language you are editing. Changes are saved for that language.' },
@@ -5196,7 +5336,7 @@ const bootLiveEdit = () => {
                 heading.textContent = step.title;
                 copy.textContent = step.copy;
 
-                if (step.tab === 'Brand' || step.tab === 'SEO' || step.tab === 'Pages') {
+                if (step.tab === 'Brand' || step.tab === 'SEO') {
                     if (!drawerTabs[step.tab]) {
                         copy.textContent = `${step.title} is not available on this website. Choose Next to continue.`;
                         return;
@@ -6044,8 +6184,7 @@ const bootLiveEdit = () => {
             const query = params.toString();
             window.history.replaceState(null, '', window.location.pathname + (query ? `?${query}` : ''));
             setEditing(true);
-            showTab('Pages');
-            openDrawer();
+            openNewPage();
         } else if (params.has('edit')) {
             params.delete('edit');
             const query = params.toString();

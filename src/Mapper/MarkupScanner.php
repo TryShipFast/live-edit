@@ -1157,16 +1157,26 @@ class MarkupScanner
         $img->removeAttribute('srcset');
         $img->removeAttribute('sizes');
 
-        $parent = $img->parentNode;
+        // A parser that does not know `<source>` is empty nests what follows it
+        // inside it, image included, so the picture is found above any sources.
+        $picture = $img->parentNode;
 
-        if (! $parent instanceof DOMElement || strtolower($parent->tagName) !== 'picture') {
+        while ($picture instanceof DOMElement && strtolower($picture->tagName) === 'source') {
+            $picture = $picture->parentNode;
+        }
+
+        if (! $picture instanceof DOMElement || strtolower($picture->tagName) !== 'picture') {
             return;
         }
 
-        foreach (iterator_to_array($parent->childNodes) as $child) {
-            if ($child instanceof DOMElement && strtolower($child->tagName) === 'source') {
-                $parent->removeChild($child);
-            }
+        // Out of any source it was nested in first, so taking the sources away
+        // does not take the image with them.
+        if ($img->parentNode !== $picture) {
+            $picture->appendChild($img);
+        }
+
+        foreach (iterator_to_array($picture->getElementsByTagName('source')) as $source) {
+            $source->parentNode?->removeChild($source);
         }
     }
 

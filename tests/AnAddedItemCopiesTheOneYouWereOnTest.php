@@ -244,4 +244,3 @@ class AnAddedItemCopiesTheOneYouWereOnTest extends TestCase
         $this->assertSame(2, substr_count($out, 'One words'));
     }
 }
-

@@ -341,109 +341,539 @@ export function renderLibrary({ container, library, pick, multiple = false, fetc
     return { chosen: () => [...on], focus: () => search.focus() };
 }
 
+
 /**
- * The Pages tab creates a page from the design's existing sections.
- * Existing pages stay in the website navigation, not in this panel.
+ * The kinds of page the design already has, to start a new page from.
  *
- * `save(key, value)` saves one setting; `go(href)` opens the page just created.
+ * The host may say so outright (`config.starts`: each of the design's pages and
+ * the sections it is made of, in order). Without that, the library is grouped
+ * by the page each section is kept on, which is the same thing for every
+ * section the design draws once.
+ *
+ * Pages that are made of exactly the same sections are one kind: sixteen
+ * product pages are one choice ("Cedar Letter, and 15 like it"), not sixteen.
  */
-export function renderPagesPanel({ container, config, save, go, notify }) {
-    container.replaceChildren();
+export function startingPoints(config = {}) {
+    const library = config.library ?? [];
+    const known = new Set(library.map((section) => section.from));
+    const hrefs = new Map((config.pages ?? []).map((page) => [page.id, page.href]));
+    const given = Array.isArray(config.starts) && config.starts.length
+        ? config.starts.map((start) => ({ id: start.id, title: start.title, sections: (start.sections ?? []).filter((from) => known.has(from)) }))
+        : grouped(library).map((group) => ({ id: null, title: group.page, sections: group.sections.map((section) => section.from) }));
 
-    // Keep this panel focused on creating a page. Existing pages
-    // remain available from the customer website navigation.
-
-    // ---- a new page --------------------------------------------------------
-    container.append(el('div', 'le-section-heading', 'Add a page'));
-
-    const titleField = el('label', 'le-field', 'Page title');
-    const title = el('input', 'le-input');
-    title.placeholder = 'Open days';
-    title.maxLength = 120;
-    titleField.append(title);
-
-    const addressField = el('label', 'le-field', 'Address');
-    const addressRow = el('div', 'le-address');
-    const origin = el('span', 'le-address-origin', '/');
-    const address = el('input', 'le-input');
-    address.placeholder = 'open-days';
-    address.maxLength = 97;
-    addressRow.append(origin, address);
-    const addressHint = el('span', 'le-hint');
-    addressField.append(addressRow, addressHint);
-
-    let addressTouched = false;
-    title.addEventListener('input', () => {
-        if (!addressTouched) address.value = slugFor(title.value);
-        refresh();
-    });
-    address.addEventListener('input', () => {
-        addressTouched = address.value !== '';
-        refresh();
-    });
-
-    const sectionsField = el('div', 'le-field', 'Start it with');
-    // A composed page shows only the sections chosen, so one that starts with a heading is
-    // one that says its own name. We say so rather than adding a heading for them: the
-    // heading would arrive carrying the words of the page it was taken from, and a page
-    // announcing itself as another page is the thing this panel should not produce.
-    const sectionsHint = el('span', 'le-hint', 'Choose one or more. Starting with a heading gives the page its name at the top. You can add, move and hide sections afterwards.');
-    sectionsField.append(sectionsHint);
-    const library = renderLibrary({ container: sectionsField, library: config.library, multiple: true, pick: () => refresh() });
-
-    const inMenu = el('label', 'le-default le-in-menu');
-    const inMenuBox = el('input');
-    inMenuBox.type = 'checkbox';
-    inMenuBox.checked = true;
-    inMenu.append(inMenuBox, document.createTextNode('Show it in the menu'));
-
-    const create = el('button', 'le-btn-publish le-create-page', 'Create page');
-    create.type = 'button';
-    const waiting = el('span', 'le-hint le-create-waiting');
-    const actions = el('div', 'le-row le-sitemap-actions');
-    actions.append(waiting, create);
-
-    container.append(titleField, addressField, sectionsField, inMenu, actions);
-
-    const taken = config.taken ?? [];
-    function refresh() {
-        const problem = address.value ? addressProblem(address.value, taken) : null;
-        addressHint.textContent = problem ?? (address.value ? `Visitors will find it at /${address.value}` : '');
-        addressHint.classList.toggle('le-hint--warn', Boolean(problem));
-
-        const missing = whyNotYet({ title: title.value, address: address.value, chosen: library.chosen(), taken });
-        create.disabled = Boolean(missing);
-        // Said beside the button rather than only where the problem is, because the
-        // button is what they are looking at when they find they cannot press it.
-        waiting.textContent = missing ?? '';
-        waiting.hidden = !missing;
-        create.title = missing ?? 'Make this page';
+    const kinds = new Map();
+    for (const start of given) {
+        if (!start.sections.length) continue;
+        const signature = start.sections.join('|');
+        if (kinds.has(signature)) {
+            kinds.get(signature).alike += 1;
+            continue;
+        }
+        kinds.set(signature, {
+            id: start.id,
+            title: start.title,
+            sections: start.sections,
+            alike: 0,
+            at: start.id !== null && start.id !== undefined ? hrefs.get(start.id) ?? null : null,
+        });
     }
-    refresh();
 
-    create.addEventListener('click', async () => {
-        const id = address.value;
-        const problem = addressProblem(id, taken);
-        if (problem || !title.value.trim()) {
-            notify(problem ?? 'Give the page a title.');
+    return [...kinds.values()];
+}
+
+/** A section's name as the library gives it. */
+const labelOf = (library, from) => (library.find((section) => section.from === from) ?? {}).label ?? from;
+
+/**
+ * A page shown small: the real page, laid out at desktop width and scaled into
+ * a card, so a kind of page is chosen by how it looks rather than by its name.
+ * Nothing in it runs (the frame is sandboxed), and it loads only when the card
+ * scrolls into view.
+ */
+function thumbnail(href, title) {
+    const holder = el('div', 'le-start-thumb');
+    if (!href) {
+        holder.classList.add('is-empty');
+
+        return holder;
+    }
+    const frame = el('iframe', 'le-start-frame');
+    frame.setAttribute('sandbox', '');
+    frame.setAttribute('loading', 'lazy');
+    frame.setAttribute('scrolling', 'no');
+    frame.setAttribute('tabindex', '-1');
+    frame.setAttribute('aria-hidden', 'true');
+    frame.title = title;
+    frame.src = href;
+    holder.append(frame);
+
+    return holder;
+}
+
+/**
+ * New page: two short steps in a window of its own.
+ *
+ *   1. What kind of page?  The design's own pages as pictures to choose from
+ *      (or, for somebody who wants to, the sections one by one).
+ *   2. What is it called?  A title; the address follows it; in the menu or not.
+ *
+ * It replaces a form that asked for a title and an address first and then for a
+ * choice among every section of the design, which is the order a developer
+ * thinks in. An owner thinks "a page like our Contact page, called Visit us".
+ *
+ * `ui` is the editor's modal handle (chrome.js `modal()`); `save(key, value)`
+ * saves one setting; `go(href)` opens the page just made.
+ */
+export function renderNewPage({ ui, config, save, go, notify }) {
+    const library = config.library ?? [];
+    const taken = config.taken ?? [];
+    const kinds = startingPoints(config);
+    const state = { kind: null, sections: [], title: '', address: '', addressTouched: false, inMenu: true };
+
+    const footer = (...buttons) => {
+        ui.foot.replaceChildren(...buttons);
+        ui.foot.hidden = !buttons.length;
+    };
+    const button = (text, className, onClick) => {
+        const node = el('button', className, text);
+        node.type = 'button';
+        node.addEventListener('click', onClick);
+
+        return node;
+    };
+
+    // ---- step 1: what kind of page --------------------------------------------
+    const chooseKind = () => {
+        ui.title('New page');
+        ui.subtitle('Start from a page your design already has. You can change every word and photo afterwards.');
+        footer();
+
+        const grid = el('div', 'le-starts');
+        const draw = (query = '') => {
+            const words = query.trim().toLowerCase().split(/\s+/).filter(Boolean);
+            grid.replaceChildren();
+            const shown = kinds.filter((kind) => {
+                const haystack = `${kind.title} ${kind.sections.map((from) => labelOf(library, from)).join(' ')}`.toLowerCase();
+
+                return words.every((word) => haystack.includes(word));
+            });
+            for (const kind of shown) {
+                const card = el('button', 'le-start');
+                card.type = 'button';
+                const names = kind.sections.map((from) => labelOf(library, from));
+                const count = `${names.length} ${names.length === 1 ? 'section' : 'sections'}`;
+                card.setAttribute('aria-label', `A page like ${kind.title}: ${count}, ${listed(names)}`);
+                const about = el('span', 'le-start-text');
+                about.append(
+                    el('span', 'le-start-name', kind.alike ? `${kind.title}, and ${kind.alike} like it` : kind.title),
+                    el('span', 'le-start-meta', `${count} · ${names.slice(0, 3).join(', ')}${names.length > 3 ? '…' : ''}`),
+                );
+                card.append(thumbnail(kind.at, kind.title), about);
+                card.addEventListener('click', () => {
+                    state.kind = kind;
+                    state.sections = [...kind.sections];
+                    nameIt();
+                });
+                grid.append(card);
+            }
+            if (!shown.length) grid.append(el('p', 'le-hint', 'No page like that. Try a word from its name, or choose the sections yourself.'));
+        };
+
+        const top = el('div', 'le-starts-top');
+        if (kinds.length > 6) {
+            const search = el('input', 'le-input le-starts-search');
+            search.type = 'search';
+            search.placeholder = 'Find a kind of page: contact, product, about…';
+            search.setAttribute('aria-label', 'Find a kind of page');
+            search.addEventListener('input', () => draw(search.value));
+            top.append(search);
+            setTimeout(() => search.focus(), 0);
+        }
+        const own = button('Or choose the sections yourself', 'le-link-btn', chooseSections);
+        top.append(own);
+
+        ui.body.replaceChildren(top, grid);
+        draw();
+    };
+
+    // ---- step 1, the long way: sections one by one ------------------------------
+    const chooseSections = () => {
+        ui.title('Choose its sections');
+        ui.subtitle('Pick the sections to start with, in any order. You can move them on the page afterwards.');
+        const holder = el('div', 'le-starts-own');
+        const next = button('Next', 'le-btn-publish', () => {
+            state.kind = { id: null, title: 'Your own choice', sections: picker.chosen(), alike: 0, at: null };
+            state.sections = picker.chosen();
+            nameIt();
+        });
+        const back = button('Back', 'le-btn-outline', chooseKind);
+        const count = el('span', 'le-modal-note');
+        const picker = renderSectionBrowser({
+            container: holder,
+            library,
+            multiple: true,
+            onChange: (on) => {
+                next.disabled = !on.length;
+                count.textContent = on.length ? `${on.length} chosen` : 'Choose at least one';
+            },
+        });
+        next.disabled = true;
+        count.textContent = 'Choose at least one';
+        ui.body.replaceChildren(holder);
+        footer(count, back, next);
+        picker.focus();
+    };
+
+    // ---- step 2: what is it called ---------------------------------------------
+    const nameIt = () => {
+        ui.title('Name your page');
+        ui.subtitle(state.kind.id === null && state.kind.title === 'Your own choice'
+            ? 'It starts with the sections you chose.'
+            : `It starts like your ${state.kind.title} page.`);
+
+        const form = el('div', 'le-name-page');
+
+        const titleField = el('label', 'le-field', 'Page title');
+        const title = el('input', 'le-input le-name-title');
+        title.placeholder = 'Open days';
+        title.maxLength = 120;
+        title.value = state.title;
+        titleField.append(title);
+
+        // The address is worked out from the title and shown as a line, not as a
+        // second field to fill in: almost nobody wants to choose it.
+        const where = el('div', 'le-name-address');
+        const whereText = el('span', 'le-name-address-text');
+        const change = button('Change', 'le-link-btn', () => {
+            addressRow.hidden = false;
+            change.hidden = true;
+            address.focus();
+        });
+        where.append(whereText, change);
+        const addressRow = el('div', 'le-address');
+        addressRow.hidden = !state.addressTouched;
+        change.hidden = state.addressTouched;
+        const address = el('input', 'le-input');
+        address.setAttribute('aria-label', 'Page address');
+        address.maxLength = 97;
+        address.value = state.address;
+        addressRow.append(el('span', 'le-address-origin', '/'), address);
+
+        const menu = el('label', 'le-switch');
+        const menuBox = el('input');
+        menuBox.type = 'checkbox';
+        menuBox.checked = state.inMenu;
+        menu.append(menuBox, el('span', 'le-switch-track'), el('span', 'le-switch-label', 'Show it in the menu'));
+        menuBox.addEventListener('change', () => { state.inMenu = menuBox.checked; });
+
+        // What it starts with, each one removable here so a near miss ("like the
+        // About page, without the team") is one click rather than a second visit.
+        const sections = el('div', 'le-field le-name-sections', 'Starts with');
+        const chips = el('div', 'le-chips');
+        const drawChips = () => {
+            chips.replaceChildren();
+            state.sections.forEach((from) => {
+                const chip = el('span', 'le-chip');
+                chip.append(el('span', null, labelOf(library, from)));
+                if (state.sections.length > 1) {
+                    const remove = button('×', 'le-chip-x', () => {
+                        state.sections = state.sections.filter((other) => other !== from);
+                        drawChips();
+                    });
+                    remove.setAttribute('aria-label', `Leave out ${labelOf(library, from)}`);
+                    chip.append(remove);
+                }
+                chips.append(chip);
+            });
+        };
+        drawChips();
+        sections.append(chips);
+
+        form.append(titleField, where, addressRow, menu, sections);
+        // What it will look like before any words change: the page it is copied from.
+        const layout = el('div', 'le-name-layout');
+        const look = el('div', 'le-name-look');
+        if (state.kind.at) look.append(thumbnail(state.kind.at, state.kind.title), el('p', 'le-hint', `Your new page starts as a copy of ${state.kind.title}. Change any word or photo once it is open.`));
+        layout.append(form, look);
+        ui.body.replaceChildren(layout);
+
+        const waiting = el('span', 'le-modal-note le-create-waiting');
+        const back = button('Back', 'le-btn-outline', () => {
+            state.title = title.value;
+            state.address = address.value;
+            if (state.kind.title === 'Your own choice') chooseSections();
+            else chooseKind();
+        });
+        const create = button('Create page', 'le-btn-publish le-create-page', async () => {
+            const missing = refresh();
+            if (missing) {
+                notify(missing);
+
+                return;
+            }
+            create.disabled = true;
+            create.textContent = 'Creating…';
+            ui.allowDismiss(false);
+            try {
+                const id = address.value;
+                const added = {};
+                for (const from of state.sections) added[newAddedId()] = from;
+                await save(`structure:page:${id}`, JSON.stringify({ added }));
+                await save(config.pagesKey, JSON.stringify([...(config.made ?? []), { id, title: title.value.trim(), menu: state.inMenu }]));
+                go(`${config.editorBase}${id}`);
+            } catch (error) {
+                ui.allowDismiss(true);
+                notify(error.message);
+                create.textContent = 'Create page';
+                refresh();
+            }
+        });
+        footer(waiting, back, create);
+
+        function refresh() {
+            if (!state.addressTouched) address.value = slugFor(title.value);
+            const problem = address.value ? addressProblem(address.value, taken) : null;
+            whereText.textContent = address.value ? `Its address: /${address.value}` : 'Its address follows the title.';
+            whereText.classList.toggle('le-hint--warn', Boolean(problem));
+            if (problem) {
+                whereText.textContent = problem;
+                addressRow.hidden = false;
+                change.hidden = true;
+            }
+            const missing = whyNotYet({ title: title.value, address: address.value, chosen: state.sections, taken });
+            create.disabled = Boolean(missing);
+            waiting.textContent = missing ?? '';
+            create.title = missing ?? 'Make this page';
+
+            return missing;
+        }
+        title.addEventListener('input', () => { state.title = title.value; refresh(); });
+        title.addEventListener('keydown', (event) => { if (event.key === 'Enter' && !create.disabled) create.click(); });
+        address.addEventListener('input', () => {
+            state.addressTouched = address.value !== '';
+            state.address = address.value;
+            refresh();
+        });
+        refresh();
+        title.focus();
+    };
+
+    if (kinds.length) chooseKind();
+    else chooseSections();
+
+    return { kinds };
+}
+
+/**
+ * Sections to choose from, seen as they are.
+ *
+ * The list on the left, the section itself on the right: chosen by how it
+ * looks, at the size it will be, on a desktop or a phone. Pointing at a row
+ * shows it; the button under the picture adds it. This replaces opening a small
+ * preview under each row of a narrow list, where a section was a thumbnail
+ * three rows tall and only one could be compared at a time.
+ *
+ * `add(section)` runs for the button under the picture. With `multiple`, the
+ * button toggles and `chosen()` says which are on; `onChange(chosen)` follows.
+ * The page each section is kept on is fetched once and kept.
+ */
+export function renderSectionBrowser({ container, library, add, multiple = false, onChange = () => {}, fetchPage = (href) => fetch(href).then((r) => r.text()), actionLabel = 'Add this section' }) {
+    const wrap = el('div', 'le-browser');
+    const side = el('div', 'le-browser-list');
+    const search = el('input', 'le-input le-library-search');
+    search.type = 'search';
+    search.placeholder = 'Find a section: team, prices, questions...';
+    search.setAttribute('aria-label', 'Find a section');
+    const list = el('div', 'le-library-list');
+    side.append(search, list);
+
+    const stage = el('div', 'le-browser-stage');
+    const stageHead = el('div', 'le-browser-head');
+    const stageName = el('div', 'le-browser-name', 'Point at a section to see it');
+    const stageFrom = el('div', 'le-browser-from');
+    const sizes = el('div', 'le-browser-sizes');
+    const sizeButtons = {};
+    let size = 'desktop';
+    for (const [key, label] of [['desktop', 'Desktop'], ['phone', 'Phone']]) {
+        const b = el('button', 'le-subtab', label);
+        b.type = 'button';
+        b.addEventListener('click', () => { size = key; paintSize(); if (looking) show(looking); });
+        sizeButtons[key] = b;
+        sizes.append(b);
+    }
+    const titleBox = el('div');
+    titleBox.append(stageName, stageFrom);
+    stageHead.append(titleBox, sizes);
+    const view = el('div', 'le-browser-view');
+    const action = el('button', 'le-btn-publish le-browser-add', actionLabel);
+    action.type = 'button';
+    action.disabled = true;
+    stage.append(stageHead, view, action);
+    wrap.append(side, stage);
+    container.append(wrap);
+
+    const on = new Set();
+    const pageHtml = new Map();
+    let looking = null;
+
+    const paintSize = () => Object.entries(sizeButtons).forEach(([key, b]) => b.classList.toggle('is-on', key === size));
+    paintSize();
+
+    const paintAction = () => {
+        if (!looking) return;
+        action.disabled = false;
+        action.textContent = multiple ? (on.has(looking.from) ? 'Remove from the page' : 'Add to the page') : actionLabel;
+        action.classList.toggle('is-added', multiple && on.has(looking.from));
+    };
+
+    const show = async (section) => {
+        looking = section;
+        stageName.textContent = section.label;
+        stageFrom.textContent = section.page ? `From your ${section.page} page` : '';
+        paintAction();
+        list.querySelectorAll('.le-library-item').forEach((row) => row.classList.toggle('is-looking', row.dataset.from === section.from));
+        if (!section.at) {
+            view.replaceChildren(el('p', 'le-hint', 'This section cannot be shown on its own. It can still be added.'));
 
             return;
         }
-
-        create.disabled = true;
-        create.textContent = 'Creating…';
+        view.replaceChildren(el('p', 'le-hint', 'Loading…'));
         try {
-            const added = {};
-            for (const from of library.chosen()) added[newAddedId()] = from;
-            await save(`structure:page:${id}`, JSON.stringify({ added }));
-            await save(config.pagesKey, JSON.stringify([...(config.made ?? []), { id, title: title.value.trim(), menu: inMenuBox.checked }]));
-            go(`${config.editorBase}${id}`);
-        } catch (error) {
-            notify(error.message);
-            create.textContent = 'Create page';
-            refresh();
+            if (!pageHtml.has(section.at)) pageHtml.set(section.at, await fetchPage(section.at));
+            if (looking !== section) return;
+            const markup = sectionMarkup(pageHtml.get(section.at), section.from);
+            if (!markup) {
+                view.replaceChildren(el('p', 'le-hint', 'This section cannot be shown on its own. It can still be added.'));
+
+                return;
+            }
+            const width = size === 'phone' ? 390 : 1280;
+            const room = Math.max(200, view.clientWidth - 2);
+            const scale = Math.min(1, room / width);
+            const frame = el('iframe', 'le-browser-frame');
+            frame.setAttribute('sandbox', 'allow-same-origin');
+            frame.setAttribute('scrolling', 'no');
+            frame.title = `${section.label}, as it looks on the site`;
+            frame.style.width = `${width}px`;
+            frame.style.transform = `scale(${scale})`;
+            frame.srcdoc = previewDoc({ styles: styleHrefs(), markup });
+            const holder = el('div', `le-browser-shot is-${size}`);
+            holder.style.width = `${Math.round(width * scale)}px`;
+            holder.append(frame);
+            frame.addEventListener('load', () => {
+                // As tall as the section is, scaled; a long section scrolls in the pane.
+                const tall = frame.contentDocument?.body?.scrollHeight || 600;
+                frame.style.height = `${tall}px`;
+                holder.style.height = `${Math.round(tall * scale)}px`;
+            });
+            view.replaceChildren(holder);
+        } catch {
+            view.replaceChildren(el('p', 'le-hint', 'The preview could not be loaded.'));
+        }
+    };
+
+    action.addEventListener('click', () => {
+        if (!looking) return;
+        if (multiple) {
+            on.has(looking.from) ? on.delete(looking.from) : on.add(looking.from);
+            draw();
+            paintAction();
+            onChange([...on]);
+        } else {
+            add(looking);
         }
     });
 
-    return { focus: () => title.focus() };
+    const draw = () => {
+        list.replaceChildren();
+        const groups = grouped(library, search.value);
+        if (!groups.length) {
+            list.append(el('p', 'le-hint', 'No section by that name. Try a word from its heading.'));
+
+            return;
+        }
+        for (const group of groups) {
+            list.append(el('div', 'le-library-page', group.page));
+            for (const section of group.sections) {
+                const row = el('button', 'le-library-item');
+                row.type = 'button';
+                row.dataset.from = section.from;
+                row.classList.toggle('is-looking', looking?.from === section.from);
+                row.append(el('span', 'le-library-name', section.label));
+                if (multiple && on.has(section.from)) row.append(el('span', 'le-library-mark', 'Added'));
+                row.setAttribute('aria-pressed', multiple && on.has(section.from) ? 'true' : 'false');
+                row.addEventListener('mouseenter', () => { if (looking !== section) show(section); });
+                row.addEventListener('focus', () => { if (looking !== section) show(section); });
+                row.addEventListener('click', () => show(section));
+                list.append(row);
+            }
+        }
+    };
+    search.addEventListener('input', draw);
+    draw();
+    const first = library?.[0];
+    if (first) show(first);
+
+    return { chosen: () => [...on], focus: () => search.focus() };
+}
+
+/**
+ * The page a card's link opens: the page whose address the link ends in (the
+ * longest id that fits), or else the one it names (`data-link-page`, the Kit's
+ * record of where the design's link goes). A card on a shop grid, a journal list or
+ * a projects page leads to a detail page this way, and the editor can offer
+ * that page from the card.
+ */
+export function pageOfLink(link, pages = [], base = 'http://localhost/') {
+    // The address first: a card the owner pointed at a page they made opens that
+    // page, whatever page the design's own data-link-page still names.
+    const named = link?.dataset?.linkPage;
+    const byName = named ? pages.find((page) => page.id === named) ?? null : null;
+    let path;
+    try {
+        path = new URL(link?.getAttribute?.('href') ?? link, base).pathname.replace(/index\.html$/, '');
+    } catch {
+        return byName;
+    }
+    if (!path.endsWith('/')) path += '/';
+    let best = null;
+    for (const page of pages) {
+        if (!page.id) continue;
+        if (path.endsWith(`/${page.id}/`) && (!best || page.id.length > best.id.length)) best = page;
+    }
+
+    return best ?? byName;
+}
+
+/** An address not yet taken, from a title: "Fig Archive" → fig-archive, then fig-archive-2. */
+export function freeAddress(title, taken = []) {
+    const first = slugFor(title) || 'new-page';
+    let id = first;
+    for (let n = 2; addressProblem(id, taken); n += 1) id = `${first}-${n}`;
+
+    return id;
+}
+
+/**
+ * A card's link, pointed at a page the owner made: the same way up to the site
+ * root (`../`), then that page's folder, which is where a made page is
+ * published. "../products/arc/" becomes "../fig-archive/".
+ */
+export function hrefTo(oldHref, newId) {
+    return `${(String(oldHref).match(/^(?:\.\.\/)*/) ?? [''])[0]}${newId}/`;
+}
+
+/**
+ * Makes a page like another (its sections, in order) for a card, under the
+ * card's own name, out of the menu: the same two settings a page made from
+ * New page writes. Returns the new page's id.
+ */
+export async function makePageLike({ config, save, sections, title }) {
+    const id = freeAddress(title, config.taken ?? []);
+    const added = {};
+    for (const from of sections) added[newAddedId()] = from;
+    await save(`structure:page:${id}`, JSON.stringify({ added }));
+    await save(config.pagesKey, JSON.stringify([...(config.made ?? []), { id, title: String(title).trim(), menu: false }]));
+
+    return id;
 }

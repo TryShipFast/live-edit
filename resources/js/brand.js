@@ -130,6 +130,36 @@ export const madeHardToRead = (before, after) => {
     return worse.sort((a, b) => a.ratio - b.ratio);
 };
 
+// ---- ready-made choices -------------------------------------------------------
+
+/**
+ * Palettes an owner can try in one press. Each fills all seven colour roles and
+ * keeps body text, captions and buttons readable on its own ground (the same
+ * check as any colour runs before saving). Plain, field-tested combinations,
+ * not trends: an ink, one accent, a light ground and its quiet partners.
+ */
+export const PALETTES = [
+    { id: 'paper', name: 'Paper and ink', colours: { ink: '#15171A', accent: '#A8432A', surface: '#FAF8F4', raised: '#F0ECE4', body: '#2A2C30', muted: '#5F6268', line: '#DCD6CB' } },
+    { id: 'forest', name: 'Forest', colours: { ink: '#17301F', accent: '#8F5A24', surface: '#F6F5EF', raised: '#E7EBDF', body: '#26312A', muted: '#5A655C', line: '#CFD6C7' } },
+    { id: 'harbour', name: 'Harbour', colours: { ink: '#0F2A43', accent: '#1D63A3', surface: '#F6F8FB', raised: '#E6EEF5', body: '#1F2D3A', muted: '#526272', line: '#CBD7E2' } },
+    { id: 'rose', name: 'Rose', colours: { ink: '#3A1D28', accent: '#B0435E', surface: '#FBF6F5', raised: '#F3E6E6', body: '#3A2A2E', muted: '#6E5C63', line: '#E3CFD2' } },
+    { id: 'sand', name: 'Sand', colours: { ink: '#2E2418', accent: '#85622A', surface: '#F8F4EC', raised: '#EEE5D3', body: '#3A3126', muted: '#675D4F', line: '#DDD1BC' } },
+    { id: 'terracotta', name: 'Terracotta', colours: { ink: '#2B1A14', accent: '#A84B24', surface: '#FBF7F2', raised: '#F2E8DE', body: '#33261F', muted: '#665549', line: '#E2D3C4' } },
+    { id: 'graphite', name: 'Graphite', colours: { ink: '#141414', accent: '#454545', surface: '#FFFFFF', raised: '#F2F2F2', body: '#222222', muted: '#5E5E5E', line: '#DCDCDC' } },
+];
+
+/** A colour role's name short enough for one cell of the strip. */
+const SHORT = { ink: 'Headings', accent: 'Links', surface: 'Page', raised: 'Cards', body: 'Text', muted: 'Captions', line: 'Borders' };
+
+/** Heading and body faces that sit well together, by the ids the host offers. */
+export const PAIRINGS = [
+    { id: 'classic', name: 'Classic', display: 'fraunces', body: 'inter' },
+    { id: 'editorial', name: 'Editorial', display: 'playfair', body: 'dmsans' },
+    { id: 'modern', name: 'Modern', display: 'spacegrotesk', body: 'inter' },
+    { id: 'clean', name: 'Clean', display: 'inter', body: 'inter' },
+    { id: 'warm', name: 'Warm', display: 'georgia', body: 'system' },
+];
+
 // ---- the panel ---------------------------------------------------------------
 
 /**
@@ -254,65 +284,16 @@ export const renderBrandPanel = ({ container, config, save, upload, done, notify
     };
 
     container.replaceChildren();
-    container.append(el('p', 'le-hint le-brand-intro', 'Set your business name for every page header, or upload a logo to use instead. Your colours and type also apply across the website; nothing goes live until you publish.'));
 
-    const swatches = el('div', 'le-brand-grid');
-    const rows = new Map();
-    for (const token of config.tokens.filter((t) => t.kind === 'colour')) {
-        const row = el('label', 'le-brand-row');
-        const input = el('input', 'le-brand-swatch');
-        input.type = 'color';
-        input.value = colourShown(token);
-        input.setAttribute('aria-label', token.label);
-        const words = el('span', 'le-brand-words');
-        words.append(el('span', 'le-brand-label', token.label), el('span', 'le-brand-hint', token.hint));
-        const reset = el('button', 'le-link-btn', "Design's own");
-        reset.type = 'button';
-        reset.hidden = current(token) === '';
-        reset.addEventListener('click', (event) => {
-            event.preventDefault();
-            pending[token.key] = '';
-            input.value = colourShown(token);
-            reset.hidden = true;
-            changed();
-        });
-        input.addEventListener('input', () => {
-            pending[token.key] = input.value.toUpperCase();
-            reset.hidden = false;
-            changed();
-        });
-        row.append(input, words, reset);
-        rows.set(token.key, row);
-        swatches.append(row);
-    }
-    container.append(el('div', 'le-section-heading', 'Colours'), swatches);
+    const colourTokens = config.tokens.filter((t) => t.kind === 'colour');
+    const faceTokens = config.tokens.filter((t) => t.kind === 'face');
+    const tokenByRole = (role) => config.tokens.find((t) => t.key.endsWith(`.${role}`));
+    const shownFor = (key) => colourShown(config.tokens.find((t) => t.key === key));
 
-    const type = el('div', 'le-brand-type');
-    for (const token of config.tokens.filter((t) => t.kind === 'face')) {
-        const row = el('label', 'le-brand-face');
-        row.append(el('span', 'le-brand-label', token.label));
-        const select = el('select', 'le-input');
-        const own = el('option', null, "The design's own");
-        own.value = '';
-        select.append(own);
-        for (const face of faces.values()) {
-            const option = el('option', null, face.name);
-            option.value = face.id;
-            option.style.fontFamily = face.stack;
-            select.append(option);
-        }
-        select.value = current(token);
-        select.addEventListener('change', () => {
-            pending[token.key] = select.value;
-            changed();
-        });
-        row.append(select);
-        type.append(row);
-    }
-    container.append(el('div', 'le-section-heading', 'Type'), type);
-
+    // ---- who you are: the name and logo first, because they are the brand a
+    //      visitor reads before any colour
     if (identity.nameKey || identity.logoKey) {
-        container.append(el('div', 'le-section-heading', 'Business identity'));
+        container.append(el('div', 'le-section-heading', 'Name and logo'));
         const fields = el('div', 'le-brand-type');
         if (identity.nameKey) {
             const row = el('label', 'le-brand-face');
@@ -344,6 +325,153 @@ export const renderBrandPanel = ({ container, config, save, upload, done, notify
         }
         container.append(fields);
     }
+
+    // ---- colours: whole palettes first, chosen by how they look; then the
+    //      palette in use, one strip, each colour pressable
+    const palettes = [{ id: 'own', name: "The design's own", colours: null }, ...PALETTES]
+        .filter((palette) => palette.colours === null || colourTokens.every((t) => palette.colours[t.key.split('.').pop()]));
+    const paletteValue = (palette, token) => (palette.colours ? palette.colours[token.key.split('.').pop()] : '');
+    const onPalette = (palette) => colourTokens.every((t) => {
+        const now = current(t);
+
+        return palette.colours === null ? now === '' : String(now).toUpperCase() === paletteValue(palette, t).toUpperCase();
+    });
+
+    container.append(el('div', 'le-section-heading', 'Colours'));
+    container.append(el('p', 'le-hint le-brand-intro', 'Try a palette on your site, then adjust any colour. Nothing goes live until you publish.'));
+    const paletteGrid = el('div', 'le-palettes');
+    const paletteButtons = palettes.map((palette) => {
+        const button = el('button', 'le-palette');
+        button.type = 'button';
+        const strip = el('span', 'le-palette-strip');
+        for (const t of colourTokens) {
+            const chip = el('span', 'le-palette-chip');
+            chip.style.background = palette.colours ? paletteValue(palette, t) : design[t.key];
+            strip.append(chip);
+        }
+        // the palette's own words on its own ground: what a page in it reads like
+        const sample = el('span', 'le-palette-sample', 'Aa');
+        const ground = palette.colours ? palette.colours.surface : design[tokenByRole('surface')?.key];
+        const ink = palette.colours ? palette.colours.ink : design[tokenByRole('ink')?.key];
+        sample.style.background = ground;
+        sample.style.color = ink;
+        const row = el('span', 'le-palette-top');
+        row.append(sample, strip);
+        button.append(row, el('span', 'le-palette-name', palette.name));
+        button.setAttribute('aria-label', `Try the ${palette.name} palette`);
+        button.addEventListener('click', () => {
+            for (const t of colourTokens) pending[t.key] = paletteValue(palette, t);
+            changed();
+        });
+        paletteGrid.append(button);
+
+        return [palette, button];
+    });
+    container.append(paletteGrid);
+
+    // the palette in use, as one strip: press a colour to change it
+    const inUse = el('div', 'le-brand-strip');
+    const stripInputs = new Map();
+    for (const token of colourTokens) {
+        const cell = el('label', 'le-brand-strip-cell');
+        cell.title = `${token.label}: ${token.hint}`;
+        const input = el('input', 'le-brand-strip-input');
+        input.type = 'color';
+        input.setAttribute('aria-label', token.label);
+        input.addEventListener('input', () => { pending[token.key] = input.value.toUpperCase(); changed(); });
+        cell.append(input, el('span', 'le-brand-strip-name', SHORT[token.key.split('.').pop()] ?? token.label));
+        stripInputs.set(token.key, [cell, input]);
+        inUse.append(cell);
+    }
+    container.append(el('p', 'le-brand-label le-brand-strip-head', 'Your colours'), inUse);
+
+    // ---- type: pairs of faces, each shown in itself
+    const pairings = [{ id: 'own', name: "The design's own", display: '', body: '' }, ...PAIRINGS]
+        .filter((pair) => pair.id === 'own' || (faces.has(pair.display) && faces.has(pair.body)));
+    const displayToken = faceTokens.find((t) => t.key.endsWith('display')) ?? faceTokens[0];
+    const bodyToken = faceTokens.find((t) => t.key.endsWith('body')) ?? faceTokens[1];
+    const pairButtons = [];
+    if (displayToken && bodyToken) {
+        container.append(el('div', 'le-section-heading', 'Type'));
+        const pairGrid = el('div', 'le-pairs');
+        for (const pair of pairings) {
+            const button = el('button', 'le-pair');
+            button.type = 'button';
+            const head = faces.get(pair.display);
+            const body = faces.get(pair.body);
+            fontLink(head); fontLink(body);
+            const big = el('span', 'le-pair-big', 'Aa');
+            big.style.fontFamily = head ? head.stack : computed.getPropertyValue(displayToken.property);
+            const line = el('span', 'le-pair-line', head && body ? `${head.name} and ${body.name}` : 'As your template was designed');
+            line.style.fontFamily = body ? body.stack : computed.getPropertyValue(bodyToken.property);
+            button.append(big, el('span', 'le-pair-name', pair.name), line);
+            button.addEventListener('click', () => { pending[displayToken.key] = pair.display; pending[bodyToken.key] = pair.body; changed(); });
+            pairGrid.append(button);
+            pairButtons.push([pair, button]);
+        }
+        container.append(pairGrid);
+    }
+
+    // ---- every colour and face one by one, for whoever wants that much control
+    const fine = el('details', 'le-style-group le-brand-fine');
+    fine.append(el('summary', 'le-section-heading', 'Fine-tune each colour and face'));
+    const swatches = el('div', 'le-brand-grid');
+    const rowInputs = new Map();
+    for (const token of colourTokens) {
+        const row = el('label', 'le-brand-row');
+        const input = el('input', 'le-brand-swatch');
+        input.type = 'color';
+        input.setAttribute('aria-label', token.label);
+        const words = el('span', 'le-brand-words');
+        words.append(el('span', 'le-brand-label', token.label), el('span', 'le-brand-hint', token.hint));
+        const reset = el('button', 'le-link-btn', "Design's own");
+        reset.type = 'button';
+        reset.addEventListener('click', (event) => { event.preventDefault(); pending[token.key] = ''; changed(); });
+        input.addEventListener('input', () => { pending[token.key] = input.value.toUpperCase(); changed(); });
+        row.append(input, words, reset);
+        rowInputs.set(token.key, [input, reset]);
+        swatches.append(row);
+    }
+    const type = el('div', 'le-brand-type');
+    const selects = new Map();
+    for (const token of faceTokens) {
+        const row = el('label', 'le-brand-face');
+        row.append(el('span', 'le-brand-label', token.label));
+        const select = el('select', 'le-input');
+        const own = el('option', null, "The design's own");
+        own.value = '';
+        select.append(own);
+        for (const face of faces.values()) {
+            const option = el('option', null, face.name);
+            option.value = face.id;
+            option.style.fontFamily = face.stack;
+            select.append(option);
+        }
+        select.addEventListener('change', () => { pending[token.key] = select.value; changed(); });
+        row.append(select);
+        selects.set(token.key, select);
+        type.append(row);
+    }
+    fine.append(swatches, type);
+    container.append(fine);
+
+    // Everything above shows the same choice, wherever it was made.
+    const paint = () => {
+        for (const token of colourTokens) {
+            const hex = colourShown(token);
+            const [cell, input] = stripInputs.get(token.key);
+            input.value = hex;
+            cell.style.background = hex;
+            cell.classList.toggle('is-dark', luminance(parseColour(hex)) < 0.25);
+            const [rowInput, reset] = rowInputs.get(token.key);
+            rowInput.value = hex;
+            reset.hidden = current(token) === '';
+        }
+        selects.forEach((select, key) => { select.value = current(config.tokens.find((t) => t.key === key)); });
+        paletteButtons.forEach(([palette, button]) => button.classList.toggle('is-on', onPalette(palette)));
+        pairButtons.forEach(([pair, button]) => button.classList.toggle('is-on', current(displayToken) === pair.display && current(bodyToken) === pair.body));
+    };
+    paint();
 
     // The verdict and the buttons stay in view however long the list gets.
     const dock = el('div', 'le-brand-dock');
@@ -384,6 +512,7 @@ export const renderBrandPanel = ({ container, config, save, upload, done, notify
     };
 
     const changed = () => {
+        paint();
         apply.disabled = Object.keys(pending).every((key) => pending[key] === (chosen[key] ?? (key === identity.nameKey ? identity.name : key === identity.logoKey ? identity.logo : '')));
         preview();
     };
