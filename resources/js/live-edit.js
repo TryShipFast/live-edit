@@ -1966,6 +1966,15 @@ const bootLiveEdit = () => {
             drawer.classList.add('is-open');
             ui.toolbar.classList.add('is-compact');
 
+            // Writing aids such as Grammarly attach to every text box they
+            // find and fill the console with their own warnings. These boxes
+            // hold short site copy, so ask them to stay out.
+            drawer.querySelectorAll('textarea, input').forEach((field) => {
+                field.setAttribute('data-gramm', 'false');
+                field.setAttribute('data-gramm_editor', 'false');
+                field.setAttribute('data-enable-grammarly', 'false');
+            });
+
             if (drawerTab === 'Edit') {
                 drawerFields.querySelector('textarea, input:not([type=checkbox]), select')?.focus();
             }
@@ -4887,6 +4896,31 @@ const bootLiveEdit = () => {
             collection: 'This counts the products in the collection it links to and shows the lowest price. Change that collection and it follows.',
             choices: 'These choices come from your products’ own words. Change a product’s type, cloth or colour on its card and the choices follow.',
         };
+        /*
+         * What is really under the pointer when a link has been stretched over
+         * a whole card.
+         *
+         * "The whole card opens the page" is usually built by giving the card's
+         * link a transparent ::after that covers the card (Bootstrap calls it a
+         * stretched link). For a visitor that is right. For an owner it put the
+         * link in front of everything they could see: every press on the date,
+         * the photo, the title or the icon landed on the link, so only the
+         * link's own words could be edited. A press that lands on a link but
+         * outside the link's own box hit its overlay, so the element beneath it
+         * is the one meant.
+         */
+        const beneathStretchedLink = (event) => {
+            const node = event.target;
+            const link = node?.closest?.('a[href]');
+            if (!link || typeof event.clientX !== 'number' || !document.elementsFromPoint) return node;
+            const inside = [...link.getClientRects()].some((r) => event.clientX >= r.left && event.clientX <= r.right && event.clientY >= r.top && event.clientY <= r.bottom);
+            if (inside) return node;
+            const below = document.elementsFromPoint(event.clientX, event.clientY)
+                .find((el) => el !== link && !link.contains(el) && !el.contains(link) && !ui.root.contains(el) && el !== ui.root);
+
+            return below ?? node;
+        };
+
         const openTarget = ({ element, kind }) => {
             if (kind === 'image') editImage(element);
             else if (kind === 'icon') void editIcon(element);
@@ -4933,7 +4967,7 @@ const bootLiveEdit = () => {
             if (hoverFrame) return;
             hoverFrame = requestAnimationFrame(() => {
                 hoverFrame = null;
-                const target = resolveTarget(event.target);
+                const target = resolveTarget(beneathStretchedLink(event));
                 if (target) showHover(target.element);
                 else hideHover();
             });
@@ -5043,9 +5077,13 @@ const bootLiveEdit = () => {
                 if (event.target === ui.root || ui.root.contains(event.target)) return;
                 if (event.target.closest('[data-live-create]')) return;
 
-                const target = resolveTarget(event.target);
-                const anchor = event.target.closest?.('a[href]');
-                const dropdown = dropdownTriggerFrom(event.target);
+                // Through a link stretched over a card to what is really there; the
+                // link is not followed either way.
+                const pressed = beneathStretchedLink(event);
+                if (pressed !== event.target) event.preventDefault();
+                const target = resolveTarget(pressed);
+                const anchor = pressed.closest?.('a[href]');
+                const dropdown = dropdownTriggerFrom(pressed);
                 if (dropdown && !dropdown.matches('a[data-edit], a[data-edit-href]')) {
                     // Keep menu toggles usable in edit mode, while suppressing
                     // an uneditable control's destination. A tagged anchor is
