@@ -3460,6 +3460,15 @@ const bootLiveEdit = () => {
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({ key: list.dataset.editList, value: JSON.stringify(ids) }),
                     });
+                    // A row of tabs and its panels (data-edit-list-pair) are one collection
+                    // drawn twice: one order for both, so a panel added is a tab added.
+                    if (list.dataset.editListPair) {
+                        await request('/live-edit/setting', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ key: list.dataset.editListPair, value: JSON.stringify(ids) }),
+                        });
+                    }
                     await settle(message, list.dataset.editList, JSON.stringify(ids), true);
                 } catch (error) {
                     notify(error.message);

@@ -407,7 +407,7 @@ class MarkupScanner
 
                 $clone = $template->cloneNode(true);
                 if ($clone instanceof DOMElement) {
-                    $this->rekeyItem($clone, $id);
+                    $this->rekeyItem($clone, $id, $this->partnerIds($xpath, $container));
                     $container->appendChild($clone);
                 }
             }
@@ -1060,7 +1060,51 @@ class MarkupScanner
         return $nearest;
     }
 
-    protected function rekeyItem(DOMElement $item, string $newId): void
+    /**
+     * The HTML ids inside a list's partner's items (data-edit-list-pair).
+     *
+     * A row of tabs and its panels are one collection drawn twice: the editor
+     * saves one order for both, so a panel added is a tab added with the same
+     * new id. The copied tab still points at the panel it was copied from
+     * (aria-controls), and that panel's copy is renamed "<id>--<new id>" in its
+     * own list, so a reference into the partner is renamed the same way.
+     * Without it the new tab opened the old panel. The browser does the same
+     * (content.js, partnerIds).
+     *
+     * @return array<string, true>
+     */
+    protected function partnerIds(DOMXPath $xpath, DOMElement $container): array
+    {
+        $pair = $container->getAttribute('data-edit-list-pair');
+
+        if ($pair === '') {
+            return [];
+        }
+
+        $ids = [];
+        foreach ($xpath->query('//*[@data-edit-list]') ?: [] as $list) {
+            if (! $list instanceof DOMElement || $list->getAttribute('data-edit-list') !== $pair) {
+                continue;
+            }
+            foreach ($list->childNodes as $child) {
+                if (! $child instanceof DOMElement || ! $child->hasAttribute('data-edit-item')) {
+                    continue;
+                }
+                foreach ([$child, ...iterator_to_array($child->getElementsByTagName('*'))] as $node) {
+                    if ($node instanceof DOMElement && $node->getAttribute('id') !== '') {
+                        $ids[$node->getAttribute('id')] = true;
+                    }
+                }
+            }
+        }
+
+        return $ids;
+    }
+
+    /**
+     * @param  array<string, true>  $partner  ids inside the paired list's items (partnerIds)
+     */
+    protected function rekeyItem(DOMElement $item, string $newId, array $partner = []): void
     {
         $item->setAttribute('data-edit-item', $newId);
 
@@ -1117,7 +1161,7 @@ class MarkupScanner
                     continue;
                 }
                 $node->setAttribute($attribute, implode(' ', array_map(
-                    static fn (string $part): string => $idMap[$part] ?? $part,
+                    static fn (string $part): string => $idMap[$part] ?? (isset($partner[$part]) ? $part.'--'.$newId : $part),
                     preg_split('/\\s+/', trim($value)) ?: [],
                 )));
             }
