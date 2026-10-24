@@ -1973,7 +1973,27 @@ const bootLiveEdit = () => {
             return new Date(iso).toLocaleDateString();
         };
 
+        /** The trigger whose press opened the panel, for that one opening; false otherwise. */
         let openedFromATrigger = false;
+        /** Where a trigger's menu shows: the boxes of the links around it that are on screen, the trigger aside. */
+        const menuRevealedBy = (trigger) => {
+            const holder = (trigger.getAttribute('aria-controls') && document.getElementById(trigger.getAttribute('aria-controls')))
+                || trigger.closest('li') || trigger.parentElement;
+
+            return [...(holder?.querySelectorAll('a[href], button') ?? [])]
+                .filter((link) => link !== trigger && !trigger.contains(link))
+                .map((link) => link.getBoundingClientRect())
+                .filter((box) => box.width > 0 && box.height > 0);
+        };
+        /** True when the panel on the left hides fewer of these links than on the right (a wide menu stays put). */
+        const betterOnTheLeft = (boxes) => {
+            if (!boxes.length || window.innerWidth <= 760) return false;
+            const width = Math.min(340, window.innerWidth - 24);
+            // hidden: less of the link than a fingertip (24px) left outside the panel to press
+            const hidden = (from, to) => boxes.filter((box) => Math.max(0, from - box.left) + Math.max(0, box.right - to) < 24).length;
+
+            return hidden(12, 12 + width) < hidden(window.innerWidth - 12 - width, window.innerWidth - 12);
+        };
         const openDrawer = () => {
             // The floating handles point at the page, and the panel is now the
             // subject. On a phone the panel is full width, so a handle left
@@ -1998,6 +2018,10 @@ const bootLiveEdit = () => {
             if (drawerTab === 'Edit' && !openedFromATrigger) {
                 drawerFields.querySelector('textarea, input:not([type=checkbox]), select')?.focus();
             }
+            // The panel sits on the right, and so does many a site's last menu: opened from its trigger, that
+            // menu would be under the panel and its links out of reach. Then the panel takes the left side, when that
+            // hides fewer of them.
+            drawer.classList.toggle('is-left', Boolean(openedFromATrigger) && betterOnTheLeft(menuRevealedBy(openedFromATrigger)));
             openedFromATrigger = false;
         };
         const closeDrawer = (force = false) => {
@@ -2018,7 +2042,7 @@ const bootLiveEdit = () => {
 
             current?.restore?.();
             clearStylePreview();
-            drawer.classList.remove('is-open');
+            drawer.classList.remove('is-open', 'is-left');
             ui.toolbar.classList.remove('is-compact');
             current = null;
         };
@@ -5177,7 +5201,7 @@ const bootLiveEdit = () => {
                     const words = isLink
                         ? (dropdown.matches('[data-edit^="setting:"]') ? dropdown : dropdown.querySelector('[data-edit^="setting:"]'))
                         : editableLabel(pressed);
-                    if (words) window.setTimeout(() => { openedFromATrigger = true; isLink ? editText(words, dropdown) : editText(words); }, 0);
+                    if (words) window.setTimeout(() => { openedFromATrigger = dropdown; isLink ? editText(words, dropdown) : editText(words); }, 0);
                     else if (isLink && dropdown.dataset.editHref !== undefined) window.setTimeout(() => editLink(dropdown), 0);
                     return;
                 }
