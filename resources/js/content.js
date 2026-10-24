@@ -726,7 +726,7 @@ export const applyOrder = (root, settings) => {
             }
             template ??= items.values().next().value;
             const clone = template.cloneNode(true);
-            rekeyRepeatedItem(clone, String(id));
+            rekeyRepeatedItem(clone, String(id), partnerIds(root, container));
             container.appendChild(clone);
         }
 
@@ -749,8 +749,29 @@ export const applyOrder = (root, settings) => {
     return moved;
 };
 
+/**
+ * The HTML ids inside a list's partner's items (data-edit-list-pair).
+ *
+ * A row of tabs and its panels are one collection drawn twice: the editor saves
+ * one order for both, so a panel added is a tab added with the same new id. The
+ * copied tab still points at the panel it was copied from (aria-controls), and
+ * that panel's copy is renamed "<id>--<new id>" in its own list, so a reference
+ * into the partner is renamed the same way. Without it the new tab opened the
+ * old panel.
+ */
+const partnerIds = (root, container) => {
+    const pair = container.getAttribute('data-edit-list-pair');
+    const partner = pair ? [...root.querySelectorAll('[data-edit-list]')].find((list) => list.getAttribute('data-edit-list') === pair) : null;
+    if (!partner) return new Set();
+    return new Set([...partner.children]
+        .filter((child) => child.hasAttribute('data-edit-item'))
+        .flatMap((child) => [child, ...child.querySelectorAll('[id]')])
+        .map((node) => node.id)
+        .filter(Boolean));
+};
+
 /** Give an inserted collection row its own editable keys and HTML ids. */
-const rekeyRepeatedItem = (item, id) => {
+const rekeyRepeatedItem = (item, id, partner = new Set()) => {
     item.setAttribute('data-edit-item', id);
     const nodes = [item, ...item.querySelectorAll('*')];
     const idMap = new Map();
@@ -782,7 +803,7 @@ const rekeyRepeatedItem = (item, id) => {
     for (const node of nodes) {
         for (const attribute of ['for', 'aria-labelledby', 'aria-describedby', 'aria-controls', 'aria-owns']) {
             const value = node.getAttribute(attribute);
-            if (value) node.setAttribute(attribute, value.split(/\s+/).map((part) => idMap.get(part) ?? part).join(' '));
+            if (value) node.setAttribute(attribute, value.split(/\s+/).map((part) => idMap.get(part) ?? (partner.has(part) ? `${part}--${id}` : part)).join(' '));
         }
         for (const attribute of ['href', 'data-bs-target']) {
             const value = node.getAttribute(attribute);

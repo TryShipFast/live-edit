@@ -201,6 +201,25 @@ describe('what a visitor sees, applied by the server and by the browser', () => 
         expect(b).toBe('i0,i1,i2');
     });
 
+    it('agrees on a tab added with its panel', () => {
+        const html = '<div role="tablist" data-edit-list="tpl:tabs" data-edit-list-pair="tpl:panels">'
+            + '<button role="tab" id="t-a" aria-controls="p-a" data-edit-item="t1">A</button>'
+            + '<button role="tab" id="t-b" aria-controls="p-b" data-edit-item="t2">B</button></div>'
+            + '<div data-edit-list="tpl:panels" data-edit-list-pair="tpl:tabs">'
+            + '<div role="tabpanel" id="p-a" aria-labelledby="t-a" data-edit-item="t1">One</div>'
+            + '<div role="tabpanel" id="p-b" aria-labelledby="t-b" data-edit-item="t2">Two</div></div>';
+        const order = JSON.stringify(['t1', 'n1', 't2']);
+        const { server: s, browser: b } = both(
+            html, { 'tpl:tabs': order, 'tpl:panels': order }, {},
+            (doc) => [...doc.querySelectorAll('[role="tab"]')].map((t) => `${t.id}>${t.getAttribute('aria-controls')}`).join(',')
+                + '|' + [...doc.querySelectorAll('[role="tabpanel"]')].map((p) => `${p.id}>${p.getAttribute('aria-labelledby')}`).join(','),
+        );
+
+        expect(b).toBe(s);
+        // the new tab opens the new panel, and the new panel names the new tab
+        expect(b).toBe('t-a>p-a,t-a--n1>p-a--n1,t-b>p-b|p-a>t-a,p-a--n1>t-a--n1,p-b>t-b');
+    });
+
     it('agrees on the stylesheet', () => {
         const { server: s, browser: b } = both(
             '<a data-style="sbtn">Book</a>',

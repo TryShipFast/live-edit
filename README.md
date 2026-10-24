@@ -303,6 +303,23 @@ list's odd one out: when its class appears once and the list has a usual
 class, the copy is made from the nearest item of the usual class. A gallery
 that opens with one large photo gets a normal tile, not a second large one.
 
+### Two lists that are one collection
+
+A row of tabs and its panels are one collection drawn twice. Each names the
+other:
+
+```html
+<div role="tablist" data-edit-list="tpl:tabs" data-edit-list-pair="tpl:panels"> ... </div>
+<div data-edit-list="tpl:panels" data-edit-list-pair="tpl:tabs"> ... </div>
+```
+
+Moving, duplicating or deleting an item in either saves the same order for
+both, so a panel added is a tab added. Items are matched by their ids
+(`data-edit-item`), so both lists use the same ids in the same order. A copy is
+renamed as any copy is (`<id>--<new id>`), and so are its references into the
+partner, so the new tab's `aria-controls` points at the new panel. The browser
+and the server do this the same way.
+
 ### Links the editor steers
 
 A host that serves pages in its own editor can keep the visitor's address in
