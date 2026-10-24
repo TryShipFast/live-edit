@@ -213,7 +213,9 @@ describe('where a static page gets its content from', () => {
     it('falls back to the application when there are no files yet', async () => {
         // A site that has never published has no snapshot, and should not be
         // blank because of it.
-        vi.spyOn(console, 'warn').mockImplementation(() => {});
+        // Put back afterwards: a spy left on console.warn is the one the next
+        // test's spyOn is handed, with this test's warning already in it.
+        const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
         globalThis.fetch = answering({
             'https://cms.test/api/v1/acme/content': { settings: { 'auto:abc': 'From the API' } },
         });
@@ -221,6 +223,7 @@ describe('where a static page gets its content from', () => {
         const payload = await resolve({ ...snapshot, base: 'https://cms.test/api/v1', site: 'acme', key: 'kbp_x' });
 
         expect(payload.settings['auto:abc']).toBe('From the API');
+        warn.mockRestore();
     });
 
     it('says so rather than pretending when there is nowhere to fall back to', async () => {

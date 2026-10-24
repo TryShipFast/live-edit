@@ -13,16 +13,18 @@ describe('tagging a page nobody prepared', () => {
 
     it('finds an element by the position it was given', () => {
         // Positions rather than selectors: the server computed them from the
-        // very markup this page sent, so the two agree by construction.
+        // very markup this page sent, so the two agree by construction. The
+        // document has a head as well as a body, as every browser builds it,
+        // so the body is the second child of <html>.
         const doc = page('<body><div><p>one</p><h1>two</h1></div></body>');
 
-        expect(elementAt(doc, [0, 0, 1]).tagName).toBe('H1');
+        expect(elementAt(doc, [1, 0, 1]).tagName).toBe('H1');
     });
 
     it('marks what it was told to mark', () => {
         const doc = page('<body><h1>Hello</h1></body>');
 
-        const applied = applyTags(doc, [{ at: [0, 0], attributes: { 'data-edit': 'setting:auto:abc' } }]);
+        const applied = applyTags(doc, [{ at: [1, 0], attributes: { 'data-edit': 'setting:auto:abc' } }]);
 
         expect(applied).toBe(1);
         expect(doc.querySelector('h1').getAttribute('data-edit')).toBe('setting:auto:abc');
@@ -33,7 +35,7 @@ describe('tagging a page nobody prepared', () => {
         // client's saved words stay attached to them.
         const doc = page('<body><h1 data-edit="setting:auto:original">Hello</h1></body>');
 
-        applyTags(doc, [{ at: [0, 0], attributes: { 'data-edit': 'setting:auto:different' } }]);
+        applyTags(doc, [{ at: [1, 0], attributes: { 'data-edit': 'setting:auto:different' } }]);
 
         expect(doc.querySelector('h1').getAttribute('data-edit')).toBe('setting:auto:original');
     });
@@ -58,7 +60,7 @@ describe('tagging a page nobody prepared', () => {
         // in the markup, and the markers were right the last time.
         globalThis.fetch = vi.fn(() => Promise.resolve({
             ok: true,
-            json: () => Promise.resolve({ elements: [{ at: [0, 0], attributes: { 'data-edit': 'setting:auto:abc' } }] }),
+            json: () => Promise.resolve({ elements: [{ at: [1, 0], attributes: { 'data-edit': 'setting:auto:abc' } }] }),
         }));
         await autoTag({ base: 'https://cms.test', site: 'a', key: 'k' }, page('<body><h2>Cached</h2></body>'));
 
@@ -71,7 +73,7 @@ describe('tagging a page nobody prepared', () => {
     it('asks once, and remembers the answer', async () => {
         globalThis.fetch = vi.fn(() => Promise.resolve({
             ok: true,
-            json: () => Promise.resolve({ elements: [{ at: [0, 0], attributes: { 'data-edit': 'setting:auto:abc' } }] }),
+            json: () => Promise.resolve({ elements: [{ at: [1, 0], attributes: { 'data-edit': 'setting:auto:abc' } }] }),
         }));
 
         const doc = page('<body><h1>Hello</h1></body>');
