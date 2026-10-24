@@ -758,13 +758,26 @@ select.le-input {
 }
 .le-modal-tab.is-on { color: var(--le-ink); border-bottom-color: var(--le-ink); }
 .le-modal-body { flex: 1; min-height: 0; overflow-y: auto; padding: 22px 24px; }
+/* Docked above the bar, bottom left: clear of the header and its menus, and of the panel on the right. */
 .le-walkthrough {
-  position: fixed; z-index: 2147483005; top: 16px; left: 16px;
-  width: min(340px, calc(100vw - 32px)); padding: 18px;
+  position: fixed; z-index: 2147483005; left: 16px; bottom: 88px;
+  width: min(340px, calc(100vw - 32px)); padding: 16px 18px 18px;
   border: 1px solid var(--le-line); border-radius: 14px; background: #fff;
   color: var(--le-body); box-shadow: 0 16px 48px rgba(11,12,15,.2);
 }
-.le-walkthrough-progress { margin-bottom: 7px; color: var(--le-muted); font-size: 12px; font-weight: 600; }
+.le-walkthrough[hidden], .le-walkthrough-pill[hidden] { display: none; }
+.le-walkthrough-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 7px; }
+.le-walkthrough-progress { color: var(--le-muted); font-size: 12px; font-weight: 600; }
+.le-walkthrough-head .le-walkthrough-progress { margin: 0; }
+.le-walkthrough-hide { border: 0; background: none; padding: 6px 2px; min-height: 32px; color: var(--le-muted); font: inherit; font-size: 12px; font-weight: 600; cursor: pointer; }
+.le-walkthrough-hide:hover { color: var(--le-ink); }
+.le-walkthrough-pill {
+  position: fixed; z-index: 2147483005; left: 16px; bottom: 88px; min-height: 40px; padding: 0 16px;
+  border: 1px solid var(--le-line); border-radius: 999px; background: #fff; color: var(--le-ink);
+  font: inherit; font-size: 13px; font-weight: 600; cursor: pointer; box-shadow: 0 8px 24px rgba(11,12,15,.14);
+}
+.le-walkthrough-actions .le-btn.is-ready { box-shadow: 0 0 0 3px rgba(27,110,243,.35); }
+@media (max-width: 700px) { .le-walkthrough, .le-walkthrough-pill { bottom: 104px; } }
 .le-walkthrough h2 { margin: 0; color: var(--le-ink); font-size: 17px; font-weight: 650; line-height: 1.3; }
 .le-walkthrough p { margin: 7px 0 16px; color: var(--le-body); font-size: 13px; line-height: 1.5; }
 .le-walkthrough-actions { display: flex; align-items: center; justify-content: flex-end; gap: 8px; }

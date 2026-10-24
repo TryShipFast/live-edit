@@ -4825,6 +4825,20 @@ const bootLiveEdit = () => {
             const href = anchor?.getAttribute('href') ?? '';
             return href !== '' && href !== '#' && !href.startsWith('javascript:');
         };
+        /*
+         * The words on a menu's trigger ("Capabilities", "Firm"). Its click is kept for the menu, so
+         * the owner can open it and reach the links inside; pressing the words could therefore never
+         * edit them, and every dropdown's label was the one thing on the page nobody could change.
+         * The pencil handle offers them instead, the way it offers a link's address.
+         */
+        const editableLabel = (target) => {
+            const trigger = dropdownTriggerFrom(target);
+            if (!trigger || trigger.matches('a[data-edit], a[data-edit-href]')) return null;
+            if (mayEditLocked !== true && trigger.closest('[data-live-lock]')) return null;
+            const words = trigger.matches('[data-edit^="setting:"]') ? trigger : trigger.querySelector('[data-edit^="setting:"]');
+
+            return words && words.textContent.trim() !== '' ? words : null;
+        };
 
         let handleTarget = null;
         let overHandle = false;
@@ -4848,9 +4862,19 @@ const bootLiveEdit = () => {
             // handle flickers as the pointer crosses the link's own children.
             if (anchor === handleTarget && !linkHandle.classList.contains('hidden')) return;
             handleTarget = anchor;
-            const rect = anchor.getBoundingClientRect();
-            linkHandle.style.top = `${rect.top + window.scrollY - 10}px`;
-            linkHandle.style.left = `${rect.right + window.scrollX - 10}px`;
+            const trigger = anchor.matches('a[href]') ? null : dropdownTriggerFrom(anchor);
+            linkHandle.setAttribute('aria-label', trigger ? 'Edit this label' : 'Edit this link');
+            if (trigger) {
+                // Above the trigger, clear of it: on a short label ("Firm") a handle on its corner sat over
+                // the middle of the button, and the press meant for the menu landed on the handle instead.
+                const box = trigger.getBoundingClientRect();
+                linkHandle.style.top = `${Math.max(2, box.top - 24) + window.scrollY}px`;
+                linkHandle.style.left = `${box.left + box.width / 2 - 13 + window.scrollX}px`;
+            } else {
+                const rect = anchor.getBoundingClientRect();
+                linkHandle.style.top = `${rect.top + window.scrollY - 10}px`;
+                linkHandle.style.left = `${rect.right + window.scrollX - 10}px`;
+            }
             linkHandle.classList.add('is-visible');
         };
         const hideHandle = () => {
@@ -5015,9 +5039,10 @@ const bootLiveEdit = () => {
             const withBackground = event.target.closest?.('[data-edit-bg], [data-has-bg]');
             if (withBackground && (mayEditLocked === true || !withBackground.closest('[data-live-lock]'))) showBgHandle(withBackground);
             const anchor = editableAnchor(event.target);
-            if (anchor && navigable(anchor)) {
+            const label = anchor ? null : editableLabel(event.target);
+            if ((anchor && navigable(anchor)) || label) {
                 cancelHide();
-                positionHandle(anchor);
+                positionHandle(anchor ?? label);
             }
         });
         document.addEventListener('pointerout', (event) => {
@@ -5025,7 +5050,7 @@ const bootLiveEdit = () => {
             // Staying on the same link (crossing its children) or moving onto the
             // handle itself is not a leave — keep it up.
             if (event.relatedTarget === linkHandle) return;
-            if (editableAnchor(event.relatedTarget) === handleTarget && handleTarget) return;
+            if (handleTarget && (editableAnchor(event.relatedTarget) ?? editableLabel(event.relatedTarget)) === handleTarget) return;
             scheduleHide();
         });
         // Track the handle's own hover explicitly instead of racing :hover.
@@ -5205,275 +5230,186 @@ const bootLiveEdit = () => {
         const completeWalkthrough = () => {
             try { window.localStorage.setItem(walkthroughStorageKey, '1'); } catch { /* Help remains available if storage is disabled. */ }
         };
+        /*
+         * The guide. It points, it never does: each step rings the real control on the page or in the
+         * bar and says what it does, and the person presses it themselves. The old tour opened an
+         * editor on a link it chose, refused Next until that edit was saved or cancelled, sat in the
+         * top corner over the site's own menus and ended by asking for a publish. A beginner could
+         * not tell the tour from the editor, or get out of either.
+         *
+         * So: a small card docked above the bar, clear of the header; Next and Back always work; a
+         * step that asks for something ("click any words") notices when it is done; Hide folds the
+         * card to a pill and Esc (or End) closes it. The first visit gets the short version; Help
+         * keeps a guide per feature.
+         */
         const startWalkthrough = (replay = false, guideId = 'getting-started') => {
             if ((!replay && walkthroughWasCompleted()) || ui.shadow.querySelector('.le-walkthrough')) return;
-            // A guided walk through the real editor. There is no overlay: each
-            // step opens the panel or control the customer will actually use.
             if (!document.body.classList.contains('editing')) setEditing(true);
+
+            const shown = (node) => {
+                if (!node?.getClientRects?.().length || node.closest('[data-live-edit-ui], [aria-hidden="true"], .skip-link')) return false;
+                const style = window.getComputedStyle(node);
+                const rect = node.getBoundingClientRect();
+                return style.visibility !== 'hidden' && Number(style.opacity) > 0 && rect.width > 1 && rect.height > 1;
+            };
+            const first = (selector, test = () => true) => [...document.querySelectorAll(selector)].find((node) => shown(node) && test(node)) ?? null;
+            const find = {
+                words: () => first('main h1[data-edit], main h2[data-edit], main [data-edit] h1, main [data-edit] h2', (n) => n.textContent.trim() !== '')
+                    ?? first('main [data-edit]', (n) => n.textContent.trim() !== ''),
+                link: () => first('main a[data-edit-href]'),
+                image: () => first('main [data-edit-img]'),
+                background: () => first('[data-edit-bg]'),
+                card: () => first('[data-edit-list]:not([data-edit-list-kind="sections"]) > [data-edit-item]'),
+            };
+            const inBar = (name) => {
+                const control = ui[name];
+                return control && !control.hidden && shown(control) ? control : null;
+            };
+            const tab = (name) => Object.assign(() => {
+                if (!drawerTabs[name]) return null;
+                // Only opened when nothing is being edited, so a guide never throws away somebody's words.
+                if (!current?.dirty) { showTab(name); openDrawer(); }
+                return drawerTabs[name];
+            }, { available: () => Boolean(drawerTabs[name]) });
+            const publishStep = { point: () => inBar('publishButton'), title: 'Nothing is live until you publish', copy: 'Everything you save is a draft only you can see. When you are happy with it, press Publish and visitors see it.' };
 
             const guides = {
                 'getting-started': [
-                    { tab: 'content', title: 'Click or tap what you want to edit', copy: 'To edit something on the page, click or tap it. Its editor opens here. Save each item to your draft, then publish all your saved edits together.' },
-                    { tab: 'Brand', title: 'Set your brand', copy: 'Add your business name or logo here. Save your brand to keep it as a draft.' },
-                    { tab: 'SEO', title: 'Set your page title', copy: 'Update the title and search description, then save them as a draft.' },
-                    { tab: 'Changes', title: 'Review your edits', copy: 'Changes to different items are collected here as drafts. Keep editing, then publish them all together.' },
-                    { tab: 'Publish', title: 'Publish your changes', copy: 'Publish sends all your saved changes live. You can then preview the live page.' },
+                    { point: find.words, waitFor: 'editor', title: 'Click any words to change them', copy: 'Try it now: click the words ringed in blue. Their editor opens on the right.', done: 'That is the editor. Change the words, then press Save changes. Pictures and links work the same way.' },
+                    { point: find.card, title: 'Cards can be moved and copied', copy: 'Click a card and the top of its panel offers Move up, Move down, Duplicate and Delete. A copy is filtered and sold like the others.' },
+                    { point: tab('Brand'), title: 'Your colours and fonts, once', copy: 'The Brand tab restyles the whole site from one place. Your logo is on the page: click it to replace it.' },
+                    publishStep,
                 ],
                 text: [
-                    { tab: 'content', title: 'Edit text or a link', copy: 'Choose the text or link you want to change. Update it in the editor and save.' },
-                    { tab: 'Changes', title: 'Review the draft', copy: 'Your saved edit appears here. You can undo it or keep editing.' },
-                    { tab: 'Publish', title: 'Put your edit live', copy: 'Publish when the change is ready for visitors.' },
+                    { point: find.words, waitFor: 'editor', title: 'Click the words you want to change', copy: 'The editor opens on the right. Type, then press Save changes.', done: 'Type your new words and press Save changes. It is saved as a draft.' },
+                    { point: find.link, title: 'Links work the same way', copy: 'Click a link to change its words and where it goes. A menu label has a small pencil above it when you point at it.' },
+                    publishStep,
                 ],
                 image: [
-                    { tab: 'content', media: 'image', title: 'Replace an image', copy: 'Choose an image on the page to open its image editor. Select or upload a replacement, then save.' },
-                    { tab: 'Changes', title: 'Review the image change', copy: 'Your replacement is saved as a draft and listed here.' },
-                    { tab: 'Publish', title: 'Publish the replacement', copy: 'Publish when you are ready for visitors to see the new image.' },
+                    { point: find.image, waitFor: 'editor', title: 'Click a picture to replace it', copy: 'Choose one of yours, a free photo, or ask for a new one, then save.', done: 'Pick the new picture and press Save changes.' },
+                    publishStep,
                 ],
                 background: [
-                    { tab: 'content', media: 'background', title: 'Edit a background image', copy: 'This opens the section background editor. To find it yourself, hover over a section and choose Replace background. Save your change as a draft.' },
-                    { tab: 'Changes', title: 'Review the background change', copy: 'Your background update is saved as a draft. You can keep editing other items before publishing.' },
-                    { tab: 'Publish', title: 'Publish the background', copy: 'Publish when you are ready for visitors to see all your saved changes.' },
+                    { point: find.background, title: 'Backgrounds have their own button', copy: 'Point at a section with a photo behind it and press the picture button in its corner.' },
+                    publishStep,
                 ],
                 brand: [
-                    { tab: 'Brand', title: 'Update your brand', copy: 'Set your site-wide colors and type here. Save to keep your changes as a draft.' },
-                    { tab: 'Changes', title: 'Review your brand changes', copy: 'Your brand updates are saved as a draft and listed here.' },
-                    { tab: 'Publish', title: 'Publish your brand', copy: 'Publish when you are ready to use the new brand on your site.' },
+                    { point: tab('Brand'), title: 'Your colours and fonts', copy: 'Pick seven colours and two fonts; the whole site follows. It warns you if words become hard to read.' },
+                    publishStep,
                 ],
                 seo: [
-                    { tab: 'SEO', title: 'Update search details', copy: 'Set this page title and search description, then save them as a draft.' },
-                    { tab: 'Changes', title: 'Review your SEO draft', copy: 'Your saved search details are listed here.' },
+                    { point: tab('SEO'), title: 'How this page looks in search', copy: 'Set the page title, its search description and the picture shown when it is shared.' },
+                    publishStep,
                 ],
                 pages: [
-                    { tab: 'toolbar', control: 'pagesButton', title: 'Start a new page', copy: 'Choose New page. Pick a page your design already has to start from, like your Contact or About page.' },
-                    { tab: 'toolbar', control: 'pagesButton', title: 'Name it and create it', copy: 'Give it a title (its address follows), choose whether it goes in the menu, and choose Create page. Live Edit opens it so you can change its words and photos.' },
+                    { point: () => inBar('pagesButton'), title: 'Add a page', copy: 'Press New page, start from a page your design already has, give it a name, and it opens ready to edit.' },
                 ],
                 languages: [
-                    { tab: 'language', title: 'Choose a language', copy: 'Use this menu to choose which language you are editing. Changes are saved for that language.' },
-                    { tab: 'content', title: 'Edit translated content', copy: 'Choose text on the page and save its translation. Switch languages to review each version.' },
+                    { point: () => (ui.languagePicker && !ui.languagePicker.hidden ? ui.languagePicker : null), title: 'Choose a language', copy: 'Pick the language you are editing. Each language keeps its own words.' },
+                    { point: find.words, title: 'Then edit as usual', copy: 'Click words on the page to write them in that language.' },
                 ],
                 review: [
-                    { tab: 'Changes', title: 'Review saved changes', copy: 'See your saved drafts here. Choose a change to inspect it or undo it.' },
-                    { tab: 'toolbar', control: 'undoButton', title: 'Undo a draft change', copy: 'Undo removes the latest unpublished change. Redo restores it.' },
+                    { point: tab('Changes'), title: 'Everything you saved', copy: 'Each draft change is listed here. Open one to see it, or undo it.' },
+                    { point: () => inBar('undoButton'), title: 'Undo and redo', copy: 'Undo takes back your latest unpublished change; redo puts it back.' },
                 ],
                 preview: [
-                    { tab: 'toolbar', control: 'previewButton', title: 'Preview the page', copy: 'Open a visitor view to check the page before publishing.' },
-                    { tab: 'Publish', title: 'Publish when ready', copy: 'When your review is complete, publish to make the saved changes live.' },
+                    { point: () => inBar('previewButton'), title: 'See it as a visitor', copy: 'Preview shows the page without the editor, so you can check it before publishing.' },
+                    publishStep,
                 ],
             };
-            const steps = guides[guideId] ?? guides['getting-started'];
-            const card = document.createElement('section');
-            card.className = 'le-walkthrough';
+            // Only steps this site has: no Brand step without a Brand tab, no Publish step where saving is publishing.
+            const steps = (guides[guideId] ?? guides['getting-started'])
+                .filter((step) => (step.point.available ? step.point.available() : step.point() !== null));
+            if (!steps.length) return;
+
+            const card = el('section', 'le-walkthrough');
             card.setAttribute('role', 'region');
-            card.setAttribute('aria-label', 'Getting started walkthrough');
-            const progress = document.createElement('div');
-            progress.className = 'le-walkthrough-progress';
-            const heading = document.createElement('h2');
-            const copy = document.createElement('p');
-            const actions = document.createElement('div');
-            actions.className = 'le-walkthrough-actions';
-            const finish = el('button', 'le-walkthrough-end', 'End tour');
+            card.setAttribute('aria-label', 'Live Edit guide');
+            const head = el('div', 'le-walkthrough-head');
+            const progress = el('div', 'le-walkthrough-progress');
+            const hide = el('button', 'le-walkthrough-hide', 'Hide');
+            hide.type = 'button';
+            hide.title = 'Fold the guide away; press it again to come back';
+            head.append(progress, hide);
+            const heading = el('h2');
+            const copy = el('p');
+            copy.setAttribute('aria-live', 'polite');
+            const actions = el('div', 'le-walkthrough-actions');
+            const finish = el('button', 'le-walkthrough-end', 'End guide');
             finish.type = 'button';
             const back = el('button', 'le-btn-outline', 'Back');
             back.type = 'button';
             const next = el('button', 'le-btn', 'Next');
             next.type = 'button';
             actions.append(finish, back, next);
-            card.append(progress, heading, copy, actions);
-            ui.shadow.append(card);
+            card.append(head, heading, copy, actions);
+            const pill = el('button', 'le-walkthrough-pill');
+            pill.type = 'button';
+            pill.hidden = true;
+            ui.shadow.append(card, pill);
+
             let index = 0;
             let target = null;
-            let positionFrame = 0;
-            const positionCard = () => {
-                if (!target?.isConnected) return;
-                const rect = target.getBoundingClientRect();
-                const cardRect = card.getBoundingClientRect();
-                const gap = 14;
-                const margin = 12;
-                const width = cardRect.width || Math.min(340, window.innerWidth - margin * 2);
-                const height = cardRect.height || 170;
-                const clamp = (value, minimum, maximum) => Math.min(Math.max(value, minimum), Math.max(minimum, maximum));
-                let left;
-                let top;
-
-                if (drawer.contains(target)) {
-                    // Keep the coach beside the drawer control it describes.
-                    const drawerRect = drawer.getBoundingClientRect();
-                    left = drawerRect.left - width - gap;
-                    top = rect.top;
-                    if (left < margin) {
-                        left = margin;
-                        top = rect.bottom + gap;
-                    }
-                } else if (ui.toolbar.contains(target)) {
-                    // Publish is at the bottom edge, so its guidance sits just above it.
-                    left = rect.left + rect.width / 2 - width / 2;
-                    top = rect.top - height - gap;
-                } else {
-                    left = rect.left;
-                    top = rect.bottom + gap;
-                    if (top + height > window.innerHeight - margin) top = rect.top - height - gap;
-                    if (top < margin) top = rect.bottom + gap;
-                }
-
-                card.style.left = `${clamp(left, margin, window.innerWidth - width - margin)}px`;
-                card.style.top = `${clamp(top, margin, window.innerHeight - height - margin)}px`;
-            };
-            const schedulePosition = () => {
-                if (positionFrame) cancelAnimationFrame(positionFrame);
-                positionFrame = requestAnimationFrame(positionCard);
-            };
-            window.addEventListener('scroll', schedulePosition, { capture: true, passive: true });
-            window.addEventListener('resize', schedulePosition, { passive: true });
             const clearTarget = () => {
                 target?.removeAttribute('data-live-edit-tour-focus');
                 target = null;
             };
+            // A step that asks for something notices when it is done: the drawer opening on the page's words.
+            const watcher = new MutationObserver(() => {
+                const step = steps[index];
+                if (step?.waitFor === 'editor' && drawer.classList.contains('is-open') && drawerTab === 'Edit' && current && current.kind !== 'list') {
+                    copy.textContent = step.done;
+                    next.classList.add('is-ready');
+                }
+            });
+            watcher.observe(drawer, { attributes: true, attributeFilter: ['class'] });
             const end = () => {
                 clearTarget();
-                sessionStorage.removeItem('tb_walkthrough_publish_preview');
+                watcher.disconnect();
+                document.removeEventListener('keydown', onKey, true);
                 completeWalkthrough();
-                window.removeEventListener('scroll', schedulePosition, true);
-                window.removeEventListener('resize', schedulePosition);
-                if (positionFrame) cancelAnimationFrame(positionFrame);
                 card.remove();
+                pill.remove();
             };
-            const hasUnsavedPanel = (tab) => {
-                if (tab !== 'Brand' && tab !== 'SEO') return false;
-                const button = drawerFields.querySelector('button.le-btn');
-                return Boolean(button && !button.disabled);
+            const onKey = (event) => {
+                if (event.key === 'Escape' && (card.matches(':focus-within') || ui.shadow.activeElement && card.contains(ui.shadow.activeElement))) {
+                    event.stopPropagation();
+                    end();
+                }
             };
-            const editableTarget = (media = 'any') => {
-                const isVisibleOnPage = (node) => {
-                    if (!node.getClientRects().length || node.closest('[data-live-edit-ui], [aria-hidden="true"]')) return false;
-                    const style = window.getComputedStyle(node);
-                    const rect = node.getBoundingClientRect();
-                    return style.display !== 'none'
-                        && style.visibility !== 'hidden'
-                        && Number(style.opacity) > 0
-                        && rect.width > 1
-                        && rect.height > 1
-                        && rect.bottom > 0
-                        && rect.right > 0;
-                };
-                const content = (node) => {
-                    if (!isVisibleOnPage(node)) return false;
-                    if (node.matches('.skip-link, [data-field="link-skip-link"], [data-component="core.skip-link"]')
-                        || node.closest('.skip-link, [data-field="link-skip-link"], [data-component="core.skip-link"]')) return false;
-                    const label = node.getAttribute('aria-label') ?? node.closest('[aria-label]')?.getAttribute('aria-label') ?? '';
-                    return !/skip\s+to\s+content/i.test(label + ' ' + node.textContent);
-                };
-                if (media === 'background') {
-                    const background = [...document.querySelectorAll('[data-edit-bg]')].find(isVisibleOnPage);
-                    return background ? { node: background, open: () => editImage(background) } : null;
-                }
-                if (media !== 'image') {
-                    const link = [...document.querySelectorAll('a[data-edit], a[data-edit-href]')].find(content);
-                    if (link) {
-                        const text = link.hasAttribute('data-edit') ? link : link.querySelector('[data-edit]');
-                        if (text) return { node: link, open: () => editText(text, link) };
-                        return { node: link, open: () => editLink(link) };
-                    }
-                    const text = [...document.querySelectorAll('[data-edit]')].find((node) => node.textContent.trim() && content(node));
-                    if (text) return { node: text, open: () => editText(text) };
-                }
-                const image = [...document.querySelectorAll('[data-edit-img], [data-edit-bg]')].find(isVisibleOnPage);
-                if (image) return { node: image, open: () => editImage(image) };
-                return null;
+            document.addEventListener('keydown', onKey, true);
+            const fold = (folded) => {
+                card.hidden = folded;
+                pill.hidden = !folded;
+                pill.textContent = `Guide · ${index + 1} of ${steps.length}`;
+                (folded ? pill : next).focus();
             };
             const show = () => {
                 const step = steps[index];
                 clearTarget();
+                next.classList.remove('is-ready');
                 back.disabled = index === 0;
-                next.disabled = false;
                 next.textContent = index === steps.length - 1 ? 'Done' : 'Next';
-                progress.textContent = `Walk-through · Step ${index + 1} of ${steps.length}`;
+                progress.textContent = `Step ${index + 1} of ${steps.length}`;
                 heading.textContent = step.title;
                 copy.textContent = step.copy;
-
-                if (step.tab === 'Brand' || step.tab === 'SEO') {
-                    if (!drawerTabs[step.tab]) {
-                        copy.textContent = `${step.title} is not available on this website. Choose Next to continue.`;
-                        return;
-                    }
-                    if (drawerTab !== step.tab && hasUnsavedPanel(drawerTab)) {
-                        copy.textContent = `Save or cancel your ${drawerTab.toLowerCase()} changes before moving on.`;
-                        return;
-                    }
-                    showTab(step.tab);
-                    openDrawer();
-                    target = drawerTabs[step.tab];
-                } else if (step.tab === 'content') {
-                    if (current?.dirty) {
-                        copy.textContent = `Save or cancel your ${drawerTab === 'Edit' ? 'edit' : drawerTab.toLowerCase()} before moving on. Your changes will stay here.`;
-                        return;
-                    }
-                    closeDrawer(true);
-                    const found = editableTarget(step.media);
-                    if (!found) {
-                        copy.textContent = step.media === 'background'
-                            ? 'No editable background image is marked on this page. Choose Next to review your changes.'
-                            : 'No editable text or image is marked on this page. Choose Next to review your changes.';
-                        return;
-                    }
-                    target = found.node;
-                    if (!target) {
-                        copy.textContent = 'No editable image is marked on this page. Choose Next to continue.';
-                        return;
-                    }
-                    target.scrollIntoView({ block: 'center', behavior: 'smooth' });
-                    target.setAttribute('data-live-edit-tour-focus', '');
-                    found.open();
-                } else if (step.tab === 'language') {
-                    if (ui.languagePicker.hidden) {
-                        copy.textContent = 'Language switching is available when this site has more than one language.';
-                        return;
-                    }
-                    target = ui.languagePicker;
-                } else if (step.tab === 'toolbar') {
-                    target = ui[step.control];
-                    if (!target || target.hidden) {
-                        copy.textContent = 'This control is not available on this website. Choose Next to continue.';
-                        return;
-                    }
-                } else if (step.tab === 'Changes') {
-                    if (current?.dirty || hasUnsavedPanel(drawerTab)) {
-                        copy.textContent = 'Save or cancel your current edit before reviewing changes.';
-                        return;
-                    }
-                    showTab('Changes');
-                    openDrawer();
-                    target = drawerTabs.Changes;
-                } else if (step.tab === 'Publish') {
-                    if (current?.dirty || hasUnsavedPanel(drawerTab)) {
-                        copy.textContent = 'Save or cancel your current edit before publishing.';
-                        return;
-                    }
-                    closeDrawer(true);
-                    target = ui.publishButton;
-                    sessionStorage.setItem('tb_walkthrough_publish_preview', '1');
-                    copy.textContent = 'Click Publish below. After it finishes, the live page will open so you can see your first change.';
-                    next.textContent = 'Finish';
-                }
-                target?.setAttribute('data-live-edit-tour-focus', '');
-                if (target && !ui.toolbar.contains(target)) target.scrollIntoView?.({ block: 'nearest' });
-                schedulePosition();
-            };
-            back.addEventListener('click', () => {
-                if (index > 0 && !current?.dirty && !hasUnsavedPanel(drawerTab)) { index -= 1; show(); }
-                else if (current?.dirty || hasUnsavedPanel(drawerTab)) copy.textContent = 'Save or cancel your current edit before going back.';
-            });
-            next.addEventListener('click', () => {
-                if (index === steps.length - 1) { end(); return; }
-                if (current?.dirty || hasUnsavedPanel(drawerTab)) {
-                    copy.textContent = `Save or cancel your ${drawerTab === 'Edit' ? 'edit' : drawerTab.toLowerCase()} before continuing.`;
+                target = step.point();
+                if (!target) {
+                    copy.textContent = `${step.copy} (It is not on this page; you will find it on another one.)`;
                     return;
                 }
+                target.setAttribute('data-live-edit-tour-focus', '');
+                if (!ui.toolbar.contains(target) && !drawer.contains(target)) target.scrollIntoView?.({ block: 'center', behavior: 'smooth' });
+            };
+            back.addEventListener('click', () => { if (index > 0) { index -= 1; show(); } });
+            next.addEventListener('click', () => {
+                if (index === steps.length - 1) { end(); return; }
                 index += 1;
                 show();
             });
-            finish.addEventListener('click', () => {
-                end();
-            });
+            finish.addEventListener('click', end);
+            hide.addEventListener('click', () => fold(true));
+            pill.addEventListener('click', () => fold(false));
             show();
         };
         // Help is a feature menu for returning editors. The getting-started
