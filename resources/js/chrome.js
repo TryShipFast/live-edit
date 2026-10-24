@@ -173,6 +173,8 @@ a.le-mark:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
   }
   .le-status { padding-right: 0; }
   .le-status span { display: none; }
+  /* dividers mark groups on one line; once the bar wraps they were left hanging at a row's end */
+  .le-sep { display: none; }
 }
 .le-status { display: flex; align-items: center; gap: 8px; font-size: 12px; color: #9A9DA5; padding: 0 6px 0 2px; }
 /* No gap where no words are: an empty label still reserved its padding, which
