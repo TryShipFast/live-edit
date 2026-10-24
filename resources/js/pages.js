@@ -877,3 +877,39 @@ export async function makePageLike({ config, save, sections, title }) {
 
     return id;
 }
+
+/**
+ * What a card says about the thing it stands for: its name, its photo, its
+ * price and its short description, read from the card as the owner sees it.
+ * A page made for the card starts with these, so the owner corrects a page
+ * that is already theirs rather than one still describing another product.
+ */
+export function cardFacts(card) {
+    const words = (el) => (el?.textContent ?? '').replace(/\s+/g, ' ').trim();
+    const img = card.querySelector('img');
+    const priced = card.querySelector('[data-kit-price], [data-field="price"]');
+
+    return {
+        name: words(card.querySelector('h1, h2, h3, h4')),
+        photo: img ? (img.currentSrc || img.src || '') : '',
+        price: words(priced),
+        notes: words(card.querySelector('[data-field="notes"], [data-field="lead"], [data-field="k"]')),
+    };
+}
+
+/**
+ * Where those facts go on a page made from a detail page's sections: its
+ * heading, its first picture, its price (the page's own, not a size's), and
+ * its short description, each only where the owner could edit it.
+ */
+export function factTargets(root) {
+    const editable = (el) => (el?.dataset?.edit?.startsWith('setting:') ? el : null);
+    const prices = [...root.querySelectorAll('[data-price-out], [data-field="price"]')].filter((el) => !el.closest('[data-kit-variant]'));
+
+    return {
+        name: editable(root.querySelector('h1[data-edit]') ?? root.querySelector('h1 [data-edit]')),
+        photo: root.querySelector('img[data-edit-img]'),
+        price: editable(prices.find((el) => el.dataset.edit) ?? null),
+        notes: editable(root.querySelector('[data-field="notes"][data-edit], [data-field="lead"][data-edit]')),
+    };
+}

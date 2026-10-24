@@ -2,7 +2,7 @@ import { createChrome } from './chrome.js';
 import { renderBrandPanel } from './brand.js';
 import { uploadWidget } from './upload.js';
 import { renderSeoPanel } from './seo.js';
-import { addedWith, describeStructure, hrefTo, makePageLike, newAddedId, orderWith, pageOfLink, renderNewPage, renderSectionBrowser } from './pages.js';
+import { addedWith, cardFacts, describeStructure, factTargets, hrefTo, makePageLike, newAddedId, orderWith, pageOfLink, renderNewPage, renderSectionBrowser } from './pages.js';
 import { dropdownTriggerFrom } from './dropdown-trigger.js';
 import { biggestThatFits, howMuchSurvives, inSourcePixels, movedWithin, whatIsThereNow } from './fitting.js';
 import { attrsWorthSending, creditWorthSending } from './only-what-changed.js';
@@ -3658,6 +3658,9 @@ const bootLiveEdit = () => {
                         try {
                             const id = await makePageLike({ config: builder, save: saveSetting, sections: like.sections, title: name });
                             await saveSetting(editableLink.dataset.editHref, hrefTo(editableLink.getAttribute('href'), id));
+                            // What the card says goes onto its page when the page first opens
+                            // (its keys only exist once the host has drawn it).
+                            try { sessionStorage.setItem(`live-edit:fill:${id}`, JSON.stringify(cardFacts(item))); } catch { /* the page opens as made */ }
                             window.location.href = `${builder.editorBase}${id}`;
                         } catch (error) {
                             notify(error.message);
@@ -6194,6 +6197,41 @@ const bootLiveEdit = () => {
             setEditing(sessionStorage.getItem('tb_editing') === '1');
         }
         if (!directPanelOpen && document.body.classList.contains('editing')) startWalkthrough();
+
+        /*
+         * A page just made for a card ("Give it its own page") opens with what
+         * the card says, rather than describing the product it was made like:
+         * the card's name in its heading, its photo, its price and its short
+         * description, saved as ordinary edits the owner can change or undo.
+         */
+        const fillKey = window.liveEditPages?.page !== undefined ? `live-edit:fill:${window.liveEditPages.page}` : null;
+        let waiting = null;
+        try { waiting = fillKey && sessionStorage.getItem(fillKey); if (waiting) sessionStorage.removeItem(fillKey); } catch { waiting = null; }
+        if (waiting) {
+            void (async () => {
+                try {
+                    const facts = JSON.parse(waiting);
+                    const into = factTargets(document.querySelector('main') ?? document.body);
+                    let filled = 0;
+                    for (const what of ['name', 'price', 'notes']) {
+                        const el = into[what];
+                        if (!el || !facts[what] || el.textContent.trim() === facts[what]) continue;
+                        await saveSetting(parseEditKey(el.dataset.edit).key, facts[what]);
+                        filled += 1;
+                    }
+                    if (into.photo && /^https?:/.test(facts.photo ?? '') && into.photo.getAttribute('src') !== facts.photo) {
+                        const body = new FormData();
+                        body.append('target', into.photo.dataset.editImg);
+                        body.append('url', facts.photo);
+                        await request('/live-edit/image', { method: 'POST', body });
+                        filled += 1;
+                    }
+                    if (filled) reloadWithToast('Its page starts with the card’s name, photo and price. Change anything here.');
+                } catch (error) {
+                    notify(error?.message || 'The card’s details could not be copied onto its page.');
+                }
+            })();
+        }
     }
 
 };
