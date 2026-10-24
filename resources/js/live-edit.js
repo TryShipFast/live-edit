@@ -2,6 +2,7 @@ import { createChrome } from './chrome.js';
 import { renderBrandPanel } from './brand.js';
 import { uploadWidget } from './upload.js';
 import { renderSeoPanel } from './seo.js';
+import { renderShopPanel } from './shop.js';
 import { addedWith, cardFacts, describeStructure, factTargets, hrefTo, makePageLike, newAddedId, orderWith, pageOfLink, renderNewPage, renderSectionBrowser } from './pages.js';
 import { renderChoice } from './choice.js';
 import { dropdownTriggerFrom } from './dropdown-trigger.js';
@@ -1161,6 +1162,7 @@ const bootLiveEdit = () => {
             else brandPanel?.unpreview();
             if (name === 'SEO') renderSeo();
             else seoPanel?.unpreview();
+            if (name === 'Shop') renderShop();
         };
 
         /*
@@ -1202,6 +1204,14 @@ const bootLiveEdit = () => {
 
         let brandPanel = null;
         let seoPanel = null;
+        // The Shop tab (shop.js): the shop's terms, WhatsApp number and products, saved as the words they are on the page.
+        const renderShop = () => renderShopPanel({
+            container: drawerFields,
+            config: window.liveEditShop,
+            save: saveSetting,
+            notify,
+            done: (message) => reloadWithToast(message),
+        });
         const renderSeo = () => {
             seoPanel = renderSeoPanel({
                 container: drawerFields,
@@ -5297,6 +5307,10 @@ const bootLiveEdit = () => {
                     { point: tab('Brand'), title: 'Your colours and fonts', copy: 'Pick seven colours and two fonts; the whole site follows. It warns you if words become hard to read.' },
                     publishStep,
                 ],
+                shop: [
+                    { point: tab('Shop'), title: 'Your shop in one place', copy: 'How customers pay, your WhatsApp number, delivery prices and offers, and every product. The same words as on your pages.' },
+                    publishStep,
+                ],
                 seo: [
                     { point: tab('SEO'), title: 'How this page looks in search', copy: 'Set the page title, its search description and the picture shown when it is shared.' },
                     publishStep,
@@ -5434,6 +5448,7 @@ const bootLiveEdit = () => {
                 ...(document.querySelector('[data-edit-bg]') ? [{ id: 'background', title: 'Change a background image', detail: 'Find and replace an image behind a section.' }] : []),
                 ...(window.liveEditBrand?.tokens?.length ? [{ id: 'brand', title: 'Set your brand', detail: 'Update site-wide colors and type.' }] : []),
                 ...(drawerTabs.SEO ? [{ id: 'seo', title: 'Update SEO details', detail: 'Edit a page title and search description.' }] : []),
+                ...(drawerTabs.Shop ? [{ id: 'shop', title: 'Run your shop', detail: 'Delivery prices, offers, your WhatsApp number and products.' }] : []),
                 ...(window.liveEditPages ? [{ id: 'pages', title: 'Create a page', detail: 'Choose a title, address and starting sections.' }] : []),
                 ...(!ui.languagePicker.hidden ? [{ id: 'languages', title: 'Edit another language', detail: 'Switch languages and update translated content.' }] : []),
                 { id: 'review', title: 'Review or undo changes', detail: 'Inspect draft edits and undo or redo them.' },

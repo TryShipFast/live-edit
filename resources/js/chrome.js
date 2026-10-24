@@ -597,6 +597,11 @@ a.le-mark:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
 .le-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
 .le-label { font-size: 13px; font-weight: 600; color: var(--le-body); letter-spacing: normal; text-transform: none; }
 .le-card-settings { display: grid; gap: 12px; }
+.le-shop-section { display: grid; gap: 10px; padding: 4px 0 18px; border-bottom: 1px solid var(--le-line); margin-bottom: 16px; }
+.le-shop-heading { margin: 0; font-size: 14px; font-weight: 650; color: var(--le-ink); }
+.le-shop-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.le-shop-row { display: grid; gap: 2px; font-size: 13px; color: var(--le-body); }
+.le-shop-product a { color: var(--le-ink); text-underline-offset: 3px; }
 .le-card-setting { display: grid; gap: 6px; }
 .le-card-setting-boxes { display: grid; gap: 4px; }
 .le-check { display: flex; align-items: center; gap: 8px; min-height: 32px; font-size: 13px; color: var(--le-body); cursor: pointer; }
@@ -1295,6 +1300,8 @@ export function createChrome() {
     const tabNames = ['Edit', 'Changes'];
     if (window.liveEditBrand?.tokens?.length) tabNames.push('Brand');
     if (window.liveEditSeo?.title?.key || window.liveEditSeo?.descriptionKey) tabNames.push('SEO');
+    // A shop's facts in one place, where the host gathers them (window.liveEditShop, shop.js).
+    if (window.liveEditShop?.products?.length || window.liveEditShop?.fields?.length) tabNames.push('Shop');
     tabNames.forEach((name) => {
         const tab = el('button', 'le-tab', name);
         tab.type = 'button';

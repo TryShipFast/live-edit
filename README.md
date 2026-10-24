@@ -345,6 +345,28 @@ the page and when publishing, only to the attributes its list declares. A copy
 gets a key of its own (`@<new id>`), so it can be filed differently from its
 original.
 
+### The Shop tab
+
+A host that serves a shop hands the editor its facts in one place
+(`window.liveEditShop`), each with the key it is saved under, and the drawer
+gains a **Shop** tab:
+
+```js
+window.liveEditShop = {
+  products: [{ name: 'After Rain', href: '/edit/products/after-rain' }],
+  checkout: { href: '/edit/checkout', modes: [{ id: 'whatsapp', label: 'Continue on WhatsApp', needs: ["the shop's WhatsApp number"] }] },
+  fields: [
+    { keys: ['tpl:wa'], label: 'WhatsApp number', kind: 'whatsapp', value: 'https://wa.me/15555550100' },
+    { keys: ['tpl:bag-std', 'tpl:checkout-std'], label: 'Standard, 3 to 6 working days', kind: 'text', value: '$8' },
+  ],
+};
+```
+
+The fields are the words the pages already show, so changing one here changes
+the page, and anything that reads it (a bag's total) follows. A term written on
+several pages is one field saved to every key. A WhatsApp field edits the number
+inside the link and keeps the message after it.
+
 ### Links the editor steers
 
 A host that serves pages in its own editor can keep the visitor's address in
