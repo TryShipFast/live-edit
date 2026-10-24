@@ -908,6 +908,17 @@ select.le-input {
  */
 export const PAGE_CSS = `
 /*
+ * No page transitions while editing.
+ *
+ * A site that opts in with @view-transition animates from one page to the
+ * next. The editor reloads and moves between pages often, after a save or a
+ * new page, and the browser drops those transitions halfway. Chrome then
+ * reports "Transition was aborted because of invalid state" with nothing to
+ * catch it. Visitors still get the transitions; the editor does not need them.
+ */
+@view-transition { navigation: none; }
+
+/*
  * Room for the bar.
  *
  * It is fixed to the bottom of the viewport and floats over whatever is
