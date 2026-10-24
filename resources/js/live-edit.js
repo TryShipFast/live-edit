@@ -199,8 +199,8 @@ const bootLiveEdit = () => {
                 // not take \u2014 which reads as the editor having done something
                 // behind their back.
                 ui.toast(expected
-                    ? 'Saved \u2014 but this page could not load the latest content, so it may be showing an older version. Reload to try again.'
-                    : 'This page could not load your saved content, so it is showing the original. Nothing has been lost \u2014 reload to try again.', 9000);
+                    ? 'Saved, but this page could not load the latest content, so it may be showing an older version. Reload to try again.'
+                    : 'This page could not load your saved content, so it is showing the original. Nothing has been lost: reload to try again.', 9000);
 
                 return;
             }
@@ -209,7 +209,7 @@ const bootLiveEdit = () => {
 
             if (result && !result.ok) {
                 console.warn('[live-edit] the change was saved but the page still shows:', result.saw, '\n  expected:', result.wanted);
-                ui.toast('Saved \u2014 but this page is still showing the old version. Your change is stored; reload, and tell us if it stays this way.', 9000);
+                ui.toast('Saved, but this page is still showing the old version. Your change is stored; reload, and tell us if it stays this way.', 9000);
             }
         });
 
@@ -586,7 +586,7 @@ const bootLiveEdit = () => {
                 caption.className = 'le-hint';
                 const describe = (src, fromTheme) => {
                     caption.textContent = src
-                        ? (fromTheme ? 'Current image (from the theme) — upload or paste a link to replace it' : 'Replacing with this image')
+                        ? (fromTheme ? 'Current image (from the theme). Upload or paste a link to replace it.' : 'Replacing with this image')
                         : 'No image set';
                     caption.title = src || '';
                 };
@@ -2260,7 +2260,7 @@ const bootLiveEdit = () => {
                 // Said as a state rather than as a verdict: the save may well
                 // have reached the server, and telling somebody it failed
                 // invites them to do it twice.
-                throw new Error('That is taking too long. Your change is still here — check your connection and press Save again.');
+                throw new Error('That is taking too long. Your change is still here: check your connection and press Save again.');
             }
             if (response.status === 419 || response.status === 401) {
                 // The key is dead. Left in storage it would put the page back
@@ -3926,7 +3926,7 @@ const bootLiveEdit = () => {
             const heading = document.createElement('div');
             heading.className = 'le-section-heading';
             heading.textContent = inside.length > shown.length
-                ? `Inside this — first ${shown.length} of ${inside.length}`
+                ? `Inside this: the first ${shown.length} of ${inside.length}`
                 : 'Inside this';
             drawerFields.append(heading);
 
@@ -6206,7 +6206,7 @@ const bootLiveEdit = () => {
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ type: button.dataset.liveCreate }),
                 });
-                reloadWithToast('Added \u2713 \u2014 click it to edit');
+                reloadWithToast('Added \u2713 Click it to edit.');
             });
         });
 
