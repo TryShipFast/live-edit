@@ -373,12 +373,17 @@ const bootLiveEdit = () => {
                 // with what is being written, so nobody edits a paragraph
                 // through a three-line slot.
                 input.classList.add('le-prose');
+                // Measured from nothing: from 'auto' the box kept the height of its rows, so a
+                // three-word button label opened in a six-line box. CSS min-height keeps a floor.
                 const grow = () => {
-                    input.style.height = 'auto';
+                    if (!input.isConnected || !input.getClientRects().length) return;
+                    input.style.height = '0px';
                     input.style.height = Math.min(input.scrollHeight + 2, 420) + 'px';
                 };
                 input.addEventListener('input', grow);
-                requestAnimationFrame(grow);
+                input.addEventListener('focus', grow);
+                // after the panel has laid out, which can be a frame after this field joins it
+                requestAnimationFrame(() => requestAnimationFrame(grow));
             }
 
             if (rich && input.tagName === 'TEXTAREA') {
@@ -1107,7 +1112,7 @@ const bootLiveEdit = () => {
             drawerTrail.classList.toggle('is-visible', shown.length > 0);
             shown.forEach((entry, index) => {
                 const ancestor = entry.node;
-                if (index > 0) drawerTrail.append('\u203A');
+                // the separator is drawn by the stylesheet (.le-crumb + .le-crumb::before); a second one here doubled it
                 const crumb = document.createElement('button');
                 crumb.type = 'button';
                 crumb.textContent = entry.label;
@@ -1968,6 +1973,27 @@ const bootLiveEdit = () => {
             return new Date(iso).toLocaleDateString();
         };
 
+        /** The trigger whose press opened the panel, for that one opening; false otherwise. */
+        let openedFromATrigger = false;
+        /** Where a trigger's menu shows: the boxes of the links around it that are on screen, the trigger aside. */
+        const menuRevealedBy = (trigger) => {
+            const holder = (trigger.getAttribute('aria-controls') && document.getElementById(trigger.getAttribute('aria-controls')))
+                || trigger.closest('li') || trigger.parentElement;
+
+            return [...(holder?.querySelectorAll('a[href], button') ?? [])]
+                .filter((link) => link !== trigger && !trigger.contains(link))
+                .map((link) => link.getBoundingClientRect())
+                .filter((box) => box.width > 0 && box.height > 0);
+        };
+        /** True when the panel on the left hides fewer of these links than on the right (a wide menu stays put). */
+        const betterOnTheLeft = (boxes) => {
+            if (!boxes.length || window.innerWidth <= 760) return false;
+            const width = Math.min(340, window.innerWidth - 24);
+            // hidden: less of the link than a fingertip (24px) left outside the panel to press
+            const hidden = (from, to) => boxes.filter((box) => Math.max(0, from - box.left) + Math.max(0, box.right - to) < 24).length;
+
+            return hidden(12, 12 + width) < hidden(window.innerWidth - 12 - width, window.innerWidth - 12);
+        };
         const openDrawer = () => {
             // The floating handles point at the page, and the panel is now the
             // subject. On a phone the panel is full width, so a handle left
@@ -1986,9 +2012,17 @@ const bootLiveEdit = () => {
                 field.setAttribute('data-enable-grammarly', 'false');
             });
 
-            if (drawerTab === 'Edit') {
+            // Not when it opened from a menu's trigger: the menu stays open behind it so its links can be
+            // reached, and a menu that closes when focus leaves it (most do) would shut the moment the field
+            // took focus. The owner clicks into the field to type.
+            if (drawerTab === 'Edit' && !openedFromATrigger) {
                 drawerFields.querySelector('textarea, input:not([type=checkbox]), select')?.focus();
             }
+            // The panel sits on the right, and so does many a site's last menu: opened from its trigger, that
+            // menu would be under the panel and its links out of reach. Then the panel takes the left side, when that
+            // hides fewer of them.
+            drawer.classList.toggle('is-left', Boolean(openedFromATrigger) && betterOnTheLeft(menuRevealedBy(openedFromATrigger)));
+            openedFromATrigger = false;
         };
         const closeDrawer = (force = false) => {
             /*
@@ -2008,7 +2042,7 @@ const bootLiveEdit = () => {
 
             current?.restore?.();
             clearStylePreview();
-            drawer.classList.remove('is-open');
+            drawer.classList.remove('is-open', 'is-left');
             ui.toolbar.classList.remove('is-compact');
             current = null;
         };
@@ -3489,7 +3523,9 @@ const bootLiveEdit = () => {
             const sections = list.dataset.editListKind === 'sections';
             const heading = document.createElement('div');
             heading.className = 'le-section-heading';
-            heading.textContent = (sections && item?.dataset.editSectionLabel)
+            // A chosen section is already named on the line above ("Section 1 of 17 · Our story"), so its
+            // actions say what they act on rather than repeating the name.
+            heading.textContent = (sections && item ? 'This section' : null)
                 || list.dataset.editListLabel
                 || (sections ? 'Page sections' : 'Items');
 
@@ -4981,8 +5017,10 @@ const bootLiveEdit = () => {
         // Outline what is under the pointer and name it, so choosing the right
         // element is not guesswork.
         let hoverFrame = null;
-        const hideHover = () => ui.hoverBox.classList.remove('is-visible');
+        let hovered = null;
+        const hideHover = () => { hovered = null; ui.hoverBox.classList.remove('is-visible'); };
         const showHover = (element) => {
+            hovered = element;
             const rect = element.getBoundingClientRect();
             if (rect.width < 4 || rect.height < 4) {
                 hideHover();
@@ -5019,7 +5057,19 @@ const bootLiveEdit = () => {
                 else hideHover();
             });
         });
-        document.addEventListener('scroll', hideHover, true);
+        // The box follows what it names when the page moves under it (a scroll, the panel opening and
+        // bringing the element into view); left where it was drawn, it outlined empty page.
+        let followFrame = null;
+        const follow = () => {
+            if (!hovered || followFrame) return;
+            followFrame = requestAnimationFrame(() => {
+                followFrame = null;
+                if (hovered?.isConnected) showHover(hovered);
+                else hideHover();
+            });
+        };
+        document.addEventListener('scroll', follow, true);
+        window.addEventListener('resize', follow);
         document.addEventListener('pointerleave', hideHover);
 
         let bgTarget = null;
@@ -5131,12 +5181,28 @@ const bootLiveEdit = () => {
                 if (pressed !== event.target) event.preventDefault();
                 const target = resolveTarget(pressed);
                 const anchor = pressed.closest?.('a[href]');
+                /*
+                 * A menu's trigger does two jobs while editing: its press still opens the menu, so the
+                 * links inside can be reached, and its words open in the panel to be changed. Owners
+                 * pressed "Shop" or "Capabilities" to rename it and got only the menu; a pencil on hover
+                 * was too easy to miss. The editor opens after the press has reached the site, so the
+                 * menu is open behind it; a link trigger is not followed.
+                 */
                 const dropdown = dropdownTriggerFrom(pressed);
-                if (dropdown && !dropdown.matches('a[data-edit], a[data-edit-href]')) {
-                    // Keep menu toggles usable in edit mode, while suppressing
-                    // an uneditable control's destination. A tagged anchor is
-                    // still content: clicking its words must open the editor.
+                if (dropdown) {
                     if (dropdown.matches('a[href]')) event.preventDefault();
+                    // A menu that opens on hover is already open when it is pressed, and the press closes
+                    // it; while editing, the press is for its words, so the menu is put back open.
+                    const wasOpen = dropdown.getAttribute('aria-expanded') === 'true';
+                    window.setTimeout(() => {
+                        if (wasOpen && dropdown.getAttribute('aria-expanded') === 'false') passThroughClick(dropdown);
+                    }, 0);
+                    const isLink = dropdown.matches('a[data-edit], a[data-edit-href]');
+                    const words = isLink
+                        ? (dropdown.matches('[data-edit^="setting:"]') ? dropdown : dropdown.querySelector('[data-edit^="setting:"]'))
+                        : editableLabel(pressed);
+                    if (words) window.setTimeout(() => { openedFromATrigger = dropdown; isLink ? editText(words, dropdown) : editText(words); }, 0);
+                    else if (isLink && dropdown.dataset.editHref !== undefined) window.setTimeout(() => editLink(dropdown), 0);
                     return;
                 }
                 if (anchor && navigable(anchor)) {

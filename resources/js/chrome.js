@@ -173,6 +173,8 @@ a.le-mark:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
   }
   .le-status { padding-right: 0; }
   .le-status span { display: none; }
+  /* dividers mark groups on one line; once the bar wraps they were left hanging at a row's end */
+  .le-sep { display: none; }
 }
 .le-status { display: flex; align-items: center; gap: 8px; font-size: 12px; color: #9A9DA5; padding: 0 6px 0 2px; }
 /* No gap where no words are: an empty label still reserved its padding, which
@@ -215,6 +217,8 @@ a.le-mark:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
 }
 .le-drawer.is-open { display: flex; animation: le-slide .28s cubic-bezier(.2,.7,.2,1); }
 @keyframes le-slide { from { transform: translateX(16px); opacity: 0; } to { transform: none; opacity: 1; } }
+/* Opened from a menu's trigger whose menu is on the right, so the menu stays reachable beside it. */
+.le-drawer.is-left { right: auto; left: 12px; }
 .le-drawer-head {
   display: flex; align-items: center; justify-content: space-between; gap: 12px;
   padding: 0 12px 0 24px; border-bottom: 1px solid var(--le-line); background: #fff;
@@ -849,10 +853,10 @@ select.le-input {
 .le-shimmer {
   width: 100%; aspect-ratio: 4 / 3; border-radius: 10px;
   background: linear-gradient(100deg, #EEEFF1 30%, #F7F8F9 50%, #EEEFF1 70%);
-  background-size: 200% 100%; animation: le-slide 1.2s linear infinite;
+  background-size: 200% 100%; animation: le-shimmer 1.2s linear infinite;
 }
 .le-grid.is-square .le-shimmer { aspect-ratio: 1 / 1; }
-@keyframes le-slide { to { background-position: -200% 0; } }
+@keyframes le-shimmer { to { background-position: -200% 0; } }
 @media (prefers-reduced-motion: reduce) { .le-shimmer { animation: none; } }
 
 /* The prompt the page writes for itself. Somebody who cannot describe the
