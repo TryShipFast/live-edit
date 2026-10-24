@@ -320,6 +320,29 @@ renamed as any copy is (`<id>--<new id>`), and so are its references into the
 partner, so the new tab's `aria-controls` points at the new panel. The browser
 and the server do this the same way.
 
+### A setting a card's words do not show
+
+A filter should read a card's own words, so a card the owner adds or retypes is
+filtered by what it says. Where a card cannot say it (a gallery photo filed
+under "Exterior", a project under its sector), the card carries the category
+in an attribute, and the list declares it so the owner can choose it:
+
+```html
+<button data-filter="ext">Exterior</button> <button data-filter="int">Interior</button>
+<ul data-edit-list="tpl:photos" data-edit-choice-attr="data-cat" data-edit-choice-label="Room"
+    data-edit-choice-from="[data-filter]" data-edit-choice-value="data-filter">
+  <li data-edit-item="one" data-cat="ext" data-edit-choice="setting:tpl:photos-one-cat"> ... </li>
+</ul>
+```
+
+The item's panel shows a **Room** select offering the filter's own choices in
+its words (without "All" or counts; `data-edit-choice-value` is the attribute on
+each control holding its value, `value` when absent, so radios and options work
+as they are). `data-edit-choice-many` turns it into boxes for an item in
+several (a space-separated list). The choice is saved under the item's key and
+written onto the attribute on the page and when publishing; a copy gets a key
+of its own (`@<new id>`), so it can be filed differently from its original.
+
 ### Links the editor steers
 
 A host that serves pages in its own editor can keep the visitor's address in

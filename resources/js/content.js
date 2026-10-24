@@ -1,3 +1,4 @@
+import { applyChoices } from './choice.js';
 import { cleanSvg } from './svg.js';
 import { ownTextOf, retrying } from './support.js';
 
@@ -778,7 +779,7 @@ const rekeyRepeatedItem = (item, id, partner = new Set()) => {
 
     for (const node of nodes) {
         if (node.hasAttribute('data-edit-section')) node.setAttribute('data-edit-section', id);
-        for (const attribute of ['data-edit', 'data-edit-img', 'data-edit-bg', 'data-edit-slide-caption']) {
+        for (const attribute of ['data-edit', 'data-edit-img', 'data-edit-bg', 'data-edit-slide-caption', 'data-edit-choice']) {
             const value = node.getAttribute(attribute) ?? '';
             if (value.startsWith('setting:') && !value.startsWith('setting:auto:')) {
                 const key = value.slice('setting:'.length).replace(/@n[0-9a-z]+$/, '');
@@ -829,6 +830,10 @@ export const applyContent = (root, settings) => {
             slide.setAttribute('data-edit-value', settings[key]);
         }
     }
+
+    // A card's category that its words do not show (choice.js): the attribute
+    // the site's own filter reads, so an added card is filtered like the rest.
+    applied += applyChoices(root, settings);
 
     // Before anything is applied, so the files are in flight while the words
     // are being written into the page.

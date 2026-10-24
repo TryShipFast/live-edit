@@ -3,6 +3,7 @@ import { renderBrandPanel } from './brand.js';
 import { uploadWidget } from './upload.js';
 import { renderSeoPanel } from './seo.js';
 import { addedWith, cardFacts, describeStructure, factTargets, hrefTo, makePageLike, newAddedId, orderWith, pageOfLink, renderNewPage, renderSectionBrowser } from './pages.js';
+import { renderChoice } from './choice.js';
 import { dropdownTriggerFrom } from './dropdown-trigger.js';
 import { biggestThatFits, howMuchSurvives, inSourcePixels, movedWithin, whatIsThereNow } from './fitting.js';
 import { attrsWorthSending, creditWorthSending } from './only-what-changed.js';
@@ -3642,6 +3643,9 @@ const bootLiveEdit = () => {
              * offered a page of its own: one made like its siblings', under the
              * card's name, which the card then opens.
              */
+            // The card's category when its words do not show it (choice.js): chosen from the filter's own options.
+            const choicePicker = !sections && item ? renderChoice({ item, list, save: saveSetting, notify }) : null;
+            if (choicePicker) block.append(choicePicker);
             const opens = !sections && item && builder?.pages?.length
                 ? [...item.querySelectorAll('a[href]')].map((a) => [a, pageOfLink(a, builder.pages, window.location.href)]).find(([, page]) => page)
                 : null;
