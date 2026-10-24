@@ -1989,8 +1989,8 @@ const bootLiveEdit = () => {
         const betterOnTheLeft = (boxes) => {
             if (!boxes.length || window.innerWidth <= 760) return false;
             const width = Math.min(340, window.innerWidth - 24);
-            // hidden: less of the link than a fingertip (24px) left outside the panel to press
-            const hidden = (from, to) => boxes.filter((box) => Math.max(0, from - box.left) + Math.max(0, box.right - to) < 24).length;
+            // hidden: the panel covers where the link's words start, its first 48px, so its name cannot be read
+            const hidden = (from, to) => boxes.filter((box) => box.left < to && box.left + Math.min(48, box.width) > from).length;
 
             return hidden(12, 12 + width) < hidden(window.innerWidth - 12 - width, window.innerWidth - 12);
         };
