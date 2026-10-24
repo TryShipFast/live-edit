@@ -202,7 +202,7 @@ a.le-mark:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
 @keyframes le-slide { from { transform: translateX(16px); opacity: 0; } to { transform: none; opacity: 1; } }
 .le-drawer-head {
   display: flex; align-items: center; justify-content: space-between; gap: 12px;
-  padding: 0 12px 0 20px; border-bottom: 1px solid var(--le-line); background: #fff;
+  padding: 0 12px 0 24px; border-bottom: 1px solid var(--le-line); background: #fff;
 }
 .le-tabs { display: flex; align-items: center; gap: 18px; }
 .le-tab {
@@ -312,7 +312,12 @@ a.le-mark:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
 .le-style-group > summary::-webkit-details-marker { display: none; }
 .le-style-group > summary::after { content: ''; width: 8px; height: 8px; border-right: 1.6px solid currentColor; border-bottom: 1.6px solid currentColor; transform: rotate(45deg) translateY(-2px); transition: transform .15s ease; }
 .le-style-group[open] > summary::after { transform: rotate(-135deg) translateY(-2px); }
-.le-style-group[open] { display: flex; flex-direction: column; gap: 14px; padding-bottom: 6px; }
+/* A <details> is not laid out as a flex box in every browser, so its gap never applied and each label sat
+   against the control above it. Spaced by margin instead, which every browser honours. */
+.le-style-group[open] { padding-bottom: 8px; }
+.le-style-group > :not(summary) { margin-top: 16px; }
+.le-style-group > summary + * { margin-top: 6px; }
+.le-style-group .le-default { font-size: 13px; font-weight: 500; color: var(--le-muted); }
 .le-subtabs { display: flex; gap: 4px; margin: 14px 24px 0; padding: 3px; border-radius: 10px; background: var(--le-soft); }
 .le-subtab { flex: 1; padding: 7px 10px; border: 0; border-radius: 8px; background: none; color: var(--le-muted); font: inherit; font-size: 12px; font-weight: 600; cursor: pointer; }
 .le-subtab.is-on { background: #fff; color: var(--le-ink); box-shadow: 0 1px 2px rgba(11,12,15,.1); }
@@ -455,7 +460,10 @@ a.le-mark:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
 .le-pagination button:disabled { opacity: .45; cursor: default; }
 
 /* What the panel is editing, under the tabs rather than beside them. */
-.le-subject { padding: 18px 20px 0; }
+/* One inset for the tabs, the title and the fields (24px), and a hairline under the title so a scrolled
+   panel's fields stop there instead of sliding up flush against it. */
+.le-subject { padding: 18px 24px 14px; border-bottom: 1px solid var(--le-line); }
+.le-subject.le-hidden + .le-fields, .le-subject.le-hidden { border-bottom: 0; }
 .le-subject .le-eyebrow { display: none; }
 .le-eyebrow { font-size: 12px; font-weight: 600; color: var(--le-muted); margin-bottom: 6px; }
 .le-title { font-size: 19px; font-weight: 700; color: var(--le-ink); letter-spacing: -.01em; }
