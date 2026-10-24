@@ -1206,6 +1206,24 @@ const bootLiveEdit = () => {
                 container: drawerFields,
                 config: window.liveEditSeo,
                 save: saveSetting,
+                // The same chooser as every picture on the site: upload, free photos, or
+                // generate with credits. A generated or uploaded file is stored first, so
+                // what is saved is an address.
+                pickImage: () => new Promise((resolve, reject) => {
+                    const near = document.querySelector('main h1') ?? document.querySelector('h1') ?? document.body;
+                    openImagePicker(near, async (what) => {
+                        try {
+                            if (what?.url) return resolve(what.url);
+                            if (!what?.file) return resolve(null);
+                            const body = new FormData();
+                            body.append('file', what.file);
+                            const response = await request('/live-edit/upload', { method: 'POST', body });
+                            resolve((await response.json()).url);
+                        } catch (error) {
+                            reject(error);
+                        }
+                    }, 'Upload', 'share image', 'Shown when this page is shared');
+                }),
                 done: (message) => {
                     if (message) reloadWithToast(message);
                     else closeDrawer(true);
@@ -2732,13 +2750,13 @@ const bootLiveEdit = () => {
          * @param {(chosen: {url?: string, file?: File, credit?: string}) => void} apply
          * @param {string} startOn which tab to open on
          */
-        const openImagePicker = (element, apply, startOn = 'Free photos', calledIt = 'image') => {
+        const openImagePicker = (element, apply, startOn = 'Free photos', calledIt = 'image', saying = null) => {
             const sheet = ui.modal({
                 // Named as the client named it. Somebody who pressed "Replace
                 // background" and lands on a dialog headed "Replace image"
                 // has reason to wonder whether they pressed the right thing.
                 title: `Replace ${calledIt}`,
-                subtitle: element.dataset.editLabel ?? describeElement(element),
+                subtitle: saying ?? element.dataset.editLabel ?? describeElement(element),
             });
 
             const panel = document.createElement('div');

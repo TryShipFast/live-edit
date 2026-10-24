@@ -311,6 +311,25 @@ A host that serves pages in its own editor can keep the visitor's address in
 link field always shows and saves the `href`, so the address a customer
 publishes is never the editor's.
 
+## The SEO tab
+
+When the host sets `window.liveEditSeo`, the drawer has an **SEO** tab for the
+page being edited: its title, its search description and, when the host gives
+an `imageKey`, its **share image** (the picture a link to the page shows in a
+chat or a feed: `og:image` and `twitter:image`).
+
+```js
+window.liveEditSeo = {
+  title: { key: 'pageTitle.…', title: 'Shop', defaultTitle: 'Shop' },
+  descriptionKey: 'pageDescription.…', description: '', defaultDescription: '…',
+  imageKey: 'pageShareImage.…', image: '', defaultImage: '…/og.jpg',
+};
+```
+
+The share image is chosen with the editor's own picture chooser (upload, free
+photos, or generate with credits), previewed as a link card under the search
+preview, and saved as an address; "Use the design's own" saves it empty.
+
 ## A card and its page
 
 Picking a card in a list (a product, a journal entry, a project) shows the

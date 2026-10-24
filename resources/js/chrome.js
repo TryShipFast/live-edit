@@ -408,6 +408,14 @@ a.le-mark:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
 .le-brand-warning strong { font-weight: 600; }
 .le-brand-dock { position: sticky; bottom: -22px; display: flex; flex-direction: column; gap: 10px; margin: 4px -24px -22px; padding: 14px 24px 20px; background: #fff; border-top: 1px solid rgba(11,12,15,.08); }
 .le-brand-actions { justify-content: flex-end; }
+.le-seo-share { display: flex; flex-direction: column; overflow: hidden; border: 1px solid rgba(11,12,15,.12); border-radius: 12px; background: #fff; margin-bottom: 8px; }
+.le-seo-share-shot { aspect-ratio: 1200 / 630; background: #F4F5F7; }
+.le-seo-share-shot img { display: block; width: 100%; height: 100%; object-fit: cover; }
+.le-seo-share-shot.is-empty img { display: none; }
+.le-seo-share-words { display: flex; flex-direction: column; gap: 2px; padding: 10px 12px 12px; }
+.le-seo-share-host { font-size: 12px; color: var(--le-muted); }
+.le-seo-share-title { font-size: 14px; color: var(--le-ink); }
+.le-seo-share-description { font-size: 12px; color: var(--le-muted); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
 /* Palettes: each one a strip of its own seven colours beside an "Aa" set in its
    ink on its ground, so a palette is chosen by how a page in it reads. */
 .le-palettes { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin: 4px 0 18px; }
