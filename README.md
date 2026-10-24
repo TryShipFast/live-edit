@@ -345,6 +345,13 @@ after the card and left out of the menu, which the card's link then opens
 the owner does is write the new product's, post's or project's details. It is
 the same two settings as New page, plus the link's own setting.
 
+The new page then opens with what the card says rather than describing the
+product it was made like: the card's name in its heading, its photo, its price
+(the page's own, not a size's) and its short description (`cardFacts`,
+`factTargets`), saved as ordinary edits the owner can change or undo. The
+card's facts wait in session storage until the page's keys exist, and are
+written once.
+
 ## The Brand tab
 
 When the host sets `window.liveEditBrand` before the editor loads, a **Brand**

@@ -302,3 +302,21 @@ describe('a card and its page', () => {
         expect(JSON.parse(saved[1][1])).toEqual([{ id: 'fig-archive', title: 'Fig Archive', menu: false }]);
     });
 });
+
+describe('a page made for a card starts with what the card says', () => {
+    it('reads the card and finds where each fact goes', async () => {
+        const { cardFacts, factTargets } = await import('../../resources/js/pages.js');
+        document.body.innerHTML = `
+            <article id="card"><img src="https://x.test/fig.jpg"><h3><a>Fig Archive</a></h3>
+              <p data-field="notes">Green fig, black tea</p><span data-kit-price>$132</span></article>
+            <main id="page"><section><h1 data-edit="setting:tpl:h1">Aster Veil</h1><img data-edit-img="setting:tpl:img" src="/a.jpg">
+              <p data-field="notes" data-edit="setting:tpl:notes">Neroli</p><span data-price-out data-field="price" data-edit="setting:tpl:price">$118</span>
+              <label data-kit-variant="50ml"><span data-field="price" data-edit="setting:tpl:v">$118</span></label></section></main>`;
+        expect(cardFacts(document.getElementById('card'))).toEqual({ name: 'Fig Archive', photo: 'https://x.test/fig.jpg', price: '$132', notes: 'Green fig, black tea' });
+        const t = factTargets(document.getElementById('page'));
+        expect(t.name.dataset.edit).toBe('setting:tpl:h1');
+        expect(t.photo.dataset.editImg).toBe('setting:tpl:img');
+        expect(t.price.dataset.edit).toBe('setting:tpl:price');
+        expect(t.notes.dataset.edit).toBe('setting:tpl:notes');
+    });
+});
