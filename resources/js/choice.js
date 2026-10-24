@@ -20,7 +20,7 @@
  * the item's settings, {"data-faculty": "se", "data-modes": "full part"}.
  */
 
-const ALL = /^(all|\*|)$/i;
+const ALL = /^(all|any|\*|)$/i;
 const ATTR = /^data-[a-z0-9-]+$/;
 
 /** What a control says, without the count some filters show beside it ("Guides (4)"). */
