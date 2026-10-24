@@ -596,8 +596,9 @@ a.le-mark:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
 .le-fields > .le-section-heading:first-child { border-top: 0; padding-top: 0; }
 .le-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
 .le-label { font-size: 13px; font-weight: 600; color: var(--le-body); letter-spacing: normal; text-transform: none; }
-.le-choice { display: grid; gap: 6px; }
-.le-choice-boxes { display: grid; gap: 4px; }
+.le-card-settings { display: grid; gap: 12px; }
+.le-card-setting { display: grid; gap: 6px; }
+.le-card-setting-boxes { display: grid; gap: 4px; }
 .le-check { display: flex; align-items: center; gap: 8px; min-height: 32px; font-size: 13px; color: var(--le-body); cursor: pointer; }
 .le-check input { width: 18px; height: 18px; margin: 0; accent-color: var(--le-accent, #2563eb); }
 .le-chip-btn {

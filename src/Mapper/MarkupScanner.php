@@ -448,20 +448,27 @@ class MarkupScanner
         }
 
         /*
-         * A card's category that its words do not show (resources/js/choice.js): the
-         * attribute the site's filter reads, named by the list that declares it, so
-         * a card the owner added is filtered under the category they chose.
+         * Settings a card's words do not show (resources/js/choice.js): the attributes the
+         * site's filter reads, declared by the list (data-edit-choices), saved per card as one
+         * JSON object. Only declared attributes are written, so a card the owner added is
+         * filtered where they filed it, and a saved value can reach no other attribute.
          */
         foreach ($xpath->query('//*[@data-edit-choice]') as $item) {
             $marker = $item->getAttribute('data-edit-choice');
-            if (! str_starts_with($marker, 'setting:')) {
+            if (! str_starts_with($marker, 'setting:') || ! array_key_exists($key = substr($marker, strlen('setting:')), $overrides)) {
                 continue;
             }
-            $key = substr($marker, strlen('setting:'));
-            $list = $xpath->query('ancestor::*[@data-edit-choice-attr][1]', $item)->item(0);
-            $attribute = $list instanceof DOMElement ? $list->getAttribute('data-edit-choice-attr') : '';
-            if (array_key_exists($key, $overrides) && preg_match('/^data-[a-z0-9-]+$/', $attribute)) {
-                $item->setAttribute($attribute, (string) $overrides[$key]);
+            $saved = json_decode((string) $overrides[$key], true);
+            $list = $xpath->query('ancestor::*[@data-edit-choices][1]', $item)->item(0);
+            $declared = $list instanceof DOMElement ? json_decode($list->getAttribute('data-edit-choices'), true) : null;
+            if (! is_array($saved) || array_is_list($saved) || ! is_array($declared)) {
+                continue;
+            }
+            foreach ($declared as $choice) {
+                $attribute = is_array($choice) ? (string) ($choice['attr'] ?? '') : '';
+                if (preg_match('/^data-[a-z0-9-]+$/', $attribute) && array_key_exists($attribute, $saved) && is_scalar($saved[$attribute])) {
+                    $item->setAttribute($attribute, (string) $saved[$attribute]);
+                }
             }
         }
 
