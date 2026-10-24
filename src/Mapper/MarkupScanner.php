@@ -447,6 +447,31 @@ class MarkupScanner
             }
         }
 
+        /*
+         * Settings a card's words do not show (resources/js/choice.js): the attributes the
+         * site's filter reads, declared by the list (data-edit-choices), saved per card as one
+         * JSON object. Only declared attributes are written, so a card the owner added is
+         * filtered where they filed it, and a saved value can reach no other attribute.
+         */
+        foreach ($xpath->query('//*[@data-edit-choice]') as $item) {
+            $marker = $item->getAttribute('data-edit-choice');
+            if (! str_starts_with($marker, 'setting:') || ! array_key_exists($key = substr($marker, strlen('setting:')), $overrides)) {
+                continue;
+            }
+            $saved = json_decode((string) $overrides[$key], true);
+            $list = $xpath->query('ancestor::*[@data-edit-choices][1]', $item)->item(0);
+            $declared = $list instanceof DOMElement ? json_decode($list->getAttribute('data-edit-choices'), true) : null;
+            if (! is_array($saved) || array_is_list($saved) || ! is_array($declared)) {
+                continue;
+            }
+            foreach ($declared as $choice) {
+                $attribute = is_array($choice) ? (string) ($choice['attr'] ?? '') : '';
+                if (preg_match('/^data-[a-z0-9-]+$/', $attribute) && array_key_exists($attribute, $saved) && is_scalar($saved[$attribute])) {
+                    $item->setAttribute($attribute, (string) $saved[$attribute]);
+                }
+            }
+        }
+
         if (str_contains($html, 'data-slide')) {
             $this->renumberCarouselSlides($xpath);
         }
@@ -1127,7 +1152,7 @@ class MarkupScanner
                 $idMap[$oldId] = $newHtmlId;
                 $node->setAttribute('id', $newHtmlId);
             }
-            foreach (['data-edit', 'data-edit-img', 'data-edit-bg', 'data-edit-slide-caption'] as $attr) {
+            foreach (['data-edit', 'data-edit-img', 'data-edit-bg', 'data-edit-slide-caption', 'data-edit-choice'] as $attr) {
                 $current = $node->getAttribute($attr);
 
                 if (! str_starts_with($current, 'setting:')) {

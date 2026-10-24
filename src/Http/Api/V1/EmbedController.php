@@ -52,6 +52,8 @@ class EmbedController
         'seo.js' => 'seo.js',
         'pages.js' => 'pages.js',
         'dropdown-trigger.js' => 'dropdown-trigger.js',
+        'choice.js' => 'choice.js',
+        'shop.js' => 'shop.js',
         // The built bundle, resolved to resources/dist rather than to a
         // sibling of the modules.
         'bundle.js' => 'bundle.js',
