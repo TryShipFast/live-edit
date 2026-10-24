@@ -160,6 +160,15 @@ class ImagineAPicture
             return null;
         }
 
+        // Paid for when it was queued, and refunded only by the job. A job that never ran (no worker) or
+        // died partway (a restart, out of memory) would keep the credits for a picture that never comes.
+        // Asked about long after any job could still be working on it, it is given up here and refunded.
+        if (in_array($generation->status, ['queued', 'processing'], true)
+            && $generation->created_at?->lt(now()->subSeconds(self::jobSeconds() + 120))) {
+            $this->giveUp($generation->id, 'timed_out');
+            $generation->refresh();
+        }
+
         return [
             'generation_id' => $generation->uuid,
             'status' => $generation->status,
@@ -167,6 +176,42 @@ class ImagineAPicture
             'balance' => $generation->balance,
             'reason' => $generation->reason,
         ];
+    }
+
+    /** How long a generation's job may run: the provider's time and twenty seconds to store what it sent. */
+    public static function jobSeconds(): int
+    {
+        return max(30, (int) config('live-edit.ai.image_job_timeout', 150)) + 20;
+    }
+
+    /**
+     * A generation that will not deliver: marked failed with why, and its credits given back, once.
+     *
+     * Returns the balance after, or null when there was nothing to give up (already delivered or
+     * already given up).
+     */
+    public function giveUp(int $generationId, string $reason): ?int
+    {
+        return DB::transaction(function () use ($generationId, $reason): ?int {
+            $generation = ImageGeneration::query()->useWritePdo()->whereKey($generationId)->lockForUpdate()->first();
+
+            if (! $generation || in_array($generation->status, ['completed', 'failed'], true)) {
+                return null;
+            }
+
+            $site = Site::query()->useWritePdo()->find($generation->site_id);
+            $balance = $site
+                ? $this->credits->refund($site, 'generate_image', ['generation' => $generation->uuid])
+                : (int) ($generation->balance ?? 0);
+
+            $generation->update([
+                'status' => 'failed',
+                'reason' => $reason,
+                'balance' => $balance,
+            ]);
+
+            return $balance;
+        });
     }
 
     /** @return array<int, string> */
@@ -253,7 +298,7 @@ class ImagineAPicture
                 // the generation record and the worker refunds an unusable
                 // result or a provider failure.
                 ->connectTimeout((int) config('live-edit.ai.image_connect_timeout', 10))
-                ->timeout((int) config('live-edit.ai.image_job_timeout', 120))
+                ->timeout(max(30, (int) config('live-edit.ai.image_job_timeout', 150)))
                 ->post(config('live-edit.ai.image_endpoint'), [
                     'model' => config('live-edit.ai.image_model'),
                     // Two options balance choice against provider latency.

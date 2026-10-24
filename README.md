@@ -536,6 +536,19 @@ It names the four things that decide whether a visitor sees the client's words
 or the theme's: where content lives, whether tagging is on, whether the app key
 is set, and what the service actually answers. It never prints the key.
 
+**Making a picture takes credits and no picture comes.** A picture is made in a
+queued job, so it needs a queue that is not `sync` and a worker running
+(`php artisan queue:work`). It also needs `LIVE_EDIT_AI=true` and
+`OPENAI_API_KEY`. The provider is given `LIVE_EDIT_AI_IMAGE_JOB_TIMEOUT` seconds
+(150 by default; two 1024px pictures often take over a minute) and the job 20
+seconds more, so the queue connection's `retry_after` must be longer than that
+(over 170 by default), or the queue starts the job a second time. The credits
+are always given back when no picture is delivered: by the job when the
+provider fails, and, when the job never ran or died partway, the next time the
+editor asks about it, once its time is well past. The reason is kept in
+`live_edit_image_generations.reason` (`provider_error`, `no_suggestion`,
+`timed_out`).
+
 **`@liveEdit` appears as text on the page.** Blade prints a directive it does
 not know rather than erroring, so this ends up visible to visitors. The package
 is not registered:
