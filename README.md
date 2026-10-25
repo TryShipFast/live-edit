@@ -375,6 +375,39 @@ A host that serves pages in its own editor can keep the visitor's address in
 link field always shows and saves the `href`, so the address a customer
 publishes is never the editor's.
 
+## Help (the ? button)
+
+Help is written for somebody who has never edited a website. It opens on what this kind of site is
+for and where to start, then offers:
+
+- **Start here:** the jobs that matter most on this kind of site. A shop starts in its Shop tab; a
+  school with its dates and news; a portfolio with its projects.
+- **Your lists:** a step-by-step guide for each list on the page ("Add to Products", "Add to News").
+  Each points at that list's own cards. It mentions the card's setting only where the list declares
+  one (`data-edit-choices`), and "Give it its own page" only where cards open pages and the page
+  builder is on. Lists are ranked by shape: cards with headings and pictures that each open their own
+  page come first. A button pair, the menu, the footer, the page's sections and lists of a layout not
+  shown are left out.
+- **Everything else:** the feature guides (words and links, pictures, the menu, sections, brand, SEO,
+  pages, languages, undo, preview and publish), each only where this editor has it.
+- **Common questions,** in plain words. Each appears only where the editor has the feature it answers.
+
+The host says what kind of site it is:
+
+```html
+<script>window.liveEditSite = { category: '11-ecommerce', kind: 'shop' };</script>
+```
+
+`kind` is one of `shop`, `school`, `university`, `training`, `salon`, `studio`, `restaurant`, `hotel`,
+`charity`, `worship`, `property` or `fintech`. Otherwise the first two digits of `category` choose:
+
+| `01` | `02` | `03` | `04` | `05` | `06` | `07` | `08` | `09` | `10` | `11` |
+|---|---|---|---|---|---|---|---|---|---|---|
+| portfolio | business | services | agency | beauty | school | restaurant | tech | health | charity | shop |
+
+Without it, a site with a Shop tab is treated as a shop and anything else gets general help. The
+content is in `resources/js/help.js`.
+
 ## The SEO tab
 
 When the host sets `window.liveEditSeo`, the drawer has an **SEO** tab for the
