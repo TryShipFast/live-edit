@@ -123,6 +123,10 @@ test('a journal post is edited in place: its body and its pictures', async ({ pa
 });
 
 test('a copied card gets its own page, a full copy, and the two never change each other', async ({ page }) => {
+    // A full copy is one save per edited field, made one after another (and paced by the content
+    // API's write limit on a real host), so this journey does many times the work of the others.
+    // On a loaded machine it ran past the 30-second default while every step was still succeeding.
+    test.setTimeout(120_000);
     // What the owner had already made of Aster Veil's page.
     const aster = drawn('products/aster-veil');
     site.host.save(keyOf(aster, '[data-component="shop.details"] p'), 'Our own story, in our own words.');
