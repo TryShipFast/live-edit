@@ -358,7 +358,7 @@ class MarkupScanner
 
         // Lists first — an item added or removed changes what the content
         // loops below have to fill in.
-        foreach ($xpath->query('//*[@data-edit-list]') as $container) {
+        foreach ($this->innermostFirst($xpath) as $container) {
             $listKey = $container->getAttribute('data-edit-list');
             if (! array_key_exists($listKey, $overrides)) {
                 continue;
@@ -407,7 +407,7 @@ class MarkupScanner
 
                 $clone = $template->cloneNode(true);
                 if ($clone instanceof DOMElement) {
-                    $this->rekeyItem($clone, $id, $this->partnerIds($xpath, $container));
+                    $this->rekeyItem($clone, $id, $this->partnerIds($xpath, $container), $template->getAttribute('data-edit-item'));
                     $container->appendChild($clone);
                 }
             }
@@ -1037,12 +1037,39 @@ class MarkupScanner
     {
         $nearest = null;
 
-        for ($back = $position - 1; $back >= 0; $back--) {
-            $candidate = (string) ($order[$back] ?? '');
+        /*
+         * An item the design wrote, never an earlier copy: a page drawn fresh
+         * holds only the originals, and the browser chooses among them the
+         * same way (content.js, templateFor), so both give the copy the same
+         * keys. A copy is the source only when no original is left.
+         */
+        // An id that names the item it was copied from ("nmh6x2k_c2") is copied from that one,
+        // wherever it has been moved to, so moving it never changes its keys.
+        if (preg_match('/^n[0-9a-z]+_([A-Za-z0-9-]+)$/', (string) ($order[$position] ?? ''), $named)
+            && isset($items[$named[1]]) && ! self::mintedId($named[1])) {
+            return $items[$named[1]];
+        }
 
-            if (isset($items[$candidate])) {
-                $nearest = $items[$candidate];
+        foreach ([true, false] as $originalsOnly) {
+            for ($back = $position - 1; $back >= 0 && $nearest === null; $back--) {
+                $candidate = (string) ($order[$back] ?? '');
 
+                if (isset($items[$candidate]) && (! $originalsOnly || ! self::mintedId($candidate))) {
+                    $nearest = $items[$candidate];
+                }
+            }
+
+            if ($nearest === null && $originalsOnly) {
+                foreach ($order as $candidate) {
+                    if (isset($items[(string) $candidate]) && ! self::mintedId((string) $candidate)) {
+                        $nearest = $items[(string) $candidate];
+
+                        break;
+                    }
+                }
+            }
+
+            if ($nearest !== null) {
                 break;
             }
         }
@@ -1129,7 +1156,7 @@ class MarkupScanner
     /**
      * @param  array<string, true>  $partner  ids inside the paired list's items (partnerIds)
      */
-    protected function rekeyItem(DOMElement $item, string $newId, array $partner = []): void
+    protected function rekeyItem(DOMElement $item, string $newId, array $partner = [], string $from = ''): void
     {
         $item->setAttribute('data-edit-item', $newId);
 
@@ -1162,13 +1189,14 @@ class MarkupScanner
                 $node->setAttribute($attr, 'setting:'.$this->derivedKey(
                     substr($current, strlen('setting:')),
                     $newId,
+                    $from,
                 ));
             }
 
             $href = $node->getAttribute('data-edit-href');
 
             if ($href !== '') {
-                $node->setAttribute('data-edit-href', $this->derivedKey($href, $newId));
+                $node->setAttribute('data-edit-href', $this->derivedKey($href, $newId, $from));
             }
 
             if (str_starts_with($node->getAttribute('data-style'), 's')) {
@@ -1277,14 +1305,56 @@ class MarkupScanner
      * separate a locale from the rest, and a key carrying one would read as a
      * language nobody declared.
      */
-    protected function derivedKey(string $key, string $itemId): string
+    protected function derivedKey(string $key, string $itemId, string $from = ''): string
     {
-        // A copy of a copy must not grow a chain of ids. Added ids are minted
-        // as "n" and a base-36 timestamp, which is specific enough to strip
-        // without touching a key that happens to contain an "@".
-        $base = preg_replace('/@n[0-9a-z]+$/', '', $key) ?? $key;
+        /*
+         * The base and the set of added ids the copy belongs to, in a fixed
+         * order. A copy of a copy drops the id of the one it was made from, so
+         * duplicating never grows a chain; a cell copied for an added column
+         * in an added row is "<cell>@<column>@<row>" whichever was added
+         * first, so its key is the same however the page was reached. The
+         * browser derives the same (content.js, derivedKey).
+         */
+        $parts = explode('@', $key);
+        $base = array_shift($parts);
+        $ids = array_values(array_unique(array_filter($parts, fn (string $part) => $part !== '' && $part !== $from)));
 
-        return $base.'@'.$itemId;
+        if (! in_array($itemId, $ids, true)) {
+            $ids[] = $itemId;
+        }
+
+        sort($ids, SORT_STRING);
+
+        return implode('@', [$base, ...$ids]);
+    }
+
+    /** Whether an item id is one an editor minted for an added item ("n" and base 36). */
+    protected static function mintedId(string $id): bool
+    {
+        return (bool) preg_match('/^n[0-9a-z]+(?:_[A-Za-z0-9-]+)?$/', $id);
+    }
+
+    /**
+     * The page's lists, those inside other lists first: a table's cells (each
+     * row a list of its columns) before its rows, so a row copied for an
+     * added row already has the added columns. The browser orders them the
+     * same way (content.js, innermostFirst).
+     *
+     * @return list<DOMElement>
+     */
+    protected function innermostFirst(DOMXPath $xpath): array
+    {
+        $lists = [];
+
+        foreach ($xpath->query('//*[@data-edit-list]') ?: [] as $index => $list) {
+            if ($list instanceof DOMElement) {
+                $lists[] = ['list' => $list, 'index' => $index, 'depth' => $xpath->query('ancestor::*[@data-edit-list]', $list)->length];
+            }
+        }
+
+        usort($lists, fn (array $a, array $b) => [$b['depth'], $a['index']] <=> [$a['depth'], $b['index']]);
+
+        return array_column($lists, 'list');
     }
 
     /**

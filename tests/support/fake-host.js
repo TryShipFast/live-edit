@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs';
 /*
  * A hosted site in miniature: a design with a shop, two products and a
  * journal, drawn the way the hosting app draws it for the editor.
@@ -196,6 +197,23 @@ const keyMarkers = (doc, name, bandsAreShared = true) => {
     }
 };
 
+/**
+ * The charts and the table every hosted template offers (TheDataComponents): the host's own markup,
+ * written out by it into data-components.json, so the editor is tested against what the host serves.
+ */
+export const DATA_COMPONENTS = JSON.parse(readFileSync(new URL('./data-components.json', import.meta.url), 'utf8'));
+
+/** chartsTheKitNames: a chart's settings, keyed on its data-chart-settings element. */
+const nameCharts = (doc, page) => {
+    for (const chart of doc.querySelectorAll('[data-chart][data-chart-choices]')) {
+        const settings = chart.querySelector('[data-chart-settings]');
+        if (!settings) continue;
+        chart.setAttribute('data-edit-choices', chart.getAttribute('data-chart-choices'));
+        const owner = chart.closest('[data-instance]')?.getAttribute('data-instance') ?? '';
+        if (!settings.hasAttribute('data-edit-choice')) settings.setAttribute('data-edit-choice', `setting:tpl:${hash(`page:${page}/chart:${owner}/settings`)}`);
+    }
+};
+
 /** listsTheKitNames and sectionsTheKitNames, for the page `page`. */
 const nameListsAndSections = (doc, page) => {
     for (const list of doc.querySelectorAll('[data-list]:not([data-edit-list])')) {
@@ -214,6 +232,8 @@ const nameListsAndSections = (doc, page) => {
             if (!item.hasAttribute('data-style')) item.setAttribute('data-style', `i${hash(`${identity}/item:${item.getAttribute('data-item')}`)}`);
         }
     }
+
+    nameCharts(doc, page);
 
     const containers = new Set();
     for (const section of doc.querySelectorAll('[data-instance]:not([data-edit-section])')) {
@@ -249,7 +269,7 @@ const nameListsAndSections = (doc, page) => {
  * `outside` hands over no page builder at all: an outside site (the plugin or
  * another adapter), which gets in-place editing only.
  */
-export function createHost({ makeDocument, serialise = (doc) => `<!doctype html>${doc.documentElement.outerHTML}`, removable = false, library = false, outside = false } = {}) {
+export function createHost({ makeDocument, serialise = (doc) => `<!doctype html>${doc.documentElement.outerHTML}`, removable = false, library = false, outside = false, data = false } = {}) {
     const settings = {};
     const styles = {};
     const saves = [];
@@ -273,6 +293,15 @@ export function createHost({ makeDocument, serialise = (doc) => `<!doctype html>
 
     /** One design section, keyed as a copy named `added:<page>/<id>` and renamed for its new page (keysOnly, cut). */
     const sectionAdded = (doc, page, id, from) => {
+        const offered = data ? DATA_COMPONENTS.find((entry) => entry.from === from) : null;
+        if (offered) {
+            const owner = page === '' ? 'home' : page;
+            const source = makeDocument(`<!doctype html><html><body>${offered.markup.replace('__INSTANCE__', `${owner}.${id}`)}</body></html>`);
+            keyMarkers(source, `added:${owner}/${id}`, false);
+            const section = source.body.firstElementChild;
+
+            return doc.importNode ? doc.importNode(section, true) : section.cloneNode(true);
+        }
         const file = fileOf(from);
         if (!file || from.startsWith('site.')) return null;
         const source = makeDocument(DESIGN[file].html);
@@ -328,7 +357,10 @@ export function createHost({ makeDocument, serialise = (doc) => `<!doctype html>
         editorBase,
         pages: pages(editorBase),
         taken: pages(editorBase).map((entry) => entry.id),
-        library: library ? LIBRARY.map(({ file, ...section }) => ({ ...section, at: `${editorBase}${file}` })) : [],
+        library: [
+            ...(library ? LIBRARY.map(({ file, ...section }) => ({ ...section, at: `${editorBase}${file}` })) : []),
+            ...(data ? DATA_COMPONENTS.map(({ markup, ...offered }) => ({ ...offered, at: null })) : []),
+        ],
         starts: [],
         ...(removable ? { removedKey: 'structure:removed', removed: removed() } : {}),
     });
@@ -355,6 +387,13 @@ export function createHost({ makeDocument, serialise = (doc) => `<!doctype html>
                 + `window.liveEditContent=${JSON.stringify({ base: api, site: 'demo', key: 'kbs_demo' })};`
                 + 'window.liveEditPublishing={pending:0};');
             if (!outside) script(`window.liveEditPages=${JSON.stringify(builderFor(id, editorBase))};`);
+            // TheDataKitScript: what draws a chart or a table, on a page that holds one.
+            if (doc.querySelector('[data-chart], [data-kit-table]')) {
+                const tag = doc.createElement('script');
+                tag.setAttribute('src', '/kit-data.js');
+                tag.setAttribute('data-kit-data', '');
+                doc.body.append(tag);
+            }
             if (runtime) {
                 const tag = doc.createElement('script');
                 tag.setAttribute('type', 'module');

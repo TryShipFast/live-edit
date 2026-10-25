@@ -46,19 +46,30 @@ export const choicesOf = (list) => {
         return [];
     }
 
+    // A setting with no filter on the page to take its choices from (a chart's order, whether its
+    // line is filled) names them itself: options, [{ value, label }].
+    const listed = (choice) => Array.isArray(choice?.options)
+        && choice.options.some((option) => typeof option?.value === 'string');
+
     return (Array.isArray(declared) ? declared : [])
-        .filter((choice) => ATTR.test(choice?.attr ?? '') && typeof choice.from === 'string' && choice.from !== '')
+        .filter((choice) => ATTR.test(choice?.attr ?? '') && ((typeof choice.from === 'string' && choice.from !== '') || listed(choice)))
         .map((choice) => ({
             attr: choice.attr,
             label: String(choice.label ?? '').trim() || 'Category',
-            from: choice.from,
+            from: typeof choice.from === 'string' ? choice.from : '',
             value: choice.value || 'value',
             many: Boolean(choice.many),
+            ...(listed(choice) ? {
+                options: choice.options
+                    .filter((option) => typeof option?.value === 'string')
+                    .map((option) => ({ value: option.value, label: String(option.label ?? '').trim() || option.value })),
+            } : {}),
         }));
 };
 
 /** The choices on offer for one setting, in the filter's order: [{ value, label }]. */
 export const optionsFor = (choice, root = document) => {
+    if (choice.options) return choice.options;
     let controls = [];
     try {
         controls = [...root.querySelectorAll(choice.from)];
@@ -129,7 +140,7 @@ export const applyChoices = (root, settings) => {
  * one per declared setting. `save(key, json)` stores all of the item's settings
  * together; the page is updated at once so the owner can try the filter.
  */
-export const renderChoice = ({ item, list, save, notify = () => {} }) => {
+export const renderChoice = ({ item, list, save, notify = () => {}, hint: said = 'Where the filter on this page shows it. Visitors see the result, not these settings.' }) => {
     const choices = choicesOf(item.closest('[data-edit-choices]') ?? list);
     const key = choiceKey(item);
     if (!choices.length || !key) return null;
@@ -208,7 +219,7 @@ export const renderChoice = ({ item, list, save, notify = () => {} }) => {
 
     const hint = document.createElement('p');
     hint.className = 'le-hint';
-    hint.textContent = 'Where the filter on this page shows it. Visitors see the result, not these settings.';
+    hint.textContent = said;
     wrap.append(hint);
 
     return wrap;

@@ -361,6 +361,14 @@ a.le-mark:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
 .le-address .le-input { border: 0; box-shadow: none; padding-left: 2px; }
 .le-address-origin { padding-left: 14px; font-size: 14px; color: var(--le-muted); letter-spacing: normal; text-transform: none; font-weight: 400; }
 .le-hint--warn { color: var(--le-danger); }
+/* A chart's row or a table's cell (data-panel.js): the kind's fields together, and what its rules say. */
+.le-data { display: flex; flex-direction: column; gap: 12px; }
+.le-data-fields { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 12px; }
+.le-data-fields .le-field { display: flex; flex-direction: column; gap: 6px; }
+.le-data-fields .le-input[aria-invalid="true"] { border-color: var(--le-danger); }
+.le-data-said { display: flex; flex-direction: column; gap: 6px; }
+.le-data-said .le-hint { margin: 0; }
+.le-data-note { color: var(--le-ink); }
 .le-library { display: flex; flex-direction: column; gap: 10px; text-transform: none; letter-spacing: normal; }
 .le-library-list { display: flex; flex-direction: column; gap: 2px; max-height: 46vh; overflow: auto; margin: 0 -6px; padding: 0 2px; }
 .le-library-page { margin: 12px 6px 4px; font-size: 12px; font-weight: 600; color: var(--le-muted); }

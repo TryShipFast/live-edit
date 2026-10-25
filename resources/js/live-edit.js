@@ -7,6 +7,8 @@ import { addedWith, describeStructure, hrefTo, newAddedId, orderWith, pageOfLink
 import { insertionNear, sectionName, sectionUnder, shownSectionLists, shownSections } from './section-inserter.js';
 import { DETAIL_MODE, copyPageForCard, deletablePage, deletePage, detailAddress, linksTo, linksWarning, showOnlyTheDetail } from './card-page.js';
 import { renderChoice } from './choice.js';
+import { chartRowOf, renderChartPanel, renderChartRow, renderTableControls } from './data-panel.js';
+import { KINDS as CHART_KINDS, chartData, chartOf, itemContext as chartItemContext, kindOf as chartKindOf } from './data-kit.js';
 import { commonQuestions, listGuides, profileFor } from './help.js';
 import { dropdownTriggerFrom } from './dropdown-trigger.js';
 import { biggestThatFits, howMuchSurvives, inSourcePixels, movedWithin, whatIsThereNow } from './fitting.js';
@@ -981,7 +983,9 @@ const bootLiveEdit = () => {
             // arrives after it was built. See redrawPanel().
             lastOpened = node;
 
-            if (node.hasAttribute('data-edit-list')) editList(node);
+            if (node.matches?.('tr') && chartRowOf(node) === node) editChartRow(node);
+            else if (node.hasAttribute('data-edit-list') && chartKindOf(chartOf(node)) && chartData(chartOf(node)).list === node) editChart(chartOf(node));
+            else if (node.hasAttribute('data-edit-list')) editList(node);
             else if (node.dataset.editImg !== undefined) editImage(node);
             else if (node.dataset.edit !== undefined) editText(node);
             else if (node.dataset.svgEdit !== undefined || node.dataset.editSvg !== undefined) editDrawing(node);
@@ -4161,7 +4165,8 @@ const bootLiveEdit = () => {
             // cards. Name the repeated item above the fields so they know
             // which product, project or section this drawer belongs to.
             const item = element.closest?.('[data-edit-item]');
-            if (item) {
+            const inTable = Boolean(element.closest?.('[data-kit-table]'));
+            if (item && !inTable) {
                 const list = item.parentElement;
                 const items = list ? [...list.children].filter((child) => child.hasAttribute('data-edit-item')) : [item];
                 const index = Math.max(0, items.indexOf(item)) + 1;
@@ -4191,7 +4196,8 @@ const bootLiveEdit = () => {
 
             // A page's sections list is the whole page: its sections are listed instead (appendListControls).
             if (element.dataset?.editListKind !== 'sections') appendContents(element);
-            appendListControls(element);
+            if (inTable) appendTableControls(element);
+            else appendListControls(element);
             setTrail(element.dataset.styleEdit ? (element.closest('[data-style]') ?? element.parentElement) : element);
             showTab('Edit');
             openDrawer();
@@ -4326,6 +4332,68 @@ const bootLiveEdit = () => {
             });
 
             drawerFields.append(row);
+        };
+
+        /* ---------------------------------------------------------- charts and tables (data-panel.js) */
+
+        // A list's order, drawn on the page the way the server will draw it (content.js).
+        const applyOrderHere = async (list, ids) => {
+            const { applyOrder } = await import('./content.js');
+            applyOrder(document, { [list.dataset.editList]: JSON.stringify(ids) });
+        };
+        const dataDeps = () => ({
+            save: saveSetting,
+            saveOrder: saveListOrder,
+            refresh: (message) => settle(message, null, null, true),
+            notify,
+            applyOrder: applyOrderHere,
+            renderChoice,
+        });
+
+        /** A chart's bar, point, slice or stage: its kind's fields and rules. */
+        const editChartRow = (row) => {
+            const chart = chartOf(row);
+            current = { kind: 'chart' };
+            lastOpened = row;
+            drawerTitle.textContent = CHART_KINDS[chartKindOf(chart)]?.one ?? 'Item';
+            drawerDelete.classList.add('le-hidden');
+            drawerFields.replaceChildren(renderChartRow({ row, ...dataDeps() }));
+            const back = document.createElement('button');
+            back.type = 'button';
+            back.className = 'le-chip-btn';
+            back.textContent = '← The whole chart';
+            back.addEventListener('click', () => editChart(chart));
+            drawerFields.append(back);
+            setTrail(chart);
+            showTab('Edit');
+            openDrawer();
+        };
+
+        /** A chart: its settings, its rows, and pasting rows into it. */
+        const editChart = (chart) => {
+            current = { kind: 'chart' };
+            lastOpened = chart;
+            drawerTitle.textContent = chart.querySelector('.kit-data__title, h2, h3')?.textContent.trim() || 'Chart';
+            drawerDelete.classList.add('le-hidden');
+            drawerFields.replaceChildren(renderChartPanel({ chart, ...dataDeps(), openRow: (row) => switchToNode(row) }));
+            const section = chart.closest('[data-edit-item]');
+            if (section) {
+                const open = document.createElement('button');
+                open.type = 'button';
+                open.className = 'le-chip-btn';
+                open.textContent = 'Move, hide or remove this section';
+                open.addEventListener('click', () => editStyle(section));
+                drawerFields.append(open);
+            }
+            setTrail(chart);
+            showTab('Edit');
+            openDrawer();
+        };
+
+        /** A table's cell: the row and the column it sits in, kept in step. */
+        const appendTableControls = (element) => {
+            const block = renderTableControls({ element, ...dataDeps() });
+            if (block) drawerFields.prepend(block);
         };
 
         const editStyle = (element) => {
@@ -5263,6 +5331,18 @@ const bootLiveEdit = () => {
             if (mayEditLocked !== true && node.closest('[data-live-lock]')) return null;
             const chip = node.closest('[data-style-edit]');
             if (chip) return { element: chip, kind: 'style' };
+            /*
+             * A chart (data-kit.js): a bar, point, slice or stage, drawn or in its table, is one of
+             * its rows, opened in the kind's own words; anywhere else on the drawing is the chart.
+             * Its title, readout and headings are words like any others, below.
+             */
+            const chart = chartOf(node);
+            if (chart && chartKindOf(chart) && !node.closest('[data-chart-units], .kit-data__head, figcaption, summary, thead')) {
+                const row = chartRowOf(node);
+                if (row) return { element: row, kind: 'chart-row', box: node.closest('[data-chart-item]') ?? row, label: chartItemContext(chart, row) };
+                const plot = node.closest('[data-chart-plot]');
+                if (plot) return { element: chart, kind: 'chart', box: plot, label: `${CHART_KINDS[chartKindOf(chart)].one}s: the chart` };
+            }
             // A picture you click ON, so it is the nearest thing and wins.
             const image = node.closest('[data-edit-img]');
             if (image) return { element: image, kind: 'image' };
@@ -5331,7 +5411,9 @@ const bootLiveEdit = () => {
         };
 
         const openTarget = ({ element, kind }) => {
-            if (kind === 'image') editImage(element);
+            if (kind === 'chart-row') editChartRow(element);
+            else if (kind === 'chart') editChart(element);
+            else if (kind === 'image') editImage(element);
             else if (kind === 'icon') void editIcon(element);
             else if (kind === 'svg') editDrawing(element);
             else if (kind === 'text') editText(element);
@@ -5345,7 +5427,7 @@ const bootLiveEdit = () => {
         let hoverFrame = null;
         let hovered = null;
         const hideHover = () => { hovered = null; ui.hoverBox.classList.remove('is-visible'); };
-        const showHover = (element) => {
+        const showHover = (element, label = null) => {
             hovered = element;
             const rect = element.getBoundingClientRect();
             if (rect.width < 4 || rect.height < 4) {
@@ -5360,7 +5442,7 @@ const bootLiveEdit = () => {
                 height: `${rect.height}px`,
             });
             ui.hoverBox.classList.toggle('is-flipped', rect.top < 26);
-            ui.hoverLabel.textContent = element.dataset.kitComputed ? 'Counted for you' : (element.dataset.editLabel ?? describeElement(element));
+            ui.hoverLabel.textContent = label ?? (element.dataset.kitComputed ? 'Counted for you' : (element.dataset.editLabel ?? describeElement(element)));
             ui.hoverBox.classList.add('is-visible');
         };
 
@@ -5379,7 +5461,7 @@ const bootLiveEdit = () => {
             hoverFrame = requestAnimationFrame(() => {
                 hoverFrame = null;
                 const target = resolveTarget(beneathStretchedLink(event));
-                if (target) showHover(target.element);
+                if (target) showHover(target.box ?? target.element, target.label);
                 else hideHover();
             });
         });

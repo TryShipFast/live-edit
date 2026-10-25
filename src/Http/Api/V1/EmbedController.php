@@ -58,6 +58,8 @@ class EmbedController
         'shop.js' => 'shop.js',
         'help.js' => 'help.js',
         'section-inserter.js' => 'section-inserter.js',
+        'data-kit.js' => 'data-kit.js',
+        'data-panel.js' => 'data-panel.js',
         // The built bundle, resolved to resources/dist rather than to a
         // sibling of the modules.
         'bundle.js' => 'bundle.js',

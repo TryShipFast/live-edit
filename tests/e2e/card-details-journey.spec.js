@@ -59,6 +59,8 @@ const openItsPage = async (page, card, button = 'Edit all details') => {
     await choose(page, `[data-edit-item="${card}"] [data-edit]:not(a)`);
     await ui(page).getByRole('button', { name: button }).click();
     await expect(detail(page).locator('h1')).toBeVisible({ timeout: 20000 });
+    // Its own editor is ready, not only its page: a press before then reached nothing.
+    await expect(detail(page).locator('body.editing')).toHaveCount(1, { timeout: 20000 });
 };
 
 const done = async (page) => {
