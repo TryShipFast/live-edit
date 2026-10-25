@@ -4578,7 +4578,13 @@ const bootLiveEdit = () => {
             if (current?.element !== element) return;
             drawerFields.replaceChildren();
 
-            const restore = () => { element.outerHTML = was; };
+            // Put back the drawing that is on the page now, not `element`: choosing one replaces the node, so
+            // the original is detached, and setting outerHTML on a detached node throws. That throw, from the
+            // drawer closing after a save, sent every saved drawing down the reload fallback.
+            const restore = () => {
+                const live = document.querySelector(`[data-edit-svg="${element.dataset.editSvg}"]`);
+                if (live?.isConnected) live.outerHTML = was;
+            };
             current.restore = restore;
 
             // One of each distinct drawing on the page, the current one first.
