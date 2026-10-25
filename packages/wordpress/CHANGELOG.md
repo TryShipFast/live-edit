@@ -1,5 +1,10 @@
 # ShipFast Live Edit for WordPress
 
+## 0.15.70
+
+- Edit a linked product, article, or project page in one pass from its card, including its editable fields, styles, and options.
+- Keep related items and shared page controls out of the linked-detail form; copies with shared pages get their own page before editing.
+
 ## 0.15.57
 
 - Fixed image generation status lookups for hosted sites by binding the route's site segment before the generation UUID.
