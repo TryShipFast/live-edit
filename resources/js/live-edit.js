@@ -5,6 +5,7 @@ import { renderSeoPanel } from './seo.js';
 import { renderShopPanel } from './shop.js';
 import { addedWith, cardFacts, describeStructure, factTargets, hrefTo, makePageLike, newAddedId, orderWith, pageOfLink, renderNewPage, renderSectionBrowser } from './pages.js';
 import { renderChoice } from './choice.js';
+import { commonQuestions, listGuides, profileFor } from './help.js';
 import { dropdownTriggerFrom } from './dropdown-trigger.js';
 import { biggestThatFits, howMuchSurvives, inSourcePixels, movedWithin, whatIsThereNow } from './fitting.js';
 import { attrsWorthSending, creditWorthSending } from './only-what-changed.js';
@@ -5352,6 +5353,9 @@ const bootLiveEdit = () => {
                 return drawerTabs[name];
             }, { available: () => Boolean(drawerTabs[name]) });
             const publishStep = { point: () => inBar('publishButton'), title: 'Nothing is live until you publish', copy: 'Everything you save is a draft only you can see. When you are happy with it, press Publish and visitors see it.' };
+            const menuLink = () => first('header nav a[data-edit], header nav a[data-edit-href], nav a[data-edit], nav a[data-edit-href]');
+            const menuTrigger = () => first('header [aria-expanded], nav [aria-expanded]');
+            const section = () => first('[data-edit-list-kind="sections"] > [data-edit-item]');
 
             const guides = {
                 'getting-started': [
@@ -5400,7 +5404,20 @@ const bootLiveEdit = () => {
                     { point: () => inBar('previewButton'), title: 'See it as a visitor', copy: 'Preview shows the page without the editor, so you can check it before publishing.' },
                     publishStep,
                 ],
+                menu: [
+                    { point: menuLink, title: 'Click a menu word to change it', copy: 'Its panel changes the words and where the link goes. Your visitors see the same menu on every page.' },
+                    { point: menuTrigger, title: 'Menus that open', copy: 'Press a menu with an arrow. It opens, and its own words open for editing; every link inside it can then be clicked and changed too.' },
+                    publishStep,
+                ],
+                sections: [
+                    { point: section, title: 'Your page is made of sections', copy: 'Click a section\'s edge or its handle to choose it. Its panel can move it up or down, copy it or hide it.' },
+                    { point: section, title: 'Hiding is not deleting', copy: 'A hidden section keeps its words and pictures. Show it again from the same panel whenever you want it back.' },
+                    publishStep,
+                ],
             };
+            // A guide for one of the site's own lists ("Add to Products"), from help.js.
+            const ownList = String(guideId).startsWith('list:') ? helpListGuides().find((g) => g.id === guideId) : null;
+            if (ownList) guides[guideId] = [...ownList.steps, publishStep];
             // Only steps this site has: no Brand step without a Brand tab, no Publish step where saving is publishing.
             const steps = (guides[guideId] ?? guides['getting-started'])
                 .filter((step) => (step.point.available ? step.point.available() : step.point() !== null));
@@ -5496,45 +5513,98 @@ const bootLiveEdit = () => {
             pill.addEventListener('click', () => fold(false));
             show();
         };
-        // Help is a feature menu for returning editors. The getting-started
-        // tour remains available here without being the only Help destination.
+        const helpListGuides = () => listGuides(document, { canMakePages: Boolean(window.liveEditPages) });
+        /*
+         * Help, for somebody who has never edited a website. It opens on what this kind of site is
+         * for and where to begin (a shop starts in its Shop tab, a school with its news and dates),
+         * then a guide for each of the site's own lists, the feature guides, and the questions people
+         * ask. Every guide points at the real thing on the page; see help.js for the content.
+         */
         const showHelpMenu = () => {
             if (ui.shadow.querySelector('.le-walkthrough')) return;
+            const profile = profileFor(window.liveEditSite, { hasShop: Boolean(drawerTabs.Shop) });
             const card = document.createElement('section');
             card.className = 'le-walkthrough le-help-menu';
             card.setAttribute('role', 'dialog');
             card.setAttribute('aria-label', 'Live Edit help and guides');
             const progress = el('div', 'le-walkthrough-progress', 'Live Edit help');
-            const heading = el('h2', null, 'What would you like to do?');
-            const copy = el('p', null, 'Choose a feature for a short guided tour.');
-            const options = el('div', 'le-help-options');
+            const heading = el('h2', null, profile.title);
+            const copy = el('p', null, profile.intro);
             const finish = el('button', 'le-walkthrough-end', 'Close help');
             finish.type = 'button';
             const actions = el('div', 'le-walkthrough-actions');
             actions.append(finish);
-            const available = [
-                { id: 'text', title: 'Edit text or a link', detail: 'Change words and destinations on the page.' },
-                { id: 'image', title: 'Replace an image', detail: 'Choose, upload or generate a replacement image.' },
-                ...(document.querySelector('[data-edit-bg]') ? [{ id: 'background', title: 'Change a background image', detail: 'Find and replace an image behind a section.' }] : []),
-                ...(window.liveEditBrand?.tokens?.length ? [{ id: 'brand', title: 'Set your brand', detail: 'Update site-wide colors and type.' }] : []),
-                ...(drawerTabs.SEO ? [{ id: 'seo', title: 'Update SEO details', detail: 'Edit a page title and search description.' }] : []),
-                ...(drawerTabs.Shop ? [{ id: 'shop', title: 'Run your shop', detail: 'Delivery prices, offers, your WhatsApp number and products.' }] : []),
-                ...(window.liveEditPages ? [{ id: 'pages', title: 'Create a page', detail: 'Choose a title, address and starting sections.' }] : []),
-                ...(!ui.languagePicker.hidden ? [{ id: 'languages', title: 'Edit another language', detail: 'Switch languages and update translated content.' }] : []),
-                { id: 'review', title: 'Review or undo changes', detail: 'Inspect draft edits and undo or redo them.' },
-                ...(!ui.previewButton.hidden ? [{ id: 'preview', title: 'Preview and publish', detail: 'Check the visitor view and publish when ready.' }] : []),
-                { id: 'getting-started', title: 'Replay getting started', detail: 'Take the full Live Edit introduction again.' },
-            ];
-            available.forEach((item) => {
+
+            const features = {
+                'getting-started': { title: 'The two minute tour', detail: 'How editing works, from your first click to publishing.' },
+                text: { title: 'Change words or a link', detail: 'Click any words on the page, type, and save.' },
+                image: { title: 'Replace a picture', detail: 'Use your own, a free photo, or ask for a new one.' },
+                ...(document.querySelector('header nav a, nav a') ? { menu: { title: 'Change your menu', detail: 'Rename menu links, change where they go, and edit menus that open.' } } : {}),
+                ...(document.querySelector('[data-edit-list-kind="sections"]') ? { sections: { title: 'Move, copy or hide a section', detail: 'Rearrange the parts of a page.' } } : {}),
+                ...(document.querySelector('[data-edit-bg]') ? { background: { title: 'Change a background picture', detail: 'Replace the picture behind a section.' } } : {}),
+                ...(window.liveEditBrand?.tokens?.length ? { brand: { title: 'Your colours and fonts', detail: 'Restyle the whole site from one place.' } } : {}),
+                ...(drawerTabs.Shop ? { shop: { title: 'Run your shop', detail: 'How customers pay, delivery prices, offers, your WhatsApp number and products.' } } : {}),
+                ...(drawerTabs.SEO ? { seo: { title: 'How you look in search', detail: 'A page\'s title, its search description and its sharing picture.' } } : {}),
+                ...(window.liveEditPages ? { pages: { title: 'Add a page', detail: 'Start from a page your site already has.' } } : {}),
+                ...(!ui.languagePicker.hidden ? { languages: { title: 'Edit another language', detail: 'Switch languages and write each one.' } } : {}),
+                review: { title: 'Check or undo your changes', detail: 'See everything you saved, and take any of it back.' },
+                ...(!ui.previewButton.hidden ? { preview: { title: 'Preview and publish', detail: 'See the page as a visitor would, then publish.' } } : {}),
+            };
+            const lists = helpListGuides();
+            const shown = new Set();
+            const option = (id, title, detail) => {
+                shown.add(id);
                 const button = el('button', 'le-help-option');
                 button.type = 'button';
-                button.append(el('span', 'le-help-option-title', item.title), el('span', 'le-help-option-detail', item.detail));
-                button.addEventListener('click', () => { card.remove(); startWalkthrough(true, item.id); });
-                options.append(button);
-            });
-            card.append(progress, heading, copy, options, actions);
+                button.append(el('span', 'le-help-option-title', title), el('span', 'le-help-option-detail', detail));
+                button.addEventListener('click', () => { card.remove(); startWalkthrough(true, id); });
+                return button;
+            };
+            const group = (title, buttons) => {
+                if (!buttons.length) return null;
+                const box = el('div', 'le-help-group');
+                const options = el('div', 'le-help-options');
+                options.append(...buttons);
+                box.append(el('h3', 'le-help-group-title', title), options);
+                return box;
+            };
+
+            const startHere = group('Start here', profile.start.flatMap((id) => {
+                if (id === 'lists') return lists.slice(0, 2).map((g) => option(g.id, g.title, g.detail));
+                return features[id] ? [option(id, features[id].title, features[id].detail)] : [];
+            }));
+            // The six an owner most likely wants, and the rest a press away: a big home page has a dozen.
+            const rest = lists.filter((g) => !shown.has(g.id));
+            const yourLists = group('Your lists', rest.slice(0, 6).map((g) => option(g.id, g.title, g.detail)));
+            if (yourLists && rest.length > 6) {
+                const more = el('button', 'le-help-more', `Show ${rest.length - 6} more lists`);
+                more.type = 'button';
+                more.addEventListener('click', () => {
+                    yourLists.querySelector('.le-help-options').append(...rest.slice(6).map((g) => option(g.id, g.title, g.detail)));
+                    more.remove();
+                });
+                yourLists.append(more);
+            }
+            const everythingElse = group('Everything else', Object.entries(features).filter(([id]) => !shown.has(id)).map(([id, f]) => option(id, f.title, f.detail)));
+
+            const questions = [...profile.questions, ...commonQuestions({
+                hasPublish: !ui.publishButton?.hidden,
+                hasPages: Boolean(window.liveEditPages),
+                hasBrand: Boolean(window.liveEditBrand?.tokens?.length),
+            })];
+            const faq = el('div', 'le-help-group le-help-faq');
+            faq.append(el('h3', 'le-help-group-title', 'Common questions'));
+            for (const { q, a } of questions) {
+                const item = document.createElement('details');
+                item.append(el('summary', null, q), el('p', null, a));
+                faq.append(item);
+            }
+
+            card.append(progress, heading, copy, ...[startHere, yourLists, everythingElse].filter(Boolean), faq, actions);
             ui.shadow.append(card);
             finish.addEventListener('click', () => card.remove());
+            card.addEventListener('keydown', (event) => { if (event.key === 'Escape') { event.stopPropagation(); card.remove(); } });
+            card.querySelector('.le-help-option')?.focus();
         };
         ui.helpButton?.addEventListener('click', showHelpMenu);
 
