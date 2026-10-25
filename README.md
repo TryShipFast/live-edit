@@ -429,25 +429,78 @@ preview, and saved as an address; "Use the design's own" saves it empty.
 
 ## A card and its page
 
-Picking a card in a list (a product, a journal entry, a project) shows the
-page it opens, under the card's actions: **Edit its page →** goes there. The
-page is found from the card's link, by its address or, for the design's own
-pages, by the `data-link-page` the Kit gives it (`pageOfLink` in `pages.js`).
+Picking a card in a list (a product, a journal entry, a project) offers **Edit
+all details**. It reads the linked page in the editor and opens that page's
+editable component fields in a modal, so somebody can update a post, product,
+or project without navigating away or clicking each field on the page. It also
+offers **Edit its page →** for the full-page editor. The page is found from the
+card's link, by its address or, for the design's own pages, by the
+`data-link-page` the Kit gives it (`pageOfLink` in `pages.js`).
 
-A card copied from another still opens the original's page. The copy (an id
-the editor minted, or a name that is not the page's) is offered **Give it its
-own page**: a page made like that one (its sections, from `starts`), named
-after the card and left out of the menu, which the card's link then opens
-(`makePageLike`, `hrefTo`). The editor goes straight to it, so the next thing
-the owner does is write the new product's, post's or project's details. It is
-the same two settings as New page, plus the link's own setting.
+The modal is deliberately data-driven: it discovers content, image and link
+keys (`data-edit`, `data-edit-img`, `data-edit-href`) from the linked page's
+`main`, and style keys (`data-style`, `data-style-props`) from its components.
+It does not infer field names from whether a card list is called “Blog” or
+“Products”. Where components have identities, it scopes the form to the linked
+record's `.article`, `.detail`, `.products-pdp-title` or `.products-title`
+component and its detail siblings. Recommendations, related cards, sticky buy
+bars, shared navigation and footers stay out. Older templates without those
+component identities retain the full-page discovery fallback.
 
-The new page then opens with what the card says rather than describing the
-product it was made like: the card's name in its heading, its photo, its price
-(the page's own, not a size's) and its short description (`cardFacts`,
-`factTargets`), saved as ordinary edits the owner can change or undo. The
-card's facts wait in session storage until the page's keys exist, and are
-written once.
+A new template feature should work by marking its page component with the same
+editing attributes the full-page editor uses. Give repeated options semantic
+`data-label` values such as “Sizes” or “Colours”; the engine passes these
+through as `data-edit-list-label`. Mark product option collections with
+`data-edit-list-kind="variants"` when their label is not descriptive. Each
+option is an ordinary editable list item: its label and price use normal edit
+keys, and add/remove updates the list's ordinary ID-order setting so changes
+remain drafts and participate in undo/publish like other edits. Keep this
+markup data-driven; do not add product-, blog- or template-specific field
+maps to the runtime.
+
+When adding a card or detail-page capability, use this checklist:
+
+1. Mark every field on the detail component with its normal Live Edit key;
+   do not add a card-type-specific hard-coded field mapping.
+2. Mark image, destination, style and repeatable-list controls with the
+   corresponding standard attributes so the single-pass form can find them.
+3. Benchmark every existing template that uses the capability, including a
+   product with colours and sizes, a product with priced variants, and an
+   article with long-form content. Open **Edit all details**, confirm related
+   cards and sticky controls are absent, save a changed value and compare it
+   with the linked page. Then duplicate a card, edit its details and verify it
+   gets an independent page without changing the source card. Keep this matrix
+   current when templates are added.
+4. Add a regression test for the discovered markup shape and the shared/copy
+   case before shipping the new capability.
+
+The existing-template markup benchmark for this flow found 14 Oxbow-Hem
+product pages with repeatable colour and size lists, 16 Vellumair product
+pages with named and priced variants, and 45 blog/journal pages with an
+identified article component. Their existing keys and list declarations are
+the reference shapes for future templates; these counts are a baseline, so
+repeat the benchmark when the catalogue changes.
+
+A card copied from another still opens the original's page initially. When a
+copy with a shared page opens **Edit all details**, the editor first creates a
+separate page for it and changes that card's link; the source card keeps its
+original page and content. The new page is seeded from the copied card's name,
+photo, price and short description, then the modal exposes the page's full
+editable fields and variants.
+
+A card copied from another can also use **Give it its own page** directly: a
+page made like that one (its sections, from `starts`), named after the card and
+left out of the menu, which the card's link then opens (`makePageLike`,
+`hrefTo`). This explicit action opens the full-page editor. The **Edit all
+details** action performs the same separation before opening its modal.
+
+The new page starts with what the card says rather than describing the product
+it was made like: the card's name in its heading, its photo, its price (the
+page's own, not a size's) and its short description (`cardFacts`,
+`factTargets`), saved as ordinary edits the owner can change or undo. In the
+modal flow, the editor reads the new page's keys and writes those facts before
+showing the form. In the full-page flow, the card's facts wait in session
+storage until the page's keys exist, and are written once.
 
 ## The Brand tab
 
