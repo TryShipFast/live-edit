@@ -3,11 +3,11 @@ import { renderBrandPanel } from './brand.js';
 import { uploadWidget } from './upload.js';
 import { renderSeoPanel } from './seo.js';
 import { renderShopPanel } from './shop.js';
-import { addedWith, cardFacts, describeStructure, factTargets, hrefTo, makePageLike, newAddedId, orderWith, pageOfLink, renderNewPage, renderSectionBrowser } from './pages.js';
+import { addedWith, describeStructure, hrefTo, newAddedId, orderWith, pageOfLink, renderNewPage, renderSectionBrowser } from './pages.js';
+import { DETAIL_MODE, copyPageForCard, deletablePage, deletePage, detailAddress, linksTo, linksWarning, showOnlyTheDetail } from './card-page.js';
 import { renderChoice } from './choice.js';
 import { commonQuestions, listGuides, profileFor } from './help.js';
 import { dropdownTriggerFrom } from './dropdown-trigger.js';
-import { elementsInComponents, linkedDetailComponents } from './linked-detail-scope.js';
 import { biggestThatFits, howMuchSurvives, inSourcePixels, movedWithin, whatIsThereNow } from './fitting.js';
 import { attrsWorthSending, creditWorthSending } from './only-what-changed.js';
 import { confirm as confirmChange, expectChange, takeExpected } from './verify.js';
@@ -217,7 +217,21 @@ const bootLiveEdit = () => {
             }
         });
 
+        /*
+         * Detail mode: this page is a card's page, opened from the card in a
+         * window over the list (card-page.js). Only its detail is shown, there
+         * is no toolbar (the list's own is behind the window), and every save
+         * tells the list, so closing the window shows what was saved.
+         */
+        const detailMode = new URLSearchParams(window.location.search).get('live-edit') === DETAIL_MODE
+            && window.parent !== window;
+        const tellTheCard = () => {
+            if (!detailMode) return;
+            try { window.parent.postMessage({ type: 'live-edit:detail-saved' }, window.location.origin); } catch { /* the list refreshes when it is next loaded */ }
+        };
+
         const reloadWithToast = (message) => {
+            tellTheCard();
             sessionStorage.setItem('tb_toast', message);
             reloadPreservingScroll();
         };
@@ -237,6 +251,7 @@ const bootLiveEdit = () => {
          * text on screen.
          */
         const settle = async (message, key = null, value = null, forceContentRefresh = false) => {
+            tellTheCard();
             const bridge = window.__liveEditReact;
 
             if (!bridge) {
@@ -2324,7 +2339,12 @@ const bootLiveEdit = () => {
                 // reason the API ever gave and showed "Could not save. Try
                 // again." instead — which says nothing, and is the wrong
                 // advice when trying again cannot possibly work.
-                throw new Error(data.error?.message ?? data.message ?? 'Could not save. Try again.');
+                const refused = new Error(data.error?.message ?? data.message ?? 'Could not save. Try again.');
+                // Kept on the error for the one caller that makes many saves in a row (a card's
+                // page copied, key by key), which waits out a "too many" rather than stopping halfway.
+                refused.status = response.status;
+                refused.retryAfter = Number(data.error?.retry_after ?? response.headers?.get?.('Retry-After')) || null;
+                throw refused;
             }
             if (!isJsonResponse(response)) {
                 throw new Error('That did not save. Reload the page and try again.');
@@ -3489,241 +3509,239 @@ const bootLiveEdit = () => {
             finishPanel(element, { linkElement });
         };
 
-        /**
-         * Edit the linked record from its card. The linked detail page is the
-         * source of truth, so the modal reads that page's editing keys rather
-         * than guessing fields from the listing card's wording.
+        /*
+         * A card and its page (card-page.js).
+         *
+         * The card's page is shown as itself: the editor, loaded in a frame on
+         * that page in detail mode, showing only the record's own components
+         * with their layout, photos, options and words. The owner edits it by
+         * clicking it, with the same panel, controls and saves as anywhere
+         * else, so there is no second way of editing to learn and nothing a
+         * form could leave out. Closing the window shows the list again with
+         * what was saved.
          */
-        const editLinkedPage = async ({ page, link, item, list, builder, shared }) => {
-            const cardName = (item.dataset.editItemLabel || item.querySelector('h1, h2, h3, h4')?.textContent || page.title || '')
-                .replace(/\s+/g, ' ').trim();
-            const editableLink = link.dataset.editHref !== undefined ? link : item.querySelector('a[data-edit-href]');
-            const like = (builder.starts ?? []).find((start) => start.id === page.id);
-            const isCopy = /^n[0-9a-z]+$/.test(item.dataset.editItem)
-                || (cardName && cardName.toLowerCase() !== String(page.title).toLowerCase());
+        const cardNameOf = (item) => (item.dataset.editItemLabel || item.querySelector('h1, h2, h3, h4')?.textContent || '')
+            .replace(/\s+/g, ' ').trim();
+
+        /** Another page of this site, as the editor serves it, read rather than run. */
+        const fetchEditorPage = async (builder, id) => {
+            const response = await fetch(`${builder.editorBase}${id}`, {
+                credentials: 'same-origin',
+                headers: { Accept: 'text/html' },
+            });
+            if (!response.ok) throw new Error(`That page could not be read (${response.status}). Try again.`);
+
+            return new DOMParser().parseFromString(await response.text(), 'text/html');
+        };
+
+        /** Every saved setting and style, with drafts over published: what the owner sees now. */
+        const readSavedContent = async () => {
+            const config = window.liveEditContent;
+            if (config?.base && config?.site && config?.key) {
+                const { fetchContent } = await import('./content.js');
+
+                return fetchContent(config);
+            }
+            const response = await request('/live-edit/content', { method: 'GET' });
+
+            return response.json();
+        };
+
+        /*
+         * One save, waiting out "too many" rather than giving up on it.
+         *
+         * Copying a page is dozens of saves in a row, which is more than the
+         * content API lets a person make in a minute. Stopping halfway would
+         * leave a page with half its words, so a refusal for speed waits as
+         * long as the server asks and tries again.
+         */
+        const patiently = async (work, progress = () => {}) => {
+            for (let attempt = 0; ; attempt += 1) {
+                try {
+                    return await work();
+                } catch (error) {
+                    if (error?.status !== 429 || attempt >= 8) throw error;
+                    const seconds = Math.min(65, Math.max(2, error.retryAfter ?? 10));
+                    progress(`Still copying. Waiting ${seconds} seconds so the server can keep up…`);
+                    await new Promise((resolve) => window.setTimeout(resolve, seconds * 1000));
+                }
+            }
+        };
+
+        /**
+         * A copied card's own page: a full copy of the page it shares, every
+         * edit included, then the card's own name, photo, price and notes
+         * where they differ, and the card pointed at it. Returns the page.
+         */
+        const giveItsOwnPage = async ({ page, link, item, builder, progress = () => {} }) => {
+            const editableLink = link?.dataset.editHref !== undefined ? link : item.querySelector('a[data-edit-href]');
+            if (!editableLink) throw new Error('This card’s link cannot be changed, so it cannot have a page of its own.');
+            const title = cardNameOf(item) || page.title;
+            const id = await copyPageForCard({
+                page,
+                title,
+                card: item,
+                builder,
+                fetchPage: (pageId) => fetchEditorPage(builder, pageId),
+                readContent: readSavedContent,
+                save: (key, value) => patiently(() => saveSetting(key, value), progress),
+                saveStyle: (key, props) => patiently(() => request('/live-edit/style', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ key, props }),
+                }), progress),
+                progress,
+            });
+            const href = hrefTo(editableLink.getAttribute('href'), id);
+            await patiently(() => saveSetting(editableLink.dataset.editHref, href), progress);
+            // So this card already opens its own page if it is chosen again before the list is redrawn.
+            editableLink.setAttribute('href', href);
+            if (editableLink.dataset.linkPage) editableLink.dataset.linkPage = id;
+
+            return { ...page, id, title };
+        };
+
+        /**
+         * Edit the page a card opens, from the card, without leaving the list.
+         * A copy that still shares its original's page is given its own first,
+         * so nothing done here can reach the original.
+         */
+        const editLinkedPage = async ({ page, link, item, builder, separate = false }) => {
+            const cardName = cardNameOf(item);
+            let changed = false;
+            const heard = (event) => {
+                if (event.origin === window.location.origin && event.data?.type === 'live-edit:detail-saved') changed = true;
+            };
+            window.addEventListener('message', heard);
             const modal = ui.modal({
                 title: cardName ? `Edit ${cardName}` : `Edit ${page.title}`,
-                subtitle: 'Update the details on this card’s page here, in one pass.',
-                size: 'is-wide',
+                subtitle: 'This is its page. Click anything on it to change it. It saves as a draft, like everything else, until you publish.',
+                size: 'is-full',
+                onClose: () => {
+                    window.removeEventListener('message', heard);
+                    ui.root.classList.remove('le-detail-open');
+                    // The list again, with what was saved: a card now pointing at its own page, its page's new words.
+                    if (changed) void settle('Saved ✓', null, null, true);
+                },
             });
-            const renderPage = async (targetPage, initialFacts = null) => {
-                modal.body.replaceChildren();
-                const loading = document.createElement('p');
-                loading.className = 'le-hint';
-                loading.textContent = 'Loading page details…';
-                modal.body.append(loading);
-                const response = await fetch(`${builder.editorBase}${targetPage.id}`, {
-                    credentials: 'same-origin',
-                    headers: { Accept: 'text/html' },
-                });
-                if (!response.ok) throw new Error(`Could not load this page’s details (${response.status}).`);
-                const html = await response.text();
-                const parsedPage = new DOMParser().parseFromString(html, 'text/html');
-                const pageRoot = parsedPage.querySelector('main') ?? parsedPage.body;
-                // A product/article page can contain related cards, sticky-buy
-                // controls, reviews and other components alongside its detail.
-                // Keep this form on the linked record's components, not every
-                // editable thing that happens to share its URL.
-                const roots = linkedDetailComponents(pageRoot);
-                const root = { querySelectorAll: (selector) => elementsInComponents(roots, selector) };
-                const fields = [];
-                const seen = new Set();
-                root.querySelectorAll('[data-edit], [data-edit-img], [data-edit-href]').forEach((node) => {
-                    if (node.closest('header, nav, footer, [data-component*="header"], [data-component*="navigation"]')) return;
-                    const attribute = node.hasAttribute('data-edit-img') ? 'data-edit-img'
-                        : node.hasAttribute('data-edit-href') ? 'data-edit-href' : 'data-edit';
-                    const parsed = parseEditKey(node.getAttribute(attribute));
-                    if (parsed.kind !== 'setting' || !parsed.key || seen.has(`${attribute}:${parsed.key}`)) return;
-                    seen.add(`${attribute}:${parsed.key}`);
-                    const field = node.dataset.field ?? node.dataset.label ?? node.getAttribute('aria-label') ?? '';
-                    const label = (field || node.tagName.toLowerCase().replace(/^h[1-6]$/, 'Heading'))
-                        .replace(/[-_]+/g, ' ').replace(/\s+/g, ' ').trim()
-                        .replace(/\b\w/g, (letter) => letter.toUpperCase());
-                    const value = attribute === 'data-edit-href' ? node.getAttribute('href') ?? ''
-                        : attribute === 'data-edit-img' ? (node.getAttribute('src') ?? node.dataset.editValue ?? '')
-                            : (node.dataset.editValue ?? node.textContent.trim());
-                    fields.push({ key: parsed.key, label, value, attribute, fieldName: node.dataset.field ?? '', rich: node.dataset.edit === 'words', rows: /description|content|body|story|notes|excerpt/i.test(label) ? 4 : 2 });
-                });
+            ui.root.classList.add('le-detail-open');
+            const wait = document.createElement('p');
+            wait.className = 'le-hint le-detail-wait';
+            wait.textContent = 'Opening its page…';
+            modal.body.replaceChildren(wait);
 
-                const styles = [];
-                root.querySelectorAll('[data-style]').forEach((node) => {
-                    const key = node.dataset.style;
-                    if (!key || styles.some((style) => style.key === key)) return;
-                    const declared = declaredStyleProps(node.dataset.styleProps, window.liveEditStyleProps ?? {});
-                    const allowed = stylePropsFor(node, declared).filter((prop) => ['background', 'textColor', 'fontSize', 'fontWeight', 'radius'].includes(prop));
-                    if (!allowed.length) return;
-                    styles.push({ key, label: node.dataset.label ?? node.dataset.component ?? 'Section style', allowed, value: (window.liveEditStyles ?? {})[key] ?? {} });
-                });
-
-                const variantLists = [...root.querySelectorAll('[data-edit-list]')]
-                    .filter((candidate) => /variant|option|size|colour|color/i.test(candidate.dataset.editListLabel ?? candidate.getAttribute('aria-label') ?? '')
-                        || candidate.dataset.editListKind === 'variants');
-                const fragment = document.createDocumentFragment();
-                if (!fields.length && !styles.length && !variantLists.length) {
-                    const empty = document.createElement('p');
-                    empty.className = 'le-hint';
-                    empty.textContent = 'This detail page has no editable fields yet.';
-                    fragment.append(empty);
-                }
-
-                const controls = fields.map((field, index) => {
-                    const wrap = fieldInput(`detail-${index}`, field.label, field.value, field.rows, field.rich);
-                    let control = wrap.querySelector('textarea, input, select');
-                    if (field.attribute === 'data-edit-href' || field.attribute === 'data-edit-img') {
-                        const urlInput = document.createElement('input');
-                        urlInput.type = 'url';
-                        urlInput.className = 'le-input';
-                        urlInput.placeholder = 'https://…';
-                        urlInput.value = field.value;
-                        control.replaceWith(urlInput);
-                        control = urlInput;
-                    }
-                    fragment.append(wrap);
-                    const fact = initialFacts && (field.attribute === 'data-edit-img' ? 'photo'
-                        : field.fieldName === 'price' ? 'price'
-                            : /^(title|name|heading)$/i.test(field.fieldName) ? 'name'
-                                : /^(notes|lead|excerpt|description|summary)$/i.test(field.fieldName) ? 'notes' : null);
-                    const factValue = fact ? initialFacts[fact] : null;
-                    if (factValue) control.value = factValue;
-                    return { ...field, control, factValue };
-                });
-                styles.forEach((style) => {
-                    const heading = document.createElement('div');
-                    heading.className = 'le-section-heading';
-                    heading.textContent = `${style.label} style`;
-                    fragment.append(heading);
-                    style.controls = [];
-                    style.allowed.forEach((prop) => {
-                        const label = ({ background: 'Background colour', textColor: 'Text colour', fontSize: 'Text size', fontWeight: 'Font weight', radius: 'Corner roundness' })[prop] ?? prop;
-                        const wrap = document.createElement('label');
-                        wrap.className = 'le-field';
-                        wrap.append(label);
-                        const input = document.createElement('input');
-                        input.className = 'le-input';
-                        input.type = ['background', 'textColor'].includes(prop) ? 'color' : 'text';
-                        input.value = style.value[prop] ?? '';
-                        if (input.type === 'color' && !/^#[0-9a-f]{6}$/i.test(input.value)) input.value = '#ffffff';
-                        input.dataset.detailStyleProp = prop;
-                        wrap.append(input);
-                        let useDefault = null;
-                        if (input.type === 'color') {
-                            const defaultLabel = document.createElement('span');
-                            defaultLabel.className = 'le-muted';
-                            defaultLabel.textContent = 'Use design default';
-                            useDefault = document.createElement('input');
-                            useDefault.type = 'checkbox';
-                            useDefault.checked = !style.value[prop];
-                            useDefault.addEventListener('change', () => { input.disabled = useDefault.checked; });
-                            input.disabled = useDefault.checked;
-                            wrap.append(useDefault, defaultLabel);
-                            input.addEventListener('input', () => { useDefault.checked = false; input.disabled = false; });
-                        }
-                        fragment.append(wrap);
-                        style.controls.push({ prop, input, useDefault });
-                    });
-                });
-
-                variantLists.forEach((variantList) => {
-                    const heading = document.createElement('div');
-                    heading.className = 'le-section-heading';
-                    const variants = [...variantList.children].filter((child) => child.dataset.editItem);
-                    heading.textContent = `${variantList.dataset.editListLabel || 'Options'} (${variants.length})`;
-                    fragment.append(heading);
-                    const add = document.createElement('button');
-                    add.type = 'button';
-                    add.className = 'le-chip-btn';
-                    add.textContent = '+ Add option';
-                    const maximum = Number.parseInt(variantList.dataset.editListMax ?? '', 10);
-                    add.disabled = Number.isFinite(maximum) && maximum > 0 && variants.length >= maximum;
-                    add.addEventListener('click', async () => {
-                        const ids = variants.map((variant) => variant.dataset.editItem);
-                        ids.push(`n${Date.now().toString(36)}`);
-                        try {
-                            await saveSetting(variantList.dataset.editList, JSON.stringify(ids));
-                            if (variantList.dataset.editListPair) await saveSetting(variantList.dataset.editListPair, JSON.stringify(ids));
-                            await renderPage(targetPage);
-                            notify('Option added. Fill in its details below.');
-                        } catch (error) { notify(error.message); }
-                    });
-                    fragment.append(add);
-                    const minimum = Math.max(1, Number.parseInt(variantList.dataset.editListMin ?? '', 10) || 1);
-                    variants.forEach((variant) => {
-                        const remove = document.createElement('button');
-                        remove.type = 'button';
-                        remove.className = 'le-chip-btn';
-                        remove.textContent = `Remove ${variant.dataset.editItemLabel || variant.dataset.editItem}`;
-                        remove.disabled = variants.length <= minimum;
-                        remove.addEventListener('click', async () => {
-                            try {
-                                const ids = variants.filter((row) => row !== variant).map((row) => row.dataset.editItem);
-                                await saveSetting(variantList.dataset.editList, JSON.stringify(ids));
-                                if (variantList.dataset.editListPair) await saveSetting(variantList.dataset.editListPair, JSON.stringify(ids));
-                                await renderPage(targetPage);
-                                notify('Option removed.');
-                            } catch (error) { notify(error.message); }
-                        });
-                        fragment.append(remove);
-                    });
-                });
-
-                if (initialFacts) {
-                    // A copy starts with the card's facts, as the former full-page
-                    // flow did, but writes those facts straight to the new page's
-                    // own component keys before presenting the form.
-                    for (const field of controls) {
-                        if (field.factValue && field.factValue !== field.value) {
-                            await saveSetting(field.key, field.factValue);
-                            field.value = field.factValue;
-                        }
-                    }
-                }
-                modal.body.replaceChildren(fragment);
-                const save = document.createElement('button');
-                save.type = 'button';
-                save.className = 'le-btn';
-                save.textContent = 'Save all details';
-                save.addEventListener('click', async () => {
-                    const changed = controls.filter((field) => field.control.value !== field.value);
-                    const styleChanges = styles.map((style) => ({
-                        ...style,
-                        props: Object.fromEntries(style.controls.map(({ prop, input, useDefault }) => [prop, useDefault?.checked ? '' : input.value])),
-                    })).filter((style) => JSON.stringify(style.props) !== JSON.stringify(Object.fromEntries(style.allowed.map((prop) => [prop, style.value[prop] ?? '']))));
-                    if (!changed.length && !styleChanges.length) return notify('No changes to save.');
-                    save.disabled = true;
-                    save.textContent = 'Saving…';
-                    try {
-                        for (const field of changed) await saveSetting(field.key, field.control.value);
-                        for (const style of styleChanges) {
-                            await request('/live-edit/style', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ key: style.key, props: style.props }) });
-                            window.liveEditStyles ??= {};
-                            window.liveEditStyles[style.key] = style.props;
-                        }
-                        notify('All details saved ✓');
-                        save.textContent = 'Saved';
-                    } catch (error) {
-                        notify(error.message);
-                        save.textContent = 'Save all details';
-                    } finally { save.disabled = false; }
-                });
-                modal.foot.hidden = false;
-                modal.foot.replaceChildren(save);
-            };
-
+            let target = page;
             try {
-                let target = page;
-                let initialFacts = null;
-                if (shared && isCopy && like?.sections?.length && editableLink) {
-                    modal.body.textContent = 'Making a page for this copy…';
-                    const id = await makePageLike({ config: builder, save: saveSetting, sections: like.sections, title: cardName || 'New page' });
-                    await saveSetting(editableLink.dataset.editHref, hrefTo(editableLink.getAttribute('href'), id));
-                    target = { ...page, id, title: cardName || page.title };
-                    initialFacts = cardFacts(item);
+                if (separate) {
+                    modal.allowDismiss(false);
+                    wait.textContent = `Giving this card its own page, a copy of ${page.title}…`;
+                    target = await giveItsOwnPage({ page, link, item, builder, progress: (said) => { wait.textContent = said; } });
+                    changed = true;
+                    modal.allowDismiss(true);
+                    wait.textContent = 'Opening its page…';
                 }
-                await renderPage(target, initialFacts);
             } catch (error) {
+                modal.allowDismiss(true);
                 modal.close();
                 notify(error.message);
+
+                return;
             }
+
+            const frame = document.createElement('iframe');
+            frame.className = 'le-detail-frame';
+            frame.title = `${target.title} page`;
+            frame.src = detailAddress(builder.editorBase, target.id);
+            frame.addEventListener('load', () => wait.remove(), { once: true });
+            modal.body.append(frame);
+
+            const note = document.createElement('span');
+            note.className = 'le-modal-note';
+            note.textContent = separate
+                ? `Its own page now: changes here never reach ${page.title}.`
+                : 'Publish from the bar when you are ready.';
+            const whole = document.createElement('button');
+            whole.type = 'button';
+            whole.className = 'le-chip-btn';
+            whole.textContent = 'Open the whole page →';
+            whole.addEventListener('click', () => { window.location.href = `${builder.editorBase}${target.id}`; });
+            const done = document.createElement('button');
+            done.type = 'button';
+            done.className = 'le-btn';
+            done.textContent = 'Done';
+            done.addEventListener('click', () => modal.close());
+            modal.foot.replaceChildren(note, whole, done);
+            modal.foot.hidden = false;
+        };
+
+        /**
+         * Delete a card that opens a page only it opens: the page can go with
+         * it, or stay. Asked in a window rather than a yes/no, because "delete
+         * this item?" says nothing about the page, and the page is the part
+         * still published and still in the sitemap if it is left behind.
+         */
+        const deleteCardAndMaybeItsPage = async ({ item, page, builder, deleteCard }) => {
+            const cardName = cardNameOf(item) || 'this item';
+            const kind = deletablePage(page, builder);
+            const modal = ui.modal({ title: `Delete “${cardName}”?`, size: 'is-medium' });
+            const said = document.createElement('p');
+            said.textContent = `This card opens its own page, “${page.title}”.`;
+            const warning = document.createElement('p');
+            warning.className = 'le-hint';
+            modal.body.replaceChildren(said, warning);
+
+            if (kind) {
+                said.textContent += ' Delete that page as well, or keep it?';
+                warning.textContent = 'Checking what else links to it…';
+                try {
+                    const { settings } = await readSavedContent();
+                    warning.textContent = linksWarning(linksTo(page, {
+                        doc: document,
+                        settings: settings ?? {},
+                        pages: builder.pages,
+                        base: window.location.href,
+                        except: [item],
+                        builder,
+                    })) || 'Nothing else on your site links to it.';
+                } catch {
+                    warning.textContent = 'Other links to it, if there are any, will lead nowhere once it is deleted.';
+                }
+            } else {
+                said.textContent += ' It came with the design, and those pages cannot be deleted here yet, so it stays on your website.';
+                warning.remove();
+            }
+
+            const button = (text, className, onClick) => {
+                const node = document.createElement('button');
+                node.type = 'button';
+                node.className = className;
+                node.textContent = text;
+                node.addEventListener('click', onClick);
+
+                return node;
+            };
+            const busy = (on) => modal.foot.querySelectorAll('button').forEach((node) => { node.disabled = on; });
+            const cancel = button('Cancel', 'le-chip-btn', () => modal.close());
+            const cardOnly = button(kind ? 'Delete the card, keep its page' : 'Delete the card', kind ? 'le-chip-btn' : 'le-btn-danger', async () => {
+                busy(true);
+                modal.close();
+                await deleteCard('Deleted ✓');
+            });
+            const both = kind ? button('Delete the card and its page', 'le-btn-danger', async () => {
+                busy(true);
+                try {
+                    await deletePage({ page, builder, save: saveSetting });
+                } catch (error) {
+                    busy(false);
+                    notify(error.message);
+
+                    return;
+                }
+                modal.close();
+                await deleteCard(`Deleted the card and “${page.title}” ✓`);
+            }) : null;
+            modal.foot.replaceChildren(...[cancel, cardOnly, both].filter(Boolean));
+            modal.foot.hidden = false;
         };
 
         /**
@@ -3764,6 +3782,9 @@ const bootLiveEdit = () => {
             };
 
             const sections = list.dataset.editListKind === 'sections';
+            // A card's page opened from its card is the record, not the page's arrangement: its
+            // sections are moved, copied and hidden on the whole page, where the rest can be seen.
+            if (sections && detailMode) return;
             const heading = document.createElement('div');
             heading.className = 'le-section-heading';
             // A chosen section is already named on the line above ("Section 1 of 17 · Our story"), so its
@@ -3783,6 +3804,21 @@ const bootLiveEdit = () => {
             const least = Math.max(1, parseInt(list.dataset.editListMin ?? '', 10) || 1);
             const full = Number.isFinite(most) && most > 0 && count >= most;
             const lowest = count <= least;
+
+            /*
+             * The page this card opens, when it opens one of the site's pages: a
+             * product card, a journal card, a project card. `shared` when another
+             * card in the list opens the same page, which is what a copied card
+             * does until it has a page of its own. Not offered inside a card's
+             * page that is itself being edited from a card (detail mode): one
+             * window over the list is enough.
+             */
+            const builder = window.liveEditPages;
+            const opens = !sections && item && builder?.pages?.length && !detailMode
+                ? [...item.querySelectorAll('a[href]')].map((a) => [a, pageOfLink(a, builder.pages, window.location.href)]).find(([, page]) => page)
+                : null;
+            const shared = Boolean(opens) && [...list.children].some((other) => other !== item && other.dataset.editItem
+                && [...other.querySelectorAll('a[href]')].some((a) => pageOfLink(a, builder.pages, window.location.href)?.id === opens[1].id));
 
             // With an item chosen, "Duplicate" below does exactly this (a copy right after it),
             // so offering both asked a novice to choose between two names for one thing.
@@ -3807,7 +3843,6 @@ const bootLiveEdit = () => {
              * arrangement, then where it goes, in this list's order. The host
              * draws it from the page it was taken from with keys of its own.
              */
-            const builder = window.liveEditPages;
             if (sections && builder?.library?.length) {
                 const addSection = document.createElement('button');
                 addSection.type = 'button';
@@ -3900,9 +3935,17 @@ const bootLiveEdit = () => {
                     remove.className = 'le-btn-danger';
                     remove.textContent = 'Delete this item';
                     remove.disabled = lowest;
+                    const deleteCard = (message) => saveOrder(currentOrder().filter((id) => id !== item.dataset.editItem), message);
                     remove.addEventListener('click', () => {
+                        // A card that opens a page of its own offers that page too; a page other
+                        // cards still open is theirs as well, so it is never offered.
+                        if (opens && !shared) {
+                            void deleteCardAndMaybeItsPage({ item, page: opens[1], builder, deleteCard });
+
+                            return;
+                        }
                         if (!window.confirm('Delete this item?')) return;
-                        saveOrder(currentOrder().filter((id) => id !== item.dataset.editItem), 'Deleted \u2713');
+                        deleteCard('Deleted \u2713');
                     });
                     row.append(remove);
                 }
@@ -3924,75 +3967,51 @@ const bootLiveEdit = () => {
                     : 'Keep at least one, so there is something to add another from.';
                 block.append(why);
             }
-            /*
-             * The card's own page. A product card, a journal card or a project
-             * card opens a detail page of the design's; the panel offers that
-             * page from the card, so the details are one press away. A card
-             * copied from another still opens the original's page, so it is
-             * offered a page of its own: one made like its siblings', under the
-             * card's name, which the card then opens.
-             */
             // The card's category when its words do not show it (choice.js): chosen from the filter's own options.
             const choicePicker = !sections && item ? renderChoice({ item, list, save: saveSetting, notify }) : null;
             if (choicePicker) block.append(choicePicker);
-            const opens = !sections && item && builder?.pages?.length
-                ? [...item.querySelectorAll('a[href]')].map((a) => [a, pageOfLink(a, builder.pages, window.location.href)]).find(([, page]) => page)
-                : null;
+            /*
+             * The card's own page. A product card, a journal card or a project
+             * card opens a detail page; the panel opens that page over the list,
+             * as itself, to be edited in place (editLinkedPage). A card copied
+             * from another still opens the original's page, so before anything
+             * on it is edited it is given a page of its own: a full copy of the
+             * one it shared, which only it opens.
+             */
             if (opens) {
                 const [link, page] = opens;
-                const shared = [...list.children].some((other) => other !== item && other.dataset.editItem
-                    && [...other.querySelectorAll('a[href]')].some((a) => pageOfLink(a, builder.pages, window.location.href)?.id === page.id));
+                const editableLink = link.dataset.editHref !== undefined ? link : item.querySelector('a[data-edit-href]');
+                const cardName = cardNameOf(item);
+                // The copy, not the card it was copied from: an id the editor minted, or a name that is not the page's.
+                const isCopy = /^n[0-9a-z]+$/.test(item.dataset.editItem) || (cardName && cardName.toLowerCase() !== String(page.title).toLowerCase());
+                const separate = Boolean(shared && isCopy && editableLink && builder.pagesKey);
                 const own = document.createElement('div');
                 own.className = 'le-row';
                 const editDetails = document.createElement('button');
                 editDetails.type = 'button';
                 editDetails.className = 'le-btn';
-                editDetails.textContent = 'Edit all details';
-                editDetails.title = 'Edit the linked page’s fields, styles and options here';
-                editDetails.addEventListener('click', () => editLinkedPage({ page, link, item, list, builder, shared }));
+                editDetails.textContent = separate ? 'Give it its own page' : 'Edit all details';
+                editDetails.title = separate
+                    ? `A copy of ${page.title} that only this card opens, edited here`
+                    : `Opens ${page.title} here, to edit by clicking it`;
+                editDetails.addEventListener('click', () => editLinkedPage({ page, link, item, builder, separate }));
                 own.append(editDetails);
-                const visit = document.createElement('button');
-                visit.type = 'button';
-                visit.className = 'le-chip-btn';
-                visit.textContent = shared ? `Open “${page.title}”` : 'Edit its page →';
-                visit.title = `Opens ${page.title} in the editor`;
-                visit.addEventListener('click', () => { window.location.href = `${builder.editorBase}${page.id}`; });
-                own.append(visit);
-                const like = (builder.starts ?? []).find((start) => start.id === page.id);
-                const editableLink = link.dataset.editHref !== undefined ? link : item.querySelector('a[data-edit-href]');
-                const cardName = (item.dataset.editItemLabel || item.querySelector('h1, h2, h3, h4')?.textContent || '').replace(/\s+/g, ' ').trim();
-                // The copy, not the card it was copied from: an id the editor minted, or a name that is not the page's.
-                const isCopy = /^n[0-9a-z]+$/.test(item.dataset.editItem) || (cardName && cardName.toLowerCase() !== String(page.title).toLowerCase());
-                if (shared && isCopy && like?.sections?.length && editableLink) {
-                    const make = document.createElement('button');
-                    make.type = 'button';
-                    make.className = 'le-btn';
-                    make.textContent = 'Give it its own page';
-                    make.title = `A new page made like ${page.title}, which this card opens`;
-                    make.addEventListener('click', async () => {
-                        const name = cardName || 'New page';
-                        make.disabled = true;
-                        make.textContent = 'Making its page…';
-                        try {
-                            const id = await makePageLike({ config: builder, save: saveSetting, sections: like.sections, title: name });
-                            await saveSetting(editableLink.dataset.editHref, hrefTo(editableLink.getAttribute('href'), id));
-                            // What the card says goes onto its page when the page first opens
-                            // (its keys only exist once the host has drawn it).
-                            try { sessionStorage.setItem(`live-edit:fill:${id}`, JSON.stringify(cardFacts(item))); } catch { /* the page opens as made */ }
-                            window.location.href = `${builder.editorBase}${id}`;
-                        } catch (error) {
-                            notify(error.message);
-                            make.disabled = false;
-                            make.textContent = 'Give it its own page';
-                        }
-                    });
-                    own.append(make);
+                if (!shared) {
+                    const visit = document.createElement('button');
+                    visit.type = 'button';
+                    visit.className = 'le-chip-btn';
+                    visit.textContent = 'Open the whole page →';
+                    visit.title = `Opens ${page.title} in the editor`;
+                    visit.addEventListener('click', () => { window.location.href = `${builder.editorBase}${page.id}`; });
+                    own.append(visit);
                 }
                 const said = document.createElement('p');
                 said.className = 'le-hint';
-                said.textContent = shared
-                    ? `This card currently shares ${page.title}. Choose Edit all details to give it a separate page and edit its details here.`
-                    : `This card opens ${page.title}. Its details, photos and price are edited there.`;
+                said.textContent = separate
+                    ? `This copy still opens ${page.title}. Give it its own page first: a copy of that page, with everything on it, that you can change without changing ${page.title}.`
+                    : shared
+                        ? `Another card opens ${page.title} too, so a change to it shows on both.`
+                        : `This card opens ${page.title}. Edit all details shows that page here: click anything on it to change it.`;
                 block.append(own, said);
             }
             const context = item ? drawerFields.querySelector('.le-item-context') : null;
@@ -4054,7 +4073,8 @@ const bootLiveEdit = () => {
             visit.addEventListener('click', () => {
                 // A host that keeps the visitor's address in the href and its own beside it
                 // (data-editor-href) means the page in the editor, not the live one.
-                window.location.href = anchor.dataset.editorHref || anchor.href;
+                // From a card's page in its window, the whole editor goes, not just the window.
+                (detailMode ? window.top : window).location.href = anchor.dataset.editorHref || anchor.href;
             });
             row.append(visit);
             drawerFields.append(row);
@@ -6561,8 +6581,13 @@ const bootLiveEdit = () => {
 
         const params = new URLSearchParams(window.location.search);
         const directPanelOpen = params.has('brand') || params.has('pages');
-        // Arriving to set the brand (a host's "Open Brand" link): straight to that tab.
-        if (params.has('brand') && window.liveEditBrand?.tokens?.length) {
+        if (detailMode) {
+            // A card's page in the window over its list: the detail and nothing else, ready to click.
+            showOnlyTheDetail(document);
+            ui.toolbar.style.display = 'none';
+            setEditing(true);
+        } else if (params.has('brand') && window.liveEditBrand?.tokens?.length) {
+            // Arriving to set the brand (a host's "Open Brand" link): straight to that tab.
             params.delete('brand');
             const query = params.toString();
             window.history.replaceState(null, '', window.location.pathname + (query ? `?${query}` : ''));
@@ -6583,42 +6608,7 @@ const bootLiveEdit = () => {
         } else {
             setEditing(sessionStorage.getItem('tb_editing') === '1');
         }
-        if (!directPanelOpen && document.body.classList.contains('editing')) startWalkthrough();
-
-        /*
-         * A page just made for a card ("Give it its own page") opens with what
-         * the card says, rather than describing the product it was made like:
-         * the card's name in its heading, its photo, its price and its short
-         * description, saved as ordinary edits the owner can change or undo.
-         */
-        const fillKey = window.liveEditPages?.page !== undefined ? `live-edit:fill:${window.liveEditPages.page}` : null;
-        let waiting = null;
-        try { waiting = fillKey && sessionStorage.getItem(fillKey); if (waiting) sessionStorage.removeItem(fillKey); } catch { waiting = null; }
-        if (waiting) {
-            void (async () => {
-                try {
-                    const facts = JSON.parse(waiting);
-                    const into = factTargets(document.querySelector('main') ?? document.body);
-                    let filled = 0;
-                    for (const what of ['name', 'price', 'notes']) {
-                        const el = into[what];
-                        if (!el || !facts[what] || el.textContent.trim() === facts[what]) continue;
-                        await saveSetting(parseEditKey(el.dataset.edit).key, facts[what]);
-                        filled += 1;
-                    }
-                    if (into.photo && /^https?:/.test(facts.photo ?? '') && into.photo.getAttribute('src') !== facts.photo) {
-                        const body = new FormData();
-                        body.append('target', into.photo.dataset.editImg);
-                        body.append('url', facts.photo);
-                        await request('/live-edit/image', { method: 'POST', body });
-                        filled += 1;
-                    }
-                    if (filled) reloadWithToast('Its page starts with the card’s name, photo and price. Change anything here.');
-                } catch (error) {
-                    notify(error?.message || 'The card’s details could not be copied onto its page.');
-                }
-            })();
-        }
+        if (!detailMode && !directPanelOpen && document.body.classList.contains('editing')) startWalkthrough();
     }
 
 };

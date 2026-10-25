@@ -268,6 +268,13 @@ a.le-mark:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
 /* New page: a window of two steps. First the kinds of page the design has, as
    small pictures of the real pages; then a title, with the address following it. */
 .le-modal.is-wide { max-width: 980px; height: min(760px, 90vh); max-height: min(760px, 90vh); }
+/* A card's detail page, shown as itself: as wide and tall as the screen allows, the page edge to edge. */
+.le-modal.is-full { max-width: min(1320px, 100%); height: calc(100vh - 40px); max-height: calc(100vh - 40px); }
+.le-modal.is-full .le-modal-body { padding: 0; overflow: hidden; display: flex; flex-direction: column; }
+.le-detail-frame { flex: 1; width: 100%; min-height: 0; border: 0; border-top: 1px solid var(--le-line); background: #fff; }
+.le-detail-wait { padding: 22px 24px; }
+/* The guide points at the page behind; while a card's page is open over it, it waits. */
+:host(.le-detail-open) .le-walkthrough, :host(.le-detail-open) .le-walkthrough-pill { display: none; }
 .le-starts-top { display: flex; align-items: center; gap: 14px; margin-bottom: 16px; }
 .le-starts-top .le-starts-search { flex: 1; min-width: 0; }
 .le-starts { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 14px; }
@@ -1412,7 +1419,7 @@ export function createChrome() {
      * running, a publish in progress. Closing those halfway is how somebody
      * ends up paying for something they never received.
      */
-    const modal = ({ title, subtitle, size = '', dismissable = true } = {}) => {
+    const modal = ({ title, subtitle, size = '', dismissable = true, onClose = null } = {}) => {
         const scrim = el('div', 'le-scrim');
         const card = el('div', `le-modal ${size}`.trim());
         card.setAttribute('role', 'dialog');
@@ -1454,6 +1461,9 @@ export function createChrome() {
             scrim.remove();
             previous?.focus?.();
             state.dismissable = true;
+            // Whatever opened this may have something to put right once it is gone (a page
+            // edited inside it is shown again with what was saved there).
+            onClose?.();
         };
 
         const onKey = (event) => {

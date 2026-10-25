@@ -864,25 +864,11 @@ export function hrefTo(oldHref, newId) {
 }
 
 /**
- * Makes a page like another (its sections, in order) for a card, under the
- * card's own name, out of the menu: the same two settings a page made from
- * New page writes. Returns the new page's id.
- */
-export async function makePageLike({ config, save, sections, title }) {
-    const id = freeAddress(title, config.taken ?? []);
-    const added = {};
-    for (const from of sections) added[newAddedId()] = from;
-    await save(`structure:page:${id}`, JSON.stringify({ added }));
-    await save(config.pagesKey, JSON.stringify([...(config.made ?? []), { id, title: String(title).trim(), menu: false }]));
-
-    return id;
-}
-
-/**
  * What a card says about the thing it stands for: its name, its photo, its
  * price and its short description, read from the card as the owner sees it.
- * A page made for the card starts with these, so the owner corrects a page
- * that is already theirs rather than one still describing another product.
+ * A copied card's own page (card-page.js) is given these where the card says
+ * something its original's page does not, so the owner corrects a page that is
+ * already theirs rather than one still describing another product.
  */
 export function cardFacts(card) {
     const words = (el) => (el?.textContent ?? '').replace(/\s+/g, ' ').trim();
