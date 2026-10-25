@@ -4646,7 +4646,13 @@ const bootLiveEdit = () => {
             if (current?.element !== element) return;
             drawerFields.replaceChildren();
 
-            const restore = () => { element.outerHTML = was; };
+            // Put back the drawing that is on the page now, not `element`: choosing one replaces the node, so
+            // the original is detached, and setting outerHTML on a detached node throws. That throw, from the
+            // drawer closing after a save, sent every saved drawing down the reload fallback.
+            const restore = () => {
+                const live = document.querySelector(`[data-edit-svg="${element.dataset.editSvg}"]`);
+                if (live?.isConnected) live.outerHTML = was;
+            };
             current.restore = restore;
 
             // One of each distinct drawing on the page, the current one first.
@@ -5706,6 +5712,12 @@ const bootLiveEdit = () => {
                     window.setTimeout(() => {
                         if (wasOpen && dropdown.getAttribute('aria-expanded') === 'false') passThroughClick(dropdown);
                     }, 0);
+                    // A drawing or picture inside the trigger (a menu's icon) is its own thing to edit: the press
+                    // landed on it, so it opens, rather than the label beside it, which left icons unreachable.
+                    if (target && ['image', 'icon', 'svg'].includes(target.kind) && target.element !== dropdown && dropdown.contains(target.element)) {
+                        window.setTimeout(() => { openedFromATrigger = dropdown; openTarget(target); }, 0);
+                        return;
+                    }
                     const isLink = dropdown.matches('a[data-edit], a[data-edit-href]');
                     const words = isLink
                         ? (dropdown.matches('[data-edit^="setting:"]') ? dropdown : dropdown.querySelector('[data-edit^="setting:"]'))
@@ -6197,34 +6209,8 @@ const bootLiveEdit = () => {
                 sheet.foot.append(keep, go);
                 go.focus();
 
-                // The list is what makes this worth stopping for, but it is
-                // not what makes it safe: a service that cannot answer must
-                // not block somebody from publishing work they already know
-                // about.
-                try {
-                    const response = await request('/live-edit/changes', { method: 'GET' });
-                    const payload = await response.json();
-                    const changes = payload?.changes ?? [];
-
-                    const list = el('div', 'le-review');
-
-                    changes.forEach((change) => {
-                        const row = el('div', 'le-review-row');
-                        row.append(
-                            // The same words the Changes tab uses, so the list
-                            // somebody checked before pressing Publish and the
-                            // list they publish are recognisably the same one.
-                            el('div', 'le-review-what', labelForChange(change)),
-                            el('div', 'le-review-to', readsOnThePageAs(change) || '(empty)'),
-                        );
-                        list.append(row);
-                    });
-
-                    sheet.body.replaceChildren(changes.length > 0 ? list : note('Nothing is waiting.'));
-                } catch (error) {
-                    sheet.body.replaceChildren(note(plainly(error, 'list what is waiting')));
-                }
-
+                // Listening before the list loads, not after it: the button is on screen and focused from
+                // the first frame, and a press while the list was still loading used to do nothing at all.
                 go.addEventListener('click', async () => {
                     go.disabled = true;
                     keep.disabled = true;
@@ -6258,6 +6244,35 @@ const bootLiveEdit = () => {
                         sheet.body.replaceChildren(note(plainly(error, 'publish that')));
                     }
                 });
+
+                // The list is what makes this worth stopping for, but it is
+                // not what makes it safe: a service that cannot answer must
+                // not block somebody from publishing work they already know
+                // about.
+                try {
+                    const response = await request('/live-edit/changes', { method: 'GET' });
+                    const payload = await response.json();
+                    const changes = payload?.changes ?? [];
+
+                    const list = el('div', 'le-review');
+
+                    changes.forEach((change) => {
+                        const row = el('div', 'le-review-row');
+                        row.append(
+                            // The same words the Changes tab uses, so the list
+                            // somebody checked before pressing Publish and the
+                            // list they publish are recognisably the same one.
+                            el('div', 'le-review-what', labelForChange(change)),
+                            el('div', 'le-review-to', readsOnThePageAs(change) || '(empty)'),
+                        );
+                        list.append(row);
+                    });
+
+                    sheet.body.replaceChildren(changes.length > 0 ? list : note('Nothing is waiting.'));
+                } catch (error) {
+                    sheet.body.replaceChildren(note(plainly(error, 'list what is waiting')));
+                }
+
             };
 
             ui.publishButton.addEventListener('click', () => {
