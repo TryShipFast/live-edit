@@ -7,6 +7,7 @@ import { addedWith, cardFacts, describeStructure, factTargets, hrefTo, makePageL
 import { renderChoice } from './choice.js';
 import { commonQuestions, listGuides, profileFor } from './help.js';
 import { dropdownTriggerFrom } from './dropdown-trigger.js';
+import { elementsInComponents, linkedDetailComponents } from './linked-detail-scope.js';
 import { biggestThatFits, howMuchSurvives, inSourcePixels, movedWithin, whatIsThereNow } from './fitting.js';
 import { attrsWorthSending, creditWorthSending } from './only-what-changed.js';
 import { confirm as confirmChange, expectChange, takeExpected } from './verify.js';
@@ -3489,6 +3490,243 @@ const bootLiveEdit = () => {
         };
 
         /**
+         * Edit the linked record from its card. The linked detail page is the
+         * source of truth, so the modal reads that page's editing keys rather
+         * than guessing fields from the listing card's wording.
+         */
+        const editLinkedPage = async ({ page, link, item, list, builder, shared }) => {
+            const cardName = (item.dataset.editItemLabel || item.querySelector('h1, h2, h3, h4')?.textContent || page.title || '')
+                .replace(/\s+/g, ' ').trim();
+            const editableLink = link.dataset.editHref !== undefined ? link : item.querySelector('a[data-edit-href]');
+            const like = (builder.starts ?? []).find((start) => start.id === page.id);
+            const isCopy = /^n[0-9a-z]+$/.test(item.dataset.editItem)
+                || (cardName && cardName.toLowerCase() !== String(page.title).toLowerCase());
+            const modal = ui.modal({
+                title: cardName ? `Edit ${cardName}` : `Edit ${page.title}`,
+                subtitle: 'Update the details on this card’s page here, in one pass.',
+                size: 'is-wide',
+            });
+            const renderPage = async (targetPage, initialFacts = null) => {
+                modal.body.replaceChildren();
+                const loading = document.createElement('p');
+                loading.className = 'le-hint';
+                loading.textContent = 'Loading page details…';
+                modal.body.append(loading);
+                const response = await fetch(`${builder.editorBase}${targetPage.id}`, {
+                    credentials: 'same-origin',
+                    headers: { Accept: 'text/html' },
+                });
+                if (!response.ok) throw new Error(`Could not load this page’s details (${response.status}).`);
+                const html = await response.text();
+                const parsedPage = new DOMParser().parseFromString(html, 'text/html');
+                const pageRoot = parsedPage.querySelector('main') ?? parsedPage.body;
+                // A product/article page can contain related cards, sticky-buy
+                // controls, reviews and other components alongside its detail.
+                // Keep this form on the linked record's components, not every
+                // editable thing that happens to share its URL.
+                const roots = linkedDetailComponents(pageRoot);
+                const root = { querySelectorAll: (selector) => elementsInComponents(roots, selector) };
+                const fields = [];
+                const seen = new Set();
+                root.querySelectorAll('[data-edit], [data-edit-img], [data-edit-href]').forEach((node) => {
+                    if (node.closest('header, nav, footer, [data-component*="header"], [data-component*="navigation"]')) return;
+                    const attribute = node.hasAttribute('data-edit-img') ? 'data-edit-img'
+                        : node.hasAttribute('data-edit-href') ? 'data-edit-href' : 'data-edit';
+                    const parsed = parseEditKey(node.getAttribute(attribute));
+                    if (parsed.kind !== 'setting' || !parsed.key || seen.has(`${attribute}:${parsed.key}`)) return;
+                    seen.add(`${attribute}:${parsed.key}`);
+                    const field = node.dataset.field ?? node.dataset.label ?? node.getAttribute('aria-label') ?? '';
+                    const label = (field || node.tagName.toLowerCase().replace(/^h[1-6]$/, 'Heading'))
+                        .replace(/[-_]+/g, ' ').replace(/\s+/g, ' ').trim()
+                        .replace(/\b\w/g, (letter) => letter.toUpperCase());
+                    const value = attribute === 'data-edit-href' ? node.getAttribute('href') ?? ''
+                        : attribute === 'data-edit-img' ? (node.getAttribute('src') ?? node.dataset.editValue ?? '')
+                            : (node.dataset.editValue ?? node.textContent.trim());
+                    fields.push({ key: parsed.key, label, value, attribute, fieldName: node.dataset.field ?? '', rich: node.dataset.edit === 'words', rows: /description|content|body|story|notes|excerpt/i.test(label) ? 4 : 2 });
+                });
+
+                const styles = [];
+                root.querySelectorAll('[data-style]').forEach((node) => {
+                    const key = node.dataset.style;
+                    if (!key || styles.some((style) => style.key === key)) return;
+                    const declared = declaredStyleProps(node.dataset.styleProps, window.liveEditStyleProps ?? {});
+                    const allowed = stylePropsFor(node, declared).filter((prop) => ['background', 'textColor', 'fontSize', 'fontWeight', 'radius'].includes(prop));
+                    if (!allowed.length) return;
+                    styles.push({ key, label: node.dataset.label ?? node.dataset.component ?? 'Section style', allowed, value: (window.liveEditStyles ?? {})[key] ?? {} });
+                });
+
+                const variantLists = [...root.querySelectorAll('[data-edit-list]')]
+                    .filter((candidate) => /variant|option|size|colour|color/i.test(candidate.dataset.editListLabel ?? candidate.getAttribute('aria-label') ?? '')
+                        || candidate.dataset.editListKind === 'variants');
+                const fragment = document.createDocumentFragment();
+                if (!fields.length && !styles.length && !variantLists.length) {
+                    const empty = document.createElement('p');
+                    empty.className = 'le-hint';
+                    empty.textContent = 'This detail page has no editable fields yet.';
+                    fragment.append(empty);
+                }
+
+                const controls = fields.map((field, index) => {
+                    const wrap = fieldInput(`detail-${index}`, field.label, field.value, field.rows, field.rich);
+                    let control = wrap.querySelector('textarea, input, select');
+                    if (field.attribute === 'data-edit-href' || field.attribute === 'data-edit-img') {
+                        const urlInput = document.createElement('input');
+                        urlInput.type = 'url';
+                        urlInput.className = 'le-input';
+                        urlInput.placeholder = 'https://…';
+                        urlInput.value = field.value;
+                        control.replaceWith(urlInput);
+                        control = urlInput;
+                    }
+                    fragment.append(wrap);
+                    const fact = initialFacts && (field.attribute === 'data-edit-img' ? 'photo'
+                        : field.fieldName === 'price' ? 'price'
+                            : /^(title|name|heading)$/i.test(field.fieldName) ? 'name'
+                                : /^(notes|lead|excerpt|description|summary)$/i.test(field.fieldName) ? 'notes' : null);
+                    const factValue = fact ? initialFacts[fact] : null;
+                    if (factValue) control.value = factValue;
+                    return { ...field, control, factValue };
+                });
+                styles.forEach((style) => {
+                    const heading = document.createElement('div');
+                    heading.className = 'le-section-heading';
+                    heading.textContent = `${style.label} style`;
+                    fragment.append(heading);
+                    style.controls = [];
+                    style.allowed.forEach((prop) => {
+                        const label = ({ background: 'Background colour', textColor: 'Text colour', fontSize: 'Text size', fontWeight: 'Font weight', radius: 'Corner roundness' })[prop] ?? prop;
+                        const wrap = document.createElement('label');
+                        wrap.className = 'le-field';
+                        wrap.append(label);
+                        const input = document.createElement('input');
+                        input.className = 'le-input';
+                        input.type = ['background', 'textColor'].includes(prop) ? 'color' : 'text';
+                        input.value = style.value[prop] ?? '';
+                        if (input.type === 'color' && !/^#[0-9a-f]{6}$/i.test(input.value)) input.value = '#ffffff';
+                        input.dataset.detailStyleProp = prop;
+                        wrap.append(input);
+                        let useDefault = null;
+                        if (input.type === 'color') {
+                            const defaultLabel = document.createElement('span');
+                            defaultLabel.className = 'le-muted';
+                            defaultLabel.textContent = 'Use design default';
+                            useDefault = document.createElement('input');
+                            useDefault.type = 'checkbox';
+                            useDefault.checked = !style.value[prop];
+                            useDefault.addEventListener('change', () => { input.disabled = useDefault.checked; });
+                            input.disabled = useDefault.checked;
+                            wrap.append(useDefault, defaultLabel);
+                            input.addEventListener('input', () => { useDefault.checked = false; input.disabled = false; });
+                        }
+                        fragment.append(wrap);
+                        style.controls.push({ prop, input, useDefault });
+                    });
+                });
+
+                variantLists.forEach((variantList) => {
+                    const heading = document.createElement('div');
+                    heading.className = 'le-section-heading';
+                    const variants = [...variantList.children].filter((child) => child.dataset.editItem);
+                    heading.textContent = `${variantList.dataset.editListLabel || 'Options'} (${variants.length})`;
+                    fragment.append(heading);
+                    const add = document.createElement('button');
+                    add.type = 'button';
+                    add.className = 'le-chip-btn';
+                    add.textContent = '+ Add option';
+                    const maximum = Number.parseInt(variantList.dataset.editListMax ?? '', 10);
+                    add.disabled = Number.isFinite(maximum) && maximum > 0 && variants.length >= maximum;
+                    add.addEventListener('click', async () => {
+                        const ids = variants.map((variant) => variant.dataset.editItem);
+                        ids.push(`n${Date.now().toString(36)}`);
+                        try {
+                            await saveSetting(variantList.dataset.editList, JSON.stringify(ids));
+                            if (variantList.dataset.editListPair) await saveSetting(variantList.dataset.editListPair, JSON.stringify(ids));
+                            await renderPage(targetPage);
+                            notify('Option added. Fill in its details below.');
+                        } catch (error) { notify(error.message); }
+                    });
+                    fragment.append(add);
+                    const minimum = Math.max(1, Number.parseInt(variantList.dataset.editListMin ?? '', 10) || 1);
+                    variants.forEach((variant) => {
+                        const remove = document.createElement('button');
+                        remove.type = 'button';
+                        remove.className = 'le-chip-btn';
+                        remove.textContent = `Remove ${variant.dataset.editItemLabel || variant.dataset.editItem}`;
+                        remove.disabled = variants.length <= minimum;
+                        remove.addEventListener('click', async () => {
+                            try {
+                                const ids = variants.filter((row) => row !== variant).map((row) => row.dataset.editItem);
+                                await saveSetting(variantList.dataset.editList, JSON.stringify(ids));
+                                if (variantList.dataset.editListPair) await saveSetting(variantList.dataset.editListPair, JSON.stringify(ids));
+                                await renderPage(targetPage);
+                                notify('Option removed.');
+                            } catch (error) { notify(error.message); }
+                        });
+                        fragment.append(remove);
+                    });
+                });
+
+                if (initialFacts) {
+                    // A copy starts with the card's facts, as the former full-page
+                    // flow did, but writes those facts straight to the new page's
+                    // own component keys before presenting the form.
+                    for (const field of controls) {
+                        if (field.factValue && field.factValue !== field.value) {
+                            await saveSetting(field.key, field.factValue);
+                            field.value = field.factValue;
+                        }
+                    }
+                }
+                modal.body.replaceChildren(fragment);
+                const save = document.createElement('button');
+                save.type = 'button';
+                save.className = 'le-btn';
+                save.textContent = 'Save all details';
+                save.addEventListener('click', async () => {
+                    const changed = controls.filter((field) => field.control.value !== field.value);
+                    const styleChanges = styles.map((style) => ({
+                        ...style,
+                        props: Object.fromEntries(style.controls.map(({ prop, input, useDefault }) => [prop, useDefault?.checked ? '' : input.value])),
+                    })).filter((style) => JSON.stringify(style.props) !== JSON.stringify(Object.fromEntries(style.allowed.map((prop) => [prop, style.value[prop] ?? '']))));
+                    if (!changed.length && !styleChanges.length) return notify('No changes to save.');
+                    save.disabled = true;
+                    save.textContent = 'Saving…';
+                    try {
+                        for (const field of changed) await saveSetting(field.key, field.control.value);
+                        for (const style of styleChanges) {
+                            await request('/live-edit/style', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ key: style.key, props: style.props }) });
+                            window.liveEditStyles ??= {};
+                            window.liveEditStyles[style.key] = style.props;
+                        }
+                        notify('All details saved ✓');
+                        save.textContent = 'Saved';
+                    } catch (error) {
+                        notify(error.message);
+                        save.textContent = 'Save all details';
+                    } finally { save.disabled = false; }
+                });
+                modal.foot.hidden = false;
+                modal.foot.replaceChildren(save);
+            };
+
+            try {
+                let target = page;
+                let initialFacts = null;
+                if (shared && isCopy && like?.sections?.length && editableLink) {
+                    modal.body.textContent = 'Making a page for this copy…';
+                    const id = await makePageLike({ config: builder, save: saveSetting, sections: like.sections, title: cardName || 'New page' });
+                    await saveSetting(editableLink.dataset.editHref, hrefTo(editableLink.getAttribute('href'), id));
+                    target = { ...page, id, title: cardName || page.title };
+                    initialFacts = cardFacts(item);
+                }
+                await renderPage(target, initialFacts);
+            } catch (error) {
+                modal.close();
+                notify(error.message);
+            }
+        };
+
+        /**
          * Add / remove for a repeated block (FAQs, cards, list rows). The order of
          * item ids is the stored value; the server rebuilds the list from it.
          */
@@ -3706,6 +3944,13 @@ const bootLiveEdit = () => {
                     && [...other.querySelectorAll('a[href]')].some((a) => pageOfLink(a, builder.pages, window.location.href)?.id === page.id));
                 const own = document.createElement('div');
                 own.className = 'le-row';
+                const editDetails = document.createElement('button');
+                editDetails.type = 'button';
+                editDetails.className = 'le-btn';
+                editDetails.textContent = 'Edit all details';
+                editDetails.title = 'Edit the linked page’s fields, styles and options here';
+                editDetails.addEventListener('click', () => editLinkedPage({ page, link, item, list, builder, shared }));
+                own.append(editDetails);
                 const visit = document.createElement('button');
                 visit.type = 'button';
                 visit.className = 'le-chip-btn';
@@ -3746,7 +3991,7 @@ const bootLiveEdit = () => {
                 const said = document.createElement('p');
                 said.className = 'le-hint';
                 said.textContent = shared
-                    ? `This card opens the same page as another card (${page.title}). Give it its own to write its details.`
+                    ? `This card currently shares ${page.title}. Choose Edit all details to give it a separate page and edit its details here.`
                     : `This card opens ${page.title}. Its details, photos and price are edited there.`;
                 block.append(own, said);
             }
