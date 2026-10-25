@@ -302,6 +302,18 @@ describe('rendering saved styles on a page nobody server-renders', () => {
         expect(document.querySelectorAll('#live-edit-styles')).toHaveLength(1);
         expect(document.getElementById('live-edit-styles').textContent).toContain('#222');
     });
+
+    it('takes away the last style when nothing is left to apply', () => {
+        // Unticking "Hide this section" when it was the page's only style left the
+        // old sheet in place, so the section stayed dimmed until a reload.
+        document.head.innerHTML = '';
+        document.body.innerHTML = '<section data-style="ssec">Visit us</section>';
+
+        applyStyles(document, { ssec: { background: '#111' } });
+        applyStyles(document, {});
+
+        expect(document.getElementById('live-edit-styles').textContent).toBe('');
+    });
 })
 
 describe('the markers that are not data-edit', () => {

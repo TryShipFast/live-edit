@@ -1178,14 +1178,19 @@ export const applyStyles = (root, styles) => {
         .map(([key, props]) => styleRules(key, props))
         .join('');
 
-    if (css === '') {
-        return 0;
-    }
-
     // One tag, reused: applying content twice — a locale change, a refresh
     // after publishing — must not stack another sheet on the page.
     const id = 'live-edit-styles';
     const tag = root.getElementById?.(id) ?? root.querySelector?.(`#${id}`) ?? null;
+
+    if (css === '') {
+        // Nothing left to apply still has to take away what was applied: clearing the last
+        // style on a page (most often "Hide this section", unticked) left the old sheet in place,
+        // so the section stayed dimmed, and hidden in Preview, until somebody reloaded.
+        if (tag) tag.textContent = '';
+
+        return 0;
+    }
     const style = tag ?? root.createElement('style');
 
     style.id = id;

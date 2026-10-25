@@ -5238,12 +5238,14 @@ const bootLiveEdit = () => {
                 // Above the trigger, clear of it: on a short label ("Firm") a handle on its corner sat over
                 // the middle of the button, and the press meant for the menu landed on the handle instead.
                 const box = trigger.getBoundingClientRect();
-                linkHandle.style.top = `${Math.max(2, box.top - 24) + window.scrollY}px`;
-                linkHandle.style.left = `${box.left + box.width / 2 - 13 + window.scrollX}px`;
+                // The handle is position: fixed, so it is placed in the viewport's own coordinates: adding the
+                // scroll offset drew it off screen on any scrolled page, and it is the only way to an icon's link.
+                linkHandle.style.top = `${Math.max(2, box.top - 24)}px`;
+                linkHandle.style.left = `${box.left + box.width / 2 - 13}px`;
             } else {
                 const rect = anchor.getBoundingClientRect();
-                linkHandle.style.top = `${rect.top + window.scrollY - 10}px`;
-                linkHandle.style.left = `${rect.right + window.scrollX - 10}px`;
+                linkHandle.style.top = `${Math.max(2, rect.top - 10)}px`;
+                linkHandle.style.left = `${rect.right - 10}px`;
             }
             linkHandle.classList.add('is-visible');
         };
