@@ -148,6 +148,20 @@ the one you were on, "Delete this item" removes only that one, and all three
 survive a reload. On Next.js that includes surviving React's own render. Both
 still need running on Laravel and WordPress before those cells move.
 
+A card's page (README, "A card and its page") is the hosted adapter's alone,
+because only the hosting app hands the editor a page builder
+(`window.liveEditPages`): the other adapters have no page the owner made and
+no page a card could be given. It was clicked through in a browser on a
+stand-in for the hosting app that draws and keys pages the way it does
+(`tests/e2e/card-details-journey.spec.js`): a product's page edited from its
+card in the window over the shop, a size added there; a journal post's body
+changed and its pictures reordered; a card copied, given its own page, the copy
+carrying every edit and each page then edited without changing the other; a
+card deleted with its page, and a design page deleted where the host keeps a
+list of removed pages. It has **not** yet been driven on the real hosting app:
+that needs a hosted trial site, and the design-page half needs the host to
+name a `removedKey` first.
+
 Nested / mixed content was measured on five shapes — a decoration before the
 words, an icon before them, a badge after them, an inline phrase between them,
 and a wrapper holding them. The fix is in the shared editor and in the server's

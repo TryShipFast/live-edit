@@ -65,8 +65,9 @@ describe('help for every kind of site', () => {
               </ul>`);
 
         const titles = (opts) => listGuides(document, opts)[0].steps.map((s) => s.title);
-        expect(titles({ canMakePages: true })).toEqual(expect.arrayContaining(['Choose its category', 'Give it its own page']));
+        expect(titles({ canMakePages: true })).toEqual(expect.arrayContaining(['Choose its category', 'Change its page from the card', 'Give it its own page']));
         expect(titles({ canMakePages: false })).not.toContain('Give it its own page');
+        expect(titles({ canMakePages: false })).not.toContain('Change its page from the card');
     });
 
     it('leaves out sections, menus, a pair of buttons and lists of another layout', () => {

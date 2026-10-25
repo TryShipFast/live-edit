@@ -70,8 +70,10 @@ const PROFILES = {
         intro: 'Customers browse your products, add them to the bag and check out. Start in the Shop tab: it gathers how customers pay, your WhatsApp number, delivery prices, offers and every product in one place.',
         start: ['shop', 'lists', 'image', 'brand', 'preview'],
         questions: [
-            { q: 'How do I add a product?', a: 'Use the guide for your products list below: copy a product card, then change its name, price and photo. Give it its own page from its panel so customers can open it.' },
+            { q: 'How do I add a product?', a: 'Use the guide for your products list below: copy a product card, then change its name, price and photo. In its panel, press Give it its own page: you get a copy of the product page, sizes and all, to change right there.' },
             { q: 'How do I change a price?', a: 'Click the price on the product card or its page and type the new one. The bag and checkout read the price from your words, so they follow it.' },
+            { q: 'Do I have to open each product page to change it?', a: 'No. Click a product card and press Edit all details. Its page opens over the shop: click its words, photos or sizes to change them, then press Done.' },
+            { q: 'How do I replace the sample products with mine?', a: 'Change a sample into your own with Edit all details, or delete it: Delete this item offers to delete its page too, so nothing is left behind on your website.' },
             { q: 'How do I change delivery prices or the WhatsApp number?', a: 'Open the Shop tab. Each delivery price, the free delivery threshold, any offer code and the WhatsApp number are there, and saving changes every page that shows them.' },
             { q: 'Where do orders go?', a: 'Your checkout offers the ways to pay listed in the Shop tab. A WhatsApp order arrives in WhatsApp as a message listing what the customer chose.' },
             { q: 'How do I put a product in a category?', a: 'Click the product card. Its panel has a setting for the category the shop filter reads, so the product appears under the right filter.' },
@@ -113,6 +115,7 @@ const PROFILES = {
         start: ['getting-started', 'lists', 'image', 'brand', 'preview'],
         questions: [
             { q: 'How do I add a project?', a: 'Use the guide for your projects list below: copy a project card, then change its title, picture and words. Give it its own page from its panel to tell its full story.' },
+            { q: 'Do I have to open each project to change it?', a: 'No. Click a project card and press Edit all details: its page opens over the list, and you change it by clicking it, the same way as everywhere else.' },
             { q: 'How do I change my photo?', a: 'Click your photo and choose one of your own, a free photo, or ask for a new one, then save.' },
             { q: 'How do I change how people contact me?', a: 'Click your email, phone or social links. Each opens with its words and where it goes.' },
         ],
@@ -132,7 +135,7 @@ const PROFILES = {
         start: ['lists', 'image', 'text', 'preview'],
         questions: [
             { q: 'How do I add a listing?', a: 'Use the guide for your listings below: copy a listing card, then change its photos, price and details.' },
-            { q: 'How do I remove a listing that has sold?', a: 'Click the listing card and press Delete this item in its panel.' },
+            { q: 'How do I remove a listing that has sold?', a: 'Click the listing card and press Delete this item in its panel. If it has a page of its own, you can delete that page too, or keep it.' },
         ],
     },
     services: {
@@ -267,9 +270,10 @@ export const listGuides = (doc = document, { canMakePages = false } = {}) => {
         const steps = [
             { point: card, title: `These are your ${name}`, copy: `Each card is one of your ${name}. Click a card to open its panel on the right.` },
             { point: card, title: 'Copy one to add another', copy: 'In the card\'s panel, press Duplicate. The copy appears right after it, ready to change. To take one away, press Delete this item.' },
+            ...(opensAPage && canMakePages ? [{ point: card, title: 'Change its page from the card', copy: 'In the card\'s panel, press Edit all details. Its page opens over this one: click anything on it to change it, then press Done. When you delete a card, you can delete its page with it.' }] : []),
             { point: card, title: 'Make the copy its own', copy: 'Click the copy\'s words and its picture and change them. Use Move up and Move down in its panel to put it in order.' },
             ...(setting ? [{ point: card, title: `Choose its ${setting}`, copy: `The card's panel has a ${setting} setting. Pick one so the filter on this page shows it in the right place.` }] : []),
-            ...(opensAPage && canMakePages ? [{ point: card, title: 'Give it its own page', copy: 'A card that opens a page needs a page of its own. In its panel, press Give it its own page and fill in its details there.' }] : []),
+            ...(opensAPage && canMakePages ? [{ point: card, title: 'Give it its own page', copy: 'A copied card still opens the page of the card it came from. In its panel, press Give it its own page: it gets a copy of that page, with everything on it, to change without touching the original.' }] : []),
         ];
 
         guides.push({ id: `list:${guides.length}`, title: `Add to ${name}`, detail: `Add, change or remove one of your ${name}.`, list, steps, score: worth(list, items, { setting, opensAPage }) });
