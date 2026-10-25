@@ -4366,6 +4366,8 @@ const bootLiveEdit = () => {
             drawerFields.append(back);
             setTrail(chart);
             showTab('Edit');
+            // Each field saves as it is changed (data-panel.js): no Save button to press.
+            ui.drawerFoot.classList.add('le-hidden');
             openDrawer();
         };
 
@@ -4387,6 +4389,8 @@ const bootLiveEdit = () => {
             }
             setTrail(chart);
             showTab('Edit');
+            // Each field saves as it is changed (data-panel.js): no Save button to press.
+            ui.drawerFoot.classList.add('le-hidden');
             openDrawer();
         };
 

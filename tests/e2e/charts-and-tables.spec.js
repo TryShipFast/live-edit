@@ -206,7 +206,7 @@ test('a table takes columns added, moved and deleted in every row, and rows with
     await drawer(page).getByLabel('Rows to paste into the table').fill('Size,Price,Weight\nSmall,$40,1 kg\nLarge,$70,2 kg');
     await drawer(page).getByRole('button', { name: 'Fill the table' }).click();
     await expect.poll(heads).toEqual(['Size', 'Price', 'Weight']);
-    expect(rowsDrawn('shop', id)).toEqual([['Small', '$40', '1 kg'], ['Large', '$70', '2 kg']]);
+    await expect.poll(() => rowsDrawn('shop', id)).toEqual([['Small', '$40', '1 kg'], ['Large', '$70', '2 kg']]);
 });
 
 test('an outside site is offered no chart and no table', async ({ page }) => {

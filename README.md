@@ -640,6 +640,17 @@ The drawer has two tabs, **Edit** and **Changes** (plus **Brand** and **SEO**
 where the host provides them). Changes holds both halves of what was saved:
 **Not published yet** and **Published**, switched just under the tabs.
 
+### Charts and tables
+
+A library entry with a `kind` (`bar`, `line`, `donut`, `funnel`, `progress`, `sparkline` or `table`) is a chart or
+a table the host draws from its standard markup rather than cut from a page (`at` is null); the library says what
+each kind holds and the rules it keeps before it is added. On the page, a chart (`data-chart`) is edited in its
+kind's own terms (`resources/js/data-kit.js`, `data-panel.js`): a drawn bar, point or slice opens its row with the
+kind's fields and rules, the drawing opens the chart's settings (`data-edit-choices` with `options` named inline)
+and "Paste rows"; a table's cell (`data-kit-table`) opens with its row and column, each added, moved and deleted,
+every row kept in step by one saved order of columns. The host's contract is in the website's
+LIVE-EDIT-STRUCTURE.md, section 7, "Charts and tables the owner adds".
+
 ## If something is wrong
 
 **Start here.** One command, safe on production, that says where this site's

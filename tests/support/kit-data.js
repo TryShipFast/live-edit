@@ -65,7 +65,8 @@
         '@media (max-width:640px){:where(.kit-table[data-kit-table-stack] thead){position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%)}',
         ':where(.kit-table[data-kit-table-stack] tr){display:block;padding:8px 0;border-bottom:1px solid var(--kit-chart-grid)}',
         ':where(.kit-table[data-kit-table-stack] th,.kit-table[data-kit-table-stack] td){display:flex;justify-content:space-between;gap:16px;border:0;padding:6px 0;text-align:right}',
-        ':where(.kit-table[data-kit-table-stack] td[data-th]::before,.kit-table[data-kit-table-stack] th[data-th][scope="row"]::before){content:attr(data-th);color:var(--kit-chart-muted);text-align:left;font-weight:400}}',
+        // A pseudo-element cannot sit inside :where(), so the label is selected after it.
+        ':where(.kit-table[data-kit-table-stack]) td[data-th]::before{content:attr(data-th);color:var(--kit-chart-muted);text-align:left;font-weight:400}}',
         ':where(.kit-chart__mark){transition:opacity .2s}',
         '@media (prefers-reduced-motion:no-preference){:where(.kit-chart--enter .kit-chart__grow){animation:kit-grow .7s cubic-bezier(.2,.7,.2,1) both}',
         ':where(.kit-chart--enter .kit-chart__trace){stroke-dasharray:var(--kit-len,2000);stroke-dashoffset:var(--kit-len,2000);animation:kit-trace 1s ease-out forwards}}',
@@ -94,10 +95,10 @@
     };
 
     /** How a figure is written with its unit: "$" leads, "%" follows, a word follows after a space. */
-    var withUnit = function (n, unit) {
+    var withUnit = function (n, unit, places) {
         var abs = Math.abs(n);
-        var digits = abs !== 0 && abs < 10 && n % 1 !== 0 ? 1 : (n % 1 !== 0 && abs < 100 ? 1 : 0);
-        var said = n.toLocaleString(undefined, { maximumFractionDigits: digits, minimumFractionDigits: 0 });
+        var digits = places != null ? places : (abs !== 0 && abs < 10 && n % 1 !== 0 ? 1 : (n % 1 !== 0 && abs < 100 ? 1 : 0));
+        var said = n.toLocaleString('en-US', { maximumFractionDigits: digits, minimumFractionDigits: places != null ? places : 0 });
         if (!unit) return said;
         var lead = unit.match(/^([$£€¥₦₹₩₱])(.*)$/);
         if (lead) return (n < 0 ? '-' : '') + lead[1] + said.replace('-', '') + lead[2];
@@ -114,7 +115,9 @@
             variant: el.getAttribute('data-chart-variant') || '',
             order: el.getAttribute('data-chart-order') || 'written',
             markers: el.getAttribute('data-chart-markers') || 'on',
-            series: el.getAttribute('data-chart-series') || 'all'
+            series: el.getAttribute('data-chart-series') || 'all',
+            // A template that draws its own key beside the chart says so (data-chart-legend="off").
+            legend: el.getAttribute('data-chart-legend') || 'on'
         };
     };
 
@@ -144,7 +147,10 @@
             };
         });
         if (!series.length && rows.length) series = rows[0].values.map(function (_, i) { return 'Series ' + (i + 1); });
-        return { series: series, rows: rows, heads: heads };
+        // As many decimal places as the owner wrote, so a total reads like its parts ($494.6k, not $495k).
+        var places = 0;
+        rows.forEach(function (row) { [].slice.call(row.tr.cells).forEach(function (c) { var m = words(c).match(/\.(\d+)/); if (m) places = Math.max(places, Math.min(2, m[1].length)); }); });
+        return { series: series, rows: rows, heads: heads, places: places };
     };
 
     /** A signed change, as a percentage: "+3.2%", "−1.0%". */
@@ -168,9 +174,11 @@
             data.rows.forEach(function (row) { put(row.tr.cells[col], change(row.values[0], row.values[1])); });
         });
         var total = function (n) { return data.rows.reduce(function (sum, row) { return sum + (row.values[n] || 0); }, 0); };
+        var everything = function () { return data.rows.reduce(function (sum, row) { return sum + row.values.reduce(function (a, v) { return a + (v || 0); }, 0); }, 0); };
         [].slice.call(chart.querySelectorAll('[data-chart-sum]')).forEach(function (el) {
-            var n = Math.max(1, parseInt(el.getAttribute('data-chart-sum'), 10) || 1) - 1;
-            put(el, withUnit(total(n), unit));
+            var which = el.getAttribute('data-chart-sum');
+            var n = Math.max(1, parseInt(which, 10) || 1) - 1;
+            put(el, withUnit(which === 'all' ? everything() : total(n), unit, data.places));
         });
         [].slice.call(chart.querySelectorAll('[data-chart-total-change]')).forEach(function (el) {
             var said = change(total(0), total(1));
@@ -180,7 +188,7 @@
         var latest = chart.querySelector('[data-chart-latest]');
         if (latest && data.rows.length) {
             var last = data.rows[data.rows.length - 1].values[0];
-            put(latest, last == null ? '' : withUnit(last, unit));
+            put(latest, last == null ? '' : withUnit(last, unit, data.places));
         }
     };
 
@@ -282,14 +290,14 @@
         var stacked = settings.variant === 'stacked';
         var series = shown(data, settings);
         var rows = data.rows.slice();
-        if (stacked) return stack(svg, width, rows, series, data, unit);
+        if (stacked) return stack(svg, width, rows, series, data, unit, settings);
         if (settings.order === 'value') rows.sort(function (a, b) { return (b.values[series[0]] || 0) - (a.values[series[0]] || 0); });
         var all = [];
         rows.forEach(function (r) { series.forEach(function (s) { if (r.values[s] != null) all.push(r.values[s]); }); });
         var axis = ticks(Math.min(0, Math.min.apply(null, all.concat([0]))), Math.max.apply(null, all.concat([0])), 4);
         var lo = axis[0];
         var hi = axis[axis.length - 1];
-        var legend = series.length > 1 ? 30 : 0;
+        var legend = series.length > 1 && settings.legend !== 'off' ? 30 : 0;
         if (across) {
             var labelRoom = Math.min(width * 0.35, Math.max.apply(null, rows.map(function (r) { return measureText(svg, r.label); }).concat([40])) + 12);
             var rowH = Math.max(28, 12 + 18 * series.length);
@@ -310,10 +318,10 @@
                     var h = (rowH - 10) / series.length;
                     var rect = make('rect', { class: 'kit-chart__mark', 'data-chart-item': r.id, x: Math.min(x(0), x(v)), y: y0 + 5 + k * h, width: Math.max(1, Math.abs(x(v) - x(0))), height: Math.max(2, h - 2), rx: 2, fill: colour(k) }, svg);
                     grow(rect, 'x', 'left', 'center');
-                    text(svg, Math.max(x(0), x(v)) + 6, y0 + 5 + k * h + h / 2 + 3, withUnit(v, unit), { 'font-size': 12, fill: 'var(--kit-chart-ink)' });
+                    text(svg, Math.max(x(0), x(v)) + 6, y0 + 5 + k * h + h / 2 + 3, withUnit(v, unit, data.places), { 'font-size': 12, fill: 'var(--kit-chart-ink)' });
                 });
             });
-            if (legend) drawLegend(svg, series.map(function (s, k) { return { label: data.series[s], colour: colour(k) }; }), box.left, 14, width - box.left);
+            if (legend && settings.legend !== 'off') drawLegend(svg, series.map(function (s, k) { return { label: data.series[s], colour: colour(k) }; }), box.left, 14, width - box.left);
             return height;
         }
         var height2 = Math.round(Math.min(420, Math.max(240, width * 0.5))) + legend;
@@ -335,16 +343,16 @@
             });
             if (i % every === 0) text(svg, x0 + band / 2, b.bottom + 18, shortLabel(r.label, band * every), { 'text-anchor': 'middle', 'font-size': 12, fill: 'var(--kit-chart-muted)' });
         });
-        if (legend) drawLegend(svg, series.map(function (s, k) { return { label: data.series[s], colour: colour(k) }; }), b.left, 14, b.right - b.left);
+        if (legend && settings.legend !== 'off') drawLegend(svg, series.map(function (s, k) { return { label: data.series[s], colour: colour(k) }; }), b.left, 14, b.right - b.left);
         return height2;
     };
 
     /** Columns with each series stacked on the one before: a total and what it is made of. */
-    var stack = function (svg, width, rows, series, data, unit) {
+    var stack = function (svg, width, rows, series, data, unit, settings) {
         var totals = rows.map(function (r) { return series.reduce(function (sum, s) { return sum + Math.max(0, r.values[s] || 0); }, 0); });
         var axis = ticks(0, Math.max.apply(null, totals.concat([1])), 3);
         var hi = axis[axis.length - 1];
-        var legend = series.length > 1 ? 30 : 0;
+        var legend = series.length > 1 && settings.legend !== 'off' ? 30 : 0;
         var height = Math.round(Math.min(420, Math.max(220, width * 0.4))) + legend;
         var b = plotBox(svg, width, height, data, unit, axis);
         b.top = 10 + legend;
@@ -365,7 +373,7 @@
             });
             if (i % every === 0) text(svg, x0 + w / 2, b.bottom + 18, shortLabel(r.label, band * every), { 'text-anchor': 'middle', 'font-size': 12, fill: 'var(--kit-chart-muted)' });
         });
-        if (legend) drawLegend(svg, series.map(function (s, k) { return { label: data.series[s], colour: colour(k) }; }), b.left, 14, b.right - b.left);
+        if (legend && settings.legend !== 'off') drawLegend(svg, series.map(function (s, k) { return { label: data.series[s], colour: colour(k) }; }), b.left, 14, b.right - b.left);
         return height;
     };
 
@@ -381,7 +389,7 @@
         var axis = small ? [min, max] : ticks(area ? Math.min(0, min) : (min >= 0 && min < (max - min) ? 0 : min), max, 4);
         var lo = axis[0];
         var hi = axis[axis.length - 1] === lo ? lo + 1 : axis[axis.length - 1];
-        var legend = !small && series.length > 1 ? 30 : 0;
+        var legend = !small && series.length > 1 && settings.legend !== 'off' ? 30 : 0;
         var height = small ? 56 : Math.round(Math.min(420, Math.max(240, width * 0.48))) + legend;
         var b = small ? { left: 4, right: width - 8, top: 6, bottom: height - 6 } : plotBox(svg, width, height, data, unit, axis);
         if (!small) b.top = 10 + legend;
@@ -396,7 +404,7 @@
             rows.forEach(function (r, i) {
                 var last = i === rows.length - 1;
                 if (i % every !== 0 && !last) return;
-                if (!last && i > 0 && x(rows.length - 1) - x(i) < room) return;
+                if (!last && i > 0 && x(rows.length - 1) - x(i) < room * 1.5) return;
                 text(svg, x(i), b.bottom + 18, r.label, { 'text-anchor': i === 0 ? 'start' : (last ? 'end' : 'middle'), 'font-size': 12, fill: 'var(--kit-chart-muted)' });
             });
         }
@@ -422,7 +430,7 @@
                 pts.forEach(function (p) { make('circle', { class: 'kit-chart__hit', 'data-chart-item': p[2].id, cx: p[0], cy: p[1], r: 12, fill: 'transparent' }, svg); });
             }
         });
-        if (legend) drawLegend(svg, series.map(function (s, k) { return { label: data.series[s], colour: colour(k) }; }), b.left, 14, b.right - b.left);
+        if (legend && settings.legend !== 'off') drawLegend(svg, series.map(function (s, k) { return { label: data.series[s], colour: colour(k) }; }), b.left, 14, b.right - b.left);
         return height;
     };
 
@@ -465,7 +473,7 @@
             var y = ly + i * 28;
             make('rect', { x: lx, y: y - 11, width: 14, height: 14, rx: 3, fill: colour(i) }, g);
             text(g, lx + 24, y, shortLabel(row.label, lw - 90));
-            text(g, lx + lw, y, withUnit(row.values[0], unit), { 'text-anchor': 'end', 'font-weight': 600 });
+            text(g, lx + lw, y, withUnit(row.values[0], unit, data.places), { 'text-anchor': 'end', 'font-weight': 600 });
         });
         return side ? ly + rows.length * 28 : Math.max(size + 8, ly + rows.length * 28);
     };
@@ -489,7 +497,7 @@
             grow(rect, 'x', 'center', 'center');
             text(svg, 0, stacked ? y + 14 : y + rowH / 2 - 2, shortLabel(row.label, (stacked ? width : labelRoom) - 12), { 'font-size': 14, fill: 'var(--kit-chart-ink)', 'font-weight': 600 });
             var prev = i ? rows[i - 1].values[0] : null;
-            var said = withUnit(row.values[0], unit) + (prev ? ' · ' + Math.round(row.values[0] / prev * 100) + '% of the stage before' : '');
+            var said = withUnit(row.values[0], unit, data.places) + (prev ? ' · ' + Math.round(row.values[0] / prev * 100) + '% of the stage before' : '');
             text(svg, 0, stacked ? y + 32 : y + rowH / 2 + 15, said, { 'font-size': 12, fill: 'var(--kit-chart-muted)' });
         });
         return rows.length * rowH;
@@ -505,7 +513,7 @@
             var top = Math.max(v, target, 1);
             var share = target ? Math.round(v / target * 100) : null;
             text(svg, 0, y + 18, shortLabel(row.label, width * 0.55), { 'font-size': 14, 'font-weight': 600, fill: 'var(--kit-chart-ink)' });
-            text(svg, width, y + 18, withUnit(v, unit) + (target ? ' of ' + withUnit(target, unit) + (share != null ? ' · ' + share + '%' : '') : ''), { 'font-size': 13, 'text-anchor': 'end', fill: 'var(--kit-chart-muted)' });
+            text(svg, width, y + 18, withUnit(v, unit, data.places) + (target ? ' of ' + withUnit(target, unit, data.places) + (share != null ? ' · ' + share + '%' : '') : ''), { 'font-size': 13, 'text-anchor': 'end', fill: 'var(--kit-chart-muted)' });
             make('rect', { x: 0, y: y + 28, width: width, height: 12, rx: 6, fill: 'var(--kit-chart-track)' }, svg);
             var fill = make('rect', { class: 'kit-chart__mark', 'data-chart-item': row.id, x: 0, y: y + 28, width: Math.max(0, v / top * width), height: 12, rx: 6, fill: v >= target && target ? 'var(--kit-chart-2)' : 'var(--kit-chart-1)' }, svg);
             grow(fill, 'x', 'left', 'center');
@@ -523,7 +531,7 @@
             return r.label + ' ' + r.values.filter(function (v) { return v != null; }).map(function (v) { return withUnit(v, unit); }).join(' and ');
         }).join(', ');
         var noun = { bar: 'Bar chart', line: 'Line chart', donut: 'Donut chart', funnel: 'Funnel', progress: 'Progress against target', sparkline: 'Sparkline' }[kind];
-        return [noun + (title ? ' of ' + title : ''), readout, listed].filter(Boolean).join('. ') + '.';
+        return [noun + (title ? ' of ' + title : ''), readout, listed].map(function (part) { return part.replace(/[.\s]+$/, ''); }).filter(Boolean).join('. ') + '.';
     };
 
     var drawChart = function (chart, first) {
@@ -616,7 +624,9 @@
                 for (var i = 0; i < records.length; i++) {
                     var target = records[i].target;
                     var node = target.nodeType === 1 ? target : target.parentNode;
-                    // What this script draws is not a change to redraw for.
+                    // What this script draws is not a change to redraw for: in the drawing, or a drawing
+                    // (or a label measured for one) already taken off the page by the time this runs.
+                    if (!node || !node.isConnected || (node.namespaceURI === SVG && !(node.closest && node.closest('[data-chart-table]')))) continue;
                     if (node && node.closest && !node.closest('[data-chart-plot], [data-chart-latest], [data-kit-computed]')) { later(el); return; }
                 }
             }).observe(el, { subtree: true, childList: true, characterData: true, attributes: true, attributeFilter: ['data-chart-variant', 'data-chart-order', 'data-chart-markers', 'data-chart-series', 'hidden'] });
