@@ -170,6 +170,21 @@ test('a copied card gets its own page, a full copy, and the two never change eac
     expect(words(drawn('fig-archive'), 'h1')).toBe('Fig Archive');
 });
 
+test('a design card named apart from its page stays the original when another card opens that page', async ({ page }) => {
+    // Design cards are often named apart from the page they open ("Unwanted hair" opens "Laser hair
+    // removal"), and owners rename cards; only an id the editor minted makes a card a copy.
+    await openAsEditor(page);
+    await choose(page, '[data-edit-item="aster"] h3 a');
+    await typeAndSave(page, 'The grey one');
+    await choose(page, '[data-edit-item="aster"] [data-kit-price]');
+    await ui(page).getByRole('button', { name: 'Duplicate' }).click();
+    await expect(page.locator('[data-list="products"] [data-edit-item]')).toHaveCount(3);
+
+    await choose(page, '[data-edit-item="aster"] [data-edit]:not(a)');
+    await expect(ui(page).getByRole('button', { name: 'Edit all details' })).toBeVisible();
+    await expect(ui(page).getByRole('button', { name: 'Give it its own page' })).toHaveCount(0);
+});
+
 test('deleting a card that has its own page offers to delete the page too', async ({ page }) => {
     await openAsEditor(page);
     await choose(page, '[data-edit-item="aster"] [data-kit-price]');
