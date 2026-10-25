@@ -57,6 +57,7 @@ class EmbedController
         'choice.js' => 'choice.js',
         'shop.js' => 'shop.js',
         'help.js' => 'help.js',
+        'section-inserter.js' => 'section-inserter.js',
         // The built bundle, resolved to resources/dist rather than to a
         // sibling of the modules.
         'bundle.js' => 'bundle.js',

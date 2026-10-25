@@ -746,6 +746,23 @@ select.le-input {
   box-shadow: 0 8px 20px -6px rgba(11,18,32,.7);
 }
 
+/* ---- "+ Add a section", on the line where it would go ----
+   Drawn over the page, never in it, so the design does not move to make room.
+   One follows the pointer to the line between the two sections nearest it; one
+   stays after the last section, so the end of the page always says it. */
+.le-insert { position: fixed; z-index: 2147482999; height: 0; display: none; pointer-events: none; }
+.le-insert.is-visible { display: block; }
+.le-insert-line { position: absolute; left: 0; right: 0; top: -1px; border-top: 2px dashed var(--le-ink); opacity: .55; }
+.le-insert-end .le-insert-line { opacity: 0; transition: opacity .15s ease; }
+.le-insert-end:has(.le-insert-btn:hover) .le-insert-line, .le-insert-end:has(.le-insert-btn:focus-visible) .le-insert-line { opacity: .55; }
+.le-insert-btn {
+  position: absolute; left: 50%; top: 0; transform: translate(-50%, -50%); pointer-events: auto;
+  cursor: pointer; border: 0; border-radius: 999px; padding: 7px 14px; white-space: nowrap;
+  font-family: inherit; font-size: 12px; font-weight: 600; line-height: 1.2; letter-spacing: .01em; background: #0b1220; color: #fff;
+  box-shadow: 0 8px 20px -6px rgba(11,18,32,.7), 0 0 0 3px #fff;
+}
+.le-insert-btn:hover { background: #2A2C31; }
+
 /* ---- toast ---- */
 .le-toast {
   position: fixed; bottom: 86px; left: 50%; transform: translateX(-50%);
@@ -1233,6 +1250,13 @@ export function createChrome() {
     pagesButton.title = 'Add a page to your website';
     pagesButton.hidden = !window.liveEditPages;
 
+    /* Adding a section to the page being looked at, beside adding a page: a page
+       the design came with takes sections from the library just as a new one does. */
+    const sectionsButton = el('button', 'le-bar-btn le-when-roomy', '+ Section');
+    sectionsButton.type = 'button';
+    sectionsButton.title = 'Add a section to this page, or move and hide the ones on it';
+    sectionsButton.hidden = true;
+
     const changesButton = el('button', 'le-bar-btn le-when-roomy', 'Changes');
     changesButton.type = 'button';
     changesButton.title = 'Everything you have changed and not published';
@@ -1268,6 +1292,7 @@ export function createChrome() {
         el("span", "le-sep"),
         languagePicker,
         pagesButton,
+        sectionsButton,
         brandButton,
         changesButton,
         helpButton,
@@ -1395,7 +1420,19 @@ export function createChrome() {
     const hoverLabel = el('span', 'le-hover-label');
     hoverBox.append(hoverLabel);
 
-    shadow.append(toolbar, drawer, linkHandle, bgHandle, hoverBox);
+    // "+ Add a section": one between sections, one after the last (section-inserter.js).
+    const inserter = (extra) => {
+        const line = el('div', `le-insert ${extra}`.trim());
+        const button = el('button', 'le-insert-btn', '+ Add a section');
+        button.type = 'button';
+        line.append(el('div', 'le-insert-line'), button);
+
+        return { line, button };
+    };
+    const sectionInsert = inserter('');
+    const sectionInsertEnd = inserter('le-insert-end');
+
+    shadow.append(toolbar, drawer, linkHandle, bgHandle, hoverBox, sectionInsert.line, sectionInsertEnd.line);
 
     // "Saved" can go by in a second; "this didn't take effect" is a sentence
     // somebody has to finish reading before it disappears.
@@ -1530,6 +1567,9 @@ export function createChrome() {
         previewButton,
         brandButton,
         pagesButton,
+        sectionsButton,
+        sectionInsert,
+        sectionInsertEnd,
         changesButton,
         helpButton,
         closeButton,

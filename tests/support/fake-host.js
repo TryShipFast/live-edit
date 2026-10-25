@@ -126,6 +126,13 @@ export const DESIGN = {
     'journal/salt-air': { title: 'Salt air', html: page('Salt air', post('salt-air', 'Salt air')) },
 };
 
+/** The design's sections an owner can add to any page (TheKit::library), with the page each one is kept on. */
+export const LIBRARY = [
+    { from: 'aster-veil.story', label: 'Story', page: 'Aster Veil', file: 'products/aster-veil' },
+    { from: 'first-light.related', label: 'More posts', page: 'First light', file: 'journal/first-light' },
+    { from: 'shop.journal', label: 'Journal', page: 'Shop', file: 'shop' },
+];
+
 /* ------------------------------ keys, as the host makes them ------------------------------ */
 
 /** A short, stable hash. The real host uses sha256; any hash that hides the path does the same job here. */
@@ -237,9 +244,12 @@ const nameListsAndSections = (doc, page) => {
 /**
  * A site built from DESIGN, with the owner's saved settings and styles.
  * `removable` lets the owner delete the design's own pages (the host contract
- * this engine asks for: `removedKey` in the page builder).
+ * this engine asks for: `removedKey` in the page builder). `library` hands the
+ * editor the design's sections to add (LIBRARY), as a site with a Kit does.
+ * `outside` hands over no page builder at all: an outside site (the plugin or
+ * another adapter), which gets in-place editing only.
  */
-export function createHost({ makeDocument, serialise = (doc) => `<!doctype html>${doc.documentElement.outerHTML}`, removable = false } = {}) {
+export function createHost({ makeDocument, serialise = (doc) => `<!doctype html>${doc.documentElement.outerHTML}`, removable = false, library = false, outside = false } = {}) {
     const settings = {};
     const styles = {};
     const saves = [];
@@ -318,7 +328,7 @@ export function createHost({ makeDocument, serialise = (doc) => `<!doctype html>
         editorBase,
         pages: pages(editorBase),
         taken: pages(editorBase).map((entry) => entry.id),
-        library: [],
+        library: library ? LIBRARY.map(({ file, ...section }) => ({ ...section, at: `${editorBase}${file}` })) : [],
         starts: [],
         ...(removable ? { removedKey: 'structure:removed', removed: removed() } : {}),
     });
@@ -344,7 +354,7 @@ export function createHost({ makeDocument, serialise = (doc) => `<!doctype html>
             script(`window.liveEditApi=${JSON.stringify({ base: api, site: 'demo', token: 'kbs_demo' })};`
                 + `window.liveEditContent=${JSON.stringify({ base: api, site: 'demo', key: 'kbs_demo' })};`
                 + 'window.liveEditPublishing={pending:0};');
-            script(`window.liveEditPages=${JSON.stringify(builderFor(id, editorBase))};`);
+            if (!outside) script(`window.liveEditPages=${JSON.stringify(builderFor(id, editorBase))};`);
             if (runtime) {
                 const tag = doc.createElement('script');
                 tag.setAttribute('type', 'module');

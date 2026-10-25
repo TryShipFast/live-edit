@@ -16,9 +16,9 @@ import { createHost } from './fake-host.js';
 
 const RUNTIME = fileURLToPath(new URL('../../resources/dist/live-edit.js', import.meta.url));
 
-export async function serveFakeHost({ removable = false } = {}) {
+export async function serveFakeHost({ removable = false, library = false, outside = false } = {}) {
     const window = new Window();
-    const host = createHost({ makeDocument: (html) => new window.DOMParser().parseFromString(html, 'text/html'), removable });
+    const host = createHost({ makeDocument: (html) => new window.DOMParser().parseFromString(html, 'text/html'), removable, library, outside });
 
     const json = (response, status, body) => {
         response.writeHead(status, { 'Content-Type': 'application/json' });

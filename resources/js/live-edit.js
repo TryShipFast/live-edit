@@ -4,6 +4,7 @@ import { uploadWidget } from './upload.js';
 import { renderSeoPanel } from './seo.js';
 import { renderShopPanel } from './shop.js';
 import { addedWith, describeStructure, hrefTo, newAddedId, orderWith, pageOfLink, renderNewPage, renderSectionBrowser } from './pages.js';
+import { insertionNear, sectionName, sectionUnder, shownSectionLists, shownSections } from './section-inserter.js';
 import { DETAIL_MODE, copyPageForCard, deletablePage, deletePage, detailAddress, linksTo, linksWarning, showOnlyTheDetail } from './card-page.js';
 import { renderChoice } from './choice.js';
 import { commonQuestions, listGuides, profileFor } from './help.js';
@@ -3744,6 +3745,68 @@ const bootLiveEdit = () => {
             modal.foot.hidden = false;
         };
 
+        /** A list's order saved as its value (and its partner's, for tabs and their panels). */
+        const saveListOrder = async (list, ids) => {
+            await request('/live-edit/setting', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ key: list.dataset.editList, value: JSON.stringify(ids) }),
+            });
+            // A row of tabs and its panels (data-edit-list-pair) are one collection
+            // drawn twice: one order for both, so a panel added is a tab added.
+            if (list.dataset.editListPair) {
+                await request('/live-edit/setting', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ key: list.dataset.editListPair, value: JSON.stringify(ids) }),
+                });
+            }
+        };
+
+        /** Whether this page can be given sections from the design's library. */
+        const canAddSections = () => Boolean(window.liveEditPages?.library?.length) && !detailMode;
+
+        /*
+         * A section from the design's library, added after another one (or
+         * last). Two saves: which section it is, under the page's arrangement,
+         * then where it goes, in the list's order. The host draws it from the
+         * page it was taken from with keys of its own, so the page is loaded
+         * again to show it: drawn here in place, the list would show a copy of
+         * the section above it until the next load, which reads as the wrong
+         * section having been added.
+         *
+         * The same on every page: a page the design came with takes sections
+         * just as a page the owner made does.
+         */
+        const openSectionPicker = ({ list, after = null }) => {
+            const builder = window.liveEditPages;
+            if (!canAddSections() || !list?.dataset?.editList) return null;
+            const below = after ? [...list.children].find((child) => child.dataset.editItem === after) : null;
+            const where = below ? `below “${sectionName(below)}”` : shownSections(list).length ? 'at the end of this page' : 'on this page';
+            const handle = ui.modal({ title: 'Add a section', subtitle: `It goes ${where}. Point at one to see it.`, size: 'is-wide' });
+            const picker = renderSectionBrowser({
+                container: handle.body,
+                library: builder.library,
+                add: async (section) => {
+                    const id = newAddedId();
+                    handle.allowDismiss(false);
+                    try {
+                        await saveSetting(builder.structureKey, addedWith(builder.added, id, section.from));
+                        const order = [...list.children].filter((child) => child.dataset.editItem).map((child) => child.dataset.editItem);
+                        await saveListOrder(list, orderWith(order, `s-${id}`, after));
+                        handle.close();
+                        reloadWithToast(`${section.label} added ✓`);
+                    } catch (error) {
+                        handle.allowDismiss(true);
+                        notify(error.message);
+                    }
+                },
+            });
+            picker.focus();
+
+            return handle;
+        };
+
         /**
          * Add / remove for a repeated block (FAQs, cards, list rows). The order of
          * item ids is the stored value; the server rebuilds the list from it.
@@ -3761,20 +3824,7 @@ const bootLiveEdit = () => {
 
             const saveOrder = async (ids, message) => {
                 try {
-                    await request('/live-edit/setting', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ key: list.dataset.editList, value: JSON.stringify(ids) }),
-                    });
-                    // A row of tabs and its panels (data-edit-list-pair) are one collection
-                    // drawn twice: one order for both, so a panel added is a tab added.
-                    if (list.dataset.editListPair) {
-                        await request('/live-edit/setting', {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ key: list.dataset.editListPair, value: JSON.stringify(ids) }),
-                        });
-                    }
+                    await saveListOrder(list, ids);
                     await settle(message, list.dataset.editList, JSON.stringify(ids), true);
                 } catch (error) {
                     notify(error.message);
@@ -3837,40 +3887,15 @@ const bootLiveEdit = () => {
                 row.append(add);
             }
 
-            /*
-             * A section from the design's library, added below this one (or
-             * last). Two saves: which section it is, under the page's
-             * arrangement, then where it goes, in this list's order. The host
-             * draws it from the page it was taken from with keys of its own.
-             */
-            if (sections && builder?.library?.length) {
+            // A section from the design's library, below this one, or at the end of the page.
+            if (sections && canAddSections()) {
                 const addSection = document.createElement('button');
                 addSection.type = 'button';
                 addSection.className = 'le-chip-btn';
                 addSection.textContent = item ? '+ Add a section below' : '+ Add a section';
-                addSection.addEventListener('click', () => {
-                    // A window with room to see a section at its real size before
-                    // adding it, rather than a list squeezed into the panel.
-                    const below = item ? `below “${item.dataset.editSectionLabel ?? 'this section'}”` : 'to this page';
-                    const handle = ui.modal({ title: 'Add a section', subtitle: `It goes ${below}. Point at one to see it.`, size: 'is-wide' });
-                    const picker = renderSectionBrowser({
-                        container: handle.body,
-                        library: builder.library,
-                        add: async (section) => {
-                            const id = newAddedId();
-                            handle.allowDismiss(false);
-                            try {
-                                await saveSetting(builder.structureKey, addedWith(builder.added, id, section.from));
-                                handle.close();
-                                await saveOrder(orderWith(currentOrder(), `s-${id}`, item?.dataset.editItem ?? null), `${section.label} added ✓`);
-                            } catch (error) {
-                                handle.allowDismiss(true);
-                                notify(error.message);
-                            }
-                        },
-                    });
-                    picker.focus();
-                });
+                // A window with room to see a section at its real size before
+                // adding it, rather than a list squeezed into the panel.
+                addSection.addEventListener('click', () => openSectionPicker({ list, after: item?.dataset.editItem ?? null }));
                 row.append(addSection);
             }
 
@@ -3959,6 +3984,34 @@ const bootLiveEdit = () => {
             const block = document.createElement('div');
             block.className = 'le-item-actions';
             block.append(heading, row);
+            /*
+             * The page's sections panel: every section on the page, in order, each
+             * opening its own panel (move, duplicate, hide, add one below it). The
+             * page's fields are not listed here, the way "Inside this" lists them
+             * for a section: on a whole page that is dozens of headings and links.
+             */
+            if (sections && !item) {
+                const order = document.createElement('div');
+                order.className = 'le-row';
+                shownSections(list).forEach((section, index) => {
+                    const open = document.createElement('button');
+                    open.type = 'button';
+                    open.className = 'le-chip-btn';
+                    open.textContent = `${index + 1}. ${sectionName(section)}`;
+                    open.title = 'Move, duplicate, hide or add a section below this one';
+                    open.addEventListener('click', () => {
+                        section.scrollIntoView({ block: 'start', behavior: 'smooth' });
+                        switchToNode(section);
+                    });
+                    order.append(open);
+                });
+                if (order.childElementCount) {
+                    const named = document.createElement('div');
+                    named.className = 'le-section-heading';
+                    named.textContent = 'On this page';
+                    block.append(named, order);
+                }
+            }
             if (!sections && (full || (item && lowest))) {
                 const why = document.createElement('p');
                 why.className = 'le-hint';
@@ -4136,7 +4189,8 @@ const bootLiveEdit = () => {
                 addStyleFields(key, props, styleOn);
             }
 
-            appendContents(element);
+            // A page's sections list is the whole page: its sections are listed instead (appendListControls).
+            if (element.dataset?.editListKind !== 'sections') appendContents(element);
             appendListControls(element);
             setTrail(element.dataset.styleEdit ? (element.closest('[data-style]') ?? element.parentElement) : element);
             showTab('Edit');
@@ -5341,6 +5395,107 @@ const bootLiveEdit = () => {
         document.addEventListener('scroll', follow, true);
         window.addEventListener('resize', follow);
         document.addEventListener('pointerleave', hideHover);
+
+        /*
+         * "+ Add a section" on the page itself (section-inserter.js): on the line
+         * between the two sections nearest the pointer, and after the last
+         * section, on every page with a list of sections. Drawn in the overlay,
+         * so the page does not move to make room for it.
+         */
+        let insertHere = null;
+        let insertEnd = null;
+        const insertFrame = { id: null };
+        const aWindowIsOpen = () => Boolean(ui.shadow?.querySelector('.le-scrim'));
+        const insertingNow = () => canAddSections() && document.body.classList.contains('editing') && !aWindowIsOpen();
+        const drawInsert = (handle, at) => {
+            if (!handle) return;
+            if (!at) {
+                handle.line.classList.remove('is-visible');
+
+                return;
+            }
+            Object.assign(handle.line.style, { top: `${at.top}px`, left: `${at.left}px`, width: `${at.width}px` });
+            handle.line.classList.add('is-visible');
+        };
+        const endList = () => shownSectionLists().at(-1) ?? null;
+        const drawEndInsert = () => {
+            const list = insertingNow() ? endList() : null;
+            const sections = list ? shownSections(list) : [];
+            if (!list) {
+                insertEnd = null;
+            } else {
+                const box = (sections.at(-1) ?? list).getBoundingClientRect();
+                // After the last section, or at the top of a page that has none yet.
+                insertEnd = { list, after: null, top: sections.length ? box.bottom : box.top, left: box.left, width: box.width };
+            }
+            drawInsert(ui.sectionInsertEnd, insertEnd);
+        };
+        const hideInserts = () => {
+            insertHere = null;
+            drawInsert(ui.sectionInsert, null);
+            drawInsert(ui.sectionInsertEnd, null);
+        };
+        document.addEventListener('pointermove', (event) => {
+            if (!insertingNow()) {
+                hideInserts();
+
+                return;
+            }
+            const path = event.composedPath?.() ?? [];
+            // On the button itself: it stays where it is, so it can be pressed.
+            if (path.includes(ui.sectionInsert?.button) || path.includes(ui.sectionInsertEnd?.button)) return;
+            if (event.target === ui.root || ui.root.contains(event.target)) {
+                insertHere = null;
+                drawInsert(ui.sectionInsert, null);
+
+                return;
+            }
+            if (insertFrame.id) return;
+            insertFrame.id = requestAnimationFrame(() => {
+                insertFrame.id = null;
+                const under = sectionUnder(event.target);
+                const at = under ? insertionNear(under.list, under.section, event.clientY) : null;
+                // The line after the last section is already drawn, with its own button.
+                insertHere = at && !(at.last && at.list === insertEnd?.list) ? at : null;
+                drawInsert(ui.sectionInsert, insertHere);
+                drawEndInsert();
+            });
+        });
+        const followInserts = () => {
+            insertHere = null;
+            drawInsert(ui.sectionInsert, null);
+            drawEndInsert();
+        };
+        document.addEventListener('scroll', followInserts, true);
+        window.addEventListener('resize', followInserts);
+        document.addEventListener('pointerleave', () => { insertHere = null; drawInsert(ui.sectionInsert, null); });
+        ui.sectionInsert?.button.addEventListener('click', (event) => {
+            event.stopPropagation();
+            const at = insertHere;
+            hideInserts();
+            if (at) openSectionPicker({ list: at.list, after: at.after });
+        });
+        ui.sectionInsertEnd?.button.addEventListener('click', (event) => {
+            event.stopPropagation();
+            const list = insertEnd?.list ?? endList();
+            hideInserts();
+            if (list) openSectionPicker({ list, after: null });
+        });
+        // The bar's "+ Section": the page's sections panel, which adds one at the end and lists the rest.
+        const refreshSectionsButton = () => {
+            if (ui.sectionsButton) ui.sectionsButton.hidden = !(canAddSections() && shownSectionLists().length);
+            if (document.body.classList.contains('editing')) drawEndInsert();
+            else hideInserts();
+        };
+        ui.sectionsButton?.addEventListener('click', () => {
+            if (!document.body.classList.contains('editing')) setEditing(true);
+            const list = endList();
+            if (list) switchToNode(list);
+        });
+        refreshSectionsButton();
+        new MutationObserver(refreshSectionsButton).observe(document.body, { attributes: true, attributeFilter: ['class'] });
+        // Pictures and fonts arriving move where the last section ends.
+        window.addEventListener('load', refreshSectionsButton);
 
         let bgTarget = null;
         const hideBgHandle = () => {
