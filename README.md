@@ -546,8 +546,19 @@ seconds more, so the queue connection's `retry_after` must be longer than that
 are always given back when no picture is delivered: by the job when the
 provider fails, and, when the job never ran or died partway, the next time the
 editor asks about it, once its time is well past. The reason is kept in
-`live_edit_image_generations.reason` (`provider_error`, `no_suggestion`,
-`timed_out`).
+`live_edit_image_generations.reason`, and the provider's own words are in the
+log (`storage/logs`):
+
+- `provider_refused`: the provider said no. With OpenAI the commonest reason is
+  that `gpt-image-1` needs the organisation behind the key to be verified
+  (platform.openai.com, Settings, Organization). Until it is, a refused model
+  is tried again on `LIVE_EDIT_AI_IMAGE_FALLBACK_MODEL` (`dall-e-3`, which needs
+  no verification; empty to turn this off).
+- `provider_unreachable`: the server could not reach the provider at all.
+- `not_stored`: the picture came back but could not be written to the media
+  disk (`LIVE_EDIT_DISK`).
+- `no_suggestion`: the provider answered with nothing usable.
+- `timed_out`, `provider_error`: the job never finished.
 
 **`@liveEdit` appears as text on the page.** Blade prints a directive it does
 not know rather than erroring, so this ends up visible to visitors. The package

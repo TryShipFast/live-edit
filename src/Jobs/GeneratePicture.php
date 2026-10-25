@@ -57,7 +57,7 @@ class GeneratePicture implements ShouldQueue
         }
 
         if ($images === []) {
-            $imagine->giveUp($this->generationId, 'no_suggestion');
+            $imagine->giveUp($this->generationId, $imagine->whyNothing());
 
             return;
         }

@@ -2,12 +2,15 @@
 
 namespace ShipFast\LiveEdit\Tests\Api;
 
+use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Storage;
 use ShipFast\LiveEdit\Application\Api\FindPhotos;
 use ShipFast\LiveEdit\Application\Api\ImagineAPicture;
 use ShipFast\LiveEdit\Domain\Credits\Credits;
 use ShipFast\LiveEdit\Domain\Site\Site;
+use ShipFast\LiveEdit\Jobs\GeneratePicture;
+use ShipFast\LiveEdit\Models\ImageGeneration;
 use ShipFast\LiveEdit\Tests\TestCase;
 
 /**
@@ -259,6 +262,95 @@ class PicturesTest extends TestCase
 
         $this->assertSame('no_suggestion', $made['reason']);
         $this->assertSame(10, app(Credits::class)->balance($this->site), 'a generation that produced nothing was charged for');
+    }
+
+    /*
+     * Reported from a self-hosted install: every picture failed as no_suggestion and nothing said why.
+     * OpenAI refuses gpt-image-1 (403) until the organisation behind the key is verified, and that
+     * refusal was thrown away as "nothing usable came back".
+     */
+    public function test_a_refused_model_is_tried_again_on_the_fallback_and_its_picture_kept(): void
+    {
+        $this->withImageModel();
+        config()->set('live-edit.ai.image_fallback_model', 'dall-e-3');
+        $disk = config('live-edit.disk', 'public');
+        Storage::fake($disk);
+        $png = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==';
+
+        Http::fake(function ($request) use ($png) {
+            return $request['model'] === 'test-image-model'
+                ? Http::response(['error' => ['message' => 'Your organization must be verified to use the model.']], 403)
+                : Http::response(['data' => [['b64_json' => $png]]], 200);
+        });
+        app(Credits::class)->grant($this->site, 10);
+
+        $made = app(ImagineAPicture::class)($this->site, 'a quiet treatment room');
+
+        $this->assertCount(1, $made['images']);
+        $this->assertStringStartsNotWith('data:', $made['images'][0]);
+        $this->assertSame(5, $made['balance']);
+        // one at a time, and as bytes: a dall-e address expires within the hour
+        Http::assertSent(fn ($request) => $request['model'] === 'dall-e-3' && $request['n'] === 1 && $request['response_format'] === 'b64_json');
+        Http::assertSent(fn ($request) => $request['model'] === 'test-image-model' && ! isset($request['response_format']));
+    }
+
+    public function test_a_refusal_says_so_and_is_not_charged(): void
+    {
+        $this->withImageModel();
+        config()->set('live-edit.ai.image_fallback_model', '');
+        Http::fake(['*' => Http::response(['error' => ['message' => 'Your organization must be verified to use the model.']], 403)]);
+        app(Credits::class)->grant($this->site, 10);
+
+        $made = app(ImagineAPicture::class)($this->site, 'a quiet treatment room');
+
+        $this->assertSame('provider_refused', $made['reason']);
+        $this->assertSame(10, $made['balance']);
+        Http::assertSentCount(1);
+    }
+
+    public function test_a_limit_is_not_retried_on_another_model(): void
+    {
+        // Too many requests, or an outage, is the same for every model: asking another only costs more.
+        $this->withImageModel();
+        config()->set('live-edit.ai.image_fallback_model', 'dall-e-3');
+        Http::fake(['*' => Http::response(['error' => ['message' => 'Rate limit reached.']], 429)]);
+        app(Credits::class)->grant($this->site, 10);
+
+        $made = app(ImagineAPicture::class)($this->site, 'a quiet treatment room');
+
+        $this->assertSame('provider_refused', $made['reason']);
+        Http::assertSentCount(1);
+    }
+
+    public function test_a_provider_that_cannot_be_reached_says_so(): void
+    {
+        $this->withImageModel();
+        Http::fake(fn () => throw new ConnectionException('Could not resolve host'));
+        app(Credits::class)->grant($this->site, 10);
+
+        $made = app(ImagineAPicture::class)($this->site, 'a quiet treatment room');
+
+        $this->assertSame('provider_unreachable', $made['reason']);
+        $this->assertSame(10, $made['balance']);
+    }
+
+    public function test_a_queued_picture_records_why_it_failed(): void
+    {
+        $this->withImageModel();
+        config()->set('live-edit.ai.image_fallback_model', '');
+        Http::fake(['*' => Http::response(['error' => ['message' => 'Your organization must be verified to use the model.']], 403)]);
+        $credits = app(Credits::class);
+        $credits->grant($this->site, 10);
+        $credits->spend($this->site, 'generate_image');
+        $generation = ImageGeneration::query()->create([
+            'uuid' => '71a01e7d-2f74-4d1f-800d-8cb2d5aa3137', 'site_id' => $this->site->id,
+            'prompt' => 'a quiet treatment room', 'status' => 'queued', 'balance' => 5,
+        ]);
+
+        (new GeneratePicture($generation->id))->handle(app(ImagineAPicture::class));
+
+        $this->assertSame('provider_refused', $generation->fresh()->reason);
+        $this->assertSame(10, $credits->balance($this->site));
     }
 
     public function test_an_unaffordable_picture_never_reaches_the_model(): void

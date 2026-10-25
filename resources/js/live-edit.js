@@ -3271,6 +3271,9 @@ const bootLiveEdit = () => {
             queue_unavailable: 'Picture generation is temporarily unavailable. Your credits have not been used.',
             no_suggestion: 'Nothing usable came back, so you have not been charged. Try describing it differently.',
             timed_out: 'That picture took too long and was stopped. Your credits are back. Try again.',
+            provider_refused: 'The picture service turned this request down, so you have not been charged. The reason is in the server log.',
+            provider_unreachable: 'The picture service could not be reached just now, so you have not been charged. Try again in a moment.',
+            not_stored: 'The picture was made but could not be saved here, so you have not been charged. The reason is in the server log.',
             nothing_to_work_with: 'Describe the picture you want first.',
         }[reason] ?? 'Could not make a picture just now. You have not been charged.');
 
