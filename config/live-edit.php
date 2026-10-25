@@ -248,6 +248,9 @@ return [
         // images.
         'image_endpoint' => env('LIVE_EDIT_AI_IMAGE_ENDPOINT', 'https://api.openai.com/v1/images/generations'),
         'image_model' => env('LIVE_EDIT_AI_IMAGE_MODEL', 'gpt-image-1'),
+        // Asked when the model above is refused (OpenAI refuses gpt-image-1 until the organisation
+        // behind the key is verified). Empty to try no other model.
+        'image_fallback_model' => env('LIVE_EDIT_AI_IMAGE_FALLBACK_MODEL', 'dall-e-3'),
         'image_connect_timeout' => (int) env('LIVE_EDIT_AI_IMAGE_CONNECT_TIMEOUT', 10),
         'image_timeout' => (int) env('LIVE_EDIT_AI_IMAGE_TIMEOUT', 50),
         // How long the provider is given to make two pictures, in the queue

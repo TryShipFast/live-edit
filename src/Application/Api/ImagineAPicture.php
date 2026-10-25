@@ -4,6 +4,7 @@ namespace ShipFast\LiveEdit\Application\Api;
 
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 use ShipFast\LiveEdit\Domain\Content\ImageStore;
 use ShipFast\LiveEdit\Domain\Content\SiteStore;
@@ -27,7 +28,19 @@ use ShipFast\LiveEdit\Models\ImageGeneration;
  */
 class ImagineAPicture
 {
+    /**
+     * Why the last call came back with no picture, as a reason the editor can word: the provider
+     * refused (provider_refused), could not be reached (provider_unreachable), the picture could not
+     * be stored (not_stored), or nothing usable came back (no_suggestion).
+     */
+    private string $whyNothing = 'no_suggestion';
+
     public function __construct(private readonly Credits $credits) {}
+
+    public function whyNothing(): string
+    {
+        return $this->whyNothing;
+    }
 
     public function available(): bool
     {
@@ -63,7 +76,7 @@ class ImagineAPicture
             return [
                 'images' => [],
                 'balance' => $this->credits->refund($site, 'generate_image', ['prompt' => mb_substr($prompt, 0, 200)]),
-                'reason' => 'no_suggestion',
+                'reason' => $this->whyNothing,
             ];
         }
 
@@ -276,8 +289,11 @@ class ImagineAPicture
 
                 try {
                     return $store->url($store->put($bytes, $mime, $extension, $directory));
-                } catch (\Throwable) {
-                    // Treated as "nothing usable came back", which refunds.
+                } catch (\Throwable $e) {
+                    // Made and paid for, and lost here: said as such, and logged for whoever runs the server.
+                    $this->whyNothing = 'not_stored';
+                    Log::warning('Live Edit could not store a generated picture.', ['error' => $e->getMessage()]);
+
                     return null;
                 }
             })
@@ -287,42 +303,87 @@ class ImagineAPicture
     }
 
     /**
+     * The pictures, from the configured model, or from the fallback when the configured one is refused.
+     *
+     * Every failure used to come back as an empty list, so a refusal read as "nothing usable came back"
+     * and the reason - which the provider spells out - was thrown away. Reported from a self-hosted
+     * install: every picture failed with no_suggestion and nothing said why. The commonest cause is
+     * gpt-image-1 itself, which OpenAI refuses (403) until the organisation behind the key is verified;
+     * dall-e-3 needs no verification, so a refused model is tried again on that before giving up.
+     *
      * @return array<int, string>
      */
     protected function ask(string $prompt, int $count): array
     {
-        try {
-            $response = Http::withToken(config('live-edit.ai.api_key'))
-                // This runs in a queue worker, outside the browser request.
-                // Give the provider enough time to finish; the editor polls
-                // the generation record and the worker refunds an unusable
-                // result or a provider failure.
-                ->connectTimeout((int) config('live-edit.ai.image_connect_timeout', 10))
-                ->timeout(max(30, (int) config('live-edit.ai.image_job_timeout', 150)))
-                ->post(config('live-edit.ai.image_endpoint'), [
-                    'model' => config('live-edit.ai.image_model'),
-                    // Two options balance choice against provider latency.
-                    // Asking for four at once made the provider call slow
-                    // enough to hit the service gateway's request timeout.
-                    'n' => max(1, min($count, 2)),
-                    'size' => '1024x1024',
-                    'prompt' => $this->frame($prompt),
+        $this->whyNothing = 'no_suggestion';
+        $model = (string) config('live-edit.ai.image_model');
+        $fallback = (string) config('live-edit.ai.image_fallback_model', 'dall-e-3');
+
+        foreach (array_values(array_unique(array_filter([$model, $fallback]))) as $i => $tryModel) {
+            $dallE = str_starts_with($tryModel, 'dall-e');
+
+            try {
+                $response = Http::withToken(config('live-edit.ai.api_key'))
+                    // This runs in a queue worker, outside the browser request.
+                    // Give the provider enough time to finish; the editor polls
+                    // the generation record and the worker refunds an unusable
+                    // result or a provider failure.
+                    ->connectTimeout((int) config('live-edit.ai.image_connect_timeout', 10))
+                    ->timeout(max(30, (int) config('live-edit.ai.image_job_timeout', 150)))
+                    ->post(config('live-edit.ai.image_endpoint'), array_filter([
+                        'model' => $tryModel,
+                        // Two options balance choice against provider latency.
+                        // Asking for four at once made the provider call slow
+                        // enough to hit the service gateway's request timeout.
+                        // dall-e-3 makes one at a time.
+                        'n' => $tryModel === 'dall-e-3' ? 1 : max(1, min($count, 2)),
+                        'size' => '1024x1024',
+                        'prompt' => $this->frame($prompt),
+                        // A dall-e address expires within the hour, which would leave a hole in
+                        // the page; bytes are stored here and kept (keep()). gpt-image-1 sends
+                        // bytes anyway and refuses this field.
+                        'response_format' => $dallE ? 'b64_json' : null,
+                    ]));
+            } catch (\Throwable $e) {
+                $this->whyNothing = 'provider_unreachable';
+                Log::warning('Live Edit could not reach the image provider.', ['model' => $tryModel, 'error' => $e->getMessage()]);
+
+                return [];
+            }
+
+            if (! $response->successful()) {
+                $this->whyNothing = 'provider_refused';
+                Log::warning('The image provider refused a picture.', [
+                    'model' => $tryModel,
+                    'status' => $response->status(),
+                    'error' => $response->json('error.message') ?? mb_substr($response->body(), 0, 300),
                 ]);
-        } catch (\Throwable) {
-            return [];
+
+                // Refused for this model (not allowed, not found, or a request it will not take):
+                // the next one may well be. A limit or an outage is the same for every model.
+                if (in_array($response->status(), [400, 403, 404], true)) {
+                    continue;
+                }
+
+                return [];
+            }
+
+            $images = collect($response->json('data') ?? [])
+                ->map(fn (array $image) => $image['url']
+                    ?? (isset($image['b64_json']) ? 'data:image/png;base64,'.$image['b64_json'] : null))
+                ->filter()
+                ->take(max(1, min($count, 2)))
+                ->values()
+                ->all();
+
+            if ($images === []) {
+                $this->whyNothing = 'no_suggestion';
+            }
+
+            return $images;
         }
 
-        if (! $response->successful()) {
-            return [];
-        }
-
-        return collect($response->json('data') ?? [])
-            ->map(fn (array $image) => $image['url']
-                ?? (isset($image['b64_json']) ? 'data:image/png;base64,'.$image['b64_json'] : null))
-            ->filter()
-            ->take(max(1, min($count, 2)))
-            ->values()
-            ->all();
+        return [];
     }
 
     /**
