@@ -9,6 +9,7 @@
     "test:e2e": "playwright test",
     "test:journey": "playwright test tests/e2e/drawer-journey.spec.js tests/e2e/content-is-yours.spec.js",
     "test:journey:blade": "playwright test tests/e2e/blade-journey.spec.js",
+    "test:journey:cards": "playwright test tests/e2e/card-details-journey.spec.js",
     "test:types": "tsc --noEmit -p packages/react/types-check"
   },
   "devDependencies": {
