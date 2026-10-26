@@ -9,6 +9,7 @@ import { addedWith, describeStructure, hrefTo, newAddedId, orderWith, pageOfLink
 import { insertionNear, sectionName, sectionUnder, shownSectionLists, shownSections } from './section-inserter.js';
 import { DETAIL_MODE, copiedItemSettings, copiedStyles, copyPageForCard, deletablePage, deletePage, detailAddress, keyMap, linksTo, linksWarning, showOnlyTheDetail } from './card-page.js';
 import { renderChoice } from './choice.js';
+import { describeListChange } from './change-review.js';
 import { chartRowOf, renderChartPanel, renderChartRow, renderTableControls } from './data-panel.js';
 import { KINDS as CHART_KINDS, chartData, chartOf, itemContext as chartItemContext, kindOf as chartKindOf } from './data-kit.js';
 import { commonQuestions, listGuides, profileFor } from './help.js';
@@ -1798,6 +1799,10 @@ const bootLiveEdit = () => {
 
             if (said) return said.label;
 
+            const list = describeListChange(change);
+
+            if (list) return list.label;
+
             const onPage = elementForChange(change);
 
             if (onPage) return describeElement(onPage);
@@ -1834,6 +1839,10 @@ const bootLiveEdit = () => {
          */
         const readsOnThePageAs = (change) => {
             const stored = trim(change.after);
+            const list = describeListChange(change);
+
+            if (list) return list.after || 'Menu order updated';
+
             const onPage = elementForChange(change);
 
             if (!onPage || change.kind === 'style' || isAPictureChange(change)) {
