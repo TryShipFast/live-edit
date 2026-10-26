@@ -13,6 +13,7 @@ import { chartRowOf, renderChartPanel, renderChartRow, renderTableControls } fro
 import { KINDS as CHART_KINDS, chartData, chartOf, itemContext as chartItemContext, kindOf as chartKindOf } from './data-kit.js';
 import { commonQuestions, listGuides, profileFor } from './help.js';
 import { dropdownTriggerFrom } from './dropdown-trigger.js';
+import { addressFromTheRoot } from './site-address.js';
 import { biggestThatFits, howMuchSurvives, inSourcePixels, movedWithin, whatIsThereNow } from './fitting.js';
 import { attrsWorthSending, creditWorthSending } from './only-what-changed.js';
 import { confirm as confirmChange, expectChange, takeExpected } from './verify.js';
@@ -2663,7 +2664,8 @@ const bootLiveEdit = () => {
                     }
                 }
                 if (current.hrefKey) {
-                    const hrefValue = drawerFields.querySelector('[data-link-field=href]').value.trim();
+                    // Saved from the site's root where the host keys this link once for every page (site-address.js).
+                    const hrefValue = addressFromTheRoot(drawerFields.querySelector('[data-link-field=href]').value.trim(), current.hrefRoot, document.baseURI);
                     const newTab = drawerFields.querySelector('[data-link-field=target]').checked;
                     await request('/live-edit/setting', {
                         method: 'POST',
@@ -3317,6 +3319,7 @@ const bootLiveEdit = () => {
 
         const appendLinkFields = (element) => {
             current.hrefKey = element.dataset.editHref;
+            current.hrefRoot = element.dataset.editHrefRoot;
             current.targetKey = element.dataset.editTarget;
             const group = document.createElement('div');
             group.className = 'le-field le-divided';
@@ -3634,7 +3637,7 @@ const bootLiveEdit = () => {
                 progress,
             });
             const href = hrefTo(editableLink.getAttribute('href'), id);
-            await patiently(() => saveSetting(editableLink.dataset.editHref, href), progress);
+            await patiently(() => saveSetting(editableLink.dataset.editHref, addressFromTheRoot(href, editableLink.dataset.editHrefRoot, document.baseURI)), progress);
             // So this card already opens its own page if it is chosen again before the list is redrawn.
             editableLink.setAttribute('href', href);
             if (editableLink.dataset.linkPage) editableLink.dataset.linkPage = id;

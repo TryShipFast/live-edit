@@ -9,6 +9,7 @@ use DOMXPath;
 use Illuminate\Support\Str;
 use ShipFast\LiveEdit\Domain\Content\Companions;
 use ShipFast\LiveEdit\Support\ContentSignature;
+use ShipFast\LiveEdit\Support\SiteRootAddress;
 use ShipFast\LiveEdit\Support\SvgSanitiser;
 
 /**
@@ -610,7 +611,8 @@ class MarkupScanner
         foreach ($xpath->query('//*[@data-edit-href]') as $node) {
             $key = $node->getAttribute('data-edit-href');
             if ($key !== '' && array_key_exists($key, $overrides) && $overrides[$key] !== '') {
-                $node->setAttribute('href', $overrides[$key]);
+                // One saved from the site's root ("~/fees/") is written out for this page (SiteRootAddress).
+                $node->setAttribute('href', SiteRootAddress::here((string) $overrides[$key], $node->getAttribute('data-edit-href-root')));
             }
         }
 
