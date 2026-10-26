@@ -26,10 +26,11 @@ import { applyContent, applyStyles } from '../../resources/js/content.js';
 
 /* ------------------------------ the design ------------------------------ */
 
-const header = `
+/* Linked relatively, as a static site is: "../shop/" one folder down, "../../shop/" two. */
+const header = (root) => `
 <header data-instance="site.header" data-component="core.header">
-  <a class="logo" href="../../shop/" data-key="nav.logo" data-edit="link">Vellum</a>
-  <nav><a href="../../shop/" data-key="nav.shop" data-edit="link">Shop</a> <a href="../../journal/" data-key="nav.journal" data-edit="link">Journal</a></nav>
+  <a class="logo" href="${root}shop/" data-key="nav.logo" data-edit="link">Vellum</a>
+  <nav><a href="${root}shop/" data-key="nav.shop" data-edit="link">Shop</a> <a href="${root}journal/" data-key="nav.journal" data-edit="link">Journal</a></nav>
 </header>`;
 
 const footer = `
@@ -115,13 +116,13 @@ const shop = `
   </section>
 </main>`;
 
-const page = (title, main) => `<!doctype html><html lang="en"><head><meta charset="utf-8"><title>${title} | Vellum</title>
+const page = (title, main, root = '../../') => `<!doctype html><html lang="en"><head><meta charset="utf-8"><title>${title} | Vellum</title>
 <style>body{font-family:sans-serif;margin:0} header,footer{background:#eee;padding:12px} main{padding:24px} .cards,.posts,.gallery{display:flex;gap:16px;list-style:none;padding:0} .cards li,.posts li{border:1px solid #ddd;padding:12px;width:220px} img{width:120px;height:80px;object-fit:cover;background:#ccd}</style>
-</head><body>${header}${main}${footer}</body></html>`;
+</head><body>${header(root)}${main}${footer}</body></html>`;
 
 /** The design's own pages, by address, as the design files hold them. */
 export const DESIGN = {
-    shop: { title: 'Shop', html: page('Shop', shop) },
+    shop: { title: 'Shop', html: page('Shop', shop, '../') },
     'products/aster-veil': { title: 'Aster Veil', html: page('Aster Veil', product('aster-veil', 'Aster Veil', '$118', 'Neroli picked at dawn, laid over cedar.')) },
     'products/blue-hour': { title: 'Blue Hour', html: page('Blue Hour', product('blue-hour', 'Blue Hour', '$96', 'Iris after rain.')) },
     'journal/first-light': { title: 'First light', html: page('First light', post('first-light', 'First light')) },
@@ -165,6 +166,17 @@ const whereItSits = (element) => {
 
 const inABand = (element) => Boolean(element.closest('header, footer, nav'));
 
+/** The way from a page up to the site's root: "" at the root, "../" one folder down. */
+const rootOf = (name) => (name === '' ? '' : '../'.repeat(name.split('/').length));
+
+/** A page's relative address as it reads from the site's root ("../../shop/" on products/x is "shop/"). */
+const fromTheRoot = (href, name) => {
+    const here = new URL(`http://site.test/${name === '' ? '' : `${name}/`}`);
+    const target = new URL(href, here);
+
+    return /^(?:[a-z][a-z0-9+.-]*:|\/|#)/i.test(href) ? href : `${target.pathname.slice(1)}${target.search}${target.hash}`;
+};
+
 /** convertEveryMarker: the designer's shorthand becomes keys, named for `name`. */
 const keyMarkers = (doc, name, bandsAreShared = true) => {
     const keyFor = (element, named = true) => {
@@ -188,6 +200,16 @@ const keyMarkers = (doc, name, bandsAreShared = true) => {
                 element.removeAttribute('data-edit');
             } else if (marker === 'link') {
                 element.setAttribute('data-edit-href', element.hasAttribute('data-key') ? keyFor(element, false) : key);
+                /*
+                 * A named link's address is one key on every page, kept from the site's root
+                 * (TheDesignersMarkersBecomeKeys::addressKey): the editor saves it as "~/<path>"
+                 * and each page writes it out with its own way up (data-edit-href-root).
+                 */
+                if (bandsAreShared && element.hasAttribute('data-key')) {
+                    element.setAttribute('data-edit-href-was', element.getAttribute('data-edit-href'));
+                    element.setAttribute('data-edit-href', `tpl:${hash(`address:named:${element.getAttribute('data-key')}|${fromTheRoot(element.getAttribute('href'), name)}`)}`);
+                    element.setAttribute('data-edit-href-root', rootOf(name));
+                }
                 element.setAttribute('data-edit', `setting:${key}.text`);
                 styleable(element, key);
             } else {

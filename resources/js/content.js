@@ -1,6 +1,7 @@
 import { applyChoices } from './choice.js';
 import { cleanSvg } from './svg.js';
 import { ownTextOf, retrying } from './support.js';
+import { addressHere } from './site-address.js';
 
 /**
  * An error that remembers what the server said.
@@ -1040,11 +1041,12 @@ export const applyContent = (root, settings) => {
         applied++;
     }
 
-    // A link's target carries its own key alongside the element's.
+    // A link's target carries its own key alongside the element's. One saved
+    // from the site's root ("~/fees/") is written out for this page (site-address.js).
     for (const element of root.querySelectorAll('[data-edit-href]')) {
         const key = element.getAttribute('data-edit-href');
         if (Object.hasOwn(settings, key)) {
-            element.setAttribute('href', settings[key]);
+            element.setAttribute('href', addressHere(settings[key], element.getAttribute('data-edit-href-root')));
             applied++;
         }
     }
