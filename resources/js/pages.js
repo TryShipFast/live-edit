@@ -13,6 +13,36 @@
  * makes is still one its designer drew.
  */
 
+import { KINDS } from './data-kit.js';
+
+/** What a chart of a kind, or a table, holds and keeps to, for choosing one before it is added. */
+export function kindSays(kind) {
+    if (kind === 'table') {
+        return [
+            'A table, for what is compared across columns: plans, fees, a timetable.',
+            'You name the columns and fill the rows; add, move and delete either, or paste rows from a spreadsheet. On a phone each row reads as a card.',
+            'It arrives with sample rows to replace.',
+        ];
+    }
+    const spec = KINDS[kind];
+    if (!spec) return [];
+    const rules = {
+        bar: 'One unit for every bar.',
+        line: 'Points stay in date order.',
+        donut: 'Shares add up to the whole, and six slices at most: the smallest go together as “Other”.',
+        funnel: 'Stages stay in order, and each count is no larger than the one before.',
+        progress: 'Each value and its target are in the same unit.',
+        sparkline: 'Drawn small, with no axes, beside its latest figure.',
+    }[kind];
+
+    return [
+        `Each ${spec.one.toLowerCase()} has ${[spec.label, ...spec.fields].map((f) => f.toLowerCase()).join(', ')}. Type them, or paste rows from a spreadsheet.`,
+        rules,
+        spec.choices ? `You choose: ${spec.choices.charAt(0).toLowerCase()}${spec.choices.slice(1)}` : '',
+        'It arrives with sample figures to replace, and redraws as you edit.',
+    ].filter(Boolean);
+}
+
 /** Addresses the host keeps for itself, matched to the host's own rule. */
 const RESERVED = ['assets', 'home', 'index', '404', 'sites', 'live-edit', 'api', 'admin'];
 const PAGE_ID = /^[a-z0-9](?:[a-z0-9-]{0,46}[a-z0-9])?(?:\/[a-z0-9](?:[a-z0-9-]{0,46}[a-z0-9])?)?$/;
@@ -729,9 +759,15 @@ export function renderSectionBrowser({ container, library, add, multiple = false
     const show = async (section) => {
         looking = section;
         stageName.textContent = section.label;
-        stageFrom.textContent = section.page ? `From your ${section.page} page` : '';
+        stageFrom.textContent = section.kind ? 'Drawn in your site’s own colours and type' : section.page ? `From your ${section.page} page` : '';
         paintAction();
         list.querySelectorAll('.le-library-item').forEach((row) => row.classList.toggle('is-looking', row.dataset.from === section.from));
+        // A chart or a table (data-kit.js): what it holds and the rules it keeps, since it is not on any page yet.
+        if (section.kind) {
+            view.replaceChildren(...kindSays(section.kind).map((line) => el('p', 'le-hint', line)));
+
+            return;
+        }
         if (!section.at) {
             view.replaceChildren(el('p', 'le-hint', 'This section cannot be shown on its own. It can still be added.'));
 
@@ -864,25 +900,11 @@ export function hrefTo(oldHref, newId) {
 }
 
 /**
- * Makes a page like another (its sections, in order) for a card, under the
- * card's own name, out of the menu: the same two settings a page made from
- * New page writes. Returns the new page's id.
- */
-export async function makePageLike({ config, save, sections, title }) {
-    const id = freeAddress(title, config.taken ?? []);
-    const added = {};
-    for (const from of sections) added[newAddedId()] = from;
-    await save(`structure:page:${id}`, JSON.stringify({ added }));
-    await save(config.pagesKey, JSON.stringify([...(config.made ?? []), { id, title: String(title).trim(), menu: false }]));
-
-    return id;
-}
-
-/**
  * What a card says about the thing it stands for: its name, its photo, its
  * price and its short description, read from the card as the owner sees it.
- * A page made for the card starts with these, so the owner corrects a page
- * that is already theirs rather than one still describing another product.
+ * A copied card's own page (card-page.js) is given these where the card says
+ * something its original's page does not, so the owner corrects a page that is
+ * already theirs rather than one still describing another product.
  */
 export function cardFacts(card) {
     const words = (el) => (el?.textContent ?? '').replace(/\s+/g, ' ').trim();

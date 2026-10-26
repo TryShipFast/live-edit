@@ -16,6 +16,47 @@ Toy pages agree with whatever the code already does.
 
 ## Open
 
+### Partly open: a card's page is edited in place, copied whole, and deleted with its card
+
+**Before.** **Edit all details** read the card's page and built a form from its
+fields: text boxes with guessed labels, an address box for a picture, colour
+inputs, and buttons to add or remove an option. It was not the page, so it lost
+the layout, the picture chooser, list reordering and anything a form could not
+guess. **Give it its own page** made a page from the design's sample sections
+and copied four facts from the card, so everything the owner had written on
+the original page (its story, its gallery, its sizes) was the template's sample
+again on the copy. Deleting a card left its page published and in the sitemap,
+with nothing offering to remove it.
+
+**Now** (`card-page.js`, README "A card and its page"). The page opens over the
+list as itself, in the editor running on that page in detail mode, and is
+edited by clicking it with the ordinary panel and saves. A copied card's own
+page is a full copy of the page it shared: every section, every list order,
+every saved word, picture, link, style and card setting under the copy's own
+keys, then what the owner put on the card. Deleting a card that has its own
+page asks whether the page goes too, and says what else links to it.
+
+**Still open:**
+
+- **The design's own pages can only be deleted where the host keeps a list of
+  removed pages** (`removedKey` in the page builder). The hosted app does not
+  yet, so "delete the six sample posts" deletes the six cards and asks the
+  owner to keep the six pages, which stay published.
+- **Links the design wrote into other pages are not found** when warning about
+  a deletion. The editor knows the page it is on and every link the owner set
+  (those are saved settings), not the markup of the pages it is not showing.
+- **Translations are not copied.** A copied page carries the site's default
+  language; words saved in another language for the original stay on it.
+- **The page's SEO title and description are not copied.** The copy is named
+  after the card; its description is left for the owner, as a made page's is.
+- **A copy is many saves.** A page with a hundred saved fields is a hundred
+  requests, waited out when the API says "too many" (40 a minute by default),
+  so a large copy can take a few minutes. A batch save would make it one.
+- **Copies are matched by structure.** Both pages come from the same design
+  file, so an element is matched by its position among same-tag siblings, and a
+  list item by its id. A section a template script rebuilds before the page is
+  served would not match, and its words would not be copied.
+
 ### Mostly fixed: nothing said which engine the service was running
 
 A cloud site is tagged by the console and saves through the console, so for

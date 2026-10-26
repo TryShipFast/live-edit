@@ -53,9 +53,15 @@ class EmbedController
         'pages.js' => 'pages.js',
         'dropdown-trigger.js' => 'dropdown-trigger.js',
         'linked-detail-scope.js' => 'linked-detail-scope.js',
+        'card-page.js' => 'card-page.js',
         'choice.js' => 'choice.js',
         'shop.js' => 'shop.js',
         'help.js' => 'help.js',
+        'section-inserter.js' => 'section-inserter.js',
+        'data-kit.js' => 'data-kit.js',
+        'data-panel.js' => 'data-panel.js',
+        'clear-of-the-bar.js' => 'clear-of-the-bar.js',
+        'dialogs-in-place.js' => 'dialogs-in-place.js',
         // The built bundle, resolved to resources/dist rather than to a
         // sibling of the modules.
         'bundle.js' => 'bundle.js',

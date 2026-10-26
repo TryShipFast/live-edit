@@ -91,7 +91,7 @@ export const renderShopPanel = ({ container, config, save, done, notify = () => 
     terms.forEach((f) => offers.append(field(f)));
 
     const products = config?.products ?? [];
-    const list = section(`Products (${products.length})`, 'Each has its own page for its photos, sizes, price and story. To add one, duplicate a product card in the shop and give it its own page from its panel.');
+    const list = section(`Products (${products.length})`, 'Each has its own page for its photos, sizes, price and story. Click a product card in the shop and press Edit all details to change its page there. To add one, duplicate a card and press Give it its own page: it starts as a full copy.');
     const ul = el('ul', 'le-shop-list');
     for (const product of products) {
         const row = el('li', 'le-shop-row le-shop-product');

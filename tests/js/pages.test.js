@@ -293,14 +293,6 @@ describe('a card and its page', () => {
         expect(hrefTo('../products/arc/', 'fig-archive')).toBe('../fig-archive/');
         expect(hrefTo('products/arc/', 'fig-archive')).toBe('fig-archive/');
     });
-    it('makes a page like another, out of the menu', async () => {
-        const { makePageLike } = await import('../../resources/js/pages.js');
-        const saved = [];
-        const id = await makePageLike({ config: { pagesKey: 'structure:pages', made: [], taken: [] }, save: async (k, v) => saved.push([k, v]), sections: ['product.detail', 'product.details'], title: 'Fig Archive' });
-        expect(id).toBe('fig-archive');
-        expect(Object.values(JSON.parse(saved[0][1]).added)).toEqual(['product.detail', 'product.details']);
-        expect(JSON.parse(saved[1][1])).toEqual([{ id: 'fig-archive', title: 'Fig Archive', menu: false }]);
-    });
 });
 
 describe('a page made for a card starts with what the card says', () => {

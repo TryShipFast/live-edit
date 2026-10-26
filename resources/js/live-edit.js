@@ -1,13 +1,18 @@
 import { createChrome } from './chrome.js';
+import { keepClearOfTheBar } from './clear-of-the-bar.js';
+import { openDialogsInPlace } from './dialogs-in-place.js';
 import { renderBrandPanel } from './brand.js';
 import { uploadWidget } from './upload.js';
 import { renderSeoPanel } from './seo.js';
 import { renderShopPanel } from './shop.js';
-import { addedWith, cardFacts, describeStructure, factTargets, hrefTo, makePageLike, newAddedId, orderWith, pageOfLink, renderNewPage, renderSectionBrowser } from './pages.js';
+import { addedWith, describeStructure, hrefTo, newAddedId, orderWith, pageOfLink, renderNewPage, renderSectionBrowser } from './pages.js';
+import { insertionNear, sectionName, sectionUnder, shownSectionLists, shownSections } from './section-inserter.js';
+import { DETAIL_MODE, copyPageForCard, deletablePage, deletePage, detailAddress, linksTo, linksWarning, showOnlyTheDetail } from './card-page.js';
 import { renderChoice } from './choice.js';
+import { chartRowOf, renderChartPanel, renderChartRow, renderTableControls } from './data-panel.js';
+import { KINDS as CHART_KINDS, chartData, chartOf, itemContext as chartItemContext, kindOf as chartKindOf } from './data-kit.js';
 import { commonQuestions, listGuides, profileFor } from './help.js';
 import { dropdownTriggerFrom } from './dropdown-trigger.js';
-import { elementsInComponents, linkedDetailComponents } from './linked-detail-scope.js';
 import { biggestThatFits, howMuchSurvives, inSourcePixels, movedWithin, whatIsThereNow } from './fitting.js';
 import { attrsWorthSending, creditWorthSending } from './only-what-changed.js';
 import { confirm as confirmChange, expectChange, takeExpected } from './verify.js';
@@ -142,6 +147,14 @@ const bootLiveEdit = () => {
         // The editor's UI is the package's own overlay in a shadow root, so the
         // host theme's CSS can neither style it nor be broken by it.
         const ui = createChrome();
+        // The site's own fixed things (a phone's Book bar, a cookie notice) lifted clear of the bar while editing.
+        keepClearOfTheBar({
+            bar: ui.toolbar,
+            isEditing: () => document.body.classList.contains('editing'),
+            skip: (element) => element === ui.root || ui.root.contains(element),
+        });
+        // A site's modal dialogs (a phone menu, a lightbox) open in place, so the editor stays usable over them.
+        const reopenDialogsInPlace = openDialogsInPlace();
 
         /**
          * Tell the client something went wrong, in the editor's own voice.
@@ -217,7 +230,21 @@ const bootLiveEdit = () => {
             }
         });
 
+        /*
+         * Detail mode: this page is a card's page, opened from the card in a
+         * window over the list (card-page.js). Only its detail is shown, there
+         * is no toolbar (the list's own is behind the window), and every save
+         * tells the list, so closing the window shows what was saved.
+         */
+        const detailMode = new URLSearchParams(window.location.search).get('live-edit') === DETAIL_MODE
+            && window.parent !== window;
+        const tellTheCard = () => {
+            if (!detailMode) return;
+            try { window.parent.postMessage({ type: 'live-edit:detail-saved' }, window.location.origin); } catch { /* the list refreshes when it is next loaded */ }
+        };
+
         const reloadWithToast = (message) => {
+            tellTheCard();
             sessionStorage.setItem('tb_toast', message);
             reloadPreservingScroll();
         };
@@ -237,6 +264,7 @@ const bootLiveEdit = () => {
          * text on screen.
          */
         const settle = async (message, key = null, value = null, forceContentRefresh = false) => {
+            tellTheCard();
             const bridge = window.__liveEditReact;
 
             if (!bridge) {
@@ -965,7 +993,9 @@ const bootLiveEdit = () => {
             // arrives after it was built. See redrawPanel().
             lastOpened = node;
 
-            if (node.hasAttribute('data-edit-list')) editList(node);
+            if (node.matches?.('tr') && chartRowOf(node) === node) editChartRow(node);
+            else if (node.hasAttribute('data-edit-list') && chartKindOf(chartOf(node)) && chartData(chartOf(node)).list === node) editChart(chartOf(node));
+            else if (node.hasAttribute('data-edit-list')) editList(node);
             else if (node.dataset.editImg !== undefined) editImage(node);
             else if (node.dataset.edit !== undefined) editText(node);
             else if (node.dataset.svgEdit !== undefined || node.dataset.editSvg !== undefined) editDrawing(node);
@@ -2159,6 +2189,7 @@ const bootLiveEdit = () => {
             // which of them are icons at all.
             if (on) markRealIcons();
             document.body.classList.toggle('editing', on);
+            if (on) reopenDialogsInPlace();
             editables().forEach((el) => {
                 if (on) {
                     el.setAttribute('tabindex', '0');
@@ -2324,7 +2355,12 @@ const bootLiveEdit = () => {
                 // reason the API ever gave and showed "Could not save. Try
                 // again." instead — which says nothing, and is the wrong
                 // advice when trying again cannot possibly work.
-                throw new Error(data.error?.message ?? data.message ?? 'Could not save. Try again.');
+                const refused = new Error(data.error?.message ?? data.message ?? 'Could not save. Try again.');
+                // Kept on the error for the one caller that makes many saves in a row (a card's
+                // page copied, key by key), which waits out a "too many" rather than stopping halfway.
+                refused.status = response.status;
+                refused.retryAfter = Number(data.error?.retry_after ?? response.headers?.get?.('Retry-After')) || null;
+                throw refused;
             }
             if (!isJsonResponse(response)) {
                 throw new Error('That did not save. Reload the page and try again.');
@@ -3489,241 +3525,326 @@ const bootLiveEdit = () => {
             finishPanel(element, { linkElement });
         };
 
-        /**
-         * Edit the linked record from its card. The linked detail page is the
-         * source of truth, so the modal reads that page's editing keys rather
-         * than guessing fields from the listing card's wording.
+        /*
+         * A card and its page (card-page.js).
+         *
+         * The card's page is shown as itself: the editor, loaded in a frame on
+         * that page in detail mode, showing only the record's own components
+         * with their layout, photos, options and words. The owner edits it by
+         * clicking it, with the same panel, controls and saves as anywhere
+         * else, so there is no second way of editing to learn and nothing a
+         * form could leave out. Closing the window shows the list again with
+         * what was saved.
          */
-        const editLinkedPage = async ({ page, link, item, list, builder, shared }) => {
-            const cardName = (item.dataset.editItemLabel || item.querySelector('h1, h2, h3, h4')?.textContent || page.title || '')
-                .replace(/\s+/g, ' ').trim();
-            const editableLink = link.dataset.editHref !== undefined ? link : item.querySelector('a[data-edit-href]');
-            const like = (builder.starts ?? []).find((start) => start.id === page.id);
-            const isCopy = /^n[0-9a-z]+$/.test(item.dataset.editItem)
-                || (cardName && cardName.toLowerCase() !== String(page.title).toLowerCase());
+        /*
+         * The page a card opens, and the link that opens it. Its name's link first (the heading), then any
+         * link to a page of the site: a barber's card on Third Chair holds the name, which opens his page,
+         * and four booking slots, which open the booking page; taking the first link found made the
+         * booking page "the card's page".
+         */
+        const cardOpens = (item, builder) => {
+            const toPages = [...item.querySelectorAll('a[href]')]
+                .map((a) => [a, pageOfLink(a, builder.pages, window.location.href)])
+                .filter(([, page]) => page);
+
+            return toPages.find(([a]) => a.closest('h1, h2, h3, h4, h5, h6')) ?? toPages[0] ?? null;
+        };
+        /*
+         * The address to point at a card's own page: one whose link opens that page, never just the first
+         * link with an address key. That pointed a booking slot at the new page and left the name opening
+         * the original. Null when no link to the page can be re-addressed (its words are marked, its
+         * address is not), so the card is not given a page only a stray button reaches.
+         */
+        const addressOfTheCardsPage = (item, link, page, builder) => {
+            if (link?.dataset.editHref !== undefined) return link;
+
+            return [...item.querySelectorAll('a[data-edit-href]')]
+                .find((a) => pageOfLink(a, builder?.pages ?? [], window.location.href)?.id === page.id) ?? null;
+        };
+        const cardNameOf = (item) => (item.dataset.editItemLabel || item.querySelector('h1, h2, h3, h4')?.textContent || '')
+            .replace(/\s+/g, ' ').trim();
+
+        /** Another page of this site, as the editor serves it, read rather than run. */
+        const fetchEditorPage = async (builder, id) => {
+            const response = await fetch(`${builder.editorBase}${id}`, {
+                credentials: 'same-origin',
+                headers: { Accept: 'text/html' },
+            });
+            if (!response.ok) throw new Error(`That page could not be read (${response.status}). Try again.`);
+
+            return new DOMParser().parseFromString(await response.text(), 'text/html');
+        };
+
+        /** Every saved setting and style, with drafts over published: what the owner sees now. */
+        const readSavedContent = async () => {
+            const config = window.liveEditContent;
+            if (config?.base && config?.site && config?.key) {
+                const { fetchContent } = await import('./content.js');
+
+                return fetchContent(config);
+            }
+            const response = await request('/live-edit/content', { method: 'GET' });
+
+            return response.json();
+        };
+
+        /*
+         * One save, waiting out "too many" rather than giving up on it.
+         *
+         * Copying a page is dozens of saves in a row, which is more than the
+         * content API lets a person make in a minute. Stopping halfway would
+         * leave a page with half its words, so a refusal for speed waits as
+         * long as the server asks and tries again.
+         */
+        const patiently = async (work, progress = () => {}) => {
+            for (let attempt = 0; ; attempt += 1) {
+                try {
+                    return await work();
+                } catch (error) {
+                    if (error?.status !== 429 || attempt >= 8) throw error;
+                    const seconds = Math.min(65, Math.max(2, error.retryAfter ?? 10));
+                    progress(`Still copying. Waiting ${seconds} seconds so the server can keep up…`);
+                    await new Promise((resolve) => window.setTimeout(resolve, seconds * 1000));
+                }
+            }
+        };
+
+        /**
+         * A copied card's own page: a full copy of the page it shares, every
+         * edit included, then the card's own name, photo, price and notes
+         * where they differ, and the card pointed at it. Returns the page.
+         */
+        const giveItsOwnPage = async ({ page, link, item, builder, progress = () => {} }) => {
+            const editableLink = addressOfTheCardsPage(item, link, page, builder);
+            if (!editableLink) throw new Error('This card’s link to its page cannot be changed, so it cannot have a page of its own.');
+            const title = cardNameOf(item) || page.title;
+            const id = await copyPageForCard({
+                page,
+                title,
+                card: item,
+                builder,
+                fetchPage: (pageId) => fetchEditorPage(builder, pageId),
+                readContent: readSavedContent,
+                save: (key, value) => patiently(() => saveSetting(key, value), progress),
+                saveStyle: (key, props) => patiently(() => request('/live-edit/style', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ key, props }),
+                }), progress),
+                progress,
+            });
+            const href = hrefTo(editableLink.getAttribute('href'), id);
+            await patiently(() => saveSetting(editableLink.dataset.editHref, href), progress);
+            // So this card already opens its own page if it is chosen again before the list is redrawn.
+            editableLink.setAttribute('href', href);
+            if (editableLink.dataset.linkPage) editableLink.dataset.linkPage = id;
+
+            return { ...page, id, title };
+        };
+
+        /**
+         * Edit the page a card opens, from the card, without leaving the list.
+         * A copy that still shares its original's page is given its own first,
+         * so nothing done here can reach the original.
+         */
+        const editLinkedPage = async ({ page, link, item, builder, separate = false }) => {
+            const cardName = cardNameOf(item);
+            let changed = false;
+            const heard = (event) => {
+                if (event.origin === window.location.origin && event.data?.type === 'live-edit:detail-saved') changed = true;
+            };
+            window.addEventListener('message', heard);
             const modal = ui.modal({
                 title: cardName ? `Edit ${cardName}` : `Edit ${page.title}`,
-                subtitle: 'Update the details on this card’s page here, in one pass.',
-                size: 'is-wide',
+                subtitle: 'This is its page. Click anything on it to change it. It saves as a draft, like everything else, until you publish.',
+                size: 'is-full',
+                onClose: () => {
+                    window.removeEventListener('message', heard);
+                    ui.root.classList.remove('le-detail-open');
+                    // The list again, with what was saved: a card now pointing at its own page, its page's new words.
+                    if (changed) void settle('Saved ✓', null, null, true);
+                },
             });
-            const renderPage = async (targetPage, initialFacts = null) => {
-                modal.body.replaceChildren();
-                const loading = document.createElement('p');
-                loading.className = 'le-hint';
-                loading.textContent = 'Loading page details…';
-                modal.body.append(loading);
-                const response = await fetch(`${builder.editorBase}${targetPage.id}`, {
-                    credentials: 'same-origin',
-                    headers: { Accept: 'text/html' },
-                });
-                if (!response.ok) throw new Error(`Could not load this page’s details (${response.status}).`);
-                const html = await response.text();
-                const parsedPage = new DOMParser().parseFromString(html, 'text/html');
-                const pageRoot = parsedPage.querySelector('main') ?? parsedPage.body;
-                // A product/article page can contain related cards, sticky-buy
-                // controls, reviews and other components alongside its detail.
-                // Keep this form on the linked record's components, not every
-                // editable thing that happens to share its URL.
-                const roots = linkedDetailComponents(pageRoot);
-                const root = { querySelectorAll: (selector) => elementsInComponents(roots, selector) };
-                const fields = [];
-                const seen = new Set();
-                root.querySelectorAll('[data-edit], [data-edit-img], [data-edit-href]').forEach((node) => {
-                    if (node.closest('header, nav, footer, [data-component*="header"], [data-component*="navigation"]')) return;
-                    const attribute = node.hasAttribute('data-edit-img') ? 'data-edit-img'
-                        : node.hasAttribute('data-edit-href') ? 'data-edit-href' : 'data-edit';
-                    const parsed = parseEditKey(node.getAttribute(attribute));
-                    if (parsed.kind !== 'setting' || !parsed.key || seen.has(`${attribute}:${parsed.key}`)) return;
-                    seen.add(`${attribute}:${parsed.key}`);
-                    const field = node.dataset.field ?? node.dataset.label ?? node.getAttribute('aria-label') ?? '';
-                    const label = (field || node.tagName.toLowerCase().replace(/^h[1-6]$/, 'Heading'))
-                        .replace(/[-_]+/g, ' ').replace(/\s+/g, ' ').trim()
-                        .replace(/\b\w/g, (letter) => letter.toUpperCase());
-                    const value = attribute === 'data-edit-href' ? node.getAttribute('href') ?? ''
-                        : attribute === 'data-edit-img' ? (node.getAttribute('src') ?? node.dataset.editValue ?? '')
-                            : (node.dataset.editValue ?? node.textContent.trim());
-                    fields.push({ key: parsed.key, label, value, attribute, fieldName: node.dataset.field ?? '', rich: node.dataset.edit === 'words', rows: /description|content|body|story|notes|excerpt/i.test(label) ? 4 : 2 });
-                });
+            ui.root.classList.add('le-detail-open');
+            const wait = document.createElement('p');
+            wait.className = 'le-hint le-detail-wait';
+            wait.textContent = 'Opening its page…';
+            modal.body.replaceChildren(wait);
 
-                const styles = [];
-                root.querySelectorAll('[data-style]').forEach((node) => {
-                    const key = node.dataset.style;
-                    if (!key || styles.some((style) => style.key === key)) return;
-                    const declared = declaredStyleProps(node.dataset.styleProps, window.liveEditStyleProps ?? {});
-                    const allowed = stylePropsFor(node, declared).filter((prop) => ['background', 'textColor', 'fontSize', 'fontWeight', 'radius'].includes(prop));
-                    if (!allowed.length) return;
-                    styles.push({ key, label: node.dataset.label ?? node.dataset.component ?? 'Section style', allowed, value: (window.liveEditStyles ?? {})[key] ?? {} });
-                });
-
-                const variantLists = [...root.querySelectorAll('[data-edit-list]')]
-                    .filter((candidate) => /variant|option|size|colour|color/i.test(candidate.dataset.editListLabel ?? candidate.getAttribute('aria-label') ?? '')
-                        || candidate.dataset.editListKind === 'variants');
-                const fragment = document.createDocumentFragment();
-                if (!fields.length && !styles.length && !variantLists.length) {
-                    const empty = document.createElement('p');
-                    empty.className = 'le-hint';
-                    empty.textContent = 'This detail page has no editable fields yet.';
-                    fragment.append(empty);
-                }
-
-                const controls = fields.map((field, index) => {
-                    const wrap = fieldInput(`detail-${index}`, field.label, field.value, field.rows, field.rich);
-                    let control = wrap.querySelector('textarea, input, select');
-                    if (field.attribute === 'data-edit-href' || field.attribute === 'data-edit-img') {
-                        const urlInput = document.createElement('input');
-                        urlInput.type = 'url';
-                        urlInput.className = 'le-input';
-                        urlInput.placeholder = 'https://…';
-                        urlInput.value = field.value;
-                        control.replaceWith(urlInput);
-                        control = urlInput;
-                    }
-                    fragment.append(wrap);
-                    const fact = initialFacts && (field.attribute === 'data-edit-img' ? 'photo'
-                        : field.fieldName === 'price' ? 'price'
-                            : /^(title|name|heading)$/i.test(field.fieldName) ? 'name'
-                                : /^(notes|lead|excerpt|description|summary)$/i.test(field.fieldName) ? 'notes' : null);
-                    const factValue = fact ? initialFacts[fact] : null;
-                    if (factValue) control.value = factValue;
-                    return { ...field, control, factValue };
-                });
-                styles.forEach((style) => {
-                    const heading = document.createElement('div');
-                    heading.className = 'le-section-heading';
-                    heading.textContent = `${style.label} style`;
-                    fragment.append(heading);
-                    style.controls = [];
-                    style.allowed.forEach((prop) => {
-                        const label = ({ background: 'Background colour', textColor: 'Text colour', fontSize: 'Text size', fontWeight: 'Font weight', radius: 'Corner roundness' })[prop] ?? prop;
-                        const wrap = document.createElement('label');
-                        wrap.className = 'le-field';
-                        wrap.append(label);
-                        const input = document.createElement('input');
-                        input.className = 'le-input';
-                        input.type = ['background', 'textColor'].includes(prop) ? 'color' : 'text';
-                        input.value = style.value[prop] ?? '';
-                        if (input.type === 'color' && !/^#[0-9a-f]{6}$/i.test(input.value)) input.value = '#ffffff';
-                        input.dataset.detailStyleProp = prop;
-                        wrap.append(input);
-                        let useDefault = null;
-                        if (input.type === 'color') {
-                            const defaultLabel = document.createElement('span');
-                            defaultLabel.className = 'le-muted';
-                            defaultLabel.textContent = 'Use design default';
-                            useDefault = document.createElement('input');
-                            useDefault.type = 'checkbox';
-                            useDefault.checked = !style.value[prop];
-                            useDefault.addEventListener('change', () => { input.disabled = useDefault.checked; });
-                            input.disabled = useDefault.checked;
-                            wrap.append(useDefault, defaultLabel);
-                            input.addEventListener('input', () => { useDefault.checked = false; input.disabled = false; });
-                        }
-                        fragment.append(wrap);
-                        style.controls.push({ prop, input, useDefault });
-                    });
-                });
-
-                variantLists.forEach((variantList) => {
-                    const heading = document.createElement('div');
-                    heading.className = 'le-section-heading';
-                    const variants = [...variantList.children].filter((child) => child.dataset.editItem);
-                    heading.textContent = `${variantList.dataset.editListLabel || 'Options'} (${variants.length})`;
-                    fragment.append(heading);
-                    const add = document.createElement('button');
-                    add.type = 'button';
-                    add.className = 'le-chip-btn';
-                    add.textContent = '+ Add option';
-                    const maximum = Number.parseInt(variantList.dataset.editListMax ?? '', 10);
-                    add.disabled = Number.isFinite(maximum) && maximum > 0 && variants.length >= maximum;
-                    add.addEventListener('click', async () => {
-                        const ids = variants.map((variant) => variant.dataset.editItem);
-                        ids.push(`n${Date.now().toString(36)}`);
-                        try {
-                            await saveSetting(variantList.dataset.editList, JSON.stringify(ids));
-                            if (variantList.dataset.editListPair) await saveSetting(variantList.dataset.editListPair, JSON.stringify(ids));
-                            await renderPage(targetPage);
-                            notify('Option added. Fill in its details below.');
-                        } catch (error) { notify(error.message); }
-                    });
-                    fragment.append(add);
-                    const minimum = Math.max(1, Number.parseInt(variantList.dataset.editListMin ?? '', 10) || 1);
-                    variants.forEach((variant) => {
-                        const remove = document.createElement('button');
-                        remove.type = 'button';
-                        remove.className = 'le-chip-btn';
-                        remove.textContent = `Remove ${variant.dataset.editItemLabel || variant.dataset.editItem}`;
-                        remove.disabled = variants.length <= minimum;
-                        remove.addEventListener('click', async () => {
-                            try {
-                                const ids = variants.filter((row) => row !== variant).map((row) => row.dataset.editItem);
-                                await saveSetting(variantList.dataset.editList, JSON.stringify(ids));
-                                if (variantList.dataset.editListPair) await saveSetting(variantList.dataset.editListPair, JSON.stringify(ids));
-                                await renderPage(targetPage);
-                                notify('Option removed.');
-                            } catch (error) { notify(error.message); }
-                        });
-                        fragment.append(remove);
-                    });
-                });
-
-                if (initialFacts) {
-                    // A copy starts with the card's facts, as the former full-page
-                    // flow did, but writes those facts straight to the new page's
-                    // own component keys before presenting the form.
-                    for (const field of controls) {
-                        if (field.factValue && field.factValue !== field.value) {
-                            await saveSetting(field.key, field.factValue);
-                            field.value = field.factValue;
-                        }
-                    }
-                }
-                modal.body.replaceChildren(fragment);
-                const save = document.createElement('button');
-                save.type = 'button';
-                save.className = 'le-btn';
-                save.textContent = 'Save all details';
-                save.addEventListener('click', async () => {
-                    const changed = controls.filter((field) => field.control.value !== field.value);
-                    const styleChanges = styles.map((style) => ({
-                        ...style,
-                        props: Object.fromEntries(style.controls.map(({ prop, input, useDefault }) => [prop, useDefault?.checked ? '' : input.value])),
-                    })).filter((style) => JSON.stringify(style.props) !== JSON.stringify(Object.fromEntries(style.allowed.map((prop) => [prop, style.value[prop] ?? '']))));
-                    if (!changed.length && !styleChanges.length) return notify('No changes to save.');
-                    save.disabled = true;
-                    save.textContent = 'Saving…';
-                    try {
-                        for (const field of changed) await saveSetting(field.key, field.control.value);
-                        for (const style of styleChanges) {
-                            await request('/live-edit/style', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ key: style.key, props: style.props }) });
-                            window.liveEditStyles ??= {};
-                            window.liveEditStyles[style.key] = style.props;
-                        }
-                        notify('All details saved ✓');
-                        save.textContent = 'Saved';
-                    } catch (error) {
-                        notify(error.message);
-                        save.textContent = 'Save all details';
-                    } finally { save.disabled = false; }
-                });
-                modal.foot.hidden = false;
-                modal.foot.replaceChildren(save);
-            };
-
+            let target = page;
             try {
-                let target = page;
-                let initialFacts = null;
-                if (shared && isCopy && like?.sections?.length && editableLink) {
-                    modal.body.textContent = 'Making a page for this copy…';
-                    const id = await makePageLike({ config: builder, save: saveSetting, sections: like.sections, title: cardName || 'New page' });
-                    await saveSetting(editableLink.dataset.editHref, hrefTo(editableLink.getAttribute('href'), id));
-                    target = { ...page, id, title: cardName || page.title };
-                    initialFacts = cardFacts(item);
+                if (separate) {
+                    modal.allowDismiss(false);
+                    wait.textContent = `Giving this card its own page, a copy of ${page.title}…`;
+                    target = await giveItsOwnPage({ page, link, item, builder, progress: (said) => { wait.textContent = said; } });
+                    changed = true;
+                    modal.allowDismiss(true);
+                    wait.textContent = 'Opening its page…';
                 }
-                await renderPage(target, initialFacts);
             } catch (error) {
+                modal.allowDismiss(true);
                 modal.close();
                 notify(error.message);
+
+                return;
             }
+
+            const frame = document.createElement('iframe');
+            frame.className = 'le-detail-frame';
+            frame.title = `${target.title} page`;
+            frame.src = detailAddress(builder.editorBase, target.id);
+            frame.addEventListener('load', () => wait.remove(), { once: true });
+            modal.body.append(frame);
+
+            const note = document.createElement('span');
+            note.className = 'le-modal-note';
+            note.textContent = separate
+                ? `Its own page now: changes here never reach ${page.title}.`
+                : 'Publish from the bar when you are ready.';
+            const whole = document.createElement('button');
+            whole.type = 'button';
+            whole.className = 'le-chip-btn';
+            whole.textContent = 'Open the whole page →';
+            whole.addEventListener('click', () => { window.location.href = `${builder.editorBase}${target.id}`; });
+            const done = document.createElement('button');
+            done.type = 'button';
+            done.className = 'le-btn';
+            done.textContent = 'Done';
+            done.addEventListener('click', () => modal.close());
+            modal.foot.replaceChildren(note, whole, done);
+            modal.foot.hidden = false;
+        };
+
+        /**
+         * Delete a card that opens a page only it opens: the page can go with
+         * it, or stay. Asked in a window rather than a yes/no, because "delete
+         * this item?" says nothing about the page, and the page is the part
+         * still published and still in the sitemap if it is left behind.
+         */
+        const deleteCardAndMaybeItsPage = async ({ item, page, builder, deleteCard }) => {
+            const cardName = cardNameOf(item) || 'this item';
+            const kind = deletablePage(page, builder);
+            const modal = ui.modal({ title: `Delete “${cardName}”?`, size: 'is-medium' });
+            const said = document.createElement('p');
+            said.textContent = `This card opens its own page, “${page.title}”.`;
+            const warning = document.createElement('p');
+            warning.className = 'le-hint';
+            modal.body.replaceChildren(said, warning);
+
+            if (kind) {
+                said.textContent += ' Delete that page as well, or keep it?';
+                warning.textContent = 'Checking what else links to it…';
+                try {
+                    const { settings } = await readSavedContent();
+                    warning.textContent = linksWarning(linksTo(page, {
+                        doc: document,
+                        settings: settings ?? {},
+                        pages: builder.pages,
+                        base: window.location.href,
+                        except: [item],
+                        builder,
+                    })) || 'Nothing else on your site links to it.';
+                } catch {
+                    warning.textContent = 'Other links to it, if there are any, will lead nowhere once it is deleted.';
+                }
+            } else {
+                said.textContent += ' It came with the design, and those pages cannot be deleted here yet, so it stays on your website.';
+                warning.remove();
+            }
+
+            const button = (text, className, onClick) => {
+                const node = document.createElement('button');
+                node.type = 'button';
+                node.className = className;
+                node.textContent = text;
+                node.addEventListener('click', onClick);
+
+                return node;
+            };
+            const busy = (on) => modal.foot.querySelectorAll('button').forEach((node) => { node.disabled = on; });
+            const cancel = button('Cancel', 'le-chip-btn', () => modal.close());
+            const cardOnly = button(kind ? 'Delete the card, keep its page' : 'Delete the card', kind ? 'le-chip-btn' : 'le-btn-danger', async () => {
+                busy(true);
+                modal.close();
+                await deleteCard('Deleted ✓');
+            });
+            const both = kind ? button('Delete the card and its page', 'le-btn-danger', async () => {
+                busy(true);
+                try {
+                    await deletePage({ page, builder, save: saveSetting });
+                } catch (error) {
+                    busy(false);
+                    notify(error.message);
+
+                    return;
+                }
+                modal.close();
+                await deleteCard(`Deleted the card and “${page.title}” ✓`);
+            }) : null;
+            modal.foot.replaceChildren(...[cancel, cardOnly, both].filter(Boolean));
+            modal.foot.hidden = false;
+        };
+
+        /** A list's order saved as its value (and its partner's, for tabs and their panels). */
+        const saveListOrder = async (list, ids) => {
+            await request('/live-edit/setting', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ key: list.dataset.editList, value: JSON.stringify(ids) }),
+            });
+            // A row of tabs and its panels (data-edit-list-pair) are one collection
+            // drawn twice: one order for both, so a panel added is a tab added.
+            if (list.dataset.editListPair) {
+                await request('/live-edit/setting', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ key: list.dataset.editListPair, value: JSON.stringify(ids) }),
+                });
+            }
+        };
+
+        /** Whether this page can be given sections from the design's library. */
+        const canAddSections = () => Boolean(window.liveEditPages?.library?.length) && !detailMode;
+
+        /*
+         * A section from the design's library, added after another one (or
+         * last). Two saves: which section it is, under the page's arrangement,
+         * then where it goes, in the list's order. The host draws it from the
+         * page it was taken from with keys of its own, so the page is loaded
+         * again to show it: drawn here in place, the list would show a copy of
+         * the section above it until the next load, which reads as the wrong
+         * section having been added.
+         *
+         * The same on every page: a page the design came with takes sections
+         * just as a page the owner made does.
+         */
+        const openSectionPicker = ({ list, after = null }) => {
+            const builder = window.liveEditPages;
+            if (!canAddSections() || !list?.dataset?.editList) return null;
+            const below = after ? [...list.children].find((child) => child.dataset.editItem === after) : null;
+            const where = below ? `below “${sectionName(below)}”` : shownSections(list).length ? 'at the end of this page' : 'on this page';
+            const handle = ui.modal({ title: 'Add a section', subtitle: `It goes ${where}. Point at one to see it.`, size: 'is-wide' });
+            const picker = renderSectionBrowser({
+                container: handle.body,
+                library: builder.library,
+                add: async (section) => {
+                    const id = newAddedId();
+                    handle.allowDismiss(false);
+                    try {
+                        await saveSetting(builder.structureKey, addedWith(builder.added, id, section.from));
+                        const order = [...list.children].filter((child) => child.dataset.editItem).map((child) => child.dataset.editItem);
+                        await saveListOrder(list, orderWith(order, `s-${id}`, after));
+                        handle.close();
+                        reloadWithToast(`${section.label} added ✓`);
+                    } catch (error) {
+                        handle.allowDismiss(true);
+                        notify(error.message);
+                    }
+                },
+            });
+            picker.focus();
+
+            return handle;
         };
 
         /**
@@ -3743,20 +3864,7 @@ const bootLiveEdit = () => {
 
             const saveOrder = async (ids, message) => {
                 try {
-                    await request('/live-edit/setting', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ key: list.dataset.editList, value: JSON.stringify(ids) }),
-                    });
-                    // A row of tabs and its panels (data-edit-list-pair) are one collection
-                    // drawn twice: one order for both, so a panel added is a tab added.
-                    if (list.dataset.editListPair) {
-                        await request('/live-edit/setting', {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ key: list.dataset.editListPair, value: JSON.stringify(ids) }),
-                        });
-                    }
+                    await saveListOrder(list, ids);
                     await settle(message, list.dataset.editList, JSON.stringify(ids), true);
                 } catch (error) {
                     notify(error.message);
@@ -3764,6 +3872,9 @@ const bootLiveEdit = () => {
             };
 
             const sections = list.dataset.editListKind === 'sections';
+            // A card's page opened from its card is the record, not the page's arrangement: its
+            // sections are moved, copied and hidden on the whole page, where the rest can be seen.
+            if (sections && detailMode) return;
             const heading = document.createElement('div');
             heading.className = 'le-section-heading';
             // A chosen section is already named on the line above ("Section 1 of 17 · Our story"), so its
@@ -3784,6 +3895,19 @@ const bootLiveEdit = () => {
             const full = Number.isFinite(most) && most > 0 && count >= most;
             const lowest = count <= least;
 
+            /*
+             * The page this card opens, when it opens one of the site's pages: a
+             * product card, a journal card, a project card. `shared` when another
+             * card in the list opens the same page, which is what a copied card
+             * does until it has a page of its own. Not offered inside a card's
+             * page that is itself being edited from a card (detail mode): one
+             * window over the list is enough.
+             */
+            const builder = window.liveEditPages;
+            const opens = !sections && item && builder?.pages?.length && !detailMode ? cardOpens(item, builder) : null;
+            const shared = Boolean(opens) && [...list.children].some((other) => other !== item && other.dataset.editItem
+                && [...other.querySelectorAll('a[href]')].some((a) => pageOfLink(a, builder.pages, window.location.href)?.id === opens[1].id));
+
             // With an item chosen, "Duplicate" below does exactly this (a copy right after it),
             // so offering both asked a novice to choose between two names for one thing.
             if (!sections && !item) {
@@ -3801,41 +3925,15 @@ const bootLiveEdit = () => {
                 row.append(add);
             }
 
-            /*
-             * A section from the design's library, added below this one (or
-             * last). Two saves: which section it is, under the page's
-             * arrangement, then where it goes, in this list's order. The host
-             * draws it from the page it was taken from with keys of its own.
-             */
-            const builder = window.liveEditPages;
-            if (sections && builder?.library?.length) {
+            // A section from the design's library, below this one, or at the end of the page.
+            if (sections && canAddSections()) {
                 const addSection = document.createElement('button');
                 addSection.type = 'button';
                 addSection.className = 'le-chip-btn';
                 addSection.textContent = item ? '+ Add a section below' : '+ Add a section';
-                addSection.addEventListener('click', () => {
-                    // A window with room to see a section at its real size before
-                    // adding it, rather than a list squeezed into the panel.
-                    const below = item ? `below “${item.dataset.editSectionLabel ?? 'this section'}”` : 'to this page';
-                    const handle = ui.modal({ title: 'Add a section', subtitle: `It goes ${below}. Point at one to see it.`, size: 'is-wide' });
-                    const picker = renderSectionBrowser({
-                        container: handle.body,
-                        library: builder.library,
-                        add: async (section) => {
-                            const id = newAddedId();
-                            handle.allowDismiss(false);
-                            try {
-                                await saveSetting(builder.structureKey, addedWith(builder.added, id, section.from));
-                                handle.close();
-                                await saveOrder(orderWith(currentOrder(), `s-${id}`, item?.dataset.editItem ?? null), `${section.label} added ✓`);
-                            } catch (error) {
-                                handle.allowDismiss(true);
-                                notify(error.message);
-                            }
-                        },
-                    });
-                    picker.focus();
-                });
+                // A window with room to see a section at its real size before
+                // adding it, rather than a list squeezed into the panel.
+                addSection.addEventListener('click', () => openSectionPicker({ list, after: item?.dataset.editItem ?? null }));
                 row.append(addSection);
             }
 
@@ -3900,9 +3998,17 @@ const bootLiveEdit = () => {
                     remove.className = 'le-btn-danger';
                     remove.textContent = 'Delete this item';
                     remove.disabled = lowest;
+                    const deleteCard = (message) => saveOrder(currentOrder().filter((id) => id !== item.dataset.editItem), message);
                     remove.addEventListener('click', () => {
+                        // A card that opens a page of its own offers that page too; a page other
+                        // cards still open is theirs as well, so it is never offered.
+                        if (opens && !shared) {
+                            void deleteCardAndMaybeItsPage({ item, page: opens[1], builder, deleteCard });
+
+                            return;
+                        }
                         if (!window.confirm('Delete this item?')) return;
-                        saveOrder(currentOrder().filter((id) => id !== item.dataset.editItem), 'Deleted \u2713');
+                        deleteCard('Deleted \u2713');
                     });
                     row.append(remove);
                 }
@@ -3916,6 +4022,34 @@ const bootLiveEdit = () => {
             const block = document.createElement('div');
             block.className = 'le-item-actions';
             block.append(heading, row);
+            /*
+             * The page's sections panel: every section on the page, in order, each
+             * opening its own panel (move, duplicate, hide, add one below it). The
+             * page's fields are not listed here, the way "Inside this" lists them
+             * for a section: on a whole page that is dozens of headings and links.
+             */
+            if (sections && !item) {
+                const order = document.createElement('div');
+                order.className = 'le-row';
+                shownSections(list).forEach((section, index) => {
+                    const open = document.createElement('button');
+                    open.type = 'button';
+                    open.className = 'le-chip-btn';
+                    open.textContent = `${index + 1}. ${sectionName(section)}`;
+                    open.title = 'Move, duplicate, hide or add a section below this one';
+                    open.addEventListener('click', () => {
+                        section.scrollIntoView({ block: 'start', behavior: 'smooth' });
+                        switchToNode(section);
+                    });
+                    order.append(open);
+                });
+                if (order.childElementCount) {
+                    const named = document.createElement('div');
+                    named.className = 'le-section-heading';
+                    named.textContent = 'On this page';
+                    block.append(named, order);
+                }
+            }
             if (!sections && (full || (item && lowest))) {
                 const why = document.createElement('p');
                 why.className = 'le-hint';
@@ -3924,75 +4058,52 @@ const bootLiveEdit = () => {
                     : 'Keep at least one, so there is something to add another from.';
                 block.append(why);
             }
-            /*
-             * The card's own page. A product card, a journal card or a project
-             * card opens a detail page of the design's; the panel offers that
-             * page from the card, so the details are one press away. A card
-             * copied from another still opens the original's page, so it is
-             * offered a page of its own: one made like its siblings', under the
-             * card's name, which the card then opens.
-             */
             // The card's category when its words do not show it (choice.js): chosen from the filter's own options.
             const choicePicker = !sections && item ? renderChoice({ item, list, save: saveSetting, notify }) : null;
             if (choicePicker) block.append(choicePicker);
-            const opens = !sections && item && builder?.pages?.length
-                ? [...item.querySelectorAll('a[href]')].map((a) => [a, pageOfLink(a, builder.pages, window.location.href)]).find(([, page]) => page)
-                : null;
+            /*
+             * The card's own page. A product card, a journal card or a project
+             * card opens a detail page; the panel opens that page over the list,
+             * as itself, to be edited in place (editLinkedPage). A card copied
+             * from another still opens the original's page, so before anything
+             * on it is edited it is given a page of its own: a full copy of the
+             * one it shared, which only it opens.
+             */
             if (opens) {
                 const [link, page] = opens;
-                const shared = [...list.children].some((other) => other !== item && other.dataset.editItem
-                    && [...other.querySelectorAll('a[href]')].some((a) => pageOfLink(a, builder.pages, window.location.href)?.id === page.id));
+                const editableLink = addressOfTheCardsPage(item, link, page, builder);
+                // The copy, not the card it was copied from: only an id the editor minted. A card's name says
+                // nothing: design cards are often named apart from their page ("Unwanted hair" opens "Laser
+                // hair removal"), two design cards can open one page, and owners rename cards.
+                const isCopy = /^n[0-9a-z]+$/.test(item.dataset.editItem);
+                const separate = Boolean(shared && isCopy && editableLink && builder.pagesKey);
                 const own = document.createElement('div');
                 own.className = 'le-row';
                 const editDetails = document.createElement('button');
                 editDetails.type = 'button';
                 editDetails.className = 'le-btn';
-                editDetails.textContent = 'Edit all details';
-                editDetails.title = 'Edit the linked page’s fields, styles and options here';
-                editDetails.addEventListener('click', () => editLinkedPage({ page, link, item, list, builder, shared }));
+                editDetails.textContent = separate ? 'Give it its own page' : 'Edit all details';
+                editDetails.title = separate
+                    ? `A copy of ${page.title} that only this card opens, edited here`
+                    : `Opens ${page.title} here, to edit by clicking it`;
+                editDetails.addEventListener('click', () => editLinkedPage({ page, link, item, builder, separate }));
                 own.append(editDetails);
-                const visit = document.createElement('button');
-                visit.type = 'button';
-                visit.className = 'le-chip-btn';
-                visit.textContent = shared ? `Open “${page.title}”` : 'Edit its page →';
-                visit.title = `Opens ${page.title} in the editor`;
-                visit.addEventListener('click', () => { window.location.href = `${builder.editorBase}${page.id}`; });
-                own.append(visit);
-                const like = (builder.starts ?? []).find((start) => start.id === page.id);
-                const editableLink = link.dataset.editHref !== undefined ? link : item.querySelector('a[data-edit-href]');
-                const cardName = (item.dataset.editItemLabel || item.querySelector('h1, h2, h3, h4')?.textContent || '').replace(/\s+/g, ' ').trim();
-                // The copy, not the card it was copied from: an id the editor minted, or a name that is not the page's.
-                const isCopy = /^n[0-9a-z]+$/.test(item.dataset.editItem) || (cardName && cardName.toLowerCase() !== String(page.title).toLowerCase());
-                if (shared && isCopy && like?.sections?.length && editableLink) {
-                    const make = document.createElement('button');
-                    make.type = 'button';
-                    make.className = 'le-btn';
-                    make.textContent = 'Give it its own page';
-                    make.title = `A new page made like ${page.title}, which this card opens`;
-                    make.addEventListener('click', async () => {
-                        const name = cardName || 'New page';
-                        make.disabled = true;
-                        make.textContent = 'Making its page…';
-                        try {
-                            const id = await makePageLike({ config: builder, save: saveSetting, sections: like.sections, title: name });
-                            await saveSetting(editableLink.dataset.editHref, hrefTo(editableLink.getAttribute('href'), id));
-                            // What the card says goes onto its page when the page first opens
-                            // (its keys only exist once the host has drawn it).
-                            try { sessionStorage.setItem(`live-edit:fill:${id}`, JSON.stringify(cardFacts(item))); } catch { /* the page opens as made */ }
-                            window.location.href = `${builder.editorBase}${id}`;
-                        } catch (error) {
-                            notify(error.message);
-                            make.disabled = false;
-                            make.textContent = 'Give it its own page';
-                        }
-                    });
-                    own.append(make);
+                if (!shared) {
+                    const visit = document.createElement('button');
+                    visit.type = 'button';
+                    visit.className = 'le-chip-btn';
+                    visit.textContent = 'Open the whole page →';
+                    visit.title = `Opens ${page.title} in the editor`;
+                    visit.addEventListener('click', () => { window.location.href = `${builder.editorBase}${page.id}`; });
+                    own.append(visit);
                 }
                 const said = document.createElement('p');
                 said.className = 'le-hint';
-                said.textContent = shared
-                    ? `This card currently shares ${page.title}. Choose Edit all details to give it a separate page and edit its details here.`
-                    : `This card opens ${page.title}. Its details, photos and price are edited there.`;
+                said.textContent = separate
+                    ? `This copy still opens ${page.title}. Give it its own page first: a copy of that page, with everything on it, that you can change without changing ${page.title}.`
+                    : shared
+                        ? `Another card opens ${page.title} too, so a change to it shows on both.`
+                        : `This card opens ${page.title}. Edit all details shows that page here: click anything on it to change it.`;
                 block.append(own, said);
             }
             const context = item ? drawerFields.querySelector('.le-item-context') : null;
@@ -4054,7 +4165,8 @@ const bootLiveEdit = () => {
             visit.addEventListener('click', () => {
                 // A host that keeps the visitor's address in the href and its own beside it
                 // (data-editor-href) means the page in the editor, not the live one.
-                window.location.href = anchor.dataset.editorHref || anchor.href;
+                // From a card's page in its window, the whole editor goes, not just the window.
+                (detailMode ? window.top : window).location.href = anchor.dataset.editorHref || anchor.href;
             });
             row.append(visit);
             drawerFields.append(row);
@@ -4088,7 +4200,8 @@ const bootLiveEdit = () => {
             // cards. Name the repeated item above the fields so they know
             // which product, project or section this drawer belongs to.
             const item = element.closest?.('[data-edit-item]');
-            if (item) {
+            const inTable = Boolean(element.closest?.('[data-kit-table]'));
+            if (item && !inTable) {
                 const list = item.parentElement;
                 const items = list ? [...list.children].filter((child) => child.hasAttribute('data-edit-item')) : [item];
                 const index = Math.max(0, items.indexOf(item)) + 1;
@@ -4116,8 +4229,10 @@ const bootLiveEdit = () => {
                 addStyleFields(key, props, styleOn);
             }
 
-            appendContents(element);
-            appendListControls(element);
+            // A page's sections list is the whole page: its sections are listed instead (appendListControls).
+            if (element.dataset?.editListKind !== 'sections') appendContents(element);
+            if (inTable) appendTableControls(element);
+            else appendListControls(element);
             setTrail(element.dataset.styleEdit ? (element.closest('[data-style]') ?? element.parentElement) : element);
             showTab('Edit');
             openDrawer();
@@ -4252,6 +4367,72 @@ const bootLiveEdit = () => {
             });
 
             drawerFields.append(row);
+        };
+
+        /* ---------------------------------------------------------- charts and tables (data-panel.js) */
+
+        // A list's order, drawn on the page the way the server will draw it (content.js).
+        const applyOrderHere = async (list, ids) => {
+            const { applyOrder } = await import('./content.js');
+            applyOrder(document, { [list.dataset.editList]: JSON.stringify(ids) });
+        };
+        const dataDeps = () => ({
+            save: saveSetting,
+            saveOrder: saveListOrder,
+            refresh: (message) => settle(message, null, null, true),
+            notify,
+            applyOrder: applyOrderHere,
+            renderChoice,
+        });
+
+        /** A chart's bar, point, slice or stage: its kind's fields and rules. */
+        const editChartRow = (row) => {
+            const chart = chartOf(row);
+            current = { kind: 'chart' };
+            lastOpened = row;
+            drawerTitle.textContent = CHART_KINDS[chartKindOf(chart)]?.one ?? 'Item';
+            drawerDelete.classList.add('le-hidden');
+            drawerFields.replaceChildren(renderChartRow({ row, ...dataDeps() }));
+            const back = document.createElement('button');
+            back.type = 'button';
+            back.className = 'le-chip-btn';
+            back.textContent = '← The whole chart';
+            back.addEventListener('click', () => editChart(chart));
+            drawerFields.append(back);
+            setTrail(chart);
+            showTab('Edit');
+            // Each field saves as it is changed (data-panel.js): no Save button to press.
+            ui.drawerFoot.classList.add('le-hidden');
+            openDrawer();
+        };
+
+        /** A chart: its settings, its rows, and pasting rows into it. */
+        const editChart = (chart) => {
+            current = { kind: 'chart' };
+            lastOpened = chart;
+            drawerTitle.textContent = chart.querySelector('.kit-data__title, h2, h3')?.textContent.trim() || 'Chart';
+            drawerDelete.classList.add('le-hidden');
+            drawerFields.replaceChildren(renderChartPanel({ chart, ...dataDeps(), openRow: (row) => switchToNode(row) }));
+            const section = chart.closest('[data-edit-item]');
+            if (section) {
+                const open = document.createElement('button');
+                open.type = 'button';
+                open.className = 'le-chip-btn';
+                open.textContent = 'Move, hide or remove this section';
+                open.addEventListener('click', () => editStyle(section));
+                drawerFields.append(open);
+            }
+            setTrail(chart);
+            showTab('Edit');
+            // Each field saves as it is changed (data-panel.js): no Save button to press.
+            ui.drawerFoot.classList.add('le-hidden');
+            openDrawer();
+        };
+
+        /** A table's cell: the row and the column it sits in, kept in step. */
+        const appendTableControls = (element) => {
+            const block = renderTableControls({ element, ...dataDeps() });
+            if (block) drawerFields.prepend(block);
         };
 
         const editStyle = (element) => {
@@ -4504,16 +4685,25 @@ const bootLiveEdit = () => {
             if (current?.element !== element) return;
             drawerFields.replaceChildren();
 
-            const restore = () => { element.outerHTML = was; };
+            // Put back the drawing that is on the page now, not `element`: choosing one replaces the node, so
+            // the original is detached, and setting outerHTML on a detached node throws. That throw, from the
+            // drawer closing after a save, sent every saved drawing down the reload fallback.
+            const restore = () => {
+                const live = document.querySelector(`[data-edit-svg="${element.dataset.editSvg}"]`);
+                if (live?.isConnected) live.outerHTML = was;
+            };
             current.restore = restore;
 
-            // One of each distinct drawing on the page, the current one first.
+            // One of each distinct drawing on the page, the current one first. Icon-sized ones only: a map, a
+            // chart or a diagram (words of its own, or bigger than an icon) is not something to put in its place.
             const seen = new Set();
             const drawings = [];
             document.querySelectorAll('svg').forEach((svg) => {
                 const markup = svg.outerHTML;
                 const shape = markup.replace(/\s+(class|style|width|height|data-[\w-]+)="[^"]*"/g, '');
-                if (seen.has(shape) || svg.getBoundingClientRect().width < 4) return;
+                const box = svg.getBoundingClientRect();
+                if (seen.has(shape) || box.width < 4) return;
+                if (svg !== element && (box.width > 96 || box.height > 96 || svg.querySelector('text, image, foreignObject'))) return;
                 seen.add(shape);
                 drawings.push(markup);
             });
@@ -5164,12 +5354,14 @@ const bootLiveEdit = () => {
                 // Above the trigger, clear of it: on a short label ("Firm") a handle on its corner sat over
                 // the middle of the button, and the press meant for the menu landed on the handle instead.
                 const box = trigger.getBoundingClientRect();
-                linkHandle.style.top = `${Math.max(2, box.top - 24) + window.scrollY}px`;
-                linkHandle.style.left = `${box.left + box.width / 2 - 13 + window.scrollX}px`;
+                // The handle is position: fixed, so it is placed in the viewport's own coordinates: adding the
+                // scroll offset drew it off screen on any scrolled page, and it is the only way to an icon's link.
+                linkHandle.style.top = `${Math.max(2, box.top - 24)}px`;
+                linkHandle.style.left = `${box.left + box.width / 2 - 13}px`;
             } else {
                 const rect = anchor.getBoundingClientRect();
-                linkHandle.style.top = `${rect.top + window.scrollY - 10}px`;
-                linkHandle.style.left = `${rect.right + window.scrollX - 10}px`;
+                linkHandle.style.top = `${Math.max(2, rect.top - 10)}px`;
+                linkHandle.style.left = `${rect.right - 10}px`;
             }
             linkHandle.classList.add('is-visible');
         };
@@ -5187,6 +5379,18 @@ const bootLiveEdit = () => {
             if (mayEditLocked !== true && node.closest('[data-live-lock]')) return null;
             const chip = node.closest('[data-style-edit]');
             if (chip) return { element: chip, kind: 'style' };
+            /*
+             * A chart (data-kit.js): a bar, point, slice or stage, drawn or in its table, is one of
+             * its rows, opened in the kind's own words; anywhere else on the drawing is the chart.
+             * Its title, readout and headings are words like any others, below.
+             */
+            const chart = chartOf(node);
+            if (chart && chartKindOf(chart) && !node.closest('[data-chart-units], .kit-data__head, figcaption, summary, thead')) {
+                const row = chartRowOf(node);
+                if (row) return { element: row, kind: 'chart-row', box: node.closest('[data-chart-item]') ?? row, label: chartItemContext(chart, row) };
+                const plot = node.closest('[data-chart-plot]');
+                if (plot) return { element: chart, kind: 'chart', box: plot, label: `${CHART_KINDS[chartKindOf(chart)].one}s: the chart` };
+            }
             // A picture you click ON, so it is the nearest thing and wins.
             const image = node.closest('[data-edit-img]');
             if (image) return { element: image, kind: 'image' };
@@ -5255,7 +5459,9 @@ const bootLiveEdit = () => {
         };
 
         const openTarget = ({ element, kind }) => {
-            if (kind === 'image') editImage(element);
+            if (kind === 'chart-row') editChartRow(element);
+            else if (kind === 'chart') editChart(element);
+            else if (kind === 'image') editImage(element);
             else if (kind === 'icon') void editIcon(element);
             else if (kind === 'svg') editDrawing(element);
             else if (kind === 'text') editText(element);
@@ -5269,7 +5475,7 @@ const bootLiveEdit = () => {
         let hoverFrame = null;
         let hovered = null;
         const hideHover = () => { hovered = null; ui.hoverBox.classList.remove('is-visible'); };
-        const showHover = (element) => {
+        const showHover = (element, label = null) => {
             hovered = element;
             const rect = element.getBoundingClientRect();
             if (rect.width < 4 || rect.height < 4) {
@@ -5284,7 +5490,7 @@ const bootLiveEdit = () => {
                 height: `${rect.height}px`,
             });
             ui.hoverBox.classList.toggle('is-flipped', rect.top < 26);
-            ui.hoverLabel.textContent = element.dataset.kitComputed ? 'Counted for you' : (element.dataset.editLabel ?? describeElement(element));
+            ui.hoverLabel.textContent = label ?? (element.dataset.kitComputed ? 'Counted for you' : (element.dataset.editLabel ?? describeElement(element)));
             ui.hoverBox.classList.add('is-visible');
         };
 
@@ -5303,7 +5509,7 @@ const bootLiveEdit = () => {
             hoverFrame = requestAnimationFrame(() => {
                 hoverFrame = null;
                 const target = resolveTarget(beneathStretchedLink(event));
-                if (target) showHover(target.element);
+                if (target) showHover(target.box ?? target.element, target.label);
                 else hideHover();
             });
         });
@@ -5321,6 +5527,107 @@ const bootLiveEdit = () => {
         document.addEventListener('scroll', follow, true);
         window.addEventListener('resize', follow);
         document.addEventListener('pointerleave', hideHover);
+
+        /*
+         * "+ Add a section" on the page itself (section-inserter.js): on the line
+         * between the two sections nearest the pointer, and after the last
+         * section, on every page with a list of sections. Drawn in the overlay,
+         * so the page does not move to make room for it.
+         */
+        let insertHere = null;
+        let insertEnd = null;
+        const insertFrame = { id: null };
+        const aWindowIsOpen = () => Boolean(ui.shadow?.querySelector('.le-scrim'));
+        const insertingNow = () => canAddSections() && document.body.classList.contains('editing') && !aWindowIsOpen();
+        const drawInsert = (handle, at) => {
+            if (!handle) return;
+            if (!at) {
+                handle.line.classList.remove('is-visible');
+
+                return;
+            }
+            Object.assign(handle.line.style, { top: `${at.top}px`, left: `${at.left}px`, width: `${at.width}px` });
+            handle.line.classList.add('is-visible');
+        };
+        const endList = () => shownSectionLists().at(-1) ?? null;
+        const drawEndInsert = () => {
+            const list = insertingNow() ? endList() : null;
+            const sections = list ? shownSections(list) : [];
+            if (!list) {
+                insertEnd = null;
+            } else {
+                const box = (sections.at(-1) ?? list).getBoundingClientRect();
+                // After the last section, or at the top of a page that has none yet.
+                insertEnd = { list, after: null, top: sections.length ? box.bottom : box.top, left: box.left, width: box.width };
+            }
+            drawInsert(ui.sectionInsertEnd, insertEnd);
+        };
+        const hideInserts = () => {
+            insertHere = null;
+            drawInsert(ui.sectionInsert, null);
+            drawInsert(ui.sectionInsertEnd, null);
+        };
+        document.addEventListener('pointermove', (event) => {
+            if (!insertingNow()) {
+                hideInserts();
+
+                return;
+            }
+            const path = event.composedPath?.() ?? [];
+            // On the button itself: it stays where it is, so it can be pressed.
+            if (path.includes(ui.sectionInsert?.button) || path.includes(ui.sectionInsertEnd?.button)) return;
+            if (event.target === ui.root || ui.root.contains(event.target)) {
+                insertHere = null;
+                drawInsert(ui.sectionInsert, null);
+
+                return;
+            }
+            if (insertFrame.id) return;
+            insertFrame.id = requestAnimationFrame(() => {
+                insertFrame.id = null;
+                const under = sectionUnder(event.target);
+                const at = under ? insertionNear(under.list, under.section, event.clientY) : null;
+                // The line after the last section is already drawn, with its own button.
+                insertHere = at && !(at.last && at.list === insertEnd?.list) ? at : null;
+                drawInsert(ui.sectionInsert, insertHere);
+                drawEndInsert();
+            });
+        });
+        const followInserts = () => {
+            insertHere = null;
+            drawInsert(ui.sectionInsert, null);
+            drawEndInsert();
+        };
+        document.addEventListener('scroll', followInserts, true);
+        window.addEventListener('resize', followInserts);
+        document.addEventListener('pointerleave', () => { insertHere = null; drawInsert(ui.sectionInsert, null); });
+        ui.sectionInsert?.button.addEventListener('click', (event) => {
+            event.stopPropagation();
+            const at = insertHere;
+            hideInserts();
+            if (at) openSectionPicker({ list: at.list, after: at.after });
+        });
+        ui.sectionInsertEnd?.button.addEventListener('click', (event) => {
+            event.stopPropagation();
+            const list = insertEnd?.list ?? endList();
+            hideInserts();
+            if (list) openSectionPicker({ list, after: null });
+        });
+        // The bar's "+ Section": the page's sections panel, which adds one at the end and lists the rest.
+        const refreshSectionsButton = () => {
+            if (ui.sectionsButton) ui.sectionsButton.hidden = !(canAddSections() && shownSectionLists().length);
+            if (document.body.classList.contains('editing')) drawEndInsert();
+            else hideInserts();
+        };
+        ui.sectionsButton?.addEventListener('click', () => {
+            if (!document.body.classList.contains('editing')) setEditing(true);
+            const list = endList();
+            if (list) switchToNode(list);
+        });
+        refreshSectionsButton();
+        new MutationObserver(refreshSectionsButton).observe(document.body, { attributes: true, attributeFilter: ['class'] });
+        // Pictures and fonts arriving move where the last section ends.
+        window.addEventListener('load', refreshSectionsButton);
 
         let bgTarget = null;
         const hideBgHandle = () => {
@@ -5439,6 +5746,20 @@ const bootLiveEdit = () => {
                  * menu is open behind it; a link trigger is not followed.
                  */
                 const dropdown = dropdownTriggerFrom(pressed);
+                /*
+                 * A trigger that is only a drawing (a phone's menu button) has nothing else to edit, and the menu it
+                 * opens is often a full-screen dialog that covered the panel: the press opened the menu and the
+                 * drawing could never be changed. Its press edits the drawing; the panel offers to press the button
+                 * ("Press “Open menu”") for the menu's own links.
+                 */
+                const drawingOnly = dropdown && target && ['image', 'icon', 'svg'].includes(target.kind) && target.element !== dropdown
+                    && dropdown.contains(target.element) && dropdown.textContent.trim() === '';
+                if (drawingOnly) {
+                    event.preventDefault();
+                    event.stopImmediatePropagation();
+                    openTarget(target);
+                    return;
+                }
                 if (dropdown) {
                     if (dropdown.matches('a[href]')) event.preventDefault();
                     // A menu that opens on hover is already open when it is pressed, and the press closes
@@ -5447,6 +5768,12 @@ const bootLiveEdit = () => {
                     window.setTimeout(() => {
                         if (wasOpen && dropdown.getAttribute('aria-expanded') === 'false') passThroughClick(dropdown);
                     }, 0);
+                    // A drawing or picture inside the trigger (a menu's icon) is its own thing to edit: the press
+                    // landed on it, so it opens, rather than the label beside it, which left icons unreachable.
+                    if (target && ['image', 'icon', 'svg'].includes(target.kind) && target.element !== dropdown && dropdown.contains(target.element)) {
+                        window.setTimeout(() => { openedFromATrigger = dropdown; openTarget(target); }, 0);
+                        return;
+                    }
                     const isLink = dropdown.matches('a[data-edit], a[data-edit-href]');
                     const words = isLink
                         ? (dropdown.matches('[data-edit^="setting:"]') ? dropdown : dropdown.querySelector('[data-edit^="setting:"]'))
@@ -5938,34 +6265,8 @@ const bootLiveEdit = () => {
                 sheet.foot.append(keep, go);
                 go.focus();
 
-                // The list is what makes this worth stopping for, but it is
-                // not what makes it safe: a service that cannot answer must
-                // not block somebody from publishing work they already know
-                // about.
-                try {
-                    const response = await request('/live-edit/changes', { method: 'GET' });
-                    const payload = await response.json();
-                    const changes = payload?.changes ?? [];
-
-                    const list = el('div', 'le-review');
-
-                    changes.forEach((change) => {
-                        const row = el('div', 'le-review-row');
-                        row.append(
-                            // The same words the Changes tab uses, so the list
-                            // somebody checked before pressing Publish and the
-                            // list they publish are recognisably the same one.
-                            el('div', 'le-review-what', labelForChange(change)),
-                            el('div', 'le-review-to', readsOnThePageAs(change) || '(empty)'),
-                        );
-                        list.append(row);
-                    });
-
-                    sheet.body.replaceChildren(changes.length > 0 ? list : note('Nothing is waiting.'));
-                } catch (error) {
-                    sheet.body.replaceChildren(note(plainly(error, 'list what is waiting')));
-                }
-
+                // Listening before the list loads, not after it: the button is on screen and focused from
+                // the first frame, and a press while the list was still loading used to do nothing at all.
                 go.addEventListener('click', async () => {
                     go.disabled = true;
                     keep.disabled = true;
@@ -5999,6 +6300,35 @@ const bootLiveEdit = () => {
                         sheet.body.replaceChildren(note(plainly(error, 'publish that')));
                     }
                 });
+
+                // The list is what makes this worth stopping for, but it is
+                // not what makes it safe: a service that cannot answer must
+                // not block somebody from publishing work they already know
+                // about.
+                try {
+                    const response = await request('/live-edit/changes', { method: 'GET' });
+                    const payload = await response.json();
+                    const changes = payload?.changes ?? [];
+
+                    const list = el('div', 'le-review');
+
+                    changes.forEach((change) => {
+                        const row = el('div', 'le-review-row');
+                        row.append(
+                            // The same words the Changes tab uses, so the list
+                            // somebody checked before pressing Publish and the
+                            // list they publish are recognisably the same one.
+                            el('div', 'le-review-what', labelForChange(change)),
+                            el('div', 'le-review-to', readsOnThePageAs(change) || '(empty)'),
+                        );
+                        list.append(row);
+                    });
+
+                    sheet.body.replaceChildren(changes.length > 0 ? list : note('Nothing is waiting.'));
+                } catch (error) {
+                    sheet.body.replaceChildren(note(plainly(error, 'list what is waiting')));
+                }
+
             };
 
             ui.publishButton.addEventListener('click', () => {
@@ -6561,8 +6891,13 @@ const bootLiveEdit = () => {
 
         const params = new URLSearchParams(window.location.search);
         const directPanelOpen = params.has('brand') || params.has('pages');
-        // Arriving to set the brand (a host's "Open Brand" link): straight to that tab.
-        if (params.has('brand') && window.liveEditBrand?.tokens?.length) {
+        if (detailMode) {
+            // A card's page in the window over its list: the detail and nothing else, ready to click.
+            showOnlyTheDetail(document);
+            ui.toolbar.style.display = 'none';
+            setEditing(true);
+        } else if (params.has('brand') && window.liveEditBrand?.tokens?.length) {
+            // Arriving to set the brand (a host's "Open Brand" link): straight to that tab.
             params.delete('brand');
             const query = params.toString();
             window.history.replaceState(null, '', window.location.pathname + (query ? `?${query}` : ''));
@@ -6583,42 +6918,7 @@ const bootLiveEdit = () => {
         } else {
             setEditing(sessionStorage.getItem('tb_editing') === '1');
         }
-        if (!directPanelOpen && document.body.classList.contains('editing')) startWalkthrough();
-
-        /*
-         * A page just made for a card ("Give it its own page") opens with what
-         * the card says, rather than describing the product it was made like:
-         * the card's name in its heading, its photo, its price and its short
-         * description, saved as ordinary edits the owner can change or undo.
-         */
-        const fillKey = window.liveEditPages?.page !== undefined ? `live-edit:fill:${window.liveEditPages.page}` : null;
-        let waiting = null;
-        try { waiting = fillKey && sessionStorage.getItem(fillKey); if (waiting) sessionStorage.removeItem(fillKey); } catch { waiting = null; }
-        if (waiting) {
-            void (async () => {
-                try {
-                    const facts = JSON.parse(waiting);
-                    const into = factTargets(document.querySelector('main') ?? document.body);
-                    let filled = 0;
-                    for (const what of ['name', 'price', 'notes']) {
-                        const el = into[what];
-                        if (!el || !facts[what] || el.textContent.trim() === facts[what]) continue;
-                        await saveSetting(parseEditKey(el.dataset.edit).key, facts[what]);
-                        filled += 1;
-                    }
-                    if (into.photo && /^https?:/.test(facts.photo ?? '') && into.photo.getAttribute('src') !== facts.photo) {
-                        const body = new FormData();
-                        body.append('target', into.photo.dataset.editImg);
-                        body.append('url', facts.photo);
-                        await request('/live-edit/image', { method: 'POST', body });
-                        filled += 1;
-                    }
-                    if (filled) reloadWithToast('Its page starts with the card’s name, photo and price. Change anything here.');
-                } catch (error) {
-                    notify(error?.message || 'The card’s details could not be copied onto its page.');
-                }
-            })();
-        }
+        if (!detailMode && !directPanelOpen && document.body.classList.contains('editing')) startWalkthrough();
     }
 
 };

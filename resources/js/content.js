@@ -678,7 +678,7 @@ export const applyOrder = (root, settings) => {
     let moved = 0;
     let carouselOrderChanged = false;
 
-    for (const container of root.querySelectorAll('[data-edit-list]')) {
+    for (const container of innermostFirst(root.querySelectorAll('[data-edit-list]'))) {
         const key = container.getAttribute('data-edit-list');
 
         if (!Object.hasOwn(settings, key)) {
@@ -719,15 +719,12 @@ export const applyOrder = (root, settings) => {
                 continue;
             }
 
-            // Added in the editor: copy the nearest existing item before this
-            // id and give the copy its own editing identity.
-            let template = null;
-            for (let before = position - 1; before >= 0 && !template; before--) {
-                template = items.get(orderedIds[before]) ?? null;
-            }
-            template ??= items.values().next().value;
+            // Added in the editor: copy the nearest item the design wrote before
+            // this id (never an earlier copy, which the server does not have)
+            // and give the copy its own editing identity.
+            const template = templateFor(items, orderedIds, position);
             const clone = template.cloneNode(true);
-            rekeyRepeatedItem(clone, String(id), partnerIds(root, container));
+            rekeyRepeatedItem(clone, String(id), partnerIds(root, container), template.getAttribute('data-edit-item'));
             container.appendChild(clone);
         }
 
@@ -771,8 +768,75 @@ const partnerIds = (root, container) => {
         .filter(Boolean));
 };
 
+/**
+ * Whether an item id is one the editor minted for an added item: "n" and base 36, and, when the
+ * editor knows it, the id of the item it is a copy of after an underscore ("nmh6x2k_c2"), so the copy
+ * is made from the same item wherever it is moved to (a table's column moved left keeps its words).
+ */
+export const mintedId = (id) => /^n[0-9a-z]+(?:_[A-Za-z0-9-]+)?$/.test(String(id ?? ''));
+
+/** The item a minted id says it was copied from, or null. */
+export const copiedFrom = (id) => String(id ?? '').match(/^n[0-9a-z]+_([A-Za-z0-9-]+)$/)?.[1] ?? null;
+
+/**
+ * Lists inside other lists first: a table's cells (each row is a list of its
+ * columns) before its rows, so a row copied for an added row already has the
+ * columns added to the row it copies. The server orders them the same way
+ * (MarkupScanner::innermostFirst).
+ */
+export const innermostFirst = (lists) => {
+    const depth = (list) => {
+        let n = 0;
+        for (let up = list.parentElement?.closest('[data-edit-list]'); up; up = up.parentElement?.closest('[data-edit-list]')) n++;
+        return n;
+    };
+
+    return [...lists].map((list, index) => ({ list, index, depth: depth(list) }))
+        .sort((a, b) => b.depth - a.depth || a.index - b.index)
+        .map(({ list }) => list);
+};
+
+/**
+ * What an added item is copied from: the nearest item before it that the
+ * design wrote (an original, not an editor's copy), else the first original in
+ * the order, else whatever is there. A page rendered by the server holds only
+ * the originals, so choosing among them here gives the same copy, and the same
+ * keys, in the browser as on the server.
+ */
+export const templateFor = (items, orderedIds, position) => {
+    const original = (id) => !mintedId(id) && items.has(id);
+    const named = copiedFrom(orderedIds[position]);
+    if (named && original(named)) return items.get(named);
+    for (let before = position - 1; before >= 0; before--) {
+        if (original(orderedIds[before])) return items.get(orderedIds[before]);
+    }
+    const first = orderedIds.find(original);
+    if (first) return items.get(first);
+    for (let before = position - 1; before >= 0; before--) {
+        if (items.has(orderedIds[before])) return items.get(orderedIds[before]);
+    }
+
+    return items.values().next().value;
+};
+
+/**
+ * A copied item's key, from the key it was copied from: the base and the set
+ * of added ids it belongs to, in a fixed order. A cell copied for an added
+ * column in an added row is "<cell>@<column>@<row>" whichever was added first,
+ * and a copy made from a copy drops the id of the one it was made from, so
+ * duplicating never grows a chain. The server derives the same
+ * (MarkupScanner::derivedKey).
+ */
+export const derivedKey = (key, id, from = null) => {
+    const [base, ...ids] = String(key).split('@');
+    const kept = new Set(ids.filter((part) => part !== from && part !== ''));
+    kept.add(String(id));
+
+    return [base, ...[...kept].sort()].join('@');
+};
+
 /** Give an inserted collection row its own editable keys and HTML ids. */
-const rekeyRepeatedItem = (item, id, partner = new Set()) => {
+const rekeyRepeatedItem = (item, id, partner = new Set(), from = null) => {
     item.setAttribute('data-edit-item', id);
     const nodes = [item, ...item.querySelectorAll('*')];
     const idMap = new Map();
@@ -781,16 +845,12 @@ const rekeyRepeatedItem = (item, id, partner = new Set()) => {
         if (node.hasAttribute('data-edit-section')) node.setAttribute('data-edit-section', id);
         for (const attribute of ['data-edit', 'data-edit-img', 'data-edit-bg', 'data-edit-slide-caption', 'data-edit-choice']) {
             const value = node.getAttribute(attribute) ?? '';
-            if (value.startsWith('setting:') && !value.startsWith('setting:auto:')) {
-                const key = value.slice('setting:'.length).replace(/@n[0-9a-z]+$/, '');
-                node.setAttribute(attribute, `setting:${key}@${id}`);
-            } else if (value.startsWith('setting:auto:')) {
-                node.setAttribute(attribute, `${value}@${id}`);
+            if (value.startsWith('setting:')) {
+                node.setAttribute(attribute, `setting:${derivedKey(value.slice('setting:'.length), id, from)}`);
             }
         }
         const href = node.getAttribute('data-edit-href') ?? '';
-        if (href.startsWith('auto:')) node.setAttribute('data-edit-href', `${href}@${id}`);
-        else if (href) node.setAttribute('data-edit-href', `${href.replace(/@n[0-9a-z]+$/, '')}@${id}`);
+        if (href) node.setAttribute('data-edit-href', derivedKey(href, id, from));
         const style = node.getAttribute('data-style') ?? '';
         if (style.startsWith('s')) node.setAttribute('data-style', `${style}.${id}`);
         if (node.id) {
@@ -1178,14 +1238,19 @@ export const applyStyles = (root, styles) => {
         .map(([key, props]) => styleRules(key, props))
         .join('');
 
-    if (css === '') {
-        return 0;
-    }
-
     // One tag, reused: applying content twice — a locale change, a refresh
     // after publishing — must not stack another sheet on the page.
     const id = 'live-edit-styles';
     const tag = root.getElementById?.(id) ?? root.querySelector?.(`#${id}`) ?? null;
+
+    if (css === '') {
+        // Nothing left to apply still has to take away what was applied: clearing the last
+        // style on a page (most often "Hide this section", unticked) left the old sheet in place,
+        // so the section stayed dimmed, and hidden in Preview, until somebody reloaded.
+        if (tag) tag.textContent = '';
+
+        return 0;
+    }
     const style = tag ?? root.createElement('style');
 
     style.id = id;

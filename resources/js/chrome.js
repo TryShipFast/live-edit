@@ -268,6 +268,13 @@ a.le-mark:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
 /* New page: a window of two steps. First the kinds of page the design has, as
    small pictures of the real pages; then a title, with the address following it. */
 .le-modal.is-wide { max-width: 980px; height: min(760px, 90vh); max-height: min(760px, 90vh); }
+/* A card's detail page, shown as itself: as wide and tall as the screen allows, the page edge to edge. */
+.le-modal.is-full { max-width: min(1320px, 100%); height: calc(100vh - 40px); max-height: calc(100vh - 40px); }
+.le-modal.is-full .le-modal-body { padding: 0; overflow: hidden; display: flex; flex-direction: column; }
+.le-detail-frame { flex: 1; width: 100%; min-height: 0; border: 0; border-top: 1px solid var(--le-line); background: #fff; }
+.le-detail-wait { padding: 22px 24px; }
+/* The guide points at the page behind; while a card's page is open over it, it waits. */
+:host(.le-detail-open) .le-walkthrough, :host(.le-detail-open) .le-walkthrough-pill { display: none; }
 .le-starts-top { display: flex; align-items: center; gap: 14px; margin-bottom: 16px; }
 .le-starts-top .le-starts-search { flex: 1; min-width: 0; }
 .le-starts { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 14px; }
@@ -354,6 +361,14 @@ a.le-mark:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
 .le-address .le-input { border: 0; box-shadow: none; padding-left: 2px; }
 .le-address-origin { padding-left: 14px; font-size: 14px; color: var(--le-muted); letter-spacing: normal; text-transform: none; font-weight: 400; }
 .le-hint--warn { color: var(--le-danger); }
+/* A chart's row or a table's cell (data-panel.js): the kind's fields together, and what its rules say. */
+.le-data { display: flex; flex-direction: column; gap: 12px; }
+.le-data-fields { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 12px; }
+.le-data-fields .le-field { display: flex; flex-direction: column; gap: 6px; }
+.le-data-fields .le-input[aria-invalid="true"] { border-color: var(--le-danger); }
+.le-data-said { display: flex; flex-direction: column; gap: 6px; }
+.le-data-said .le-hint { margin: 0; }
+.le-data-note { color: var(--le-ink); }
 .le-library { display: flex; flex-direction: column; gap: 10px; text-transform: none; letter-spacing: normal; }
 .le-library-list { display: flex; flex-direction: column; gap: 2px; max-height: 46vh; overflow: auto; margin: 0 -6px; padding: 0 2px; }
 .le-library-page { margin: 12px 6px 4px; font-size: 12px; font-weight: 600; color: var(--le-muted); }
@@ -738,6 +753,23 @@ select.le-input {
   font-size: 12px; font-weight: 600; letter-spacing: .01em; background: #0b1220; color: #fff;
   box-shadow: 0 8px 20px -6px rgba(11,18,32,.7);
 }
+
+/* ---- "+ Add a section", on the line where it would go ----
+   Drawn over the page, never in it, so the design does not move to make room.
+   One follows the pointer to the line between the two sections nearest it; one
+   stays after the last section, so the end of the page always says it. */
+.le-insert { position: fixed; z-index: 2147482999; height: 0; display: none; pointer-events: none; }
+.le-insert.is-visible { display: block; }
+.le-insert-line { position: absolute; left: 0; right: 0; top: -1px; border-top: 2px dashed var(--le-ink); opacity: .55; }
+.le-insert-end .le-insert-line { opacity: 0; transition: opacity .15s ease; }
+.le-insert-end:has(.le-insert-btn:hover) .le-insert-line, .le-insert-end:has(.le-insert-btn:focus-visible) .le-insert-line { opacity: .55; }
+.le-insert-btn {
+  position: absolute; left: 50%; top: 0; transform: translate(-50%, -50%); pointer-events: auto;
+  cursor: pointer; border: 0; border-radius: 999px; padding: 7px 14px; white-space: nowrap;
+  font-family: inherit; font-size: 12px; font-weight: 600; line-height: 1.2; letter-spacing: .01em; background: #0b1220; color: #fff;
+  box-shadow: 0 8px 20px -6px rgba(11,18,32,.7), 0 0 0 3px #fff;
+}
+.le-insert-btn:hover { background: #2A2C31; }
 
 /* ---- toast ---- */
 .le-toast {
@@ -1226,6 +1258,13 @@ export function createChrome() {
     pagesButton.title = 'Add a page to your website';
     pagesButton.hidden = !window.liveEditPages;
 
+    /* Adding a section to the page being looked at, beside adding a page: a page
+       the design came with takes sections from the library just as a new one does. */
+    const sectionsButton = el('button', 'le-bar-btn le-when-roomy', '+ Section');
+    sectionsButton.type = 'button';
+    sectionsButton.title = 'Add a section to this page, or move and hide the ones on it';
+    sectionsButton.hidden = true;
+
     const changesButton = el('button', 'le-bar-btn le-when-roomy', 'Changes');
     changesButton.type = 'button';
     changesButton.title = 'Everything you have changed and not published';
@@ -1261,6 +1300,7 @@ export function createChrome() {
         el("span", "le-sep"),
         languagePicker,
         pagesButton,
+        sectionsButton,
         brandButton,
         changesButton,
         helpButton,
@@ -1388,7 +1428,19 @@ export function createChrome() {
     const hoverLabel = el('span', 'le-hover-label');
     hoverBox.append(hoverLabel);
 
-    shadow.append(toolbar, drawer, linkHandle, bgHandle, hoverBox);
+    // "+ Add a section": one between sections, one after the last (section-inserter.js).
+    const inserter = (extra) => {
+        const line = el('div', `le-insert ${extra}`.trim());
+        const button = el('button', 'le-insert-btn', '+ Add a section');
+        button.type = 'button';
+        line.append(el('div', 'le-insert-line'), button);
+
+        return { line, button };
+    };
+    const sectionInsert = inserter('');
+    const sectionInsertEnd = inserter('le-insert-end');
+
+    shadow.append(toolbar, drawer, linkHandle, bgHandle, hoverBox, sectionInsert.line, sectionInsertEnd.line);
 
     // "Saved" can go by in a second; "this didn't take effect" is a sentence
     // somebody has to finish reading before it disappears.
@@ -1412,7 +1464,7 @@ export function createChrome() {
      * running, a publish in progress. Closing those halfway is how somebody
      * ends up paying for something they never received.
      */
-    const modal = ({ title, subtitle, size = '', dismissable = true } = {}) => {
+    const modal = ({ title, subtitle, size = '', dismissable = true, onClose = null } = {}) => {
         const scrim = el('div', 'le-scrim');
         const card = el('div', `le-modal ${size}`.trim());
         card.setAttribute('role', 'dialog');
@@ -1454,6 +1506,9 @@ export function createChrome() {
             scrim.remove();
             previous?.focus?.();
             state.dismissable = true;
+            // Whatever opened this may have something to put right once it is gone (a page
+            // edited inside it is shown again with what was saved there).
+            onClose?.();
         };
 
         const onKey = (event) => {
@@ -1520,6 +1575,9 @@ export function createChrome() {
         previewButton,
         brandButton,
         pagesButton,
+        sectionsButton,
+        sectionInsert,
+        sectionInsertEnd,
         changesButton,
         helpButton,
         closeButton,
