@@ -1,4 +1,5 @@
 import { createChrome } from './chrome.js';
+import { keepClearOfTheBar } from './clear-of-the-bar.js';
 import { renderBrandPanel } from './brand.js';
 import { uploadWidget } from './upload.js';
 import { renderSeoPanel } from './seo.js';
@@ -145,6 +146,12 @@ const bootLiveEdit = () => {
         // The editor's UI is the package's own overlay in a shadow root, so the
         // host theme's CSS can neither style it nor be broken by it.
         const ui = createChrome();
+        // The site's own fixed things (a phone's Book bar, a cookie notice) lifted clear of the bar while editing.
+        keepClearOfTheBar({
+            bar: ui.toolbar,
+            isEditing: () => document.body.classList.contains('editing'),
+            skip: (element) => element === ui.root || ui.root.contains(element),
+        });
 
         /**
          * Tell the client something went wrong, in the editor's own voice.
@@ -5709,6 +5716,20 @@ const bootLiveEdit = () => {
                  * menu is open behind it; a link trigger is not followed.
                  */
                 const dropdown = dropdownTriggerFrom(pressed);
+                /*
+                 * A trigger that is only a drawing (a phone's menu button) has nothing else to edit, and the menu it
+                 * opens is often a full-screen dialog that covered the panel: the press opened the menu and the
+                 * drawing could never be changed. Its press edits the drawing; the panel offers to press the button
+                 * ("Press “Open menu”") for the menu's own links.
+                 */
+                const drawingOnly = dropdown && target && ['image', 'icon', 'svg'].includes(target.kind) && target.element !== dropdown
+                    && dropdown.contains(target.element) && dropdown.textContent.trim() === '';
+                if (drawingOnly) {
+                    event.preventDefault();
+                    event.stopImmediatePropagation();
+                    openTarget(target);
+                    return;
+                }
                 if (dropdown) {
                     if (dropdown.matches('a[href]')) event.preventDefault();
                     // A menu that opens on hover is already open when it is pressed, and the press closes

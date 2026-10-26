@@ -60,6 +60,7 @@ class EmbedController
         'section-inserter.js' => 'section-inserter.js',
         'data-kit.js' => 'data-kit.js',
         'data-panel.js' => 'data-panel.js',
+        'clear-of-the-bar.js' => 'clear-of-the-bar.js',
         // The built bundle, resolved to resources/dist rather than to a
         // sibling of the modules.
         'bundle.js' => 'bundle.js',
