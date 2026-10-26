@@ -1,5 +1,16 @@
 # ShipFast Live Edit for WordPress
 
+## 0.15.71
+
+- Charts and tables: add a chart (bar, line, donut, funnel, progress, sparkline) or a table to any page, each edited in its own kind's terms.
+- Sections can be added to every page, not only new ones.
+- A site's modal dialogs (a phone menu, a lightbox) open in place under the editor, so everything in them can be edited and saved.
+- The site's own fixed bars (a phone's Book bar, a cookie notice) are lifted clear of the editor's bar while editing.
+- A menu button that is only a drawing opens the drawing's panel, which offers to open the menu.
+- A copied card's own page is opened by its name; design cards named apart from their page keep "Edit all details".
+- The drawing picker lists icon-sized drawings only.
+- Security: test dependency happy-dom 21.0.4.
+
 ## 0.15.70
 
 - Edit a linked product, article, or project page in one pass from its card, including its editable fields, styles, and options.
