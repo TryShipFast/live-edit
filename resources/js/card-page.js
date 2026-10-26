@@ -275,6 +275,23 @@ export function copiedSettings(keys, settings = {}, leaveOut = new Set()) {
     return writes;
 }
 
+/**
+ * Every saved setting of a list item, under its copy's keys: each key on the item that the copy
+ * draws under another key, with the words a picture keeps beside its key (COMPANIONS). Only the
+ * item's own keys, never another copy's `<key>@<id>` that merely starts the same.
+ */
+export function copiedItemSettings(keys, settings = {}) {
+    const writes = [];
+    for (const [from, to] of keys) {
+        for (const suffix of ['', ...COMPANIONS]) {
+            const value = settings[`${from}${suffix}`];
+            if (typeof value === 'string') writes.push([`${to}${suffix}`, value]);
+        }
+    }
+
+    return writes;
+}
+
 /** Every saved style of the original, under the copy's style keys. */
 export function copiedStyles(styleKeys, styles = {}) {
     const writes = [];

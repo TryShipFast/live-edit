@@ -7,7 +7,7 @@ import { renderSeoPanel } from './seo.js';
 import { renderShopPanel } from './shop.js';
 import { addedWith, describeStructure, hrefTo, newAddedId, orderWith, pageOfLink, renderNewPage, renderSectionBrowser } from './pages.js';
 import { insertionNear, sectionName, sectionUnder, shownSectionLists, shownSections } from './section-inserter.js';
-import { DETAIL_MODE, copyPageForCard, deletablePage, deletePage, detailAddress, linksTo, linksWarning, showOnlyTheDetail } from './card-page.js';
+import { DETAIL_MODE, copiedItemSettings, copiedStyles, copyPageForCard, deletablePage, deletePage, detailAddress, keyMap, linksTo, linksWarning, showOnlyTheDetail } from './card-page.js';
 import { renderChoice } from './choice.js';
 import { chartRowOf, renderChartPanel, renderChartRow, renderTableControls } from './data-panel.js';
 import { KINDS as CHART_KINDS, chartData, chartOf, itemContext as chartItemContext, kindOf as chartKindOf } from './data-kit.js';
@@ -3785,6 +3785,48 @@ const bootLiveEdit = () => {
             modal.foot.hidden = false;
         };
 
+        /*
+         * A new id for a copy of the item `source`: "n" and base 36, and for a list item the
+         * design's item it is drawn from after an underscore ("nmh6x2k_t3", as a chart's rows are
+         * named, data-kit.js freshIds). A copy's keys are derived from the item it is drawn from,
+         * and without the name that was the nearest design item before it, which changes when
+         * that item is deleted or moved: the copy's stored words were then under keys it no
+         * longer had. A copy of a copy names the same design item as its source.
+         */
+        const copyId = (source, sections = false) => {
+            const minted = /^n[0-9a-z]+(?:_|$)/.test(source);
+            const named = minted ? (source.match(/^n[0-9a-z]+_([A-Za-z0-9-]+)$/)?.[1] ?? null) : source;
+            const suffix = !sections && named && /^[A-Za-z0-9-]+$/.test(named) ? `_${named}` : '';
+
+            return `n${Date.now().toString(36)}${suffix}`;
+        };
+
+        /*
+         * What a duplicated item holds, stored under its copy's own keys.
+         *
+         * A copy is drawn from the design's markup with keys of its own (`<key>@<copy id>`,
+         * content.js derivedKey), and nothing stored under them meant the design's sample words:
+         * the copy showed its item's words only until the page was drawn again. So every saved
+         * word, link, picture and style of the item is saved under the copy's keys before the
+         * copy is added. A copy of a copy works the same, from the copy's own keys.
+         */
+        const storeTheCopysContent = async (item, id) => {
+            const { copyOfItem } = await import('./content.js');
+            const map = keyMap([[item, copyOfItem(item, id)]]);
+            if (!map.keys.size && !map.styles.size) return;
+            const { settings = {}, styles = {} } = await readSavedContent();
+            for (const [key, value] of copiedItemSettings(map.keys, settings ?? {})) {
+                await patiently(() => saveSetting(key, value));
+            }
+            for (const [key, props] of copiedStyles(map.styles, styles ?? {})) {
+                await patiently(() => request('/live-edit/style', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ key, props }),
+                }));
+            }
+        };
+
         /** A list's order saved as its value (and its partner's, for tabs and their panels). */
         const saveListOrder = async (list, ids) => {
             await request('/live-edit/setting', {
@@ -3964,10 +4006,21 @@ const bootLiveEdit = () => {
                     duplicate.className = 'le-chip-btn';
                     duplicate.textContent = sections ? 'Duplicate section' : 'Duplicate';
                     duplicate.disabled = !sections && full;
-                    duplicate.addEventListener('click', () => {
+                    duplicate.addEventListener('click', async () => {
                         const reordered = currentOrder();
                         const at = reordered.indexOf(item.dataset.editItem);
-                        reordered.splice(at + 1, 0, 'n' + Date.now().toString(36));
+                        const id = copyId(item.dataset.editItem, sections);
+                        duplicate.disabled = true;
+                        try {
+                            // The copy's words first, so it is never drawn without them.
+                            await storeTheCopysContent(item, id);
+                        } catch (error) {
+                            notify(error.message);
+                            duplicate.disabled = false;
+
+                            return;
+                        }
+                        reordered.splice(at + 1, 0, id);
                         saveOrder(reordered, sections ? 'Section duplicated \u2713' : 'Item duplicated \u2713');
                     });
                     row.append(duplicate);
@@ -4075,7 +4128,7 @@ const bootLiveEdit = () => {
                 // The copy, not the card it was copied from: only an id the editor minted. A card's name says
                 // nothing: design cards are often named apart from their page ("Unwanted hair" opens "Laser
                 // hair removal"), two design cards can open one page, and owners rename cards.
-                const isCopy = /^n[0-9a-z]+$/.test(item.dataset.editItem);
+                const isCopy = /^n[0-9a-z]+(?:_[A-Za-z0-9-]+)?$/.test(item.dataset.editItem);
                 const separate = Boolean(shared && isCopy && editableLink && builder.pagesKey);
                 const own = document.createElement('div');
                 own.className = 'le-row';

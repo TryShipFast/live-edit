@@ -873,6 +873,18 @@ const rekeyRepeatedItem = (item, id, partner = new Set(), from = null) => {
     }
 };
 
+/**
+ * The copy a list draws for an item added as a copy of `item` under the id `id`: the same markup
+ * with the keys it will be drawn with (applyOrder), so the editor can store the item's words under
+ * them when it is duplicated.
+ */
+export const copyOfItem = (item, id) => {
+    const clone = item.cloneNode(true);
+    rekeyRepeatedItem(clone, String(id), new Set(), item.getAttribute('data-edit-item'));
+
+    return clone;
+};
+
 /** @param {Record<string, string>} settings */
 export const applyContent = (root, settings) => {
     let applied = 0;

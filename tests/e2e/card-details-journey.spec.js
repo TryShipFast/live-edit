@@ -140,7 +140,7 @@ test('a copied card gets its own page, a full copy, and the two never change eac
     await ui(page).getByRole('button', { name: 'Duplicate' }).click();
     await expect(page.locator('[data-list="products"] [data-edit-item]')).toHaveCount(3);
     const copy = await page.locator('[data-list="products"] [data-edit-item]').nth(1).getAttribute('data-edit-item');
-    expect(copy).toMatch(/^n[0-9a-z]+$/);
+    expect(copy).toMatch(/^n[0-9a-z]+(?:_[A-Za-z0-9-]+)?$/);
 
     await choose(page, `[data-edit-item="${copy}"] h3 a`);
     await typeAndSave(page, 'Fig Archive');
@@ -195,7 +195,7 @@ test('a copied card’s own page is opened by its name, not by another link on t
     await ui(page).getByRole('button', { name: 'Duplicate' }).click();
     await expect(page.locator('[data-list="posts"] [data-edit-item]')).toHaveCount(3);
     const copy = await page.locator('[data-list="posts"] [data-edit-item]').nth(2).getAttribute('data-edit-item');
-    expect(copy).toMatch(/^n[0-9a-z]+$/);
+    expect(copy).toMatch(/^n[0-9a-z]+(?:_[A-Za-z0-9-]+)?$/);
 
     await choose(page, `[data-edit-item="${copy}"] p[data-edit]`);
     await ui(page).getByRole('button', { name: 'Give it its own page' }).click();
