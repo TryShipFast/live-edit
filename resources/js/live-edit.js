@@ -3536,6 +3536,31 @@ const bootLiveEdit = () => {
          * form could leave out. Closing the window shows the list again with
          * what was saved.
          */
+        /*
+         * The page a card opens, and the link that opens it. Its name's link first (the heading), then any
+         * link to a page of the site: a barber's card on Third Chair holds the name, which opens his page,
+         * and four booking slots, which open the booking page; taking the first link found made the
+         * booking page "the card's page".
+         */
+        const cardOpens = (item, builder) => {
+            const toPages = [...item.querySelectorAll('a[href]')]
+                .map((a) => [a, pageOfLink(a, builder.pages, window.location.href)])
+                .filter(([, page]) => page);
+
+            return toPages.find(([a]) => a.closest('h1, h2, h3, h4, h5, h6')) ?? toPages[0] ?? null;
+        };
+        /*
+         * The address to point at a card's own page: one whose link opens that page, never just the first
+         * link with an address key. That pointed a booking slot at the new page and left the name opening
+         * the original. Null when no link to the page can be re-addressed (its words are marked, its
+         * address is not), so the card is not given a page only a stray button reaches.
+         */
+        const addressOfTheCardsPage = (item, link, page, builder) => {
+            if (link?.dataset.editHref !== undefined) return link;
+
+            return [...item.querySelectorAll('a[data-edit-href]')]
+                .find((a) => pageOfLink(a, builder?.pages ?? [], window.location.href)?.id === page.id) ?? null;
+        };
         const cardNameOf = (item) => (item.dataset.editItemLabel || item.querySelector('h1, h2, h3, h4')?.textContent || '')
             .replace(/\s+/g, ' ').trim();
 
@@ -3590,8 +3615,8 @@ const bootLiveEdit = () => {
          * where they differ, and the card pointed at it. Returns the page.
          */
         const giveItsOwnPage = async ({ page, link, item, builder, progress = () => {} }) => {
-            const editableLink = link?.dataset.editHref !== undefined ? link : item.querySelector('a[data-edit-href]');
-            if (!editableLink) throw new Error('This card’s link cannot be changed, so it cannot have a page of its own.');
+            const editableLink = addressOfTheCardsPage(item, link, page, builder);
+            if (!editableLink) throw new Error('This card’s link to its page cannot be changed, so it cannot have a page of its own.');
             const title = cardNameOf(item) || page.title;
             const id = await copyPageForCard({
                 page,
@@ -3879,9 +3904,7 @@ const bootLiveEdit = () => {
              * window over the list is enough.
              */
             const builder = window.liveEditPages;
-            const opens = !sections && item && builder?.pages?.length && !detailMode
-                ? [...item.querySelectorAll('a[href]')].map((a) => [a, pageOfLink(a, builder.pages, window.location.href)]).find(([, page]) => page)
-                : null;
+            const opens = !sections && item && builder?.pages?.length && !detailMode ? cardOpens(item, builder) : null;
             const shared = Boolean(opens) && [...list.children].some((other) => other !== item && other.dataset.editItem
                 && [...other.querySelectorAll('a[href]')].some((a) => pageOfLink(a, builder.pages, window.location.href)?.id === opens[1].id));
 
@@ -4048,7 +4071,7 @@ const bootLiveEdit = () => {
              */
             if (opens) {
                 const [link, page] = opens;
-                const editableLink = link.dataset.editHref !== undefined ? link : item.querySelector('a[data-edit-href]');
+                const editableLink = addressOfTheCardsPage(item, link, page, builder);
                 // The copy, not the card it was copied from: only an id the editor minted. A card's name says
                 // nothing: design cards are often named apart from their page ("Unwanted hair" opens "Laser
                 // hair removal"), two design cards can open one page, and owners rename cards.

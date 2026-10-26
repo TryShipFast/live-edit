@@ -187,6 +187,29 @@ test('a design card named apart from its page stays the original when another ca
     await expect(ui(page).getByRole('button', { name: 'Give it its own page' })).toHaveCount(0);
 });
 
+test('a copied card’s own page is opened by its name, not by another link on the card', async ({ page }) => {
+    // Found on Third Chair: a barber's card holds his name (his page) and booking slots (the booking page).
+    // "Give it its own page" re-addressed the first slot, so the name still opened the original page.
+    await openAsEditor(page);
+    await choose(page, '[data-edit-item="second"] p[data-edit]');
+    await ui(page).getByRole('button', { name: 'Duplicate' }).click();
+    await expect(page.locator('[data-list="posts"] [data-edit-item]')).toHaveCount(3);
+    const copy = await page.locator('[data-list="posts"] [data-edit-item]').nth(2).getAttribute('data-edit-item');
+    expect(copy).toMatch(/^n[0-9a-z]+$/);
+
+    await choose(page, `[data-edit-item="${copy}"] p[data-edit]`);
+    await ui(page).getByRole('button', { name: 'Give it its own page' }).click();
+    await expect(detail(page).locator('h1')).toBeVisible();
+    await done(page);
+
+    const made = site.host.made().map((m) => m.id);
+    expect(made).toHaveLength(1);
+    await expect(page.locator(`[data-edit-item="${copy}"] h3 a`)).toHaveAttribute('href', `../${made[0]}/`);
+    await expect(page.locator(`[data-edit-item="${copy}"] a.also`)).toHaveAttribute('href', '../products/blue-hour/');
+    // The original still opens the original.
+    await expect(page.locator('[data-edit-item="second"] h3 a')).toHaveAttribute('href', '../journal/salt-air/');
+});
+
 test('deleting a card that has its own page offers to delete the page too', async ({ page }) => {
     await openAsEditor(page);
     await choose(page, '[data-edit-item="aster"] [data-kit-price]');

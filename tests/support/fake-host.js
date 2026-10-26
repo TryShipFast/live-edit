@@ -107,6 +107,7 @@ const shop = `
         <p data-edit="text" data-field="lead">A short walk at first light.</p>
       </li>
       <li data-item="second">
+        <a class="also" data-edit="link" data-link-page="products/blue-hour" href="../products/blue-hour/">Wear Blue Hour</a>
         <h3><a data-edit="link" data-link-page="journal/salt-air" href="../journal/salt-air/">Salt air</a></h3>
         <p data-edit="text" data-field="lead">The coast in winter.</p>
       </li>
