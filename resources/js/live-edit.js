@@ -1,5 +1,6 @@
 import { createChrome } from './chrome.js';
 import { keepClearOfTheBar } from './clear-of-the-bar.js';
+import { openDialogsInPlace } from './dialogs-in-place.js';
 import { renderBrandPanel } from './brand.js';
 import { uploadWidget } from './upload.js';
 import { renderSeoPanel } from './seo.js';
@@ -152,6 +153,8 @@ const bootLiveEdit = () => {
             isEditing: () => document.body.classList.contains('editing'),
             skip: (element) => element === ui.root || ui.root.contains(element),
         });
+        // A site's modal dialogs (a phone menu, a lightbox) open in place, so the editor stays usable over them.
+        const reopenDialogsInPlace = openDialogsInPlace();
 
         /**
          * Tell the client something went wrong, in the editor's own voice.
@@ -2186,6 +2189,7 @@ const bootLiveEdit = () => {
             // which of them are icons at all.
             if (on) markRealIcons();
             document.body.classList.toggle('editing', on);
+            if (on) reopenDialogsInPlace();
             editables().forEach((el) => {
                 if (on) {
                     el.setAttribute('tabindex', '0');
@@ -4667,13 +4671,16 @@ const bootLiveEdit = () => {
             };
             current.restore = restore;
 
-            // One of each distinct drawing on the page, the current one first.
+            // One of each distinct drawing on the page, the current one first. Icon-sized ones only: a map, a
+            // chart or a diagram (words of its own, or bigger than an icon) is not something to put in its place.
             const seen = new Set();
             const drawings = [];
             document.querySelectorAll('svg').forEach((svg) => {
                 const markup = svg.outerHTML;
                 const shape = markup.replace(/\s+(class|style|width|height|data-[\w-]+)="[^"]*"/g, '');
-                if (seen.has(shape) || svg.getBoundingClientRect().width < 4) return;
+                const box = svg.getBoundingClientRect();
+                if (seen.has(shape) || box.width < 4) return;
+                if (svg !== element && (box.width > 96 || box.height > 96 || svg.querySelector('text, image, foreignObject'))) return;
                 seen.add(shape);
                 drawings.push(markup);
             });

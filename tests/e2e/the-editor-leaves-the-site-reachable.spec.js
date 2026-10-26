@@ -37,7 +37,7 @@ const addPhoneThings = (page) => page.evaluate(() => {
           style="position:fixed;top:8px;right:8px;width:44px;height:44px">
           <svg data-edit-svg="setting:menu-drawing" width="24" height="24" viewBox="0 0 24 24"><path d="M3 6h18M3 12h18M3 18h18" stroke="#000"/></svg>
         </button>
-        <dialog id="phone-menu"><a href="#a">A link in the menu</a></dialog>`);
+        <dialog id="phone-menu" style="width:100%;height:100%;max-width:none;max-height:none;margin:0"><a href="#a" data-edit="setting:menu-services">Services</a></dialog>`);
     document.querySelector('.menu-open').addEventListener('click', () => document.getElementById('phone-menu').showModal());
 });
 
@@ -60,9 +60,30 @@ test('the site’s own bar at the foot of a phone screen is lifted clear of the 
 test('the drawing in a phone’s menu button opens its own panel, which offers the menu', async ({ page }) => {
     await openAsEditor(page);
     await addPhoneThings(page);
+    // A map with its street names drawn in: not a drawing to put in the menu button's place.
+    await page.evaluate(() => document.querySelector('main').insertAdjacentHTML('afterbegin',
+        '<svg class="map" width="320" height="200" viewBox="0 0 320 200"><rect width="320" height="200" fill="#eee"/><text x="20" y="40">Mill Lane</text></svg>'));
     await page.locator('.menu-open svg').click();
     await expect(page.locator('#phone-menu')).not.toHaveAttribute('open', '');
     await expect(ui(page).locator('.le-drawer.is-open')).toBeVisible();
+    await expect(ui(page).locator('.le-icon-grid .le-icon-choice').first()).toBeVisible();
+    expect((await ui(page).locator('.le-icon-grid').allInnerTexts()).join(' ') + (await ui(page).locator('.le-icon-grid').evaluateAll((grids) => grids.map((g) => g.innerHTML).join('')))).not.toContain('Mill Lane');
     await ui(page).getByRole('button', { name: 'Press “Open menu”' }).click();
     await expect(page.locator('#phone-menu')).toHaveAttribute('open', '');
+});
+
+test('a phone menu the site opens as a modal dialog can be edited and saved', async ({ page }) => {
+    // A modal dialog sits above the editor and makes it inert: the menu opened, and nothing in it could be saved.
+    await openAsEditor(page);
+    await addPhoneThings(page);
+    await page.evaluate(() => document.getElementById('phone-menu').showModal());
+    await expect(page.locator('#phone-menu')).toHaveAttribute('open', '');
+    await page.locator('#phone-menu a').click();
+    const words = ui(page).locator('.le-drawer textarea').first();
+    await words.click();
+    await words.fill('What we do');
+    await ui(page).getByRole('button', { name: 'Save changes' }).click();
+    await expect.poll(() => site.host.settings['menu-services']).toBe('What we do');
+    // Nothing is left modal, so the bar is usable over the menu too, even with editing turned off.
+    expect(await page.evaluate(() => document.querySelector('dialog:modal'))).toBeNull();
 });
