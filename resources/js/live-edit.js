@@ -4038,9 +4038,10 @@ const bootLiveEdit = () => {
             if (opens) {
                 const [link, page] = opens;
                 const editableLink = link.dataset.editHref !== undefined ? link : item.querySelector('a[data-edit-href]');
-                const cardName = cardNameOf(item);
-                // The copy, not the card it was copied from: an id the editor minted, or a name that is not the page's.
-                const isCopy = /^n[0-9a-z]+$/.test(item.dataset.editItem) || (cardName && cardName.toLowerCase() !== String(page.title).toLowerCase());
+                // The copy, not the card it was copied from: only an id the editor minted. A card's name says
+                // nothing: design cards are often named apart from their page ("Unwanted hair" opens "Laser
+                // hair removal"), two design cards can open one page, and owners rename cards.
+                const isCopy = /^n[0-9a-z]+$/.test(item.dataset.editItem);
                 const separate = Boolean(shared && isCopy && editableLink && builder.pagesKey);
                 const own = document.createElement('div');
                 own.className = 'le-row';
