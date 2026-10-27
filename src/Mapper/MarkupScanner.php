@@ -227,7 +227,42 @@ class MarkupScanner
             $this->walk($body);
         }
 
+        // A legacy image marker is an explicit promise from a ShipFast
+        // template that the picture is editable. The normal walk can stop at
+        // a collection boundary (or skip a header/footer), so ensure those
+        // marked images still get an image candidate for apply() to promote.
+        $xpath = new DOMXPath($this->doc);
+        foreach ($xpath->query('//img[translate(normalize-space(@data-edit), "IMAGE", "image")="image" and not(@data-edit-img)]') as $image) {
+            if (! $image instanceof DOMElement || $this->insideScannerChrome($image)) {
+                continue;
+            }
+
+            $alreadyRecognised = false;
+            foreach ($this->candidates as $candidate) {
+                if (($candidate['kind'] ?? null) === 'image' && ($candidate['node'] ?? null)?->isSameNode($image)) {
+                    $alreadyRecognised = true;
+                    break;
+                }
+            }
+
+            if (! $alreadyRecognised) {
+                $this->addImage($image);
+            }
+        }
+
         $this->assignBands();
+    }
+
+    /** A scanner chrome boundary still wins over an explicit legacy marker. */
+    protected function insideScannerChrome(DOMElement $element): bool
+    {
+        for ($node = $element; $node instanceof DOMElement; $node = $node->parentNode) {
+            if ($this->isChrome($node)) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /**
@@ -263,6 +298,26 @@ class MarkupScanner
 
     protected function writeTag(DOMElement $node, array $candidate, array $meta = []): void
     {
+        /*
+         * Older ShipFast templates used `data-edit="image"` as a kind marker
+         * on pictures. The runtime's image editor needs the separate
+         * data-edit-img setting key; treating the generic data-edit marker as
+         * complete meant these pictures were opened as text instead. Promote
+         * that legacy marker while keeping it in place for older consumers.
+         */
+        if (
+            $candidate['kind'] === 'image'
+            && strtolower(trim($node->getAttribute('data-edit'))) === 'image'
+            && ! $node->hasAttribute('data-edit-img')
+        ) {
+            $key = $this->autoMode ? 'auto:'.$this->autoKey($node, '#img') : $candidate['key'];
+            $node->setAttribute('data-edit-img', 'setting:'.$key);
+
+            if (! $node->hasAttribute('data-edit-preview') && $node->hasAttribute('src')) {
+                $node->setAttribute('data-edit-preview', $node->getAttribute('src'));
+            }
+        }
+
         if ($node->hasAttribute('data-edit') || $node->hasAttribute('data-edit-img') || $node->hasAttribute('data-edit-href')) {
             return; // already tagged — apply is idempotent
         }

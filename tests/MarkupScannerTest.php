@@ -683,6 +683,34 @@ class MarkupScannerTest extends TestCase
         $this->assertSame(4, $result['applied']);
     }
 
+    public function test_apply_promotes_the_legacy_image_marker_to_an_image_setting(): void
+    {
+        $html = '<img src="/hero.jpg" alt="The hero" data-edit="image" data-field="heroImage">';
+
+        $result = (new MarkupScanner)->apply($html);
+
+        $this->assertStringContainsString('data-edit="image"', $result['html']);
+        $this->assertMatchesRegularExpression('/data-edit-img="setting:[^"]+"/', $result['html']);
+        $this->assertStringContainsString('data-edit-preview="/hero.jpg"', $result['html']);
+        $this->assertSame($result['html'], (new MarkupScanner)->apply($result['html'])['html']);
+    }
+
+    public function test_apply_promotes_blank_alt_legacy_images_inside_a_collection(): void
+    {
+        $html = '<div class="cards"><article class="card"><img src="/one.jpg" alt="" data-edit="image"></article><article class="card"><img src="/two.jpg" alt="" data-edit="image"></article></div>';
+
+        $result = (new MarkupScanner)->apply($html, ['image']);
+        $doc = new \DOMDocument;
+        $doc->loadHTML($result['html']);
+        $images = (new \DOMXPath($doc))->query('//img[@data-edit="image"]');
+
+        $this->assertSame(2, $images->length);
+        foreach ($images as $image) {
+            $this->assertMatchesRegularExpression('/^setting:.+/', $image->getAttribute('data-edit-img'));
+            $this->assertSame($image->getAttribute('src'), $image->getAttribute('data-edit-preview'));
+        }
+    }
+
     public function test_apply_leaves_collections_for_manual_wiring(): void
     {
         $html = '<div class="grid"><div class="card"><h3>A</h3></div><div class="card"><h3>B</h3></div></div>';
