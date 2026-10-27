@@ -1,5 +1,9 @@
 # ShipFast Live Edit for WordPress
 
+## 0.15.73
+
+- Older templates that mark pictures with `data-edit="image"` now open them in the image editor.
+
 ## 0.15.72
 
 - Duplicating an item keeps its words: every field of the original, as edited, is saved under the copy's keys, so a reload or a publish shows them. A copy names the design item it is drawn from, so deleting the original does not change it.
