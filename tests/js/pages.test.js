@@ -287,6 +287,21 @@ describe('a card and its page', () => {
         a.setAttribute('href', '../fig-archive/');
         expect(pageOfLink(a, [{ id: 'product-arc' }, { id: 'fig-archive' }], 'http://x.test/shop/').id).toBe('fig-archive');
     });
+    it('reads a nested page\'s links from its folder, not the editor\'s address', async () => {
+        // The hosted editor serves services/exterior at .../edit/services/exterior, with no closing slash:
+        // resolved against that, "../polish/" is .../edit/polish/ and the card seemed to open no page.
+        const { pageBase, pageOfLink } = await import('../../resources/js/pages.js');
+        const pages = [{ id: '' }, { id: 'services/exterior' }, { id: 'services/polish' }];
+        const window = 'http://x.test/sites/tidewell/edit/services/exterior';
+        const builder = { base: 'http://x.test/sites/tidewell/edit/services/exterior/' };
+        expect(pageOfLink('../polish/', pages, window)).toBeNull();
+        expect(pageOfLink('../polish/', pages, pageBase(builder, window)).id).toBe('services/polish');
+        // a page written at the root and served anywhere (404.html) is read from the root
+        expect(pageOfLink('services/polish/', pages, pageBase({ base: 'http://x.test/sites/tidewell/edit/' }, 'http://x.test/sites/tidewell/edit/404')).id).toBe('services/polish');
+        // a host that does not say keeps the window's address
+        expect(pageBase({}, window)).toBe(window);
+        expect(pageBase(undefined, window)).toBe(window);
+    });
     it('names a free address and points the link at it', async () => {
         const { freeAddress, hrefTo } = await import('../../resources/js/pages.js');
         expect(freeAddress('Fig Archive', ['fig-archive'])).toBe('fig-archive-2');

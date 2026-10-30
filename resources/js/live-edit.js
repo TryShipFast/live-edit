@@ -5,7 +5,7 @@ import { renderBrandPanel } from './brand.js';
 import { uploadWidget } from './upload.js';
 import { renderSeoPanel } from './seo.js';
 import { renderShopPanel } from './shop.js';
-import { addedWith, describeStructure, hrefTo, newAddedId, orderWith, pageOfLink, renderNewPage, renderSectionBrowser } from './pages.js';
+import { addedWith, describeStructure, hrefTo, newAddedId, orderWith, pageBase, pageOfLink, renderNewPage, renderSectionBrowser } from './pages.js';
 import { insertionNear, sectionName, sectionUnder, shownSectionLists, shownSections } from './section-inserter.js';
 import { DETAIL_MODE, copiedItemSettings, copiedStyles, copyPageForCard, deletablePage, deletePage, detailAddress, keyMap, linksTo, linksWarning, showOnlyTheDetail } from './card-page.js';
 import { renderChoice } from './choice.js';
@@ -2665,7 +2665,7 @@ const bootLiveEdit = () => {
                 }
                 if (current.hrefKey) {
                     // Saved from the site's root where the host keys this link once for every page (site-address.js).
-                    const hrefValue = addressFromTheRoot(drawerFields.querySelector('[data-link-field=href]').value.trim(), current.hrefRoot, document.baseURI);
+                    const hrefValue = addressFromTheRoot(drawerFields.querySelector('[data-link-field=href]').value.trim(), current.hrefRoot, pageBase(window.liveEditPages, document.baseURI));
                     const newTab = drawerFields.querySelector('[data-link-field=target]').checked;
                     await request('/live-edit/setting', {
                         method: 'POST',
@@ -3547,7 +3547,7 @@ const bootLiveEdit = () => {
          */
         const cardOpens = (item, builder) => {
             const toPages = [...item.querySelectorAll('a[href]')]
-                .map((a) => [a, pageOfLink(a, builder.pages, window.location.href)])
+                .map((a) => [a, pageOfLink(a, builder.pages, pageBase(builder, window.location.href))])
                 .filter(([, page]) => page);
 
             return toPages.find(([a]) => a.closest('h1, h2, h3, h4, h5, h6')) ?? toPages[0] ?? null;
@@ -3562,7 +3562,7 @@ const bootLiveEdit = () => {
             if (link?.dataset.editHref !== undefined) return link;
 
             return [...item.querySelectorAll('a[data-edit-href]')]
-                .find((a) => pageOfLink(a, builder?.pages ?? [], window.location.href)?.id === page.id) ?? null;
+                .find((a) => pageOfLink(a, builder?.pages ?? [], pageBase(builder, window.location.href))?.id === page.id) ?? null;
         };
         const cardNameOf = (item) => (item.dataset.editItemLabel || item.querySelector('h1, h2, h3, h4')?.textContent || '')
             .replace(/\s+/g, ' ').trim();
@@ -3637,7 +3637,7 @@ const bootLiveEdit = () => {
                 progress,
             });
             const href = hrefTo(editableLink.getAttribute('href'), id);
-            await patiently(() => saveSetting(editableLink.dataset.editHref, addressFromTheRoot(href, editableLink.dataset.editHrefRoot, document.baseURI)), progress);
+            await patiently(() => saveSetting(editableLink.dataset.editHref, addressFromTheRoot(href, editableLink.dataset.editHrefRoot, pageBase(builder, document.baseURI))), progress);
             // So this card already opens its own page if it is chosen again before the list is redrawn.
             editableLink.setAttribute('href', href);
             if (editableLink.dataset.linkPage) editableLink.dataset.linkPage = id;
@@ -3743,7 +3743,7 @@ const bootLiveEdit = () => {
                         doc: document,
                         settings: settings ?? {},
                         pages: builder.pages,
-                        base: window.location.href,
+                        base: pageBase(builder, window.location.href),
                         except: [item],
                         builder,
                     })) || 'Nothing else on your site links to it.';
@@ -3951,7 +3951,7 @@ const bootLiveEdit = () => {
             const builder = window.liveEditPages;
             const opens = !sections && item && builder?.pages?.length && !detailMode ? cardOpens(item, builder) : null;
             const shared = Boolean(opens) && [...list.children].some((other) => other !== item && other.dataset.editItem
-                && [...other.querySelectorAll('a[href]')].some((a) => pageOfLink(a, builder.pages, window.location.href)?.id === opens[1].id));
+                && [...other.querySelectorAll('a[href]')].some((a) => pageOfLink(a, builder.pages, pageBase(builder, window.location.href))?.id === opens[1].id));
 
             // With an item chosen, "Duplicate" below does exactly this (a copy right after it),
             // so offering both asked a novice to choose between two names for one thing.

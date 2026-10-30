@@ -854,6 +854,18 @@ export function renderSectionBrowser({ container, library, add, multiple = false
 }
 
 /**
+ * The address a page's relative links are written from.
+ *
+ * The host's, where it says (the builder's `base`): a hosted editor serves a page at
+ * .../edit/services/exterior, without the closing slash the page's folder has on the
+ * website, so "../polish/" resolved against the window lands a folder too high, and a card
+ * linking there seemed to open no page. Otherwise the address it is given (the window's).
+ */
+export function pageBase(builder, fallback) {
+    return typeof builder?.base === 'string' && builder.base !== '' ? builder.base : fallback;
+}
+
+/**
  * The page a card's link opens: the page whose address the link ends in (the
  * longest id that fits), or else the one it names (`data-link-page`, the Kit's
  * record of where the design's link goes). A card on a shop grid, a journal list or
