@@ -4441,6 +4441,49 @@ const bootLiveEdit = () => {
             renderChoice,
         });
 
+        /** The options of a dropdown the owner can change: those marked with words of their own. */
+        const choicesOfDropdown = (dropdown) => [...dropdown.querySelectorAll('option[data-edit]')];
+
+        /**
+         * A dropdown: its choices, each opening in the panel as words (editText), with a way back
+         * to the rest. Only their words: which choices a form offers belongs to the form builder.
+         */
+        const editChoices = (dropdown) => {
+            current = { kind: 'choices' };
+            lastOpened = dropdown;
+            const label = dropdown.closest('label')?.cloneNode(true);
+            label?.querySelectorAll('select, input, textarea').forEach((inner) => inner.remove());
+            drawerTitle.textContent = `Choices${label?.textContent.trim() ? `: ${label.textContent.replace(/\s+/g, ' ').trim()}` : ''}`;
+            drawerDelete.classList.add('le-hidden');
+            const hint = document.createElement('p');
+            hint.className = 'le-hint';
+            hint.textContent = 'The choices in this dropdown. Pick one to change its words.';
+            const list = document.createElement('div');
+            list.className = 'le-choices';
+            choicesOfDropdown(dropdown).forEach((option) => {
+                const open = document.createElement('button');
+                open.type = 'button';
+                open.className = 'le-chip-btn';
+                open.dataset.choice = option.dataset.edit;
+                open.textContent = option.textContent.replace(/\s+/g, ' ').trim() || '(no words)';
+                open.addEventListener('click', () => {
+                    editText(option);
+                    const back = document.createElement('button');
+                    back.type = 'button';
+                    back.className = 'le-chip-btn';
+                    back.textContent = '← All the choices';
+                    back.addEventListener('click', () => editChoices(dropdown));
+                    drawerFields.append(back);
+                });
+                list.append(open);
+            });
+            drawerFields.replaceChildren(hint, list);
+            setTrail(dropdown);
+            showTab('Edit');
+            ui.drawerFoot.classList.add('le-hidden');
+            openDrawer();
+        };
+
         /** A chart's bar, point, slice or stage: its kind's fields and rules. */
         const editChartRow = (row) => {
             const chart = chartOf(row);
@@ -5458,6 +5501,13 @@ const bootLiveEdit = () => {
             // not typed over, because the next page load would count it again.
             const computed = node.closest('[data-kit-computed]');
             if (computed) return { element: computed, kind: 'computed' };
+            /*
+             * A dropdown's choices. A closed <select> draws no box for its options, so none of them
+             * could be pressed, and the press landed on the words around the dropdown (its label).
+             * The dropdown itself opens its choices, each in the panel like any other words.
+             */
+            const dropdown = node.closest('select');
+            if (dropdown && choicesOfDropdown(dropdown).length > 0) return { element: dropdown, kind: 'choices' };
             const text = node.closest('[data-edit]');
             if (text) return { element: text, kind: 'text' };
             /*
@@ -5521,6 +5571,7 @@ const bootLiveEdit = () => {
             else if (kind === 'icon') void editIcon(element);
             else if (kind === 'svg') editDrawing(element);
             else if (kind === 'text') editText(element);
+            else if (kind === 'choices') editChoices(element);
             else if (kind === 'link') editLink(element);
             else if (kind === 'computed') ui.toast(COMPUTED_SAYS[element.dataset.kitComputed] ?? COMPUTED_SAYS.count, 7000);
             else editStyle(element);
@@ -5773,6 +5824,17 @@ const bootLiveEdit = () => {
             toggleButton?.classList.add('is-asked');
             setTimeout(() => toggleButton?.classList.remove('is-asked'), 2200);
         };
+
+        /*
+         * While editing, a dropdown with choices to change does not open its own list: that list is
+         * drawn by the browser, outside the page, where nothing in it can be pressed to edit. Its
+         * press opens the choices in the panel instead (editChoices).
+         */
+        document.addEventListener('mousedown', (event) => {
+            if (!document.body.classList.contains('editing') || passingThrough) return;
+            const dropdown = event.target?.closest?.('select');
+            if (dropdown && !ui.root.contains(dropdown) && choicesOfDropdown(dropdown).length > 0) event.preventDefault();
+        }, true);
 
         document.addEventListener(
             'click',
