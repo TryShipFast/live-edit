@@ -3978,7 +3978,7 @@ const bootLiveEdit = () => {
                 const add = document.createElement('button');
                 add.type = 'button';
                 add.className = 'le-chip-btn';
-                add.textContent = '+ Add item';
+                add.textContent = list.tagName === 'SELECT' ? '+ Add a choice' : '+ Add item';
                 add.disabled = full;
                 add.addEventListener('click', () => {
                     const ids = currentOrder();
@@ -4497,6 +4497,12 @@ const bootLiveEdit = () => {
                 list.append(open);
             });
             drawerFields.replaceChildren(hint, list);
+            // A dropdown whose choices are a list: choices are added here, and each choice's own panel
+            // moves, copies or removes it (appendListControls, as for any list's items).
+            if (dropdown.dataset.editList) {
+                hint.textContent = 'The choices in this dropdown. Pick one to change, move or remove it, or add another.';
+                appendListControls(dropdown);
+            }
             setTrail(dropdown);
             showTab('Edit');
             ui.drawerFoot.classList.add('le-hidden');

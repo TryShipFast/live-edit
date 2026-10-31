@@ -839,6 +839,11 @@ export const derivedKey = (key, id, from = null) => {
 /** Give an inserted collection row its own editable keys and HTML ids. */
 const rekeyRepeatedItem = (item, id, partner = new Set(), from = null) => {
     item.setAttribute('data-edit-item', id);
+    // A dropdown's added choice sends its own words, never the value of the choice it was copied from.
+    if (item.tagName === 'OPTION') {
+        item.removeAttribute('value');
+        item.removeAttribute('selected');
+    }
     const nodes = [item, ...item.querySelectorAll('*')];
     const idMap = new Map();
 
