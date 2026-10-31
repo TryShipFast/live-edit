@@ -5563,6 +5563,7 @@ const bootLiveEdit = () => {
             count: 'This number counts itself from the products on this page. Add or remove a product and it changes.',
             collection: 'This counts the products in the collection it links to and shows the lowest price. Change that collection and it follows.',
             choices: 'These choices come from your products’ own words. Change a product’s type, cloth or colour on its card and the choices follow.',
+            product: 'This card shows the product its link leads to: its photo, name and price come from that product’s own page. To show another product, change the card’s “See the product” link; to change the words, edit the product’s page.',
         };
         /*
          * What is really under the pointer when a link has been stretched over
