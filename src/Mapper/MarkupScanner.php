@@ -1217,6 +1217,12 @@ class MarkupScanner
     {
         $item->setAttribute('data-edit-item', $newId);
 
+        // A dropdown's added choice sends its own words, never the value of the choice it was copied from.
+        if (strtolower($item->tagName) === 'option') {
+            $item->removeAttribute('value');
+            $item->removeAttribute('selected');
+        }
+
         $nodes = [$item];
         foreach ($item->getElementsByTagName('*') as $descendant) {
             $nodes[] = $descendant;

@@ -57,6 +57,24 @@ class AnAddedItemCopiesTheOneYouWereOnTest extends TestCase
         $this->assertSame(1, substr_count($out, 'One words'));
     }
 
+    public function test_a_choice_added_to_a_dropdown_sends_its_own_words(): void
+    {
+        $html = '<select name="service" data-edit-list="choices"><option value="">Choose</option>'
+            .'<option value="exterior" selected data-edit-item="t1" data-edit="setting:c.choice">Exterior wash</option>'
+            .'<option value="interior" data-edit-item="t2" data-edit="setting:c.choice2">Interior clean</option></select>';
+
+        $out = (new MarkupScanner)->applyOverrides($html, ['choices' => json_encode(['t1', 'n1abc_t1', 't2']), 'c.choice@n1abc_t1' => 'Ceramic coating']);
+        $doc = new \DOMDocument;
+        $doc->loadHTML($out);
+        $options = (new \DOMXPath($doc))->query('//option[@data-edit-item]');
+
+        $this->assertCount(3, $options);
+        $this->assertSame('exterior', $options->item(0)->getAttribute('value'));
+        $this->assertSame('Ceramic coating', $options->item(1)->textContent);
+        $this->assertFalse($options->item(1)->hasAttribute('value'), 'the copy would send the value of the choice it was copied from');
+        $this->assertFalse($options->item(1)->hasAttribute('selected'));
+    }
+
     public function test_a_copy_gets_distinct_edit_keys_and_valid_internal_id_references(): void
     {
         $html = '<ul data-edit-list="courses"><li data-edit-item="one">'
