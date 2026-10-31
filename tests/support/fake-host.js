@@ -1,3 +1,4 @@
+import { join } from 'node:path';
 import { readFileSync } from 'node:fs';
 /*
  * A hosted site in miniature: a design with a shop, two products and a
@@ -224,7 +225,8 @@ const keyMarkers = (doc, name, bandsAreShared = true) => {
  * The charts and the table every hosted template offers (TheDataComponents): the host's own markup,
  * written out by it into data-components.json, so the editor is tested against what the host serves.
  */
-export const DATA_COMPONENTS = JSON.parse(readFileSync(new URL('./data-components.json', import.meta.url), 'utf8'));
+// From the repository root (vitest's root): under happy-dom import.meta.url is not a file: URL, which readFileSync refuses.
+export const DATA_COMPONENTS = JSON.parse(readFileSync(join(process.cwd(), 'tests/support/data-components.json'), 'utf8'));
 
 /** chartsTheKitNames: a chart's settings, keyed on its data-chart-settings element. */
 const nameCharts = (doc, page) => {
