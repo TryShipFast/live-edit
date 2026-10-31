@@ -159,7 +159,9 @@ test('a copied card gets its own page, a full copy, and the two never change eac
 
     // The copy opens its own page; the original card still opens the original.
     await expect(page.locator(`[data-edit-item="${copy}"] h3 a`)).toHaveAttribute('href', '../fig-archive/');
+    await expect(page.locator(`[data-edit-item="${copy}"] a:has(img)`)).toHaveAttribute('href', '../fig-archive/');
     await expect(page.locator('[data-edit-item="aster"] h3 a')).toHaveAttribute('href', '../products/aster-veil/');
+    await expect(page.locator('[data-edit-item="aster"] a:has(img)')).toHaveAttribute('href', '../products/aster-veil/');
     expect(words(drawn('products/aster-veil'), '[data-component="shop.details"] p')).toBe('Our own story, in our own words.');
 
     // And the other way: the original edited from its card leaves the copy alone.

@@ -88,7 +88,7 @@ const shop = `
     <h1 data-edit="text">Shop</h1>
     <ul class="cards" data-list="products" data-label="Products" data-max="12">
       <li data-item="aster" data-kit-product="aster">
-        <img data-edit="image" src="https://img.test/aster-veil.jpg" alt="">
+        <a data-edit="link" data-field="photo" data-link-page="products/aster-veil" href="../products/aster-veil/"><img data-edit="image" src="https://img.test/aster-veil.jpg" alt=""></a>
         <h3><a data-edit="link" data-link-page="products/aster-veil" href="../products/aster-veil/">Aster Veil</a></h3>
         <p data-edit="text" data-field="notes">Neroli and cedar</p>
         <span data-edit="text" data-kit-price data-field="price">$118</span>

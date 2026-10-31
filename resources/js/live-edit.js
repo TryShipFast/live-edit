@@ -3553,16 +3553,28 @@ const bootLiveEdit = () => {
             return toPages.find(([a]) => a.closest('h1, h2, h3, h4, h5, h6')) ?? toPages[0] ?? null;
         };
         /*
-         * The address to point at a card's own page: one whose link opens that page, never just the first
-         * link with an address key. That pointed a booking slot at the new page and left the name opening
-         * the original. Null when no link to the page can be re-addressed (its words are marked, its
-         * address is not), so the card is not given a page only a stray button reaches.
+         * Every address in the card that opens its own page. A product card commonly has separate
+         * photo and title links; changing only the clicked link leaves the other one at the original.
+         * Unrelated links (such as a booking slot) must keep their destinations.
          */
-        const addressOfTheCardsPage = (item, link, page, builder) => {
-            if (link?.dataset.editHref !== undefined) return link;
+        const addressesOfTheCardsPage = (item, link, page, builder) => {
+            item = item.matches?.('[data-edit-item]') ? item : item.closest?.('[data-edit-item]') ?? item;
+            const candidates = [...item.querySelectorAll('a[data-edit-href]')];
+            if (link?.dataset.editHref !== undefined && !candidates.includes(link)) candidates.unshift(link);
+            const pages = builder?.pages ?? [];
+            const base = pageBase(builder, window.location.href);
+            const target = (anchor) => {
+                try {
+                    return new URL(anchor.getAttribute('href') ?? '', base).pathname.replace(/index\.html$/, '').replace(/\/+$/, '');
+                } catch {
+                    return '';
+                }
+            };
+            const selectedPath = target(link);
 
-            return [...item.querySelectorAll('a[data-edit-href]')]
-                .find((a) => pageOfLink(a, builder?.pages ?? [], pageBase(builder, window.location.href))?.id === page.id) ?? null;
+            return candidates.filter((a) => pageOfLink(a, pages, base)?.id === page.id
+                || (link?.dataset.linkPage && a.dataset.linkPage === link.dataset.linkPage)
+                || (selectedPath && target(a) === selectedPath));
         };
         const cardNameOf = (item) => (item.dataset.editItemLabel || item.querySelector('h1, h2, h3, h4')?.textContent || '')
             .replace(/\s+/g, ' ').trim();
@@ -3618,8 +3630,7 @@ const bootLiveEdit = () => {
          * where they differ, and the card pointed at it. Returns the page.
          */
         const giveItsOwnPage = async ({ page, link, item, builder, progress = () => {} }) => {
-            const editableLink = addressOfTheCardsPage(item, link, page, builder);
-            if (!editableLink) throw new Error('This card’s link to its page cannot be changed, so it cannot have a page of its own.');
+            if (!addressesOfTheCardsPage(item, link, page, builder).length) throw new Error('This card’s link to its page cannot be changed, so it cannot have a page of its own.');
             const title = cardNameOf(item) || page.title;
             const id = await copyPageForCard({
                 page,
@@ -3636,11 +3647,19 @@ const bootLiveEdit = () => {
                 }), progress),
                 progress,
             });
-            const href = hrefTo(editableLink.getAttribute('href'), id);
-            await patiently(() => saveSetting(editableLink.dataset.editHref, addressFromTheRoot(href, editableLink.dataset.editHrefRoot, pageBase(builder, document.baseURI))), progress);
-            // So this card already opens its own page if it is chosen again before the list is redrawn.
-            editableLink.setAttribute('href', href);
-            if (editableLink.dataset.linkPage) editableLink.dataset.linkPage = id;
+            const itemNode = item.matches?.('[data-edit-item]') ? item : item.closest?.('[data-edit-item]') ?? item;
+            const currentItem = itemNode.dataset.editItem
+                ? document.querySelector(`[data-edit-item="${CSS.escape(itemNode.dataset.editItem)}"]`) ?? itemNode
+                : itemNode;
+            const editableLinks = addressesOfTheCardsPage(currentItem, link, page, builder);
+            if (!editableLinks.length) throw new Error('This card’s links could not be updated after its page was copied. Refresh and try again.');
+            for (const editableLink of editableLinks) {
+                const href = hrefTo(editableLink.getAttribute('href'), id);
+                await patiently(() => saveSetting(editableLink.dataset.editHref, addressFromTheRoot(href, editableLink.dataset.editHrefRoot, pageBase(builder, document.baseURI))), progress);
+                // So every product link already opens the copy if it is chosen again before redraw.
+                editableLink.setAttribute('href', href);
+                if (editableLink.dataset.linkPage) editableLink.dataset.linkPage = id;
+            }
 
             return { ...page, id, title };
         };
@@ -4127,7 +4146,7 @@ const bootLiveEdit = () => {
              */
             if (opens) {
                 const [link, page] = opens;
-                const editableLink = addressOfTheCardsPage(item, link, page, builder);
+                const editableLink = addressesOfTheCardsPage(item, link, page, builder)[0] ?? null;
                 // The copy, not the card it was copied from: only an id the editor minted. A card's name says
                 // nothing: design cards are often named apart from their page ("Unwanted hair" opens "Laser
                 // hair removal"), two design cards can open one page, and owners rename cards.
