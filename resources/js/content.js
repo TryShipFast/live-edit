@@ -1102,7 +1102,15 @@ export const defendContent = (doc, { limit = 12, debounce = 60 } = {}) => {
         return null;
     }
 
-    const watched = doc.querySelectorAll('[data-edit], [data-edit-img], [data-edit-href]');
+    /*
+     * A price (data-kit-price) is the template's to print: the shop writes it with the currency and
+     * follows the size a shopper chooses (LIVE-EDIT-STRUCTURE.md, "A shop works itself out from the
+     * page"). Defended, the product page kept the first size's price while the bag charged the
+     * chosen one (car-wash-auto, 31 Oct 2026). The owner's words are still applied to it; only
+     * the shop's own reprinting is left alone.
+     */
+    const watched = [...doc.querySelectorAll('[data-edit], [data-edit-img], [data-edit-href]')]
+        .filter((element) => !element.hasAttribute('data-kit-price'));
 
     if (watched.length === 0) {
         return null;

@@ -645,6 +645,21 @@ describe('a theme that puts its own words back', () => {
         expect(doc.querySelector('h1').textContent).toBe('Their headline');
     });
 
+    it('leaves a price to the shop that prints it', async () => {
+        // A product page follows the size chosen: the shop reprints its price, and putting the
+        // first size's price back showed £24 beside a bag charging £38.
+        const doc = page('<p data-kit-price data-edit="setting:auto:price">£24</p><h1 data-edit="setting:auto:title">Wax</h1>');
+        applyContent(doc, { 'auto:price': '£24', 'auto:title': 'Wax' });
+        defendContent(doc);
+
+        doc.querySelector('p').textContent = '£38';
+        doc.querySelector('h1').textContent = 'Theme';
+        await settle();
+
+        expect(doc.querySelector('p').textContent).toBe('£38');
+        expect(doc.querySelector('h1').textContent).toBe('Wax');
+    });
+
     it('puts the client\'s picture back when a slider swaps the source', async () => {
         const doc = page('<img data-edit-img="setting:auto:pic" src="/theme.jpg">');
         const settings = { 'auto:pic': '/theirs.jpg' };
