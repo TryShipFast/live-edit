@@ -916,7 +916,12 @@ export function pageOfLink(link, pages = [], base = 'http://localhost/') {
     const byName = named ? pages.find((page) => page.id === named) ?? null : null;
     let path;
     try {
-        path = new URL(link?.getAttribute?.('href') ?? link, base).pathname.replace(/index\.html$/, '');
+        const url = new URL(link?.getAttribute?.('href') ?? link, base);
+        // Another website is none of this site's pages, whatever its address ends in: a repository at
+        // github.com/someone/talks is not the Talks page (The Developer's open-source cards were offered
+        // "Give it its own page" and their GitHub links rewritten).
+        if (url.origin !== new URL(base).origin) return null;
+        path = url.pathname.replace(/index\.html$/, '');
     } catch {
         return byName;
     }

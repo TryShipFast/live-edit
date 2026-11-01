@@ -303,6 +303,9 @@ describe('a card and its page', () => {
         expect(pageOfLink('../products/arc/', pages, 'http://x.test/shop/').id).toBe('products/arc');
         expect(pageOfLink('../../journal/battery-life/index.html', pages, 'http://x.test/a/b/').id).toBe('journal/battery-life');
         expect(pageOfLink('https://elsewhere.test/', pages, 'http://x.test/')).toBeNull();
+        // another website's address ending in a page's name is still another website (a repository called talks)
+        expect(pageOfLink('https://github.example/orlaquinn/talks', [{ id: 'talks' }], 'http://x.test/projects/')).toBeNull();
+        expect(pageOfLink('../talks/', [{ id: 'talks' }], 'http://x.test/projects/').id).toBe('talks');
         const a = document.createElement('a'); a.setAttribute('href', '../products/arc/'); a.dataset.linkPage = 'arc';
         expect(pageOfLink(a, [{ id: 'product-arc' }, { id: 'arc' }], 'http://x.test/shop/').id).toBe('arc');
         a.dataset.linkPage = 'product-arc';
