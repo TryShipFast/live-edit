@@ -1,5 +1,9 @@
 # ShipFast Live Edit for WordPress
 
+## 0.15.86
+
+- Release only: the v0.15.84 and v0.15.85 tags were set one commit early (v0.15.84 before the category products, v0.15.85 on the 0.15.84 release), so neither carried its changes. 0.15.86 carries all of 0.15.84 and 0.15.85; no code changes.
+
 ## 0.15.85
 
 - Import products in the Shop tab: a sample file made from the shop (its columns, categories and some of its own products), every row checked before anything is added, each product given its own page and its categories (with the website's host), and the last import taken back.
