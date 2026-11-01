@@ -1069,6 +1069,43 @@ select.le-input {
 
 .le-price-field .le-prose { font-variant-numeric: tabular-nums; }
 
+/* ---- help (0.15.81) ----------------------------------------------------------
+   A window with a fixed header and a close button; guides as rows, not a wall of
+   boxes; the common questions as a proper accordion. On a phone, a sheet over the
+   lower part of the screen that leaves the bar alone. */
+.le-help-menu { display: flex; flex-direction: column; padding: 0; overflow: hidden; width: min(400px, calc(100vw - 32px)); max-height: min(640px, calc(100vh - 120px)); }
+.le-help-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; padding: 16px 16px 12px 20px; border-bottom: 1px solid var(--le-line); }
+.le-help-titles .le-walkthrough-progress { margin: 0 0 2px; }
+.le-help-titles h2 { margin: 0; }
+.le-help-body { overflow-y: auto; padding: 4px 20px 16px; }
+.le-help-body > p { margin: 12px 0 4px; }
+.le-help-group { margin: 18px 0 0; }
+.le-help-group-title { margin: 0 0 6px; font-size: 12px; letter-spacing: .04em; color: var(--le-muted); }
+.le-help-options { gap: 0; }
+.le-help-option {
+  position: relative; gap: 2px; padding: 11px 32px 11px 10px; margin: 0 -10px; width: calc(100% + 20px);
+  border: 0; border-radius: 10px; background: none;
+}
+.le-help-option::after { content: '›'; position: absolute; right: 12px; top: 50%; transform: translateY(-50%); color: var(--le-muted); font-size: 18px; line-height: 1; }
+.le-help-option + .le-help-option { box-shadow: 0 -1px 0 var(--le-line); }
+.le-help-option:hover, .le-help-option:focus-visible { background: var(--le-soft); box-shadow: none; }
+.le-help-option:hover + .le-help-option, .le-help-option:focus-visible + .le-help-option { box-shadow: none; }
+.le-help-option-title { font-size: 14px; font-weight: 600; }
+.le-help-option-detail { font-size: 13px; color: var(--le-muted); }
+/* The questions: a row each, a chevron that turns, the answer under the question it answers. */
+.le-help-faq details { padding: 0; border-top: 1px solid var(--le-line); }
+.le-help-faq details:last-child { border-bottom: 1px solid var(--le-line); margin-bottom: 0; }
+.le-help-faq summary { list-style: none; display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 0; font-size: 14px; font-weight: 600; line-height: 1.4; }
+.le-help-faq summary::-webkit-details-marker { display: none; }
+.le-help-faq summary:hover .le-faq-q { text-decoration: underline; text-underline-offset: 3px; }
+.le-faq-chevron { flex: none; width: 8px; height: 8px; margin-right: 4px; border-right: 2px solid var(--le-muted); border-bottom: 2px solid var(--le-muted); transform: rotate(45deg) translateY(-2px); transition: transform .15s ease; }
+.le-help-faq details[open] .le-faq-chevron { transform: rotate(-135deg) translateY(-2px); }
+.le-help-faq details p { margin: 0 0 14px; padding-right: 24px; font-size: 14px; line-height: 1.6; color: var(--le-body); }
+.le-help-menu .le-walkthrough-actions { display: none; }
+@media (max-width: 760px) {
+  .le-help-menu { left: 0; right: 0; bottom: 0; width: 100%; max-height: 78vh; border-radius: 18px 18px 0 0; z-index: 2147483006; }
+}
+
 `;
 
 /**

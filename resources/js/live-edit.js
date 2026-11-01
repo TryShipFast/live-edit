@@ -6392,7 +6392,15 @@ const bootLiveEdit = () => {
          * ask. Every guide points at the real thing on the page; see help.js for the content.
          */
         const showHelpMenu = () => {
-            if (ui.shadow.querySelector('.le-walkthrough')) return;
+            /*
+             * "?" always answers. It returned early whenever a guide card was in the page, and a guide
+             * set aside with Hide stays there (hidden, its pill offering to resume it), so for most
+             * owners the help button did nothing at all. A second press closes help; a guide step that
+             * is showing gives way to help, and its pill still resumes it.
+             */
+            const open = ui.shadow.querySelector('.le-help-menu');
+            if (open) { open.remove(); return; }
+            ui.shadow.querySelectorAll('.le-walkthrough:not(.le-help-menu)').forEach((guide) => { guide.hidden = true; });
             const profile = profileFor(window.liveEditSite, { hasShop: Boolean(drawerTabs.Shop) });
             const card = document.createElement('section');
             card.className = 'le-walkthrough le-help-menu';
@@ -6467,11 +6475,29 @@ const bootLiveEdit = () => {
             faq.append(el('h3', 'le-help-group-title', 'Common questions'));
             for (const { q, a } of questions) {
                 const item = document.createElement('details');
-                item.append(el('summary', null, q), el('p', null, a));
+                const summary = el('summary', null);
+                summary.append(el('span', 'le-faq-q', q), el('span', 'le-faq-chevron'));
+                summary.lastChild.setAttribute('aria-hidden', 'true');
+                item.append(summary, el('p', null, a));
                 faq.append(item);
             }
 
-            card.append(progress, heading, copy, ...[startHere, yourLists, everythingElse].filter(Boolean), faq, actions);
+            /*
+             * A header that stays put while the guides scroll under it, with a close button where
+             * every window has one; the questions owners actually ask straight after "Start here",
+             * not under every guide on the page.
+             */
+            const top = el('div', 'le-help-head');
+            const titles = el('div', 'le-help-titles');
+            titles.append(progress, heading);
+            const close = el('button', 'le-close', '×');
+            close.type = 'button';
+            close.setAttribute('aria-label', 'Close help');
+            close.addEventListener('click', () => card.remove());
+            top.append(titles, close);
+            const body = el('div', 'le-help-body');
+            body.append(copy, ...[startHere, faq, yourLists, everythingElse].filter(Boolean), actions);
+            card.append(top, body);
             ui.shadow.append(card);
             finish.addEventListener('click', () => card.remove());
             card.addEventListener('keydown', (event) => { if (event.key === 'Escape') { event.stopPropagation(); card.remove(); } });
