@@ -511,7 +511,7 @@ const bootLiveEdit = () => {
             if (tag === 'HEADER') return 'Header';
             if (tag === 'FOOTER') return 'Footer';
             if (tag === 'FORM') return 'Form';
-            if (element.hasAttribute('data-edit-item')) return 'Card';
+            if (element.hasAttribute('data-edit-item')) return element.parentElement?.dataset?.editListKind === 'sections' ? 'Section' : 'Card';
             if (element.hasAttribute('data-edit-icon')) return 'Icon';
             if (element.hasAttribute('data-edit-svg')) return 'Drawing';
             if (element.hasAttribute('data-edit')) return 'Text';
@@ -747,6 +747,31 @@ const bootLiveEdit = () => {
                 });
                 input.value = value ?? '';
                 wrap.append(input);
+            } else if (name === 'fontSize' || type === 'lineHeight' || ['paddingX', 'paddingY', 'radius'].includes(name)) {
+                /*
+                 * Steps of a scale, not any number: a size typed freely ("17", "23") drifts a site
+                 * off its own design, and "default" in an empty number box says nothing about what
+                 * the default is. The value saved is the same number as before.
+                 */
+                const input = document.createElement('select');
+                input.className = 'le-input';
+                input.dataset.styleProp = name;
+                const scale = name === 'fontSize'
+                    ? [['', 'As designed'], ['13', 'Small (13)'], ['15', 'Body (15)'], ['17', 'Large (17)'], ['20', 'Lead (20)'], ['24', 'Title S (24)'], ['32', 'Title M (32)'], ['40', 'Title L (40)'], ['56', 'Display (56)']]
+                    : type === 'lineHeight'
+                        ? [['', 'As designed'], ['1.1', 'Tight (1.1)'], ['1.3', 'Snug (1.3)'], ['1.5', 'Normal (1.5)'], ['1.7', 'Relaxed (1.7)'], ['2', 'Loose (2)']]
+                        : [['', 'As designed'], ['0', 'None (0)'], ['4', 'XS (4)'], ['8', 'S (8)'], ['12', 'M (12)'], ['16', 'L (16)'], ['24', 'XL (24)'], ['32', '2XL (32)'], ['48', '3XL (48)'], ['64', '4XL (64)'], ['96', '5XL (96)']];
+                const known = new Set(scale.map(([v]) => v));
+                // A value saved before the scale existed stays chosen, named as it is.
+                if (value && !known.has(String(value))) scale.push([String(value), `${value} (saved)`]);
+                scale.forEach(([v, label]) => {
+                    const option = document.createElement('option');
+                    option.value = v;
+                    option.textContent = label;
+                    input.append(option);
+                });
+                input.value = value ?? '';
+                wrap.append(input);
             } else {
                 const input = document.createElement('input');
                 input.type = 'number';
@@ -911,13 +936,21 @@ const bootLiveEdit = () => {
             previewStyleTag.textContent = '';
         };
 
+        // The footer says whether this panel holds changes not yet saved.
+        const sayHowThePanelStands = () => {
+            const dirty = Boolean(current?.dirty);
+            ui.footStatus.textContent = dirty ? 'Unsaved changes' : '';
+            ui.footStatus.classList.toggle('is-dirty', dirty);
+        };
         drawerFields.addEventListener('input', () => {
             if (current) current.dirty = true;
             applyStylePreview();
+            sayHowThePanelStands();
         });
         drawerFields.addEventListener('change', () => {
             if (current) current.dirty = true;
             applyStylePreview();
+            sayHowThePanelStands();
         });
 
         const collectStyleProps = () => {
@@ -1150,7 +1183,9 @@ const bootLiveEdit = () => {
                 const crumb = document.createElement('button');
                 crumb.type = 'button';
                 crumb.textContent = entry.label;
-                crumb.className = 'le-crumb';
+                // Where you came from is a way back, not a place on the page: drawn apart from the location.
+                crumb.className = entry.label.startsWith('← ') ? 'le-crumb le-crumb-back' : 'le-crumb';
+                if (entry.label.startsWith('← ')) crumb.setAttribute('aria-label', `Back to ${entry.label.slice(2)}`);
                 crumb.addEventListener('click', () => switchToNode(ancestor));
                 drawerTrail.append(crumb);
             });
@@ -1630,7 +1665,7 @@ const bootLiveEdit = () => {
             const changes = payload?.changes ?? [];
 
             if (changes.length === 0) {
-                drawerFields.replaceChildren(note('No unpublished changes.'));
+                drawerFields.replaceChildren(note('Everything is published. Changes you save appear here until you publish them.'));
 
                 return;
             }
@@ -2029,12 +2064,14 @@ const bootLiveEdit = () => {
             return hidden(12, 12 + width) < hidden(window.innerWidth - 12 - width, window.innerWidth - 12);
         };
         const openDrawer = () => {
+            sayHowThePanelStands();
             // The floating handles point at the page, and the panel is now the
             // subject. On a phone the panel is full width, so a handle left
             // showing sits on top of it and looks like a fault.
             hideHandle();
             hideBgHandle();
             drawer.classList.add('is-open');
+            ui.root.classList.add('le-drawer-open');
             ui.toolbar.classList.add('is-compact');
 
             // Writing aids such as Grammarly attach to every text box they
@@ -2077,6 +2114,7 @@ const bootLiveEdit = () => {
             current?.restore?.();
             clearStylePreview();
             drawer.classList.remove('is-open', 'is-left');
+            ui.root.classList.remove('le-drawer-open');
             ui.toolbar.classList.remove('is-compact');
             current = null;
         };
@@ -2191,6 +2229,11 @@ const bootLiveEdit = () => {
             // which of them are icons at all.
             if (on) markRealIcons();
             document.body.classList.toggle('editing', on);
+            // What can be edited, shown for a moment as editing starts; after that, where the pointer is.
+            if (on) {
+                document.body.classList.add('le-show-editable');
+                window.setTimeout(() => document.body.classList.remove('le-show-editable'), 2400);
+            }
             if (on) reopenDialogsInPlace();
             editables().forEach((el) => {
                 if (on) {
@@ -3324,7 +3367,7 @@ const bootLiveEdit = () => {
             current.targetKey = element.dataset.editTarget;
             const group = document.createElement('div');
             group.className = 'le-field le-divided';
-            group.append('Link');
+            group.append('Goes to');
             const hrefInput = document.createElement('input');
             hrefInput.type = 'text';
             hrefInput.dataset.linkField = 'href';
@@ -3335,6 +3378,42 @@ const bootLiveEdit = () => {
             // shadow root, where the page's stylesheet cannot reach: the field
             // had been rendering unstyled next to a text box that was not.
             hrefInput.className = 'le-input le-link';
+            /*
+             * Where it goes, chosen by name: "Aster Veil" rather than "../products/aster-veil/".
+             * The address stays under it, written out, for an address outside the site.
+             */
+            const pages = window.liveEditPages?.pages ?? [];
+            let picker = null;
+            if (pages.length) {
+                picker = document.createElement('select');
+                picker.className = 'le-input le-page-pick';
+                picker.setAttribute('aria-label', 'Goes to');
+                const here = pageOfLink(element, pages, pageBase(window.liveEditPages, window.location.href));
+                const other = document.createElement('option');
+                other.value = '';
+                other.textContent = 'Another address…';
+                pages.forEach((page) => {
+                    const option = document.createElement('option');
+                    option.value = page.id;
+                    option.textContent = page.title || page.id || 'Home';
+                    option.selected = here?.id === page.id;
+                    picker.append(option);
+                });
+                picker.append(other);
+                if (!here) other.selected = true;
+                const prefix = element.dataset.editHrefRoot ?? ((currentHref.match(/^(?:\.\.\/)*/) ?? [''])[0]);
+                picker.addEventListener('change', () => {
+                    if (picker.value === '' && pages.every((page) => page.id !== '')) { hrefInput.focus(); return; }
+                    const chosen = pages.find((page) => page.id === picker.value);
+                    if (!chosen) { hrefInput.focus(); return; }
+                    hrefInput.value = chosen.id === '' ? (prefix || './') : `${prefix}${chosen.id}/`;
+                    hrefInput.dispatchEvent(new Event('input', { bubbles: true }));
+                });
+                hrefInput.addEventListener('input', () => {
+                    const now = pageOfLink(Object.assign(document.createElement('a'), { href: hrefInput.value }), pages, pageBase(window.liveEditPages, window.location.href));
+                    picker.value = now?.id ?? '';
+                });
+            }
             const targetWrap = document.createElement('label');
             targetWrap.className = 'le-default';
             const targetInput = document.createElement('input');
@@ -3342,7 +3421,14 @@ const bootLiveEdit = () => {
             targetInput.dataset.linkField = 'target';
             targetInput.checked = element.getAttribute('target') === '_blank';
             targetWrap.append(targetInput, 'Open in a new tab');
-            group.append(hrefInput, targetWrap);
+            if (picker) {
+                const said = document.createElement('span');
+                said.className = 'le-hint';
+                said.textContent = 'Address';
+                group.append(picker, said, hrefInput, targetWrap);
+            } else {
+                group.append(hrefInput, targetWrap);
+            }
             drawerFields.append(group);
         };
 
@@ -3404,6 +3490,18 @@ const bootLiveEdit = () => {
                     ? fieldInput('icon', 'Icon', element.dataset.editValue ?? '', 1, false)
                     : fieldInput('value', separatedWords.length ? 'Text around formatted words' : 'Text', text, 6, richSetting);
                 drawerFields.append(textField);
+                /*
+                 * The page changes as the words are typed, so they are judged where they will be read.
+                 * Only where the element is its own words (no markup inside to keep); put back on
+                 * Cancel, and replaced by what was saved on Save.
+                 */
+                if (!asIcon && !richSetting && !separatedWords.length && element.children.length === 0) {
+                    const before = element.textContent;
+                    const box = textField.querySelector('textarea');
+                    box?.addEventListener('input', () => { element.textContent = box.value; });
+                    const restoreBefore = current.restore;
+                    current.restore = () => { if (element.isConnected) element.textContent = before; restoreBefore?.(); };
+                }
 
                 /*
                  * Say why a word on the page is not in the box.
@@ -4106,7 +4204,7 @@ const bootLiveEdit = () => {
              */
             if (sections && !item) {
                 const order = document.createElement('div');
-                order.className = 'le-row';
+                order.className = 'le-section-rows';
                 shownSections(list).forEach((section, index) => {
                     const open = document.createElement('button');
                     open.type = 'button';
@@ -4157,7 +4255,8 @@ const bootLiveEdit = () => {
                 own.className = 'le-row';
                 const editDetails = document.createElement('button');
                 editDetails.type = 'button';
-                editDetails.className = 'le-btn';
+                // One main button per panel, and it is Save: this one opens a page, so it is outlined.
+                editDetails.className = 'le-btn-outline';
                 editDetails.textContent = separate ? 'Give it its own page' : 'Edit all details';
                 editDetails.title = separate
                     ? `A copy of ${page.title} that only this card opens, edited here`
@@ -4269,6 +4368,31 @@ const bootLiveEdit = () => {
          * here, where each remaining aspect is offered if the element has it.
          * Adding an aspect later means adding it once.
          */
+        /*
+         * One order for every panel: what was clicked first, ready to type into; then the card or
+         * section it belongs to, with that item's actions; then style, folded. The item's actions led
+         * the panel, so the words somebody clicked sat below five buttons, and on a phone the link
+         * field was off screen. Delete goes last in its group, quiet, away from Duplicate.
+         */
+        const organisePanel = () => {
+            const context = drawerFields.querySelector(':scope > .le-item-context');
+            const actions = drawerFields.querySelector(':scope > .le-item-actions');
+            if (!context || !actions) return;
+            const group = document.createElement('section');
+            group.className = 'le-group';
+            group.setAttribute('aria-label', context.textContent);
+            group.append(context, actions);
+            const remove = [...actions.querySelectorAll('.le-btn-danger')];
+            if (remove.length) {
+                const end = document.createElement('div');
+                end.className = 'le-row le-row-end';
+                remove.forEach((button) => { button.classList.add('le-btn-quiet-danger'); end.append(button); });
+                actions.append(end);
+            }
+            const fieldsEnd = drawerFields.querySelector(':scope > .le-style-group, :scope > .le-contents');
+            drawerFields.insertBefore(group, fieldsEnd);
+        };
+
         const finishPanel = (element, { styleKey = null, styleOn = element, linkElement = element } = {}) => {
             lastOpened = element;
 
@@ -4309,6 +4433,7 @@ const bootLiveEdit = () => {
             if (element.dataset?.editListKind !== 'sections') appendContents(element);
             if (inTable) appendTableControls(element);
             else appendListControls(element);
+            organisePanel();
             setTrail(element.dataset.styleEdit ? (element.closest('[data-style]') ?? element.parentElement) : element);
             showTab('Edit');
             openDrawer();
@@ -4389,7 +4514,7 @@ const bootLiveEdit = () => {
 
             if (lists.length > 0) {
                 const heading = document.createElement('div');
-                heading.className = 'le-section-heading';
+                heading.className = 'le-section-heading le-contents';
                 heading.textContent = 'Repeated content';
                 drawerFields.append(heading);
 

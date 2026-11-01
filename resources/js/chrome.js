@@ -211,7 +211,7 @@ a.le-mark:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
    page underneath stays visibly theirs and the editor stays visibly ours. */
 .le-drawer {
   position: fixed; top: 12px; right: 12px; bottom: 12px; z-index: 2147483000;
-  width: min(340px, calc(100vw - 24px)); display: none; flex-direction: column;
+  width: min(380px, calc(100vw - 24px)); display: none; flex-direction: column;
   background: #fff; border: 1px solid var(--le-line);
   border-radius: 16px; box-shadow: 0 30px 80px -20px rgba(11,12,15,.3); overflow: hidden;
 }
@@ -976,6 +976,92 @@ select.le-input {
 .le-review-row:last-child { border-bottom: 0; }
 .le-review-what { font-size: 12px; color: var(--le-muted); }
 .le-review-to { font-size: 14px; font-weight: 500; color: var(--le-ink); margin-top: 2px; }
+
+/* ---- the drawer's system (0.15.81) -------------------------------------------
+   One hierarchy in every panel: header (where you are, what this is), the field
+   that was clicked, the item it belongs to with its actions, style folded, and a
+   sticky footer whose only main button is Save. One spacing scale (4/8/12/16/24),
+   one type scale (12/13/14/15/17), text at 4.5:1 or better, and a focus ring on
+   everything that can be pressed. */
+:host { --le-muted: #6B6F78; --le-space: 16px; }
+.le-subject { padding: 16px 20px 14px; }
+.le-title { font-size: 17px; font-weight: 650; line-height: 1.3; }
+.le-fields { padding: 20px; gap: 16px; }
+.le-field { gap: 8px; font-size: 13px; font-weight: 600; color: var(--le-ink); }
+.le-hint { font-size: 12.5px; line-height: 1.5; color: var(--le-muted); }
+.le-default { font-size: 13px; color: var(--le-body); }
+.le-prose { min-height: 48px; font-size: 15px; line-height: 1.55; padding: 12px 14px; }
+/* Where you are: the location, and apart from it a way back to where you came from. */
+.le-trail { gap: 6px; font-size: 12px; margin-bottom: 4px; }
+.le-crumb { font-size: 12px; color: var(--le-muted); }
+.le-crumb-back {
+  margin-right: 6px; padding: 2px 8px 2px 6px; border-radius: 6px; background: var(--le-soft);
+  color: var(--le-ink); font-weight: 600;
+}
+.le-crumb-back:hover { text-decoration: none; background: var(--le-line); }
+.le-crumb-back + .le-crumb::before { content: none; }
+/* The item the field belongs to, after the field: a titled group, not a grey box. */
+.le-group { display: grid; gap: 10px; padding-top: 16px; border-top: 1px solid var(--le-line); }
+.le-group > .le-item-context { margin: 0; padding: 0; border: 0; font-size: 13px; font-weight: 650; color: var(--le-ink); }
+.le-group .le-item-actions { padding: 0; margin: 0; background: none; border-radius: 0; gap: 10px; }
+.le-group .le-item-actions > .le-section-heading { margin: 0; padding: 0; border: 0; font-size: 12px; font-weight: 600; color: var(--le-muted); }
+.le-chip-btn { min-height: 36px; padding: 0 14px; font-size: 13px; color: var(--le-ink); border-color: var(--le-field); }
+.le-btn-outline { min-height: 40px; color: var(--le-ink); }
+/* Removing is quiet and last: a text button under the rest, never beside Duplicate. */
+.le-row-end { padding-top: 4px; }
+.le-btn-quiet-danger {
+  min-height: 32px; padding: 0 2px; border: 0; background: none; border-radius: 6px;
+  color: var(--le-danger); font-size: 13px; font-weight: 600; text-decoration: underline; text-underline-offset: 3px;
+}
+.le-btn-quiet-danger:hover { background: none; color: #9b2c20; }
+/* Every control shows where the keyboard is. */
+.le-drawer :is(button, a, input, select, textarea, summary):focus-visible,
+.le-toolbar :is(button, a, select):focus-visible { outline: 2px solid var(--le-blue); outline-offset: 2px; }
+/* The footer: what state the panel is in, then Cancel and Save. */
+.le-foot { justify-content: flex-end; padding: 12px 20px; background: #fff; }
+.le-foot-status { margin-right: auto; font-size: 13px; color: var(--le-muted); }
+.le-foot-status.is-dirty { color: #8a5a00; font-weight: 600; }
+.le-foot-status.is-dirty::before { content: ''; display: inline-block; width: 8px; height: 8px; margin-right: 8px; border-radius: 50%; background: #e0a400; vertical-align: 1px; }
+.le-foot .le-btn { min-height: 40px; }
+/* Published is a state, not a button that is switched off. */
+.le-publish[disabled] { opacity: 1; background: transparent; color: rgba(255,255,255,.72); font-weight: 500; }
+.le-publish[disabled]::before { content: '✓ '; }
+/* The page's sections, as a list of rows. */
+.le-section-rows { display: grid; gap: 6px; }
+.le-section-rows .le-chip-btn { justify-content: flex-start; text-align: left; border-radius: 10px; width: 100%; }
+/* A phone: the drawer is a sheet over the lower half, so what is being edited stays in view,
+   and the bar is one row with the rest under More. */
+.le-more { display: none; }
+@media (max-width: 760px) {
+  .le-drawer {
+    top: auto; left: 0; right: 0; bottom: 0; width: 100%; max-height: min(62vh, 560px); height: auto;
+    border-radius: 18px 18px 0 0; border-bottom: 0;
+  }
+  .le-drawer.is-open { animation: le-rise .24s cubic-bezier(.2,.7,.2,1); }
+  .le-drawer::before { content: ''; align-self: center; width: 40px; height: 4px; margin-top: 8px; border-radius: 4px; background: var(--le-field); flex: none; }
+  .le-toolbar { flex-wrap: nowrap; justify-content: space-between; border-radius: 16px; }
+  .le-toolbar .le-when-roomy { display: none; }
+  .le-toolbar.is-more { flex-wrap: wrap; }
+  .le-toolbar.is-more .le-when-roomy { display: inline-flex; }
+  .le-more { display: inline-flex; }
+  /* No floating guide pill on a phone: every corner belongs to the site (its menu button, its Book bar)
+     or to our bar. The guide is under More, behind "?". */
+  .le-walkthrough-pill { display: none !important; }
+  .le-walkthrough { bottom: 84px; }
+}
+@keyframes le-rise { from { transform: translateY(24px); opacity: 0; } to { transform: none; opacity: 1; } }
+
+.le-foot .le-btn, .le-foot .le-btn-outline { white-space: nowrap; }
+.le-page-pick { margin-bottom: 2px; }
+/* On a phone the guide waits while a panel is open, rather than covering its fields. */
+@media (max-width: 760px) { :host(.le-drawer-open) .le-walkthrough-pill, :host(.le-drawer-open) .le-walkthrough { display: none; } }
+
+.le-foot-status { white-space: nowrap; }
+@media (max-width: 760px) {
+  .le-toolbar { gap: 2px; padding: 6px; }
+  .le-toolbar .le-bar-btn, .le-toolbar .le-publish { white-space: nowrap; padding-left: 10px; padding-right: 10px; }
+}
+
 `;
 
 /**
@@ -1034,11 +1120,23 @@ body.editing [data-edit-href]:not([data-edit]),
 /* The picture itself is marked the same way the words are. */
 body.editing img[data-edit-img],
 body.editing [data-edit-bg] {
-  outline: 1px dashed rgba(17, 24, 39, .35);
+  outline: 1px dashed transparent;
   outline-offset: 3px;
   border-radius: 3px;
   cursor: pointer;
+  transition: outline-color .2s ease;
 }
+/* Shown for a moment when editing starts, and wherever the pointer is, rather than round every
+   sentence all the time: a page drawn over with dashes is hard to judge as a page. */
+body.editing.le-show-editable [data-edit],
+body.editing.le-show-editable [data-edit-href]:not([data-edit]),
+body.editing.le-show-editable img[data-edit-img],
+body.editing.le-show-editable [data-edit-bg],
+body.editing [data-edit]:hover,
+body.editing [data-edit-href]:not([data-edit]):hover,
+body.editing img[data-edit-img]:hover,
+body.editing [data-edit-bg]:hover,
+body.editing [data-edit]:focus-visible { outline-color: rgba(17, 24, 39, .4); }
 /* A sentence whose original has changed since it was translated.
  *
  * Marked where it sits, because a count cannot be acted on: told that six
@@ -1292,11 +1390,22 @@ export function createChrome() {
     publishCount.hidden = true;
     publishButton.append(publishLabel, publishCount);
 
+    // On a phone the bar is one row: Done, Undo, Redo and Publish, and the rest under More.
+    const moreButton = el('button', 'le-bar-btn le-more', 'More');
+    moreButton.type = 'button';
+    moreButton.setAttribute('aria-expanded', 'false');
+    moreButton.addEventListener('click', () => {
+        const open = toolbar.classList.toggle('is-more');
+        moreButton.setAttribute('aria-expanded', String(open));
+        moreButton.textContent = open ? 'Less' : 'More';
+    });
+
     toolbar.append(
         el('span', 'le-sep'),
         toggleButton,
         undoButton,
         redoButton,
+        moreButton,
         el("span", "le-sep"),
         languagePicker,
         pagesButton,
@@ -1406,7 +1515,10 @@ export function createChrome() {
     cancelButton.type = 'button';
     const saveButton = el('button', 'le-btn', 'Save changes');
     saveButton.type = 'button';
-    foot.append(drawerDelete, cancelButton, saveButton);
+    // What state the panel is in, said in words: nothing changed yet, or changes not saved.
+    const footStatus = el('span', 'le-foot-status');
+    footStatus.setAttribute('aria-live', 'polite');
+    foot.append(footStatus, drawerDelete, cancelButton, saveButton);
 
     drawer.append(head, subtabs, subject, drawerFields, foot);
 
@@ -1583,6 +1695,7 @@ export function createChrome() {
         closeButton,
         cancelButton,
         saveButton,
+        footStatus,
         linkHandle,
         bgHandle,
         hoverBox,
