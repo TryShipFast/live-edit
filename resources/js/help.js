@@ -220,6 +220,20 @@ const PROFILES = {
 };
 
 /** Questions everybody asks, shown on every site; each only where the editor has the feature it answers. */
+/*
+ * How to run a shop, for any site that sells: a salon's vouchers and a writer's books as much as a
+ * store. Written from LIVE-EDIT-STRUCTURE.md ("Update or add a product", "Add a category") and the
+ * orders a hosted shop now takes (HOSTED-SITES.md, "A shop's orders").
+ */
+export const shopQuestions = () => [
+    { q: 'How do I add a product?', a: 'Click a product card and press Duplicate. Change the copy’s name, photo and price, then press Give it its own page: you get its own product page, sizes and all, ready to change.' },
+    { q: 'How do I create a category?', a: 'Click a category card and press Duplicate, then change its photo, name and description. Press Give it its own page so it has a page of its own. Then put products in it: click each product card and choose the category in its panel.' },
+    { q: 'How do I change a product’s sizes or colours?', a: 'Click the product card and press Edit all details. On its page, click the sizes: add one, rename one, delete one, and set each one’s price.' },
+    { q: 'How do I change a price?', a: 'Click the price on the product card or its page and type the new one, with its currency sign. The bag and checkout use that amount.' },
+    { q: 'How do I take a product away?', a: 'Click its card and press Delete this item. It offers to delete the product’s page too, so nothing is left behind.' },
+    { q: 'How do customers pay, and where do orders go?', a: 'Open the Shop tab to choose how customers pay (online, or by WhatsApp) and to set delivery prices, offers and your WhatsApp number. Orders paid online are listed in your dashboard under Orders; WhatsApp orders arrive in WhatsApp as a message.' },
+];
+
 export const commonQuestions = ({ hasPublish = true, hasPages = false, hasBrand = false } = {}) => [
     ...(hasPublish ? [{ q: 'I changed something, but the live site has not changed.', a: 'What you save is a draft only you can see. Press Publish when you are happy, and visitors see it.' }] : []),
     { q: 'How do I undo a mistake?', a: 'Press Undo in the bar to take back your latest change. The Changes tab lists everything you have saved, and each can be undone.' },

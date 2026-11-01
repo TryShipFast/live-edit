@@ -12,7 +12,7 @@ import { DETAIL_MODE, copiedItemSettings, copiedStyles, copyPageForCard, deletab
 import { renderChoice } from './choice.js';
 import { chartRowOf, renderChartPanel, renderChartRow, renderTableControls } from './data-panel.js';
 import { KINDS as CHART_KINDS, chartData, chartOf, itemContext as chartItemContext, kindOf as chartKindOf } from './data-kit.js';
-import { commonQuestions, listGuides, profileFor } from './help.js';
+import { commonQuestions, listGuides, profileFor, shopQuestions } from './help.js';
 import { dropdownTriggerFrom } from './dropdown-trigger.js';
 import { addressFromTheRoot } from './site-address.js';
 import { biggestThatFits, howMuchSurvives, inSourcePixels, movedWithin, whatIsThereNow } from './fitting.js';
@@ -6466,7 +6466,7 @@ const bootLiveEdit = () => {
             }
             const everythingElse = group('Everything else', Object.entries(features).filter(([id]) => !shown.has(id)).map(([id, f]) => option(id, f.title, f.detail)));
 
-            const questions = [...profile.questions, ...commonQuestions({
+            const questions = [...(profile.key === 'shop' ? [] : profile.questions), ...commonQuestions({
                 hasPublish: !ui.publishButton?.hidden,
                 hasPages: Boolean(window.liveEditPages),
                 hasBrand: Boolean(window.liveEditBrand?.tokens?.length),
@@ -6487,6 +6487,27 @@ const bootLiveEdit = () => {
              * every window has one; the questions owners actually ask straight after "Start here",
              * not under every guide on the page.
              */
+            // A site that sells gets its own questions, whatever kind of site it is, unless its profile already asks them.
+            const sells = Boolean(drawerTabs.Shop || document.querySelector('[data-kit-product]'));
+            let shopFaq = null;
+            if (sells || profile.key === 'shop') {
+                shopFaq = el('div', 'le-help-group le-help-faq');
+                shopFaq.append(el('h3', 'le-help-group-title', 'Your shop'));
+                // A shop profile's own questions join them, without asking the same thing twice.
+                const asked = shopQuestions();
+                if (profile.key === 'shop') {
+                    const said = new Set(asked.map(({ q }) => q.toLowerCase()));
+                    asked.push(...profile.questions.filter(({ q }) => !said.has(q.toLowerCase())));
+                }
+                for (const { q, a } of asked) {
+                    const item = document.createElement('details');
+                    const summary = el('summary', null);
+                    summary.append(el('span', 'le-faq-q', q), el('span', 'le-faq-chevron'));
+                    summary.lastChild.setAttribute('aria-hidden', 'true');
+                    item.append(summary, el('p', null, a));
+                    shopFaq.append(item);
+                }
+            }
             const top = el('div', 'le-help-head');
             const titles = el('div', 'le-help-titles');
             titles.append(progress, heading);
@@ -6496,7 +6517,7 @@ const bootLiveEdit = () => {
             close.addEventListener('click', () => card.remove());
             top.append(titles, close);
             const body = el('div', 'le-help-body');
-            body.append(copy, ...[startHere, faq, yourLists, everythingElse].filter(Boolean), actions);
+            body.append(copy, ...[startHere, shopFaq, faq, yourLists, everythingElse].filter(Boolean), actions);
             card.append(top, body);
             ui.shadow.append(card);
             finish.addEventListener('click', () => card.remove());
