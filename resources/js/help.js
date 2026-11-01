@@ -227,7 +227,7 @@ const PROFILES = {
  */
 export const shopQuestions = () => [
     { q: 'How do I add a product?', a: 'Click a product card and press Duplicate. Change the copy’s name, photo and price, then press Give it its own page: you get its own product page, sizes and all, ready to change.' },
-    { q: 'How do I create a category?', a: 'Click a category card and press Duplicate, then change its photo, name and description. Press Give it its own page so it has a page of its own. Then put products in it: click each product card and choose the category in its panel.' },
+    { q: 'How do I create a category?', a: 'Click a category card and press Duplicate, then change its photo, name and description. Press Give it its own page: the new category gets a page made like the others, and the card opens it. Fill that page with its products, and add it to your menu if you want it there. To file a product under a shop filter, change the category its card shows (the filter offers what the cards say); where a card does not show one, its panel has a Category setting.' },
     { q: 'How do I change a product’s sizes or colours?', a: 'Click the product card and press Edit all details. On its page, click the sizes: add one, rename one, delete one, and set each one’s price.' },
     { q: 'How do I change a price?', a: 'Click the price on the product card or its page and type the new one, with its currency sign. The bag and checkout use that amount.' },
     { q: 'How do I take a product away?', a: 'Click its card and press Delete this item. It offers to delete the product’s page too, so nothing is left behind.' },
