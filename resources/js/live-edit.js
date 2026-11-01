@@ -3491,6 +3491,29 @@ const bootLiveEdit = () => {
                     : fieldInput('value', separatedWords.length ? 'Text around formatted words' : 'Text', text, 6, richSetting);
                 drawerFields.append(textField);
                 /*
+                 * A price is a price, not a sentence: called Price, one line, figures aligned, and
+                 * checked as it is typed. The shop reads the amount from these words (and prints it
+                 * with the currency), so words with no amount in them would sell the product for
+                 * nothing; that is said under the field before it can be saved.
+                 */
+                if (element.hasAttribute('data-kit-price') && !asIcon) {
+                    textField.classList.add('le-price-field');
+                    textField.firstChild.textContent = 'Price';
+                    const box = textField.querySelector('textarea');
+                    const said = document.createElement('span');
+                    said.className = 'le-hint';
+                    const check = () => {
+                        const amount = /\d/.test(box?.value ?? '');
+                        said.textContent = amount
+                            ? 'As visitors see it, with its currency sign (for example $118). The bag and checkout use this amount.'
+                            : 'Write an amount: without one this product has no price.';
+                        said.classList.toggle('le-hint--warn', !amount);
+                    };
+                    box?.addEventListener('input', check);
+                    check();
+                    textField.append(said);
+                }
+                /*
                  * The page changes as the words are typed, so they are judged where they will be read.
                  * Only where the element is its own words (no markup inside to keep); put back on
                  * Cancel, and replaced by what was saved on Save.
