@@ -1,5 +1,17 @@
 # ShipFast Live Edit for WordPress
 
+## 0.15.81
+
+- The editor's panel puts what you clicked first, ready to type; the card or section it belongs to follows with its actions, then style, folded.
+- Words change on the page as they are typed; the footer says when there are unsaved changes, and Cancel puts them back.
+- Save is the only main button; removing is a quiet text button at the end of its group.
+- A link's page is chosen by name ("Goes to"), with the address under it.
+- A price is called Price and says when it has no amount.
+- Text size, line height, spacing and corners are steps of a scale.
+- Clearer type and contrast, and a focus ring on every control.
+- On a phone the panel is a bottom sheet and the bar is one row, with the rest under More.
+- What can be edited is outlined for a moment as editing starts, then on hover.
+
 ## 0.15.73
 
 - Older templates that mark pictures with `data-edit="image"` now open them in the image editor.
