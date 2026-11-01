@@ -998,10 +998,23 @@ export function factTargets(root) {
  */
 export const leafCategories = (categories = []) => categories.filter((one) => !categories.some((other) => other !== one && one.id !== '' && String(other.id).startsWith(`${one.id}/`)));
 
+/**
+ * What a new category starts like: a category, not the page that holds them all; one the menu links
+ * where the menu has any (Women rather than Oxbow's gift guide); and of those the fullest, so it does
+ * not start as Car Wash Auto's two gift cards. `products` and `inMenu` come from the host.
+ */
+export const firstLike = (categories = []) => {
+    const leaves = leafCategories(categories);
+    const linked = leaves.filter((category) => category.inMenu);
+    const pool = linked.length ? linked : leaves.length ? leaves : categories;
+
+    return pool.reduce((best, category) => ((category.products ?? 0) > (best?.products ?? 0) ? category : best), pool[0] ?? null);
+};
+
 export function renderNewCategory({ ui, config, from = null, save, go, notify }) {
     const categories = (config.categories ?? []).filter((category) => (category.copies ?? []).length);
     const taken = config.taken ?? [];
-    let like = from ?? leafCategories(categories)[0] ?? categories[0] ?? null;
+    let like = from ?? firstLike(categories);
     if (!like) {
         notify('This design has no category to start one like.');
         ui.close?.();
@@ -1029,9 +1042,9 @@ export function renderNewCategory({ ui, config, from = null, save, go, notify })
         for (const category of categories) {
             const option = el('option', null, category.title);
             option.value = category.id;
-            option.selected = category === like;
             pick.append(option);
         }
+        pick.value = like.id;
         pick.addEventListener('change', () => {
             like = categories.find((category) => category.id === pick.value) ?? like;
             refresh();
@@ -1044,7 +1057,10 @@ export function renderNewCategory({ ui, config, from = null, save, go, notify })
     const menu = el('label', 'le-switch');
     const menuBox = el('input');
     menuBox.type = 'checkbox';
-    menuBox.checked = true;
+    // In the menu where the shop's categories are in it; Car Wash Auto's are reached from its shop page.
+    const anyInMenu = categories.some((category) => category.inMenu);
+    const told = categories.some((category) => typeof category.inMenu === 'boolean');
+    menuBox.checked = from ? from.inMenu ?? true : !told || anyInMenu;
     menu.append(menuBox, el('span', 'le-switch-track'), el('span', 'le-switch-label', 'Show it in the menu'));
     parts.push(starts, menu);
     form.append(...parts);

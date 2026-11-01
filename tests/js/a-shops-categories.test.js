@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { leafCategories, renderNewCategory } from '../../resources/js/pages.js';
+import { firstLike, leafCategories, renderNewCategory } from '../../resources/js/pages.js';
 import { renderShopPanel } from '../../resources/js/shop.js';
 
 /*
@@ -46,6 +46,27 @@ describe("a shop's categories", () => {
 
     it('starts a new category like a category, not like the page that holds them all', () => {
         expect(leafCategories(categories).map((c) => c.id)).toEqual(['shop/headphones', 'shop/speakers']);
+    });
+
+    it('starts like the fullest category the menu links, and out of the menu where the menu links none (Car Wash Auto)', () => {
+        const oxbow = [
+            { id: 'gift-guide', title: 'Gift guide', copies: ['a'], products: 12, inMenu: false },
+            { id: 'shop', title: 'All clothes', copies: ['b'], products: 14, inMenu: true },
+            { id: 'shop/men', title: 'Men', copies: ['c'], products: 9, inMenu: true },
+            { id: 'shop/women', title: 'Women', copies: ['d'], products: 11, inMenu: true },
+        ];
+        expect(firstLike(oxbow).title).toBe('Women');
+
+        const carWash = [
+            { id: 'shop', title: 'Car care shop', copies: ['a'], products: 8, inMenu: false },
+            { id: 'shop/gift-cards', title: 'Gift cards', copies: ['b'], products: 2, inMenu: false },
+            { id: 'shop/picks', title: 'Our picks', copies: ['c'], products: 7, inMenu: false },
+        ];
+        expect(firstLike(carWash).title).toBe('Our picks');
+        const ui = fakeModal();
+        renderNewCategory({ ui, config: { ...config, categories: carWash }, save: async () => {}, go: () => {}, notify: () => {} });
+        expect(ui.body.querySelector('.le-category-like').value).toBe('shop/picks');
+        expect(ui.body.querySelector('.le-switch input').checked).toBe(false);
     });
 
     it('makes a category from a name: the sections of the one it looks like, in the menu', async () => {

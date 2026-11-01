@@ -598,7 +598,8 @@ window.liveEditPages = {
   ],                                      // each with its library sections in order; a new page copies `own`
   categories: [                           // optional, a shop: its categories for the Shop tab
     { id: 'shop/headphones', title: 'Headphones', href: '/sites/trial/edit/shop/headphones', made: false,
-      copies: ['shop-headphones.intro', 'shop-headphones.headphones'] },  // what a new one like it copies
+      copies: ['shop-headphones.intro', 'shop-headphones.headphones'],    // what a new one like it copies
+      products: 3, inMenu: true },        // optional: how full it is, and whether a marked menu links it
   ],
   pagesKey: 'structure:pages',            // the owner's pages: [{ id, title, menu }]
   made: [{ id: 'open-days', title: 'Open days', menu: true }],
@@ -611,7 +612,9 @@ window.liveEditPages = {
 
 - **A shop's categories.** With `categories`, the Shop tab lists them (each opens its page;
   **Duplicate** copies one) and **New category** asks for a name and which category it looks like,
-  then saves a made page with that category's `copies`, in the menu by default. The host names the
+  then saves a made page with that category's `copies`. It starts like the fullest category the menu
+  links (`products`, `inMenu`; the fullest of all where the menu links none) and goes in the menu only
+  where the shop's categories are. The host names the
   page and places its menu link beside the other categories (the website's LIVE-EDIT-STRUCTURE.md,
   "A shop's categories").
 - **New page, step 1: a page like one you have.** The design's pages are shown
