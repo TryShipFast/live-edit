@@ -655,6 +655,8 @@ a.le-mark:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
   border-radius: 999px; padding: 8px 14px; font-size: 12px; font-weight: 600; transition: background .15s ease, border-color .15s ease;
 }
 .le-chip-btn:hover { background: var(--le-soft); border-color: var(--le-accent); color: var(--le-accent); }
+/* A link drawn as a button (the Shop tab's "Open the checkout page") centres its words as a button does. */
+a.le-chip-btn { display: inline-flex; align-items: center; justify-content: center; gap: 6px; text-align: center; text-decoration: none; }
 /* A list at the size its design holds: the button stays, greyed, and the hint
    under it says why, rather than the button vanishing without a word. */
 .le-chip-btn:disabled, .le-btn-danger:disabled { opacity: .45; cursor: not-allowed; background: transparent; border-color: var(--le-line); color: inherit; }
