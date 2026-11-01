@@ -274,7 +274,7 @@ a.le-mark:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
 .le-detail-frame { flex: 1; width: 100%; min-height: 0; border: 0; border-top: 1px solid var(--le-line); background: #fff; }
 .le-detail-wait { padding: 22px 24px; }
 /* The guide points at the page behind; while a card's page is open over it, it waits. */
-:host(.le-detail-open) .le-walkthrough, :host(.le-detail-open) .le-walkthrough-pill { display: none; }
+:host(.le-detail-open) .le-walkthrough, :host(.le-detail-open) .le-walkthrough-pill, :host(.le-modal-open) .le-walkthrough-pill { display: none; }
 .le-starts-top { display: flex; align-items: center; gap: 14px; margin-bottom: 16px; }
 .le-starts-top .le-starts-search { flex: 1; min-width: 0; }
 .le-starts { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 14px; }
@@ -282,7 +282,22 @@ a.le-mark:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
 .le-start:hover { border-color: var(--le-ink); transform: translateY(-1px); }
 .le-start:focus-visible { outline: none; border-color: var(--le-accent); box-shadow: 0 0 0 3px var(--le-accent-soft); }
 .le-start-thumb { position: relative; height: 128px; overflow: hidden; background: var(--le-soft); border-bottom: 1px solid var(--le-line); }
-.le-start-thumb.is-empty::after { content: ''; position: absolute; inset: 24px 28px; border: 2px dashed var(--le-field); border-radius: 8px; }
+.le-start-thumb.is-outline { display: flex; align-items: stretch; justify-content: center; padding: 14px 18px 0; background: linear-gradient(180deg, var(--le-soft), #fff); }
+.le-outline { display: flex; flex-direction: column; gap: 5px; width: 100%; padding: 8px 9px; background: #fff; border: 1px solid var(--le-line); border-bottom: 0; border-radius: 8px 8px 0 0; box-shadow: 0 1px 2px rgba(17,19,24,.05); }
+.le-outline-bar { height: 6px; width: 38%; border-radius: 3px; background: var(--le-field); margin-bottom: 2px; }
+.le-outline-block { display: flex; align-items: center; min-height: 18px; padding: 0 8px; border-radius: 5px; background: var(--le-soft); color: var(--le-muted); font-size: 10.5px; font-weight: 550; letter-spacing: .01em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.le-outline-block.is-first { min-height: 36px; background: var(--le-accent-soft); color: var(--le-ink); }
+.le-outline-more { color: var(--le-muted); font-size: 10.5px; padding-left: 2px; }
+.le-start-own { display: flex; flex-direction: column; align-items: flex-start; justify-content: flex-end; gap: 3px; min-height: 188px; padding: 13px; border: 1.5px dashed var(--le-field); border-radius: 12px; background: transparent; text-align: left; cursor: pointer; font: inherit; color: var(--le-body); transition: border-color .15s ease, background .15s ease; }
+.le-start-own:hover { border-color: var(--le-ink); background: var(--le-soft); }
+.le-start-own:focus-visible { outline: none; border-color: var(--le-accent); box-shadow: 0 0 0 3px var(--le-accent-soft); }
+.le-start-own-plus { display: grid; place-items: center; width: 34px; height: 34px; margin-bottom: auto; border-radius: 50%; background: var(--le-soft); color: var(--le-ink); font-size: 20px; line-height: 1; }
+.le-starts-none { grid-column: 1 / -1; }
+.le-modal.is-fit { height: auto; }
+.le-name-look .le-start-thumb.is-outline { padding: 28px 40px 0; }
+.le-name-look .le-outline { gap: 8px; padding: 14px; }
+.le-name-look .le-outline-block { min-height: 34px; font-size: 12.5px; }
+.le-name-look .le-outline-block.is-first { min-height: 84px; }
 .le-start-frame { position: absolute; top: 0; left: 0; width: 1280px; height: 800px; border: 0; transform: scale(.17); transform-origin: 0 0; pointer-events: none; background: #fff; }
 .le-start-text { display: flex; flex-direction: column; gap: 3px; padding: 11px 13px 13px; }
 .le-start-name { color: var(--le-ink); font-size: 14px; font-weight: 650; }
@@ -350,6 +365,8 @@ a.le-mark:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
 @media (max-width: 640px) {
   .le-starts { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
   .le-start-thumb { height: 96px; }
+  .le-start-thumb.is-outline { padding: 10px 10px 0; }
+  .le-start-own { min-height: 150px; }
   .le-start-frame { transform: scale(.125); }
   .le-starts-top { flex-direction: column; align-items: stretch; }
 }
@@ -1660,6 +1677,7 @@ export function createChrome() {
             shut = true;
             document.removeEventListener('keydown', onKey, true);
             scrim.remove();
+            if (!shadow.querySelector('.le-scrim')) root.classList.remove('le-modal-open');
             previous?.focus?.();
             state.dismissable = true;
             // Whatever opened this may have something to put right once it is gone (a page
@@ -1683,6 +1701,8 @@ export function createChrome() {
         document.addEventListener('keydown', onKey, true);
 
         shadow.append(scrim);
+        // The guide's pill sits above everything; a dialog is what is being read now.
+        root.classList.add('le-modal-open');
         close.focus();
 
         return {

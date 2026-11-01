@@ -1261,7 +1261,7 @@ const bootLiveEdit = () => {
             if (!window.liveEditPages) return null;
             if (!document.body.classList.contains('editing')) setEditing(true);
             closeDrawer(true);
-            const handle = ui.modal({ title: 'New page', size: 'is-wide' });
+            const handle = ui.modal({ title: 'New page', size: 'is-wide is-fit' });
             renderNewPage({
                 ui: handle,
                 config: window.liveEditPages,

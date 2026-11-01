@@ -420,10 +420,20 @@ const labelOf = (library, from) => (library.find((section) => section.from === f
  * Nothing in it runs (the frame is sandboxed), and it loads only when the card
  * scrolls into view.
  */
-function thumbnail(href, title) {
+function thumbnail(href, title, names = []) {
     const holder = el('div', 'le-start-thumb');
     if (!href) {
-        holder.classList.add('is-empty');
+        // No page to show (a kind made of sections the host gave without a page):
+        // its outline instead, one block for each section it starts with, named.
+        holder.classList.add('is-outline');
+        const page = el('div', 'le-outline');
+        page.setAttribute('aria-hidden', 'true');
+        page.append(el('span', 'le-outline-bar'));
+        (names.length ? names : ['Your sections']).slice(0, 4).forEach((name, index) => {
+            page.append(el('span', `le-outline-block${index === 0 ? ' is-first' : ''}`, name));
+        });
+        if (names.length > 4) page.append(el('span', 'le-outline-more', `+${names.length - 4} more`));
+        holder.append(page);
 
         return holder;
     }
@@ -496,9 +506,9 @@ export function renderNewPage({ ui, config, save, go, notify }) {
                 const about = el('span', 'le-start-text');
                 about.append(
                     el('span', 'le-start-name', kind.alike ? `${kind.title}, and ${kind.alike} like it` : kind.title),
-                    el('span', 'le-start-meta', `${count} · ${names.slice(0, 3).join(', ')}${names.length > 3 ? '…' : ''}`),
+                    el('span', 'le-start-meta', names.length > 3 ? `${names.slice(0, 3).join(', ')} and ${names.length - 3} more` : listed(names)),
                 );
-                card.append(thumbnail(kind.at, kind.title), about);
+                card.append(thumbnail(kind.at, kind.title, names), about);
                 card.addEventListener('click', () => {
                     state.kind = kind;
                     state.sections = [...kind.sections];
@@ -506,8 +516,19 @@ export function renderNewPage({ ui, config, save, go, notify }) {
                 });
                 grid.append(card);
             }
-            if (!shown.length) grid.append(el('p', 'le-hint', 'No page like that. Try a word from its name, or choose the sections yourself.'));
+            if (!shown.length) grid.append(el('p', 'le-hint le-starts-none', 'No page like that. Try a word from its name, or build it from sections.'));
+            grid.append(own);
         };
+
+        // The other way in, as a choice beside the pages rather than a line of small print.
+        const own = el('button', 'le-start-own');
+        own.type = 'button';
+        own.append(
+            el('span', 'le-start-own-plus', '+'),
+            el('span', 'le-start-name', 'Build it from sections'),
+            el('span', 'le-start-meta', 'Choose the sections yourself, one by one'),
+        );
+        own.addEventListener('click', chooseSections);
 
         const top = el('div', 'le-starts-top');
         if (kinds.length > 6) {
@@ -519,10 +540,7 @@ export function renderNewPage({ ui, config, save, go, notify }) {
             top.append(search);
             setTimeout(() => search.focus(), 0);
         }
-        const own = button('Or choose the sections yourself', 'le-link-btn', chooseSections);
-        top.append(own);
-
-        ui.body.replaceChildren(top, grid);
+        ui.body.replaceChildren(...(top.childElementCount ? [top] : []), grid);
         draw();
     };
 
@@ -623,7 +641,13 @@ export function renderNewPage({ ui, config, save, go, notify }) {
         // What it will look like before any words change: the page it is copied from.
         const layout = el('div', 'le-name-layout');
         const look = el('div', 'le-name-look');
-        if (state.kind.at) look.append(thumbnail(state.kind.at, state.kind.title), el('p', 'le-hint', `Your new page starts as a copy of ${state.kind.title}. Change any word or photo once it is open.`));
+        const ownChoice = state.kind.title === 'Your own choice';
+        look.append(
+            thumbnail(state.kind.at, state.kind.title, state.sections.map((from) => labelOf(library, from))),
+            el('p', 'le-hint', ownChoice
+                ? 'Your new page starts with these sections, filled with your design\'s words and photos. Change any of them once it is open.'
+                : `Your new page starts as a copy of ${state.kind.title}. Change any word or photo once it is open.`),
+        );
         layout.append(form, look);
         ui.body.replaceChildren(layout);
 
