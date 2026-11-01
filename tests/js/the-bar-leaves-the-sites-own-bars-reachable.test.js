@@ -80,7 +80,10 @@ describe('the room is added once, however often the page changes', () => {
         const stop = keepClearOfTheBar({ bar: { getBoundingClientRect: () => bar }, isEditing: () => true, doc });
         const room = 844 - 688 + 8;
         expect(now).toBe(`${room}px`);
-        for (let i = 0; i < 4; i++) { changed(); timers.shift()(); }
+        for (let i = 0; i < 4; i++) { changed([{ type: 'attributes', attributeName: 'class' }]); timers.shift()(); }
+        // a menu opened is given its room at once, not after the page settles
+        changed([{ type: 'attributes', attributeName: 'hidden' }]);
+        expect(timers).toHaveLength(0);
         expect(now).toBe(`${room}px`);
         stop();
         expect(now).toBe('');
