@@ -52,6 +52,7 @@ export const roomFor = (rect, bar, viewHeight) => {
  * read the room already added as the element's own.
  */
 const ROOM = 'data-le-room-before';
+const GIVEN = 'data-le-room';
 
 /**
  * Keep the page's fixed things clear of `bar` while `isEditing()` holds.
@@ -61,43 +62,62 @@ export const keepClearOfTheBar = ({ bar, isEditing, doc = document, skip = () =>
     const view = doc.defaultView;
     const lifted = new Map();
     const roomed = new Map();
+    const unroom = (element) => {
+        if (element.hasAttribute(ROOM)) element.style.paddingBottom = element.getAttribute(ROOM);
+        element.removeAttribute(ROOM);
+        element.removeAttribute(GIVEN);
+    };
     const putBack = () => {
         for (const [element, before] of lifted) element.style.translate = before;
         lifted.clear();
-        for (const element of roomed.keys()) {
-            if (element.hasAttribute(ROOM)) element.style.paddingBottom = element.getAttribute(ROOM);
-            element.removeAttribute(ROOM);
-        }
+        for (const element of roomed.keys()) unroom(element);
         roomed.clear();
     };
     const apply = () => {
-        putBack();
-        if (!isEditing()) return;
+        if (!isEditing()) { putBack(); return; }
+        // lifts are measured from where things sit unlifted, so they are put back first; room is not taken off and
+        // put back, since a menu without it for a moment is scrolled back by the browser, and what the owner was
+        // pointing at jumps away under the pointer
+        for (const [element, before] of lifted) element.style.translate = before;
+        lifted.clear();
         const barRect = bar.getBoundingClientRect();
-        if (!barRect.width || !barRect.height) return;
+        if (!barRect.width || !barRect.height) { putBack(); return; }
+        const roomNow = new Set();
         for (const element of doc.body.querySelectorAll('*')) {
             if (skip(element) || !staysPut(element, view)) continue;
             if ([...lifted.keys()].some((outer) => outer.contains(element))) continue;
             const rect = element.getBoundingClientRect();
             const room = roomFor(rect, barRect, view.innerHeight);
             if (room) {
-                if ([...roomed.keys()].some((outer) => outer.contains(element))) continue;
+                if ([...roomNow].some((outer) => outer !== element && outer.contains(element))) continue;
                 if (!element.hasAttribute(ROOM)) element.setAttribute(ROOM, element.style.paddingBottom);
                 roomed.set(element, true);
+                roomNow.add(element);
                 // read with transitions off: a menu that animates its padding reports the padding it is animating
                 // from, which is the room added last time
                 const transition = element.style.transition;
+                const was = element.style.paddingBottom;
                 element.style.transition = 'none';
                 element.style.paddingBottom = element.getAttribute(ROOM);
                 const own = parseFloat(view.getComputedStyle(element).paddingBottom) || 0;
+                // never less than it was given: the bar grows and shrinks for a moment (a "Saved" note), and room
+                // taken away from a menu scrolled to its foot scrolls it back under the owner's pointer
+                const given = Math.max(room, Number(element.getAttribute(GIVEN)) || 0);
+                element.setAttribute(GIVEN, String(given));
+                const want = `${own + given}px`;
+                element.style.paddingBottom = was === want ? was : want;
                 element.style.transition = transition;
-                element.style.paddingBottom = `${own + room}px`;
                 continue;
             }
             const lift = liftFor(rect, barRect, view.innerHeight);
             if (!lift) continue;
             lifted.set(element, element.style.translate);
             element.style.translate = `0 ${-lift}px`;
+        }
+        for (const element of [...roomed.keys()]) {
+            if (roomNow.has(element)) continue;
+            unroom(element);
+            roomed.delete(element);
         }
     };
     let timer = 0;
