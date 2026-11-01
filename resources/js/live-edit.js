@@ -5738,6 +5738,7 @@ const bootLiveEdit = () => {
             count: 'This number counts itself from the products on this page. Add or remove a product and it changes.',
             collection: 'This counts the products in the collection it links to and shows the lowest price. Change that collection and it follows.',
             choices: 'These choices come from your products’ own words. Change a product’s type, cloth or colour on its card and the choices follow.',
+            gallery: 'This shows whichever photo a visitor opens from the gallery above it. To change the photos, replace them in the gallery.',
             'bag-count': 'This counts what the shopper has in their bag, on every page. It is worked out for each visitor, so there is nothing to type here.',
             bag: 'This line is the shopper’s bag: each product’s name, size and price come from what they added on its page. To change them, edit the product’s page.',
             product: 'This card shows the product its link leads to: its photo, name and price come from that product’s own page. To show another product, change the card’s “See the product” link; to change the words, edit the product’s page.',
