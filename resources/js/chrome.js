@@ -424,9 +424,11 @@ a.le-mark:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
 /* Brand: a swatch you can press, its name and what it colours, and a way back
    to the design's own. Two columns of these read as a palette, not a form. */
 .le-brand-intro { margin: 0 0 4px; }
-.le-brand-grid { display: grid; grid-template-columns: 1fr; gap: 2px; }
-.le-brand-row { display: grid; grid-template-columns: 40px 1fr auto; align-items: center; gap: 12px; padding: 8px 6px; border-radius: 10px; cursor: pointer; }
-.le-brand-row:hover { background: #F4F5F7; }
+.le-brand-grid { display: grid; grid-template-columns: 1fr; gap: 8px; margin-bottom: 12px; }
+.le-brand-row { display: grid; grid-template-columns: 40px 1fr auto; align-items: center; gap: 12px; padding: 10px 12px; border: 1px solid rgba(11,12,15,.12); border-radius: 12px; background: #FFFFFF; cursor: pointer; transition: border-color .15s, background-color .15s; }
+.le-brand-row:hover { background: #F7F8FA; border-color: rgba(11,12,15,.24); }
+.le-brand-row:focus-within { border-color: #0B0C0F; }
+@media (prefers-reduced-motion: reduce) { .le-brand-row { transition: none; } }
 .le-brand-swatch { width: 40px; height: 40px; padding: 0; border: 1px solid rgba(11,12,15,.12); border-radius: 10px; background: none; cursor: pointer; }
 .le-brand-swatch::-webkit-color-swatch-wrapper { padding: 0; }
 .le-brand-swatch::-webkit-color-swatch { border: 0; border-radius: 9px; }
@@ -437,7 +439,8 @@ a.le-mark:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
 .le-link-btn { border: 0; background: none; padding: 4px 2px; font: inherit; font-size: 12px; color: #4A4D55; text-decoration: underline; text-underline-offset: 2px; cursor: pointer; }
 .le-link-btn:hover { color: #0B0C0F; }
 .le-brand-type { display: grid; grid-template-columns: minmax(0, 1fr); gap: 12px; min-width: 0; }
-.le-brand-face { display: flex; flex-direction: column; gap: 6px; min-width: 0; width: 100%; }
+.le-brand-face { display: flex; flex-direction: column; gap: 6px; min-width: 0; width: 100%; padding: 10px 12px; border: 1px solid rgba(11,12,15,.12); border-radius: 12px; background: #FFFFFF; }
+.le-brand-face:focus-within { border-color: #0B0C0F; }
 .le-brand-logo-fields { display: grid; grid-template-columns: minmax(0, 1fr); align-items: stretch; gap: 8px; min-width: 0; width: 100%; }
 .le-brand-logo-fields > .le-input { box-sizing: border-box; min-width: 0; width: 100%; }
 .le-brand-logo-fields .le-upload { box-sizing: border-box; min-width: 0; max-width: 100%; width: 100%; justify-content: center; gap: 0; padding: 6px 8px; border-radius: 10px; overflow: hidden; }
