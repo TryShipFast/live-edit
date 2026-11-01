@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { liftFor } from '../../resources/js/clear-of-the-bar.js';
+import { liftFor, roomFor } from '../../resources/js/clear-of-the-bar.js';
 
 /*
  * A site's fixed things at the foot of a phone screen (a Book and Call bar, a
@@ -29,5 +29,16 @@ describe('what the bar covers is lifted just above it', () => {
 
     it('leaves what is not drawn', () => {
         expect(liftFor({ top: 700, bottom: 700, left: 0, right: 0, width: 0, height: 0 }, bar, 844)).toBe(0);
+    });
+});
+
+describe('a full-screen menu the bar covers gets room at its foot', () => {
+    it('adds as much room as the bar covers, with a gap, so its last links scroll above it', () => {
+        expect(roomFor(rect(0, 844), bar, 844)).toBe(844 - 688 + 8);
+    });
+
+    it('adds none to what is small (that is lifted) or what the bar does not touch', () => {
+        expect(roomFor(rect(786, 834), bar, 844)).toBe(0);
+        expect(roomFor(rect(0, 600), bar, 844)).toBe(0);
     });
 });

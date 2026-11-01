@@ -34,15 +34,29 @@ export const liftFor = (rect, bar, viewHeight) => {
 };
 
 /**
+ * How much room to add at the foot of a full-screen fixed thing (a phone menu, a dialog) that the bar covers, or 0.
+ * It is not slid away (the owner opens and closes it); room at its foot lets its last links scroll up above the bar,
+ * where they can be pressed. Adeola Crest's phone menu kept its last four links under the bar.
+ */
+export const roomFor = (rect, bar, viewHeight) => {
+    if (!rect.width || !rect.height || rect.height <= viewHeight / 2) return 0;
+    const overlaps = rect.bottom > bar.top && rect.top < bar.bottom && rect.right > bar.left && rect.left < bar.right;
+    return overlaps ? Math.ceil(rect.bottom - bar.top + GAP) : 0;
+};
+
+/**
  * Keep the page's fixed things clear of `bar` while `isEditing()` holds.
  * Returns a function that stops watching and puts everything back.
  */
 export const keepClearOfTheBar = ({ bar, isEditing, doc = document, skip = () => false }) => {
     const view = doc.defaultView;
     const lifted = new Map();
+    const roomed = new Map();
     const putBack = () => {
         for (const [element, before] of lifted) element.style.translate = before;
         lifted.clear();
+        for (const [element, before] of roomed) element.style.paddingBottom = before;
+        roomed.clear();
     };
     const apply = () => {
         putBack();
@@ -52,7 +66,16 @@ export const keepClearOfTheBar = ({ bar, isEditing, doc = document, skip = () =>
         for (const element of doc.body.querySelectorAll('*')) {
             if (skip(element) || !staysPut(element, view)) continue;
             if ([...lifted.keys()].some((outer) => outer.contains(element))) continue;
-            const lift = liftFor(element.getBoundingClientRect(), barRect, view.innerHeight);
+            const rect = element.getBoundingClientRect();
+            const room = roomFor(rect, barRect, view.innerHeight);
+            if (room) {
+                if ([...roomed.keys()].some((outer) => outer.contains(element))) continue;
+                roomed.set(element, element.style.paddingBottom);
+                const own = parseFloat(view.getComputedStyle(element).paddingBottom) || 0;
+                element.style.paddingBottom = `${own + room}px`;
+                continue;
+            }
+            const lift = liftFor(rect, barRect, view.innerHeight);
             if (!lift) continue;
             lifted.set(element, element.style.translate);
             element.style.translate = `0 ${-lift}px`;
