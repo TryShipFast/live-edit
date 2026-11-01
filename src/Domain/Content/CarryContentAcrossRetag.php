@@ -94,6 +94,18 @@ class CarryContentAcrossRetag
         foreach ($was as $signature => $oldKey) {
             $newKey = $now[$signature] ?? null;
 
+            /*
+             * Only an auto key is a description of where an element sits, so only an auto key can be renamed by a
+             * re-tag. A key the page names for itself (a designer's "tpl:", a developer's "hero.title") stays the
+             * element's wherever it moves, and when the page changes shape, an element without words of its own is
+             * recognisable only by its place ("the fourth list"). Moving stored work along that place handed one
+             * list's order to another: Adeola Crest's footer links took the order of a list elsewhere on the page,
+             * and the footer published as the design shipped it.
+             */
+            if (! str_starts_with($oldKey, 'auto:')) {
+                continue;
+            }
+
             if ($newKey !== null && $newKey !== $oldKey) {
                 $moves[$oldKey] = $newKey;
             }
