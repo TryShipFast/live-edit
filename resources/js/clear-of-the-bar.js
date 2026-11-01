@@ -127,7 +127,14 @@ export const keepClearOfTheBar = ({ bar, isEditing, doc = document, skip = () =>
     };
     // A cookie notice shown by the site's script, a bar shown at a breakpoint, editing turned on or off.
     // Style is not watched: the lift itself writes style, and would wake this again.
-    const watcher = new view.MutationObserver(soon);
+    // A menu or dialog opened or closed is cleared at once: waiting for the page to settle left a just-opened phone
+    // menu's last links under the bar for that moment, long enough to press the wrong thing on a busy machine.
+    const watcher = new view.MutationObserver((mutations) => {
+        if (mutations.some((m) => m.type === 'attributes' && (m.attributeName === 'hidden' || m.attributeName === 'open'))) {
+            view.clearTimeout(timer);
+            apply();
+        } else soon();
+    });
     watcher.observe(doc.body, { subtree: true, childList: true, attributes: true, attributeFilter: ['class', 'hidden', 'open'] });
     view.addEventListener('resize', soon);
     const barSize = typeof view.ResizeObserver === 'function' ? new view.ResizeObserver(soon) : null;
