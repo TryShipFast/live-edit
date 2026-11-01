@@ -5683,6 +5683,19 @@ const bootLiveEdit = () => {
             return words && words.textContent.trim() !== '' ? words : null;
         };
 
+        /*
+         * The drawing on a menu's button (a hamburger, a theme switch's moon): its press is kept for the button, so
+         * the owner can open the menu, and a button with no words of its own had nothing else to offer. Every
+         * template draws its menu button as an inline SVG and the host keys each as an icon, yet none could be
+         * changed (The Developer's walk, 1 Nov 2026). The pencil handle offers it, as it offers a trigger's words.
+         */
+        const editableDrawing = (target) => {
+            const trigger = dropdownTriggerFrom(target);
+            if (!trigger || editableLabel(target)) return null;
+            if (mayEditLocked !== true && trigger.closest('[data-live-lock]')) return null;
+            return target.closest?.('[data-edit-svg]') ?? trigger.querySelector('[data-edit-svg]');
+        };
+
         let handleTarget = null;
         let overHandle = false;
         let hideTimer = null;
@@ -5706,7 +5719,7 @@ const bootLiveEdit = () => {
             if (anchor === handleTarget && !linkHandle.classList.contains('hidden')) return;
             handleTarget = anchor;
             const trigger = anchor.matches('a[href]') ? null : dropdownTriggerFrom(anchor);
-            linkHandle.setAttribute('aria-label', trigger ? 'Edit this label' : 'Edit this link');
+            linkHandle.setAttribute('aria-label', anchor.matches('[data-edit-svg]') ? 'Edit this icon' : trigger ? 'Edit this label' : 'Edit this link');
             if (trigger) {
                 // Above the trigger, clear of it: on a short label ("Firm") a handle on its corner sat over
                 // the middle of the button, and the press meant for the menu landed on the handle instead.
@@ -6026,9 +6039,10 @@ const bootLiveEdit = () => {
             if (withBackground && (mayEditLocked === true || !withBackground.closest('[data-live-lock]'))) showBgHandle(withBackground);
             const anchor = editableAnchor(event.target);
             const label = anchor ? null : editableLabel(event.target);
-            if ((anchor && navigable(anchor)) || label) {
+            const drawing = anchor || label ? null : editableDrawing(event.target);
+            if ((anchor && navigable(anchor)) || label || drawing) {
                 cancelHide();
-                positionHandle(anchor ?? label);
+                positionHandle(anchor ?? label ?? drawing);
             }
         });
         document.addEventListener('pointerout', (event) => {
@@ -6036,7 +6050,7 @@ const bootLiveEdit = () => {
             // Staying on the same link (crossing its children) or moving onto the
             // handle itself is not a leave — keep it up.
             if (event.relatedTarget === linkHandle) return;
-            if (handleTarget && (editableAnchor(event.relatedTarget) ?? editableLabel(event.relatedTarget)) === handleTarget) return;
+            if (handleTarget && (editableAnchor(event.relatedTarget) ?? editableLabel(event.relatedTarget) ?? editableDrawing(event.relatedTarget)) === handleTarget) return;
             scheduleHide();
         });
         // Track the handle's own hover explicitly instead of racing :hover.
@@ -6053,7 +6067,8 @@ const bootLiveEdit = () => {
             event.stopPropagation();
             if (!handleTarget) return;
             const target = handleTarget;
-            if (target.dataset.edit !== undefined) editText(target);
+            if (target.matches('[data-edit-svg]')) editDrawing(target);
+            else if (target.dataset.edit !== undefined) editText(target);
             else editLink(target);
             hideHandle();
         });
