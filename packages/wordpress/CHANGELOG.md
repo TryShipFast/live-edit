@@ -1,5 +1,10 @@
 # ShipFast Live Edit for WordPress
 
+## 0.15.84
+
+- A category's products, ticked in and out: Products beside a category in the Shop tab, and in New category (with the website's host, which draws them as the design's own cards).
+- Help answers how to choose the products in a category.
+
 ## 0.15.83
 
 - New category starts like the fullest category the menu links (or the fullest of all where the menu links none), not the first one listed, and goes in the menu only where the shop's categories are (with the website's host; found on Car Wash Auto).
