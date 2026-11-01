@@ -61,6 +61,7 @@ class EmbedController
         'data-kit.js' => 'data-kit.js',
         'data-panel.js' => 'data-panel.js',
         'clear-of-the-bar.js' => 'clear-of-the-bar.js',
+        'computed.js' => 'computed.js',
         'dialogs-in-place.js' => 'dialogs-in-place.js',
         'site-address.js' => 'site-address.js',
         // The built bundle, resolved to resources/dist rather than to a
