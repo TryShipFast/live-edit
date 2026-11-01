@@ -5921,6 +5921,11 @@ const bootLiveEdit = () => {
         const insertFrame = { id: null };
         const aWindowIsOpen = () => Boolean(ui.shadow?.querySelector('.le-scrim'));
         const insertingNow = () => canAddSections() && document.body.classList.contains('editing') && !aWindowIsOpen();
+        // Whether a box lies under where the section button is drawn on a line (mid-line, about 140 by 36).
+        const coversTheButton = (box, at) => {
+            const middle = at.left + at.width / 2;
+            return box.left < middle + 80 && box.right > middle - 80 && box.top < at.top + 20 && box.bottom > at.top - 20;
+        };
         const drawInsert = (handle, at) => {
             if (!handle) return;
             if (!at) {
@@ -5971,6 +5976,14 @@ const bootLiveEdit = () => {
                 const at = under ? insertionNear(under.list, under.section, event.clientY) : null;
                 // The line after the last section is already drawn, with its own button.
                 insertHere = at && !(at.last && at.list === insertEnd?.list) ? at : null;
+                /*
+                 * Not over what the owner is pointing at. The button sits mid-line on the boundary, and a section
+                 * whose last line touches its foot (The Developer's talk pages: "22 minutes (Sample)") had that
+                 * line under it, so a press on the words added a section instead. Over editable words or a
+                 * picture near the line, the button waits until the pointer moves off them.
+                 */
+                const pointedAt = event.target.closest?.('[data-edit], [data-edit-img], [data-edit-href], [data-edit-svg], [data-edit-bg]');
+                if (insertHere && pointedAt && coversTheButton(pointedAt.getBoundingClientRect(), insertHere)) insertHere = null;
                 drawInsert(ui.sectionInsert, insertHere);
                 drawEndInsert();
             });
