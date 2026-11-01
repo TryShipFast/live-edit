@@ -1,5 +1,14 @@
 # ShipFast Live Edit for WordPress
 
+## 0.15.82
+
+- A shop's categories in the Shop tab: each opens its page, Duplicate copies one with its products, and New category asks only for a name and which category it looks like. The new page is named in its heading, breadcrumb and menu, beside the other categories (with the website's host).
+- Help: "?" always opens; a window with a header, guides as rows and questions as an accordion.
+- Help for shops: a "Your shop" group of questions, and a "Set up your shop" guide from how customers pay to where orders arrive. Guides ring parts of the editor too, and stay on screen on a phone.
+- New page: a page started like another copies that page's own sections (its heading, not another page's); previews show the real page; a kind with nothing to preview shows its outline; "Build it from sections" is a choice beside the pages; the window fits what it holds.
+- The guide's pill hides while a dialog is open.
+- "Open the checkout page" in the Shop tab centres its words.
+
 ## 0.15.81
 
 - The editor's panel puts what you clicked first, ready to type; the card or section it belongs to follows with its actions, then style, folded.
