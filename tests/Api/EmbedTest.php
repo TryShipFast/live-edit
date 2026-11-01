@@ -457,4 +457,28 @@ class EmbedTest extends TestCase
         $this->assertStringNotContainsString('kastsbuild_runtime_url', $plugin, 'the plugin remembers the answer again');
         $this->assertStringContainsString('/live-edit/runtime.js', $plugin);
     }
+
+    /**
+     * Every module the editor imports is one it is served. Found 1 Nov 2026: catalogue.js was imported
+     * by live-edit.js and not listed, so a hosted editor never started (the bundle the tests load has
+     * every module in it already, so nothing else noticed).
+     */
+    public function test_every_module_the_editor_imports_is_served(): void
+    {
+        $files = (new \ReflectionClassConstant(EmbedController::class, 'FILES'))->getValue();
+        $missing = [];
+
+        foreach (glob(dirname(__DIR__, 2).'/resources/js/*.js') as $module) {
+            preg_match_all("/from\\s+'\\.\\/([^']+)'/", (string) file_get_contents($module), $imports);
+
+            foreach ($imports[1] as $imported) {
+                if (! array_key_exists($imported, $files)) {
+                    $missing[] = basename($module).' imports '.$imported;
+                }
+            }
+        }
+
+        $this->assertSame([], $missing);
+    }
 }
+

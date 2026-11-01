@@ -6,6 +6,7 @@ import { computedOf, computedKind } from './computed.js';
 import { uploadWidget } from './upload.js';
 import { renderSeoPanel } from './seo.js';
 import { renderShopPanel } from './shop.js';
+import { renderImport, undoTheLastImport, UNDO_KEY } from './catalogue.js';
 import { addedWith, describeStructure, hrefTo, newAddedId, orderWith, pageBase, pageOfLink, renderCategoryProducts, renderNewCategory, renderNewPage, renderSectionBrowser } from './pages.js';
 import { insertionNear, sectionName, sectionUnder, shownSectionLists, shownSections } from './section-inserter.js';
 import { DETAIL_MODE, copiedItemSettings, copiedStyles, copyPageForCard, deletablePage, deletePage, detailAddress, keyMap, linksTo, linksWarning, showOnlyTheDetail } from './card-page.js';
@@ -1291,10 +1292,44 @@ const bootLiveEdit = () => {
                     window.location.href = href;
                 },
                 notify,
-                products: (window.liveEditShop?.products ?? []).filter((product) => product.id),
+                products: shopProducts(),
             });
 
             return handle;
+        };
+        // Every product the shop sells: the design's (the Shop tab's) and the owner's own catalogue.
+        const shopProducts = () => [
+            ...(window.liveEditShop?.products ?? []).filter((product) => product.id),
+            ...(window.liveEditPages?.catalogue?.items ?? []).map((product) => ({ id: product.id, name: product.name, price: product.price })),
+        ];
+        // Import products (catalogue.js): a file of products, checked, then saved as the shop's catalogue.
+        const openImport = () => {
+            closeDrawer(true);
+            const handle = ui.modal({ title: 'Import products', size: 'is-medium' });
+            renderImport({
+                ui: handle,
+                config: window.liveEditPages,
+                products: shopProducts(),
+                save: (key, value) => saveSetting(key, value),
+                done: (message) => {
+                    handle.close?.();
+                    sessionStorage.setItem('tb_editing', '1');
+                    reloadWithToast(message);
+                },
+                notify,
+            });
+
+            return handle;
+        };
+        const undoImport = async () => {
+            if (!window.confirm('Take back the last import? Its products leave the shop and its categories.')) return;
+            try {
+                const count = await undoTheLastImport({ config: window.liveEditPages, save: (key, value) => saveSetting(key, value) });
+                sessionStorage.setItem('tb_editing', '1');
+                reloadWithToast(`The last import is taken back (${count} ${count === 1 ? 'product' : 'products'}).`);
+            } catch (error) {
+                notify(error.message);
+            }
         };
         // A category's products, ticked in and out (pages.js renderCategoryProducts), then the page shows them.
         const openCategoryProducts = (category) => {
@@ -1303,7 +1338,7 @@ const bootLiveEdit = () => {
             renderCategoryProducts({
                 ui: handle,
                 category,
-                products: (window.liveEditShop?.products ?? []).filter((product) => product.id),
+                products: shopProducts(),
                 save: saveSetting,
                 done: (message) => {
                     handle.close?.();
@@ -1328,6 +1363,8 @@ const bootLiveEdit = () => {
             categories: window.liveEditPages?.categories ?? [],
             newCategory: window.liveEditPages ? openNewCategory : null,
             categoryProducts: window.liveEditPages && window.liveEditShop?.products?.length ? openCategoryProducts : null,
+            importProducts: window.liveEditPages?.catalogue ? openImport : null,
+            undoImport: window.liveEditPages?.catalogue && (() => { try { return sessionStorage.getItem(UNDO_KEY); } catch { return null; } })() ? undoImport : null,
         });
         const renderSeo = () => {
             seoPanel = renderSeoPanel({

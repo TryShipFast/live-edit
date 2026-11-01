@@ -661,6 +661,23 @@ a.le-mark:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
 .le-product-row:hover { background: var(--le-soft); }
 .le-product-row input { width: 18px; height: 18px; margin: 0; accent-color: var(--le-accent); flex: none; }
 .le-product-row[hidden] { display: none; }
+.le-import-btn { margin-top: 10px; }
+.le-undo-import { margin-top: 6px; }
+.le-import-steps { display: grid; gap: 18px; margin: 0; padding-left: 20px; }
+.le-import-steps > li { display: grid; gap: 6px; }
+.le-import-steps strong { color: var(--le-ink); font-size: 14px; }
+.le-import-steps .le-hint { margin: 0; }
+.le-import-sample { justify-self: start; text-decoration: none; display: inline-flex; align-items: center; }
+.le-import-columns { display: grid; gap: 6px; margin: 2px 0 0; padding: 0; list-style: none; font-size: 13px; color: var(--le-body); }
+.le-import-columns code { font: 600 12px/1.4 ui-monospace, SFMono-Regular, Menlo, monospace; padding: 1px 6px; border-radius: 5px; background: var(--le-soft); color: var(--le-ink); }
+.le-import-file { font: inherit; font-size: 13px; }
+.le-import-report { margin-top: 16px; display: grid; gap: 8px; }
+.le-import-summary { margin: 0; font-weight: 600; color: var(--le-ink); }
+.le-import-ready { display: grid; gap: 2px; margin: 0; padding: 4px; list-style: none; max-height: 220px; overflow-y: auto; border: 1px solid var(--le-field); border-radius: 10px; }
+.le-import-ready li { display: grid; grid-template-columns: 1fr auto; gap: 0 12px; padding: 7px 10px; font-size: 13px; }
+.le-import-ready .le-hint { grid-column: 1 / -1; margin: 0; }
+.le-import-name { color: var(--le-ink); font-weight: 600; }
+.le-import-problems { margin: 0; padding-left: 18px; color: #A1260D; font-size: 13px; display: grid; gap: 4px; }
 .le-shop-product a { color: var(--le-ink); text-underline-offset: 3px; }
 .le-card-setting { display: grid; gap: 6px; }
 .le-card-setting-boxes { display: grid; gap: 4px; }

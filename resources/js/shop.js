@@ -35,7 +35,7 @@ export const withWhatsappNumber = (href, typed) => {
  * its Categories: each one opens its page, Duplicate copies it, and New category makes one
  * (pages.js renderNewCategory). Without them the tab has no Categories part.
  */
-export const renderShopPanel = ({ container, config, save, done, notify = () => {}, doc = document, categories = [], newCategory = null, categoryProducts = null }) => {
+export const renderShopPanel = ({ container, config, save, done, notify = () => {}, doc = document, categories = [], newCategory = null, categoryProducts = null, importProducts = null, undoImport = null }) => {
     const el = (tag, className, text) => {
         const node = doc.createElement(tag);
         if (className) node.className = className;
@@ -140,12 +140,26 @@ export const renderShopPanel = ({ container, config, save, done, notify = () => 
     }
     list.append(ul);
 
+    // Many at once, from a spreadsheet (catalogue.js), and the last import taken back.
+    if (importProducts) {
+        const bring = el('button', 'le-btn-outline le-wide le-import-btn', 'Import products');
+        bring.type = 'button';
+        bring.addEventListener('click', () => importProducts());
+        list.append(bring);
+    }
+    if (undoImport) {
+        const back = el('button', 'le-link-btn le-undo-import', 'Undo the last import');
+        back.type = 'button';
+        back.addEventListener('click', () => undoImport());
+        list.append(back);
+    }
+
     const actions = el('div', 'le-row');
     const saveButton = el('button', 'le-btn', 'Save shop details');
     saveButton.type = 'button';
     actions.append(saveButton);
 
-    container.append(intro, pay, ...(terms.length ? [offers] : []), ...(groups ? [groups] : []), ...(products.length ? [list] : []), ...(inputs.length ? [actions] : []));
+    container.append(intro, pay, ...(terms.length ? [offers] : []), ...(groups ? [groups] : []), ...(products.length || importProducts ? [list] : []), ...(inputs.length ? [actions] : []));
 
     saveButton.addEventListener('click', async () => {
         const changed = inputs.filter(({ input, start }) => input.value.trim() !== start.trim());
