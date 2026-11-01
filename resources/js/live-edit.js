@@ -2,6 +2,7 @@ import { createChrome } from './chrome.js';
 import { keepClearOfTheBar } from './clear-of-the-bar.js';
 import { openDialogsInPlace } from './dialogs-in-place.js';
 import { renderBrandPanel } from './brand.js';
+import { computedOf, computedKind } from './computed.js';
 import { uploadWidget } from './upload.js';
 import { renderSeoPanel } from './seo.js';
 import { renderShopPanel } from './shop.js';
@@ -5524,7 +5525,7 @@ const bootLiveEdit = () => {
             if (drawing) return { element: drawing, kind: 'svg' };
             // A number the template works out (data-kit-computed): it is explained,
             // not typed over, because the next page load would count it again.
-            const computed = node.closest('[data-kit-computed]');
+            const computed = computedOf(node);
             if (computed) return { element: computed, kind: 'computed' };
             /*
              * A dropdown's choices. A closed <select> draws no box for its options, so none of them
@@ -5563,6 +5564,7 @@ const bootLiveEdit = () => {
             count: 'This number counts itself from the products on this page. Add or remove a product and it changes.',
             collection: 'This counts the products in the collection it links to and shows the lowest price. Change that collection and it follows.',
             choices: 'These choices come from your products’ own words. Change a product’s type, cloth or colour on its card and the choices follow.',
+            'bag-count': 'This counts what the shopper has in their bag, on every page. It is worked out for each visitor, so there is nothing to type here.',
             bag: 'This line is the shopper’s bag: each product’s name, size and price come from what they added on its page. To change them, edit the product’s page.',
             product: 'This card shows the product its link leads to: its photo, name and price come from that product’s own page. To show another product, change the card’s “See the product” link; to change the words, edit the product’s page.',
         };
@@ -5600,7 +5602,7 @@ const bootLiveEdit = () => {
             else if (kind === 'text') editText(element);
             else if (kind === 'choices') editChoices(element);
             else if (kind === 'link') editLink(element);
-            else if (kind === 'computed') ui.toast(COMPUTED_SAYS[element.dataset.kitComputed] ?? COMPUTED_SAYS.count, 7000);
+            else if (kind === 'computed') ui.toast(COMPUTED_SAYS[computedKind(element)] ?? COMPUTED_SAYS.count, 7000);
             else editStyle(element);
         };
 
@@ -5624,7 +5626,7 @@ const bootLiveEdit = () => {
                 height: `${rect.height}px`,
             });
             ui.hoverBox.classList.toggle('is-flipped', rect.top < 26);
-            ui.hoverLabel.textContent = label ?? (element.dataset.kitComputed ? 'Counted for you' : (element.dataset.editLabel ?? describeElement(element)));
+            ui.hoverLabel.textContent = label ?? (computedOf(element) === element ? 'Counted for you' : (element.dataset.editLabel ?? describeElement(element)));
             ui.hoverBox.classList.add('is-visible');
         };
 

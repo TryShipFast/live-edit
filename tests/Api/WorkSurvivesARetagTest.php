@@ -181,6 +181,31 @@ class WorkSurvivesARetagTest extends TestCase
         $this->assertSame('A beach at dawn', (clone $rows)->where('key', $nowCalled.'Alt')->value('value'), 'the description was left behind');
     }
 
+    /*
+     * A list the page names for itself keeps its order when another list is added above it.
+     *
+     * A list has no words of its own, so the only thing that tells one from another on a re-tag is its place: "the
+     * fourth list". When a section with a list was added above the footer, every list after it moved down one, and
+     * each list's saved order was moved onto the key of the list that now stood in its old place. Adeola Crest's
+     * footer links published as the design shipped them, while the editor showed the owner's.
+     */
+    public function test_a_named_list_keeps_its_order_when_another_list_is_added_above_it(): void
+    {
+        $before = '<body><ul data-edit-list="tpl:aaa"></ul><ul data-edit-list="tpl:bbb"></ul></body>';
+        $after = '<body><ul data-edit-list="tpl:new"></ul><ul data-edit-list="tpl:aaa"></ul><ul data-edit-list="tpl:bbb"></ul></body>';
+
+        app(CarryContentAcrossRetag::class)($this->store(), 'index', $before);
+        SiteSetting::query()->create(['site_id' => $this->site->id, 'key' => 'tpl:aaa', 'value' => '["a1","a2"]']);
+        SiteSetting::query()->create(['site_id' => $this->site->id, 'key' => 'tpl:bbb', 'value' => '["b1"]']);
+
+        app(CarryContentAcrossRetag::class)($this->store(), 'index', $after);
+
+        $saved = SiteSetting::query()->where('site_id', $this->site->id)->pluck('value', 'key')->all();
+        $this->assertSame('["a1","a2"]', $saved['tpl:aaa'] ?? null);
+        $this->assertSame('["b1"]', $saved['tpl:bbb'] ?? null);
+        $this->assertArrayNotHasKey('tpl:new', $saved);
+    }
+
     public function test_an_unchanged_page_writes_nothing(): void
     {
         // This runs on every view of a page that is tagged as it loads, so it
