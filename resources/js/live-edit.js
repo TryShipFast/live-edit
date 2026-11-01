@@ -954,6 +954,21 @@ const bootLiveEdit = () => {
             sayHowThePanelStands();
         });
 
+        /*
+         * Which style options the owner has touched in the open panel. A background photo's panel holds its
+         * section's style too ("Hide this section"), and its Save asked for a picture when only the style had
+         * changed: hiding a section with a background photograph said "Choose a file from your computer"
+         * (The Photographer's walk, 1 Nov 2026). The inputs are new each time a panel opens, so a WeakSet of
+         * them forgets the last panel by itself.
+         */
+        const touchedStyle = new WeakSet();
+        const styleTouched = () => [...drawerFields.querySelectorAll('[data-style-prop]')].some((input) => touchedStyle.has(input));
+        for (const type of ['input', 'change']) {
+            drawerFields.addEventListener(type, (event) => {
+                if (event.target?.matches?.('[data-style-prop]')) touchedStyle.add(event.target);
+            });
+        }
+
         const collectStyleProps = () => {
             const props = {};
             drawerFields.querySelectorAll('[data-style-prop]').forEach((input) => {
@@ -2760,7 +2775,7 @@ const bootLiveEdit = () => {
                     if (file) formData.append('file', file);
                     else if (url) formData.append('url', url.startsWith('http') ? url : `https://${url}`);
                     changedAttrs.forEach((input) => formData.append(input.dataset.imgAttr, input.value));
-                    if (!file && !url && changedAttrs.length === 0 && !captionChanged) {
+                    if (!file && !url && changedAttrs.length === 0 && !captionChanged && !styleTouched()) {
                         restoreButton();
                         // Told apart, because they are different situations:
                         // a panel nobody typed in, and a panel with nowhere
