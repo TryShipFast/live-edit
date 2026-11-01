@@ -1062,6 +1062,11 @@ select.le-input {
   .le-toolbar .le-bar-btn, .le-toolbar .le-publish { white-space: nowrap; padding-left: 10px; padding-right: 10px; }
 }
 
+/* A panel that is only a list's controls (the page's sections): flat, as the grouped ones are. */
+.le-fields > .le-item-actions { padding: 0; background: none; border-radius: 0; }
+.le-fields > .le-item-actions > .le-section-heading:first-child { display: none; }
+.le-btn-outline.le-wide { width: 100%; }
+
 `;
 
 /**

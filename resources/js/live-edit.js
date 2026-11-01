@@ -5466,7 +5466,8 @@ const bootLiveEdit = () => {
                 credit: attributeOf(element, 'data-edit-credit', 'editCredit'),
             });
 
-            const replace = el('button', 'le-btn le-wide', isBackground ? 'Replace background' : 'Replace image');
+            // Outlined: Save is the panel's one main button.
+            const replace = el('button', 'le-btn-outline le-wide', isBackground ? 'Replace background' : 'Replace image');
             replace.type = 'button';
             replace.addEventListener('click', () => openImagePicker(element, takeChosen, 'Free photos', isBackground ? 'background' : 'image'));
             ways.append(replace);
@@ -5533,7 +5534,8 @@ const bootLiveEdit = () => {
                 const removeButton = document.createElement('button');
                 removeButton.type = 'button';
                 removeButton.textContent = isBackground ? 'Remove background' : 'Remove image';
-                removeButton.className = 'le-btn-danger';
+                // Quiet and last, as removing is everywhere in the panel.
+                removeButton.className = 'le-btn-quiet-danger';
                 removeButton.addEventListener('click', async () => {
                     const prompt = isBackground
                         ? 'Remove this background image? The section keeps its layout and colour.'
