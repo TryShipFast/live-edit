@@ -1,5 +1,10 @@
 # ShipFast Live Edit for WordPress
 
+## 0.15.83
+
+- New category starts like the fullest category the menu links (or the fullest of all where the menu links none), not the first one listed, and goes in the menu only where the shop's categories are (with the website's host; found on Car Wash Auto).
+- The "Looks like" choice shows the category it starts from.
+
 ## 0.15.82
 
 - A shop's categories in the Shop tab: each opens its page, Duplicate copies one with its products, and New category asks only for a name and which category it looks like. The new page is named in its heading, breadcrumb and menu, beside the other categories (with the website's host).
