@@ -1,5 +1,10 @@
 # ShipFast Live Edit for WordPress
 
+## 0.15.85
+
+- Import products in the Shop tab: a sample file made from the shop (its columns, categories and some of its own products), every row checked before anything is added, each product given its own page and its categories (with the website's host), and the last import taken back.
+- A hosted editor is served every module it loads (the new one was missing, so the editor did not start); a test now catches any that is not.
+
 ## 0.15.84
 
 - A category's products, ticked in and out: Products beside a category in the Shop tab, and in New category (with the website's host, which draws them as the design's own cards).
