@@ -68,7 +68,7 @@ const PROFILES = {
     shop: {
         title: 'Help with your shop',
         intro: 'Customers browse your products, add them to the bag and check out. Start in the Shop tab: it gathers how customers pay, your WhatsApp number, delivery prices, offers and every product in one place.',
-        start: ['shop', 'lists', 'image', 'brand', 'preview'],
+        start: ['shop-setup', 'shop', 'lists', 'image', 'brand', 'preview'],
         questions: [
             { q: 'How do I add a product?', a: 'Use the guide for your products list below: copy a product card, then change its name, price and photo. In its panel, press Give it its own page: you get a copy of the product page, sizes and all, to change right there.' },
             { q: 'How do I change a price?', a: 'Click the price on the product card or its page and type the new one. The bag and checkout read the price from your words, so they follow it.' },

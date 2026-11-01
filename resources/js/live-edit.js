@@ -6228,6 +6228,41 @@ const bootLiveEdit = () => {
             const menuTrigger = () => first('header [aria-expanded], nav [aria-expanded]');
             const section = () => first('[data-edit-list-kind="sections"] > [data-edit-item]');
 
+            /*
+             * Setting up a shop, in the order an owner needs it: how customers pay, the WhatsApp
+             * number, delivery, then the products (the first one, its sizes, more of them, their
+             * categories), then the bag tried as a customer, publishing and where orders arrive.
+             * Each step rings the real thing: a part of the Shop tab, a product card, the bar.
+             * A step for something this site does not have is left out; a step for something on
+             * another page (the product cards, from the home page) says where to find it.
+             */
+            const shopConfig = window.liveEditShop ?? {};
+            const shopPart = (heading) => Object.assign(() => {
+                const opened = tab('Shop')();
+                if (!opened) return null;
+                return [...drawerFields.querySelectorAll('.le-shop-section')]
+                    .find((part) => part.querySelector('.le-shop-heading')?.textContent.startsWith(heading)) ?? opened;
+            }, { available: () => Boolean(drawerTabs.Shop) });
+            const whatsappField = Object.assign(() => {
+                if (!tab('Shop')()) return null;
+                return drawerFields.querySelector('.le-shop-section input[type="tel"]')?.closest('.le-field') ?? null;
+            }, { available: () => Boolean(drawerTabs.Shop) && (shopConfig.fields ?? []).some((f) => f.kind === 'whatsapp') });
+            const sells = () => Boolean(drawerTabs.Shop || document.querySelector('[data-kit-product]'));
+            const productCard = Object.assign(
+                () => first('[data-edit-list]:not([data-edit-list-kind="sections"]) > [data-edit-item]', (n) => Boolean(n.querySelector('[data-kit-product]')) || n.matches('[data-kit-product]'))
+                    ?? first('[data-kit-product]'),
+                { available: sells },
+            );
+            const bag = Object.assign(
+                () => first('[data-kit-action="commerce.view-bag"]') ?? inBar('previewButton'),
+                { available: sells },
+            );
+            const dashboard = Object.assign(
+                () => { const mark = ui.shadow.querySelector('a.le-mark'); return mark && shown(mark) ? mark : null; },
+                { available: () => Boolean(window.liveEditEditor?.console) },
+            );
+            const onTheShopPage = 'Your product cards are on your shop page: open it from your menu, then press Next or Back to see this step there.';
+
             const guides = {
                 'getting-started': [
                     { point: find.words, waitFor: 'editor', title: 'Click any words to change them', copy: 'Try it now: click the words ringed in blue. Their editor opens on the right.', done: 'That is the editor. Change the words, then press Save changes. Pictures and links work the same way.' },
@@ -6255,6 +6290,18 @@ const bootLiveEdit = () => {
                 shop: [
                     { point: tab('Shop'), title: 'Your shop in one place', copy: 'How customers pay, your WhatsApp number, delivery prices and offers, and every product. The same words as on your pages.' },
                     publishStep,
+                ],
+                'shop-setup': [
+                    { point: shopPart('How customers pay'), title: 'First, how customers pay', copy: 'The Shop tab lists the ways your checkout takes payment. Customers fill in their details, then choose one of these.' },
+                    { point: whatsappField, title: 'Your WhatsApp number', copy: 'Type it with the country code, digits only, then press Save shop details. WhatsApp orders arrive there as a message listing what the customer chose.' },
+                    { point: shopPart('Delivery and offers'), title: 'Delivery prices and offers', copy: 'Write each price the way a customer reads it ("$8"). The bag reads the figures from your words, so it adds delivery and takes off offers by itself.' },
+                    { point: productCard, title: 'Make your first product yours', copy: 'Click a product card and change its name, price and photo. A price needs its figure ("$45"): the bag and checkout read it.', elsewhere: onTheShopPage },
+                    { point: productCard, title: 'Sizes, colours and the story', copy: 'In the product\'s panel, press Edit all details. Its own page opens over the shop: click a size, colour, photo or word there to change it, then press Done.', elsewhere: onTheShopPage },
+                    { point: productCard, title: 'Add more products', copy: 'In a product\'s panel, press Duplicate, then Give it its own page on the copy. It starts as a full copy, sizes and all, ready to change.', elsewhere: onTheShopPage },
+                    { point: productCard, title: 'Put each product in a category', copy: 'If your shop has filters, each product\'s panel has a setting for its category. Choose one, and the product shows under that filter. A new category starts as a copy of a category card.', elsewhere: onTheShopPage },
+                    { point: bag, title: 'Try your bag as a customer', copy: 'Press Preview, add a product to the bag and go through checkout the way a customer would. Check the prices, delivery and offers add up.', elsewhere: 'Your bag opens from your site\'s header on the shop and product pages.' },
+                    publishStep,
+                    { point: dashboard, title: 'Where your orders arrive', copy: 'Orders paid online are listed in your dashboard under Orders. Press this mark to open your dashboard in a new tab.' },
                 ],
                 seo: [
                     { point: tab('SEO'), title: 'How this page looks in search', copy: 'Set the page title, its search description and the picture shown when it is shared.' },
@@ -6366,12 +6413,21 @@ const bootLiveEdit = () => {
                 heading.textContent = step.title;
                 copy.textContent = step.copy;
                 target = step.point();
+                card.classList.remove('le-walkthrough-top');
                 if (!target) {
-                    copy.textContent = `${step.copy} (It is not on this page; you will find it on another one.)`;
+                    copy.textContent = step.elsewhere ? `${step.copy} ${step.elsewhere}` : `${step.copy} (It is not on this page; you will find it on another one.)`;
                     return;
                 }
                 target.setAttribute('data-live-edit-tour-focus', '');
-                if (!ui.toolbar.contains(target) && !drawer.contains(target)) target.scrollIntoView?.({ block: 'center', behavior: 'smooth' });
+                const onThePage = !ui.toolbar.contains(target) && !drawer.contains(target);
+                // On a phone the drawer's sheet would cover what the step points at on the page; it
+                // gives way, unless somebody is in the middle of changing something in it.
+                if (onThePage && window.matchMedia?.('(max-width: 760px)').matches && drawer.classList.contains('is-open') && !current?.dirty) closeDrawer(true);
+                if (onThePage) target.scrollIntoView?.({ block: 'center', behavior: 'smooth' });
+                // A part of the drawer further down (Delivery, under How customers pay) is brought into view.
+                else if (drawer.contains(target)) target.scrollIntoView?.({ block: 'nearest', behavior: 'smooth' });
+                // On a phone the card sits over the bar; pointing at the bar, it moves to the top.
+                card.classList.toggle('le-walkthrough-top', ui.toolbar.contains(target) && Boolean(window.matchMedia?.('(max-width: 760px)').matches));
             };
             back.addEventListener('click', () => { if (index > 0) { index -= 1; show(); } });
             next.addEventListener('click', () => {
@@ -6422,6 +6478,7 @@ const bootLiveEdit = () => {
                 ...(document.querySelector('[data-edit-list-kind="sections"]') ? { sections: { title: 'Move, copy or hide a section', detail: 'Rearrange the parts of a page.' } } : {}),
                 ...(document.querySelector('[data-edit-bg]') ? { background: { title: 'Change a background picture', detail: 'Replace the picture behind a section.' } } : {}),
                 ...(window.liveEditBrand?.tokens?.length ? { brand: { title: 'Your colours and fonts', detail: 'Restyle the whole site from one place.' } } : {}),
+                ...(drawerTabs.Shop || document.querySelector('[data-kit-product]') ? { 'shop-setup': { title: 'Set up your shop', detail: 'Step by step: payment, delivery, your products and their categories, then your first order.' } } : {}),
                 ...(drawerTabs.Shop ? { shop: { title: 'Run your shop', detail: 'How customers pay, delivery prices, offers, your WhatsApp number and products.' } } : {}),
                 ...(drawerTabs.SEO ? { seo: { title: 'How you look in search', detail: 'A page\'s title, its search description and its sharing picture.' } } : {}),
                 ...(window.liveEditPages ? { pages: { title: 'Add a page', detail: 'Start from a page your site already has.' } } : {}),
@@ -6448,7 +6505,9 @@ const bootLiveEdit = () => {
                 return box;
             };
 
-            const startHere = group('Start here', profile.start.flatMap((id) => {
+            // Any site that sells starts with setting its shop up, whatever kind of site it is.
+            const startIds = features['shop-setup'] && !profile.start.includes('shop-setup') ? ['shop-setup', ...profile.start] : profile.start;
+            const startHere = group('Start here', startIds.flatMap((id) => {
                 if (id === 'lists') return lists.slice(0, 2).map((g) => option(g.id, g.title, g.detail));
                 return features[id] ? [option(id, features[id].title, features[id].detail)] : [];
             }));

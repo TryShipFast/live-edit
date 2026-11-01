@@ -864,7 +864,9 @@ select.le-input {
 .le-help-option:hover, .le-help-option:focus-visible { border-color: var(--le-accent); background: var(--le-soft); outline: none; }
 .le-help-option-title { color: var(--le-ink); font-size: 13px; font-weight: 650; }
 .le-help-option-detail { color: var(--le-muted); font-size: 12px; line-height: 1.4; }
-.le-tab[data-live-edit-tour-focus], .le-publish[data-live-edit-tour-focus] { outline: 3px solid #1B6EF3; outline-offset: 4px; }
+/* A guide step rings what it points at in the editor too: a tab, a part of the Shop tab, the bar's mark. */
+[data-live-edit-tour-focus] { outline: 3px solid #1B6EF3; outline-offset: 4px; border-radius: 8px; }
+.le-shop-section[data-live-edit-tour-focus], .le-field[data-live-edit-tour-focus] { outline-offset: 6px; box-shadow: 0 0 0 9px rgba(27,110,243,.08); }
 .le-hint--callout { margin: 0 0 14px; padding: 10px 12px; border: 1px solid var(--le-line); border-radius: 10px; background: var(--le-soft); color: var(--le-body); font-size: 12px; line-height: 1.5; }
 .le-modal-foot {
   display: flex; align-items: center; gap: 10px; justify-content: flex-end;
@@ -1071,7 +1073,15 @@ select.le-input {
 .le-foot .le-btn, .le-foot .le-btn-outline { white-space: nowrap; }
 .le-page-pick { margin-bottom: 2px; }
 /* On a phone the guide waits while a panel is open, rather than covering its fields. */
-@media (max-width: 760px) { :host(.le-drawer-open) .le-walkthrough-pill, :host(.le-drawer-open) .le-walkthrough { display: none; } }
+/* On a phone the drawer is a sheet over the lower part of the screen. A guide step that opens it
+   (a Shop tab part, the Brand tab) keeps its card, docked above the sheet, compact. */
+@media (max-width: 760px) {
+  :host(.le-drawer-open) .le-walkthrough-pill { display: none; }
+  .le-walkthrough.le-walkthrough-top { top: 12px; bottom: auto; }
+  :host(.le-drawer-open) .le-walkthrough:not(.le-help-menu) { top: 12px; bottom: auto; left: 12px; right: 12px; width: auto; padding: 12px 14px 14px; max-height: calc(38vh - 20px); overflow-y: auto; }
+  :host(.le-drawer-open) .le-walkthrough:not(.le-help-menu) h2 { font-size: 15px; margin: 4px 0 2px; }
+  :host(.le-drawer-open) .le-walkthrough:not(.le-help-menu) p { font-size: 13px; margin-bottom: 10px; }
+}
 
 .le-foot-status { white-space: nowrap; }
 @media (max-width: 760px) {

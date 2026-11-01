@@ -35,9 +35,9 @@ describe('help for every kind of site', () => {
         expect(profileFor({ category: 'something new', kind: 'unheard of' }).key).toBe('general');
     });
 
-    it('leads a shop owner to the Shop tab first and answers where orders go', () => {
+    it('leads a shop owner to setting the shop up first, then the Shop tab, and answers where orders go', () => {
         const shop = profileFor({ kind: 'shop' });
-        expect(shop.start[0]).toBe('shop');
+        expect(shop.start.slice(0, 2)).toEqual(['shop-setup', 'shop']);
         expect(shop.questions.map((q) => q.q)).toContain('Where do orders go?');
     });
 
