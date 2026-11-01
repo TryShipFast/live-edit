@@ -388,7 +388,13 @@ export function startingPoints(config = {}) {
     const known = new Set(library.map((section) => section.from));
     const hrefs = new Map((config.pages ?? []).map((page) => [page.id, page.href]));
     const given = Array.isArray(config.starts) && config.starts.length
-        ? config.starts.map((start) => ({ id: start.id, title: start.title, sections: (start.sections ?? []).filter((from) => known.has(from)) }))
+        ? config.starts.map((start) => {
+            // `own` is the same sections as the page has them (its heading says Headphones, not
+            // About); a host that does not send it is copied by the library's names.
+            const kept = (start.sections ?? []).map((from, i) => [from, start.own?.[i] ?? from]).filter(([from]) => known.has(from));
+
+            return { id: start.id, title: start.title, sections: kept.map(([from]) => from), own: kept.map(([, own]) => own) };
+        })
         : grouped(library).map((group) => ({ id: null, title: group.page, sections: group.sections.map((section) => section.from) }));
 
     const kinds = new Map();
@@ -403,6 +409,7 @@ export function startingPoints(config = {}) {
             id: start.id,
             title: start.title,
             sections: start.sections,
+            own: start.own ?? start.sections,
             alike: 0,
             at: start.id !== null && start.id !== undefined ? hrefs.get(start.id) ?? null : null,
         });
@@ -438,7 +445,9 @@ function thumbnail(href, title, names = []) {
         return holder;
     }
     const frame = el('iframe', 'le-start-frame');
-    frame.setAttribute('sandbox', '');
+    // Same origin, so the page's own stylesheets and pictures load (an opaque origin sends no
+    // sign-in with them, and the editor's page was drawn blank); no scripts, so nothing runs.
+    frame.setAttribute('sandbox', 'allow-same-origin');
     frame.setAttribute('loading', 'lazy');
     frame.setAttribute('scrolling', 'no');
     frame.setAttribute('tabindex', '-1');
@@ -468,6 +477,9 @@ export function renderNewPage({ ui, config, save, go, notify }) {
     const library = config.library ?? [];
     const taken = config.taken ?? [];
     const kinds = startingPoints(config);
+    // A page's own copy of a section (shop-headphones.intro) is named as the library names it (Page heading).
+    const likeOf = new Map(kinds.flatMap((kind) => kind.own.map((own, i) => [own, kind.sections[i]])));
+    const nameOf = (from) => labelOf(library, likeOf.get(from) ?? from);
     const state = { kind: null, sections: [], title: '', address: '', addressTouched: false, inMenu: true };
 
     const footer = (...buttons) => {
@@ -511,7 +523,8 @@ export function renderNewPage({ ui, config, save, go, notify }) {
                 card.append(thumbnail(kind.at, kind.title, names), about);
                 card.addEventListener('click', () => {
                     state.kind = kind;
-                    state.sections = [...kind.sections];
+                    // Copied as that page has them: its heading, its words.
+                    state.sections = [...kind.own];
                     nameIt();
                 });
                 grid.append(card);
@@ -622,13 +635,13 @@ export function renderNewPage({ ui, config, save, go, notify }) {
             chips.replaceChildren();
             state.sections.forEach((from) => {
                 const chip = el('span', 'le-chip');
-                chip.append(el('span', null, labelOf(library, from)));
+                chip.append(el('span', null, nameOf(from)));
                 if (state.sections.length > 1) {
                     const remove = button('×', 'le-chip-x', () => {
                         state.sections = state.sections.filter((other) => other !== from);
                         drawChips();
                     });
-                    remove.setAttribute('aria-label', `Leave out ${labelOf(library, from)}`);
+                    remove.setAttribute('aria-label', `Leave out ${nameOf(from)}`);
                     chip.append(remove);
                 }
                 chips.append(chip);
@@ -643,7 +656,7 @@ export function renderNewPage({ ui, config, save, go, notify }) {
         const look = el('div', 'le-name-look');
         const ownChoice = state.kind.title === 'Your own choice';
         look.append(
-            thumbnail(state.kind.at, state.kind.title, state.sections.map((from) => labelOf(library, from))),
+            thumbnail(state.kind.at, state.kind.title, state.sections.map((from) => nameOf(from))),
             el('p', 'le-hint', ownChoice
                 ? 'Your new page starts with these sections, filled with your design\'s words and photos. Change any of them once it is open.'
                 : `Your new page starts as a copy of ${state.kind.title}. Change any word or photo once it is open.`),

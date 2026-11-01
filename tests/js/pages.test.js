@@ -143,6 +143,29 @@ describe('the Pages tab', () => {
         expect(went).toBe('/sites/trial/edit/visit-the-studio');
     });
 
+    it('copies a page as that page has it: its own heading, not the one the library keeps from another page', async () => {
+        // Ohmline, 1 Nov 2026: a category started like Headphones opened with About's heading and breadcrumb.
+        const config = {
+            library: [
+                { from: 'about.intro', label: 'Page heading', page: 'About', at: null },
+                { from: 'shop-headphones.headphones', label: 'This collection', page: 'Headphones', at: null },
+            ],
+            starts: [{ id: 'shop/headphones', title: 'Headphones', sections: ['about.intro', 'shop-headphones.headphones'], own: ['shop-headphones.intro', 'shop-headphones.headphones'] }],
+            pages: [], taken: [], made: [], pagesKey: 'structure:pages', editorBase: '/e/',
+        };
+        const ui = fakeModal();
+        const saved = [];
+        renderNewPage({ ui, config, save: async (key, value) => saved.push([key, value]), go: () => {}, notify: () => {} });
+        ui.body.querySelector('.le-start').click();
+        expect([...ui.body.querySelectorAll('.le-chip')].map((chip) => chip.textContent)).toEqual(['Page heading×', 'This collection×']);
+        const title = ui.body.querySelector('.le-name-title');
+        title.value = 'Cables';
+        title.dispatchEvent(new Event('input'));
+        ui.foot.querySelector('.le-create-page').click();
+        await tick();
+        expect(Object.values(JSON.parse(saved[0][1]).added)).toEqual(['shop-headphones.intro', 'shop-headphones.headphones']);
+    });
+
     it('will not take an address a page already has, and says so where the address is', () => {
         const ui = fakeModal();
         renderNewPage({ ui, config: starting, save: async () => {}, go: () => {}, notify: () => {} });
