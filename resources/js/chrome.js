@@ -645,6 +645,13 @@ a.le-mark:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
 .le-shop-heading { margin: 0; font-size: 14px; font-weight: 650; color: var(--le-ink); }
 .le-shop-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
 .le-shop-row { display: grid; gap: 2px; font-size: 13px; color: var(--le-body); }
+.le-shop-category { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 8px 0; border-bottom: 1px solid var(--le-line); }
+.le-shop-category:last-child { border-bottom: 0; }
+.le-shop-category a { color: var(--le-ink); font-weight: 600; text-decoration: none; }
+.le-shop-category a:hover { text-decoration: underline; }
+.le-new-category-btn { margin-top: 4px; }
+.le-new-category { display: grid; gap: 14px; }
+.le-category-starts { margin: 0; }
 .le-shop-product a { color: var(--le-ink); text-underline-offset: 3px; }
 .le-card-setting { display: grid; gap: 6px; }
 .le-card-setting-boxes { display: grid; gap: 4px; }

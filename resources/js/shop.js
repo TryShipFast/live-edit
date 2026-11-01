@@ -30,7 +30,12 @@ export const withWhatsappNumber = (href, typed) => {
     return `https://wa.me/${digits}`;
 };
 
-export const renderShopPanel = ({ container, config, save, done, notify = () => {}, doc = document }) => {
+/*
+ * `categories` (window.liveEditPages.categories, from the host) and `newCategory(from)` give the tab
+ * its Categories: each one opens its page, Duplicate copies it, and New category makes one
+ * (pages.js renderNewCategory). Without them the tab has no Categories part.
+ */
+export const renderShopPanel = ({ container, config, save, done, notify = () => {}, doc = document, categories = [], newCategory = null }) => {
     const el = (tag, className, text) => {
         const node = doc.createElement(tag);
         if (className) node.className = className;
@@ -90,6 +95,31 @@ export const renderShopPanel = ({ container, config, save, done, notify = () => 
     const offers = section('Delivery and offers', terms.length ? 'Write them the way a customer reads them ("$8", "$150"): the bag reads the figure from your words.' : null);
     terms.forEach((f) => offers.append(field(f)));
 
+    // The shop's categories, as pages to open, copy or add to: never a kind of page or its sections.
+    let groups = null;
+    if (newCategory && categories.length) {
+        groups = section('Categories', 'Each category is a page your menu links to, showing its products.');
+        const rows = el('ul', 'le-shop-list le-shop-categories');
+        for (const category of categories) {
+            const row = el('li', 'le-shop-row le-shop-category');
+            const link = el('a', null, category.title);
+            link.href = category.href;
+            row.append(link);
+            if ((category.copies ?? []).length) {
+                const copy = el('button', 'le-link-btn le-category-duplicate', 'Duplicate');
+                copy.type = 'button';
+                copy.setAttribute('aria-label', `Duplicate ${category.title}`);
+                copy.addEventListener('click', () => newCategory(category));
+                row.append(copy);
+            }
+            rows.append(row);
+        }
+        const add = el('button', 'le-btn-outline le-wide le-new-category-btn', '+ New category');
+        add.type = 'button';
+        add.addEventListener('click', () => newCategory(null));
+        groups.append(rows, add);
+    }
+
     const products = config?.products ?? [];
     const list = section(`Products (${products.length})`, 'Each has its own page for its photos, sizes, price and story. Click a product card in the shop and press Edit all details to change its page there. To add one, duplicate a card and press Give it its own page: it starts as a full copy.');
     const ul = el('ul', 'le-shop-list');
@@ -107,7 +137,7 @@ export const renderShopPanel = ({ container, config, save, done, notify = () => 
     saveButton.type = 'button';
     actions.append(saveButton);
 
-    container.append(intro, pay, ...(terms.length ? [offers] : []), ...(products.length ? [list] : []), ...(inputs.length ? [actions] : []));
+    container.append(intro, pay, ...(terms.length ? [offers] : []), ...(groups ? [groups] : []), ...(products.length ? [list] : []), ...(inputs.length ? [actions] : []));
 
     saveButton.addEventListener('click', async () => {
         const changed = inputs.filter(({ input, start }) => input.value.trim() !== start.trim());

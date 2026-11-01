@@ -984,3 +984,115 @@ export function factTargets(root) {
         notes: editable(root.querySelector('[data-field="notes"][data-edit], [data-field="lead"][data-edit]')),
     };
 }
+
+/**
+ * A shop's categories, as the owner thinks of them (LIVE-EDIT-STRUCTURE.md, "A shop's categories").
+ *
+ * The host finds them (`config.categories`): the design's pages the menu links to that list the
+ * shop's products, and the ones the owner made like them. A new one is a page made like one of them,
+ * named once: its heading, breadcrumb, tab title and menu link all say the name, and its menu link
+ * goes beside the other categories. Nothing here asks what kind of page it is, or for its sections.
+ *
+ * `from` is the category being duplicated, or null for a new one; it then starts like the first
+ * category that is not the parent of another (Headphones rather than All products).
+ */
+export const leafCategories = (categories = []) => categories.filter((one) => !categories.some((other) => other !== one && one.id !== '' && String(other.id).startsWith(`${one.id}/`)));
+
+export function renderNewCategory({ ui, config, from = null, save, go, notify }) {
+    const categories = (config.categories ?? []).filter((category) => (category.copies ?? []).length);
+    const taken = config.taken ?? [];
+    let like = from ?? leafCategories(categories)[0] ?? categories[0] ?? null;
+    if (!like) {
+        notify('This design has no category to start one like.');
+        ui.close?.();
+
+        return null;
+    }
+
+    ui.title(from ? `Duplicate ${from.title}` : 'New category');
+    ui.subtitle(from ? 'A copy of this category, with its products, under a new name.' : 'A page for a group of your products, linked from your menu.');
+
+    const form = el('div', 'le-name-page le-new-category');
+    const nameField = el('label', 'le-field', 'Name');
+    const name = el('input', 'le-input le-name-title');
+    name.placeholder = 'Cables';
+    name.maxLength = 120;
+    name.value = from ? `${from.title} 2` : '';
+    nameField.append(name);
+    const where = el('p', 'le-hint le-name-address');
+
+    const parts = [nameField, where];
+    let pick = null;
+    if (!from && categories.length > 1) {
+        const likeField = el('label', 'le-field', 'Looks like');
+        pick = el('select', 'le-input le-category-like');
+        for (const category of categories) {
+            const option = el('option', null, category.title);
+            option.value = category.id;
+            option.selected = category === like;
+            pick.append(option);
+        }
+        pick.addEventListener('change', () => {
+            like = categories.find((category) => category.id === pick.value) ?? like;
+            refresh();
+        });
+        likeField.append(pick);
+        parts.push(likeField);
+    }
+
+    const starts = el('p', 'le-hint le-category-starts');
+    const menu = el('label', 'le-switch');
+    const menuBox = el('input');
+    menuBox.type = 'checkbox';
+    menuBox.checked = true;
+    menu.append(menuBox, el('span', 'le-switch-track'), el('span', 'le-switch-label', 'Show it in the menu'));
+    parts.push(starts, menu);
+    form.append(...parts);
+    ui.body.replaceChildren(form);
+
+    const waiting = el('span', 'le-modal-note le-create-waiting');
+    const create = el('button', 'le-btn-publish le-create-category', from ? 'Duplicate category' : 'Create category');
+    create.type = 'button';
+
+    function address() { return slugFor(name.value); }
+    function refresh() {
+        const id = address();
+        const problem = id ? addressProblem(id, taken) : null;
+        where.textContent = problem ?? (id ? `Its address: /${id}` : 'Its address follows the name.');
+        where.classList.toggle('le-hint--warn', Boolean(problem));
+        starts.textContent = `It starts as a copy of ${like.title}, with its products: change or remove them on the new page.`;
+        const missing = !name.value.trim() ? 'Give the category a name.' : whyNotYet({ title: name.value, address: id, chosen: like.copies, taken });
+        create.disabled = Boolean(missing);
+        waiting.textContent = missing ?? '';
+
+        return missing;
+    }
+
+    create.addEventListener('click', async () => {
+        if (refresh()) return;
+        create.disabled = true;
+        create.textContent = 'Creating…';
+        ui.allowDismiss?.(false);
+        try {
+            const id = address();
+            const added = {};
+            for (const section of like.copies) added[newAddedId()] = section;
+            await save(`structure:page:${id}`, JSON.stringify({ added }));
+            await save(config.pagesKey, JSON.stringify([...(config.made ?? []), { id, title: name.value.trim(), menu: menuBox.checked }]));
+            go(`${config.editorBase}${id}`);
+        } catch (error) {
+            ui.allowDismiss?.(true);
+            notify(error.message);
+            create.textContent = from ? 'Duplicate category' : 'Create category';
+            refresh();
+        }
+    });
+    name.addEventListener('input', refresh);
+    name.addEventListener('keydown', (event) => { if (event.key === 'Enter' && !create.disabled) create.click(); });
+    ui.foot.replaceChildren(waiting, create);
+    ui.foot.hidden = false;
+    refresh();
+    setTimeout(() => { name.focus(); name.select(); }, 0);
+
+    return { like: () => like };
+}

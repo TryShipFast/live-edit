@@ -593,8 +593,13 @@ window.liveEditPages = {
     { from: 'about.leadership', label: 'Leadership team', page: 'About the school', at: '/sites/trial/edit/about' },
   ],
   starts: [                               // optional: the design's pages to start a new page from,
-    { id: 'about', title: 'About the school', sections: ['about.head', 'about.leadership'] },
-  ],                                      // each with its library sections in order
+    { id: 'about', title: 'About the school', sections: ['about.head', 'about.leadership'],
+      own: ['about.head', 'about.leadership'] },  // optional: the same sections as this page has them;
+  ],                                      // each with its library sections in order; a new page copies `own`
+  categories: [                           // optional, a shop: its categories for the Shop tab
+    { id: 'shop/headphones', title: 'Headphones', href: '/sites/trial/edit/shop/headphones', made: false,
+      copies: ['shop-headphones.intro', 'shop-headphones.headphones'] },  // what a new one like it copies
+  ],
   pagesKey: 'structure:pages',            // the owner's pages: [{ id, title, menu }]
   made: [{ id: 'open-days', title: 'Open days', menu: true }],
   structureKey: 'structure:page:about',   // this page's additions: { added: { <id>: <from> } }
@@ -604,6 +609,11 @@ window.liveEditPages = {
 };
 ```
 
+- **A shop's categories.** With `categories`, the Shop tab lists them (each opens its page;
+  **Duplicate** copies one) and **New category** asks for a name and which category it looks like,
+  then saves a made page with that category's `copies`, in the menu by default. The host names the
+  page and places its menu link beside the other categories (the website's LIVE-EDIT-STRUCTURE.md,
+  "A shop's categories").
 - **New page, step 1: a page like one you have.** The design's pages are shown
   as small live pictures (`starts`, each drawn from its page's `href`; without
   `starts`, the library grouped by `page`). Pages made of the same sections are
