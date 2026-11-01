@@ -1067,8 +1067,6 @@ select.le-input {
 .le-repeats-title { display: none; }
 .le-btn-outline.le-wide { width: 100%; }
 
-/* One "+ Add a section" at a time: while the one between two sections shows, the end one steps aside. */
-.le-insert.is-visible:not(.le-insert-end) ~ .le-insert-end { display: none; }
 .le-price-field .le-prose { font-variant-numeric: tabular-nums; }
 
 `;
