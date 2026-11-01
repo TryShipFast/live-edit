@@ -41,8 +41,17 @@ export const liftFor = (rect, bar, viewHeight) => {
 export const roomFor = (rect, bar, viewHeight) => {
     if (!rect.width || !rect.height || rect.height <= viewHeight / 2) return 0;
     const overlaps = rect.bottom > bar.top && rect.top < bar.bottom && rect.right > bar.left && rect.left < bar.right;
-    return overlaps ? Math.ceil(rect.bottom - bar.top + GAP) : 0;
+    // what the bar covers of it on screen, never more: a menu taller than the screen is not covered below it
+    return overlaps ? Math.ceil(Math.min(rect.bottom, viewHeight) - bar.top + GAP) : 0;
 };
+
+/**
+ * The element's own padding before any room was added, kept on the element itself. Room is always added to this,
+ * never to what is there now: added to what is there now, every change on the page added the room again (Adeola
+ * Crest's phone menu grew to millions of pixels), since a second watcher, or a re-run before the first was put back,
+ * read the room already added as the element's own.
+ */
+const ROOM = 'data-le-room-before';
 
 /**
  * Keep the page's fixed things clear of `bar` while `isEditing()` holds.
@@ -55,7 +64,10 @@ export const keepClearOfTheBar = ({ bar, isEditing, doc = document, skip = () =>
     const putBack = () => {
         for (const [element, before] of lifted) element.style.translate = before;
         lifted.clear();
-        for (const [element, before] of roomed) element.style.paddingBottom = before;
+        for (const element of roomed.keys()) {
+            if (element.hasAttribute(ROOM)) element.style.paddingBottom = element.getAttribute(ROOM);
+            element.removeAttribute(ROOM);
+        }
         roomed.clear();
     };
     const apply = () => {
@@ -70,8 +82,15 @@ export const keepClearOfTheBar = ({ bar, isEditing, doc = document, skip = () =>
             const room = roomFor(rect, barRect, view.innerHeight);
             if (room) {
                 if ([...roomed.keys()].some((outer) => outer.contains(element))) continue;
-                roomed.set(element, element.style.paddingBottom);
+                if (!element.hasAttribute(ROOM)) element.setAttribute(ROOM, element.style.paddingBottom);
+                roomed.set(element, true);
+                // read with transitions off: a menu that animates its padding reports the padding it is animating
+                // from, which is the room added last time
+                const transition = element.style.transition;
+                element.style.transition = 'none';
+                element.style.paddingBottom = element.getAttribute(ROOM);
                 const own = parseFloat(view.getComputedStyle(element).paddingBottom) || 0;
+                element.style.transition = transition;
                 element.style.paddingBottom = `${own + room}px`;
                 continue;
             }
