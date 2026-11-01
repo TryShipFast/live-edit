@@ -1,5 +1,9 @@
 # ShipFast Live Edit for WordPress
 
+## 0.15.87
+
+- Brand tab: every colour and face under "Fine-tune each colour and face" sits in its own bordered row; the border darkens on hover and while the row is being changed.
+
 ## 0.15.86
 
 - Release only: the v0.15.84 and v0.15.85 tags were set one commit early (v0.15.84 before the category products, v0.15.85 on the 0.15.84 release), so neither carried its changes. 0.15.86 carries all of 0.15.84 and 0.15.85; no code changes.
