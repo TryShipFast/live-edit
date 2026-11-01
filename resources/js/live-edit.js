@@ -6,7 +6,7 @@ import { computedOf, computedKind } from './computed.js';
 import { uploadWidget } from './upload.js';
 import { renderSeoPanel } from './seo.js';
 import { renderShopPanel } from './shop.js';
-import { addedWith, describeStructure, hrefTo, newAddedId, orderWith, pageBase, pageOfLink, renderNewCategory, renderNewPage, renderSectionBrowser } from './pages.js';
+import { addedWith, describeStructure, hrefTo, newAddedId, orderWith, pageBase, pageOfLink, renderCategoryProducts, renderNewCategory, renderNewPage, renderSectionBrowser } from './pages.js';
 import { insertionNear, sectionName, sectionUnder, shownSectionLists, shownSections } from './section-inserter.js';
 import { DETAIL_MODE, copiedItemSettings, copiedStyles, copyPageForCard, deletablePage, deletePage, detailAddress, keyMap, linksTo, linksWarning, showOnlyTheDetail } from './card-page.js';
 import { renderChoice } from './choice.js';
@@ -1291,6 +1291,26 @@ const bootLiveEdit = () => {
                     window.location.href = href;
                 },
                 notify,
+                products: (window.liveEditShop?.products ?? []).filter((product) => product.id),
+            });
+
+            return handle;
+        };
+        // A category's products, ticked in and out (pages.js renderCategoryProducts), then the page shows them.
+        const openCategoryProducts = (category) => {
+            closeDrawer(true);
+            const handle = ui.modal({ title: `Products in ${category.title}`, size: 'is-medium' });
+            renderCategoryProducts({
+                ui: handle,
+                category,
+                products: (window.liveEditShop?.products ?? []).filter((product) => product.id),
+                save: saveSetting,
+                done: (message) => {
+                    handle.close?.();
+                    sessionStorage.setItem('tb_editing', '1');
+                    reloadWithToast(message);
+                },
+                notify,
             });
 
             return handle;
@@ -1307,6 +1327,7 @@ const bootLiveEdit = () => {
             done: (message) => reloadWithToast(message),
             categories: window.liveEditPages?.categories ?? [],
             newCategory: window.liveEditPages ? openNewCategory : null,
+            categoryProducts: window.liveEditPages && window.liveEditShop?.products?.length ? openCategoryProducts : null,
         });
         const renderSeo = () => {
             seoPanel = renderSeoPanel({
@@ -6320,7 +6341,7 @@ const bootLiveEdit = () => {
                     { point: productCard, title: 'Make your first product yours', copy: 'Click a product card and change its name, price and photo. A price needs its figure ("$45"): the bag and checkout read it.', elsewhere: onTheShopPage },
                     { point: productCard, title: 'Sizes, colours and the story', copy: 'In the product\'s panel, press Edit all details. Its own page opens over the shop: click a size, colour, photo or word there to change it, then press Done.', elsewhere: onTheShopPage },
                     { point: productCard, title: 'Add more products', copy: 'In a product\'s panel, press Duplicate, then Give it its own page on the copy. It starts as a full copy, sizes and all, ready to change.', elsewhere: onTheShopPage },
-                    { point: shopPart('Categories'), title: 'Your categories', copy: 'Each category is a page your menu links to. Press New category to make one: give it a name, and it opens with that name in its heading and menu, starting with the products of the category it looks like. Duplicate copies one with its products.' },
+                    { point: shopPart('Categories'), title: 'Your categories', copy: 'Each category is a page of products. Products beside one ticks the products it shows. New category makes one: give it a name and tick its products, and it opens with that name in its heading and menu. Duplicate copies one.' },
                     { point: bag, title: 'Try your bag as a customer', copy: 'Press Preview, add a product to the bag and go through checkout the way a customer would. Check the prices, delivery and offers add up.', elsewhere: 'Your bag opens from your site\'s header on the shop and product pages.' },
                     publishStep,
                     { point: dashboard, title: 'Where your orders arrive', copy: 'Orders paid online are listed in your dashboard under Orders. Press this mark to open your dashboard in a new tab.' },

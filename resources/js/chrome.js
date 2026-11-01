@@ -652,6 +652,15 @@ a.le-mark:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
 .le-new-category-btn { margin-top: 4px; }
 .le-new-category { display: grid; gap: 14px; }
 .le-category-starts { margin: 0; }
+.le-shop-category { flex-wrap: wrap; }
+.le-shop-category a { margin-right: auto; }
+.le-product-picker { display: grid; gap: 8px; }
+.le-product-picker-head { display: flex; align-items: baseline; justify-content: space-between; }
+.le-product-list { display: grid; gap: 2px; max-height: 260px; overflow-y: auto; padding: 4px; border: 1px solid var(--le-field); border-radius: 10px; }
+.le-product-row { display: flex; align-items: center; gap: 10px; min-height: 40px; padding: 0 10px; border-radius: 8px; cursor: pointer; font-size: 14px; color: var(--le-ink); }
+.le-product-row:hover { background: var(--le-soft); }
+.le-product-row input { width: 18px; height: 18px; margin: 0; accent-color: var(--le-accent); flex: none; }
+.le-product-row[hidden] { display: none; }
 .le-shop-product a { color: var(--le-ink); text-underline-offset: 3px; }
 .le-card-setting { display: grid; gap: 6px; }
 .le-card-setting-boxes { display: grid; gap: 4px; }

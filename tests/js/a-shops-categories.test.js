@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { firstLike, leafCategories, renderNewCategory } from '../../resources/js/pages.js';
+import { firstLike, leafCategories, productPicker, renderCategoryProducts, renderNewCategory } from '../../resources/js/pages.js';
 import { renderShopPanel } from '../../resources/js/shop.js';
 
 /*
@@ -115,4 +115,63 @@ describe("a shop's categories", () => {
         expect(saved[0][0]).toBe('structure:page:studio-headphones');
         expect(Object.values(JSON.parse(saved[0][1]).added)).toEqual(['shop-headphones.intro', 'shop-headphones.headphones']);
     });
+
+    // Part 2: a category's products, ticked in and out.
+    const shopProducts = [{ id: 'arc', name: 'Arc' }, { id: 'studio', name: 'Studio' }, { id: 'cable', name: 'USB-C cable, 2 m' }];
+
+    it('ticks products in and out, in the shop order whatever order they were ticked in', () => {
+        const picker = productPicker({ products: shopProducts, ticked: ['cable', 'gone'] });
+        expect(picker.chosen()).toEqual(['cable']);
+        // What it shows comes first, then the rest by name.
+        expect([...picker.node.querySelectorAll('.le-product-name')].map((n) => n.textContent)).toEqual(['USB-C cable, 2 m', 'Arc', 'Studio']);
+        const arc = picker.node.querySelector('input[value="arc"]');
+        arc.checked = true;
+        arc.dispatchEvent(new Event('change'));
+        expect(picker.chosen()).toEqual(['arc', 'cable']);
+        expect(picker.node.textContent).toContain('2 chosen');
+    });
+
+    it('saves the products a category shows, and will not save none', async () => {
+        const ui = fakeModal();
+        const saved = [];
+        let said = null;
+        const category = { id: 'shop/headphones', title: 'Headphones', has: ['arc', 'studio'], productsKey: 'structure:products:shop/headphones' };
+        renderCategoryProducts({ ui, category, products: shopProducts, save: async (key, value) => saved.push([key, value]), done: (m) => (said = m), notify: () => {} });
+
+        expect(ui.said.title).toBe('Products in Headphones');
+        const ticks = [...ui.body.querySelectorAll('input[type=checkbox]')];
+        for (const tick of ticks.slice(0, 2)) { tick.checked = false; tick.dispatchEvent(new Event('change')); }
+        expect(ui.foot.querySelector('.le-save-products').disabled).toBe(true);
+
+        ticks[2].checked = true;
+        ticks[2].dispatchEvent(new Event('change'));
+        ui.foot.querySelector('.le-save-products').click();
+        await tick();
+        expect(saved).toEqual([['structure:products:shop/headphones', '["cable"]']]);
+        expect(said).toContain('1 product');
+    });
+
+    it('a new category starts with the products of the one it looks like, and saves the ones ticked', async () => {
+        const withProducts = categories.map((c) => ({ ...c, has: c.id === 'shop/speakers' ? ['studio'] : ['arc'] }));
+        const ui = fakeModal();
+        const saved = [];
+        renderNewCategory({ ui, config: { ...config, categories: withProducts, productsKey: 'structure:products:' }, products: shopProducts, save: async (key, value) => saved.push([key, value]), go: () => {}, notify: () => {} });
+
+        const ticked = () => [...ui.body.querySelectorAll('.le-product-row input')].filter((t) => t.checked).map((t) => t.value);
+        const pick = ui.body.querySelector('.le-category-like');
+        pick.value = 'shop/speakers';
+        pick.dispatchEvent(new Event('change'));
+        expect(ticked()).toEqual(['studio']);
+
+        const cable = [...ui.body.querySelectorAll('.le-product-row input')].find((t) => t.value === 'cable');
+        cable.checked = true;
+        cable.dispatchEvent(new Event('change'));
+        const name = ui.body.querySelector('.le-name-title');
+        name.value = 'Cables';
+        name.dispatchEvent(new Event('input'));
+        ui.foot.querySelector('.le-create-category').click();
+        await tick();
+        expect(saved[1]).toEqual(['structure:products:cables', '["studio","cable"]']);
+    });
 });
+

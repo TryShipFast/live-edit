@@ -227,7 +227,8 @@ const PROFILES = {
  */
 export const shopQuestions = () => [
     { q: 'How do I add a product?', a: 'Click a product card and press Duplicate. Change the copy’s name, photo and price, then press Give it its own page: you get its own product page, sizes and all, ready to change.' },
-    { q: 'How do I create a category?', a: 'Open the Shop tab and press New category under Categories. Give it a name and choose which category it looks like, then press Create category. Its page opens with that name in its heading and your menu, beside your other categories. It starts with the products of the one it looks like: change or remove them there. To copy a category with its products, press Duplicate beside it instead.' },
+    { q: 'How do I create a category?', a: 'Open the Shop tab and press New category under Categories. Give it a name, choose which category it looks like, and tick the products it shows, then press Create category. Its page opens with that name in its heading and your menu, beside your other categories. To copy a category, press Duplicate beside it instead.' },
+    { q: 'How do I choose the products in a category?', a: 'Open the Shop tab and press Products beside the category. Tick the products it shows and press Save products. A product you leave out stays in your shop and in its other categories.' },
     { q: 'How do I change a product’s sizes or colours?', a: 'Click the product card and press Edit all details. On its page, click the sizes: add one, rename one, delete one, and set each one’s price.' },
     { q: 'How do I change a price?', a: 'Click the price on the product card or its page and type the new one, with its currency sign. The bag and checkout use that amount.' },
     { q: 'How do I take a product away?', a: 'Click its card and press Delete this item. It offers to delete the product’s page too, so nothing is left behind.' },

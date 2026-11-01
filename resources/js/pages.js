@@ -1011,7 +1011,7 @@ export const firstLike = (categories = []) => {
     return pool.reduce((best, category) => ((category.products ?? 0) > (best?.products ?? 0) ? category : best), pool[0] ?? null);
 };
 
-export function renderNewCategory({ ui, config, from = null, save, go, notify }) {
+export function renderNewCategory({ ui, config, from = null, save, go, notify, products = [] }) {
     const categories = (config.categories ?? []).filter((category) => (category.copies ?? []).length);
     const taken = config.taken ?? [];
     let like = from ?? firstLike(categories);
@@ -1047,12 +1047,16 @@ export function renderNewCategory({ ui, config, from = null, save, go, notify })
         pick.value = like.id;
         pick.addEventListener('change', () => {
             like = categories.find((category) => category.id === pick.value) ?? like;
+            if (picker && !touched) picker.set(like.has ?? []);
             refresh();
         });
         likeField.append(pick);
         parts.push(likeField);
     }
 
+    // Which products it shows: those of the category it looks like, until the owner ticks otherwise.
+    let touched = false;
+    const picker = products.length && like.has ? productPicker({ products, ticked: like.has, onChange: () => { touched = true; refresh(); } }) : null;
     const starts = el('p', 'le-hint le-category-starts');
     const menu = el('label', 'le-switch');
     const menuBox = el('input');
@@ -1062,7 +1066,7 @@ export function renderNewCategory({ ui, config, from = null, save, go, notify })
     const told = categories.some((category) => typeof category.inMenu === 'boolean');
     menuBox.checked = from ? from.inMenu ?? true : !told || anyInMenu;
     menu.append(menuBox, el('span', 'le-switch-track'), el('span', 'le-switch-label', 'Show it in the menu'));
-    parts.push(starts, menu);
+    parts.push(...(picker ? [picker.node] : [starts]), menu);
     form.append(...parts);
     ui.body.replaceChildren(form);
 
@@ -1077,7 +1081,9 @@ export function renderNewCategory({ ui, config, from = null, save, go, notify })
         where.textContent = problem ?? (id ? `Its address: /${id}` : 'Its address follows the name.');
         where.classList.toggle('le-hint--warn', Boolean(problem));
         starts.textContent = `It starts as a copy of ${like.title}, with its products: change or remove them on the new page.`;
-        const missing = !name.value.trim() ? 'Give the category a name.' : whyNotYet({ title: name.value, address: id, chosen: like.copies, taken });
+        const missing = !name.value.trim() ? 'Give the category a name.'
+            : picker && !picker.chosen().length ? 'Choose at least one product.'
+            : whyNotYet({ title: name.value, address: id, chosen: like.copies, taken });
         create.disabled = Boolean(missing);
         waiting.textContent = missing ?? '';
 
@@ -1094,6 +1100,7 @@ export function renderNewCategory({ ui, config, from = null, save, go, notify })
             const added = {};
             for (const section of like.copies) added[newAddedId()] = section;
             await save(`structure:page:${id}`, JSON.stringify({ added }));
+            if (picker && config.productsKey) await save(`${config.productsKey}${id}`, JSON.stringify(picker.chosen()));
             await save(config.pagesKey, JSON.stringify([...(config.made ?? []), { id, title: name.value.trim(), menu: menuBox.checked }]));
             go(`${config.editorBase}${id}`);
         } catch (error) {
@@ -1111,4 +1118,109 @@ export function renderNewCategory({ ui, config, from = null, save, go, notify })
     setTimeout(() => { name.focus(); name.select(); }, 0);
 
     return { like: () => like };
+}
+
+/**
+ * The shop's products as a list to tick (`products`: [{ id, name }], the Shop tab's own), with a
+ * search above it once there are more than eight. `ticked` is what starts ticked.
+ */
+export function productPicker({ products = [], ticked = [], onChange = () => {} }) {
+    const chosen = new Set(ticked.filter((id) => products.some((product) => product.id === id)));
+    const box = el('div', 'le-field le-product-picker');
+    const head = el('div', 'le-product-picker-head');
+    const label = el('span', 'le-label', 'Products in it');
+    const count = el('span', 'le-hint le-product-count');
+    head.append(label, count);
+    box.append(head);
+
+    let search = null;
+    if (products.length > 8) {
+        search = el('input', 'le-input le-product-search');
+        search.type = 'search';
+        search.placeholder = 'Find a product';
+        search.setAttribute('aria-label', 'Find a product');
+        box.append(search);
+    }
+
+    const list = el('div', 'le-product-list');
+    list.setAttribute('role', 'group');
+    list.setAttribute('aria-label', 'Products in it');
+    // What it shows first, then the rest by name; sorted once, so a row never jumps as it is ticked.
+    const shown = [...products].sort((a, b) => Number(chosen.has(b.id)) - Number(chosen.has(a.id)) || a.name.localeCompare(b.name));
+    const rows = shown.map((product) => {
+        const row = el('label', 'le-product-row');
+        const tick = el('input');
+        tick.type = 'checkbox';
+        tick.value = product.id;
+        tick.checked = chosen.has(product.id);
+        tick.addEventListener('change', () => {
+            if (tick.checked) chosen.add(product.id); else chosen.delete(product.id);
+            say();
+            onChange([...chosen]);
+        });
+        row.append(tick, el('span', 'le-product-name', product.name));
+        list.append(row);
+
+        return { row, tick, product };
+    });
+    box.append(list);
+
+    function say() {
+        count.textContent = chosen.size === 1 ? '1 chosen' : `${chosen.size} chosen`;
+    }
+    search?.addEventListener('input', () => {
+        const words = search.value.trim().toLowerCase().split(/\s+/).filter(Boolean);
+        for (const { row, product } of rows) row.hidden = !words.every((word) => product.name.toLowerCase().includes(word));
+    });
+    say();
+
+    return {
+        node: box,
+        // In the shop's order, whatever order they were ticked in.
+        chosen: () => products.map((product) => product.id).filter((id) => chosen.has(id)),
+        set(ids) {
+            chosen.clear();
+            for (const id of ids) chosen.add(id);
+            for (const { tick, product } of rows) tick.checked = chosen.has(product.id);
+            say();
+        },
+    };
+}
+
+/**
+ * A category's products, ticked in and out (the Shop tab's Products beside a category). Saved as the
+ * category's `productsKey`; its page then shows those products, each as the card the design draws
+ * for it, and nothing it shows is lost: a product unticked is only left off this category.
+ */
+export function renderCategoryProducts({ ui, category, products = [], save, done, notify }) {
+    ui.title(`Products in ${category.title}`);
+    ui.subtitle('Tick the products this category shows. A product left out stays in your shop.');
+    const picker = productPicker({ products, ticked: category.has ?? [], onChange: () => refresh() });
+    ui.body.replaceChildren(picker.node);
+
+    const waiting = el('span', 'le-modal-note');
+    const keep = el('button', 'le-btn-publish le-save-products', 'Save products');
+    keep.type = 'button';
+    function refresh() {
+        const none = picker.chosen().length === 0;
+        keep.disabled = none;
+        waiting.textContent = none ? 'Choose at least one product.' : '';
+    }
+    keep.addEventListener('click', async () => {
+        keep.disabled = true;
+        keep.textContent = 'Saving…';
+        try {
+            await save(category.productsKey, JSON.stringify(picker.chosen()));
+            done(`${category.title} now shows ${picker.chosen().length} ${picker.chosen().length === 1 ? 'product' : 'products'}.`);
+        } catch (error) {
+            notify(error.message);
+            keep.textContent = 'Save products';
+            refresh();
+        }
+    });
+    ui.foot.replaceChildren(waiting, keep);
+    ui.foot.hidden = false;
+    refresh();
+
+    return picker;
 }

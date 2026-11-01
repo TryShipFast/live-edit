@@ -35,7 +35,7 @@ export const withWhatsappNumber = (href, typed) => {
  * its Categories: each one opens its page, Duplicate copies it, and New category makes one
  * (pages.js renderNewCategory). Without them the tab has no Categories part.
  */
-export const renderShopPanel = ({ container, config, save, done, notify = () => {}, doc = document, categories = [], newCategory = null }) => {
+export const renderShopPanel = ({ container, config, save, done, notify = () => {}, doc = document, categories = [], newCategory = null, categoryProducts = null }) => {
     const el = (tag, className, text) => {
         const node = doc.createElement(tag);
         if (className) node.className = className;
@@ -105,6 +105,14 @@ export const renderShopPanel = ({ container, config, save, done, notify = () => 
             const link = el('a', null, category.title);
             link.href = category.href;
             row.append(link);
+            // Its products, ticked in and out, where the host says which it shows.
+            if (categoryProducts && category.productsKey && Array.isArray(category.has)) {
+                const choose = el('button', 'le-link-btn le-category-products', `Products (${category.has.length})`);
+                choose.type = 'button';
+                choose.setAttribute('aria-label', `Choose the products in ${category.title}`);
+                choose.addEventListener('click', () => categoryProducts(category));
+                row.append(choose);
+            }
             if ((category.copies ?? []).length) {
                 const copy = el('button', 'le-link-btn le-category-duplicate', 'Duplicate');
                 copy.type = 'button';
