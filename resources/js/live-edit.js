@@ -4045,6 +4045,8 @@ const bootLiveEdit = () => {
             heading.textContent = (sections && item ? 'This section' : null)
                 || list.dataset.editListLabel
                 || (sections ? 'Page sections' : 'Items');
+            // The page's sections panel is already titled "Page sections".
+            if (sections && !item) heading.classList.add('le-repeats-title');
 
             const row = document.createElement('div');
             row.className = 'le-row';

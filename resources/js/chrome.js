@@ -1064,7 +1064,7 @@ select.le-input {
 
 /* A panel that is only a list's controls (the page's sections): flat, as the grouped ones are. */
 .le-fields > .le-item-actions { padding: 0; background: none; border-radius: 0; }
-.le-fields > .le-item-actions > .le-section-heading:first-child { display: none; }
+.le-repeats-title { display: none; }
 .le-btn-outline.le-wide { width: 100%; }
 
 `;
