@@ -9,7 +9,8 @@ const BRAND_FIELDS = [
     ['data-brand-phone-2', 'brand.phone-2'], ['data-brand-whatsapp', 'brand.whatsapp'], ['data-brand-email', 'brand.email'],
     ['data-brand-address', 'brand.address'],
 ];
-const BRANDED = BRAND_FIELDS.map(([marker]) => `[${marker}]`).join(', ');
+// A link marked "link" only follows the brand for where it leads; its own words stay the owner's to edit.
+const BRANDED = BRAND_FIELDS.map(([marker]) => `[${marker}]:not([${marker}="link"])`).join(', ');
 import { computedOf, computedKind } from './computed.js';
 import { uploadWidget } from './upload.js';
 import { renderSeoPanel } from './seo.js';
