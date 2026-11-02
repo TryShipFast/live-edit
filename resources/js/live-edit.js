@@ -11,6 +11,15 @@ const BRAND_FIELDS = [
 ];
 // A link marked "link" only follows the brand for where it leads; its own words stay the owner's to edit.
 const BRANDED = BRAND_FIELDS.map(([marker]) => `[${marker}]:not([${marker}="link"])`).join(', ');
+/*
+ * A shop's terms, written as words on many pages (the delivery price in the bag, the checkout, the footer; the
+ * free-delivery threshold; the code on offer and its percent). The Shop tab saves every copy at once; editing one copy
+ * on the page changed that copy only, and the page could say one delivery price while the bag charged another (owner,
+ * 2 Nov 2026: "if some words are shop settings bound, should they be editable or asked to edit it via the shop").
+ * Where the site has a Shop tab, pressing one opens it at that term; the words around it stay editable here.
+ */
+const SHOP_TERMS = '[data-kit-rate], [data-kit-free-over], [data-kit-deal-code], [data-kit-deal-percent]';
+const shopTermsHere = () => Boolean(window.liveEditShop);
 import { computedOf, computedKind } from './computed.js';
 import { uploadWidget } from './upload.js';
 import { renderSeoPanel } from './seo.js';
@@ -2220,7 +2229,9 @@ const bootLiveEdit = () => {
         const editables = () => [...document.querySelectorAll('[data-edit], [data-edit-img], [data-edit-bg], [data-edit-href], [data-edit-icon], [data-edit-svg]')]
             .filter((element) => mayEditLocked === true || !element.closest('[data-live-lock]'))
             // set in Branding, where one change reaches every copy (the press opens Branding)
-            .filter((element) => !element.matches(BRANDED));
+            .filter((element) => !element.matches(BRANDED))
+            // and a shop's terms, set in the Shop tab (the press opens it)
+            .filter((element) => !shopTermsHere() || !element.matches(SHOP_TERMS));
 
         /**
          * Every icon name the theme's own stylesheets define.
@@ -6147,6 +6158,23 @@ const bootLiveEdit = () => {
                     window.setTimeout(() => {
                         const input = field ? drawer.querySelector(`[data-brand-field="${field}"]`) : null;
                         (input ?? drawer.querySelector('.le-brand-type input'))?.focus();
+                    }, 0);
+                    return;
+                }
+
+                // A shop's term (a delivery price, the free-delivery threshold, the code on offer): the Shop tab.
+                const term = shopTermsHere() ? event.target.closest?.(SHOP_TERMS) : null;
+                if (term && drawerTabs.Shop) {
+                    event.preventDefault();
+                    event.stopImmediatePropagation();
+                    showTab('Shop');
+                    openDrawer();
+                    const key = String(term.getAttribute('data-edit') || '').replace(/^setting:/, '');
+                    window.setTimeout(() => {
+                        const input = [...drawer.querySelectorAll('[data-shop-keys]')].find((box) => key && box.dataset.shopKeys.split(' ').includes(key));
+                        const part = drawer.querySelector(term.matches('[data-kit-deal-code], [data-kit-deal-percent]') ? '[data-shop-part="offers"]' : '[data-shop-part="delivery"]');
+                        (input ?? part)?.scrollIntoView?.({ block: 'center' });
+                        input?.focus();
                     }, 0);
                     return;
                 }

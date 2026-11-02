@@ -115,6 +115,8 @@ export const renderShopPanel = ({
             box.value = value ?? '';
             if (placeholder) box.placeholder = placeholder;
         }
+        // Where each is saved, so pressing that term on the page finds its field here (live-edit.js, SHOP_TERMS).
+        box.dataset.shopKeys = (keys ?? []).join(' ');
         inputs.push({ spec: { ...spec, keys, kind, value }, input: box, start: box.value });
         wrap.append(tag, box);
         if (hint) wrap.append(el('p', 'le-hint', hint));
