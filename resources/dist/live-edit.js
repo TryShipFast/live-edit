@@ -649,7 +649,11 @@ a.le-mark:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
 .le-shop-choice { display: grid; gap: 10px; margin: 0; padding: 12px; border: 1px solid var(--le-line); border-radius: 10px; }
 .le-shop-choice legend { padding: 0 4px; }
 .le-shop-choice-name { margin: 0; font-size: 14px; font-weight: 600; color: var(--le-ink); }
-.le-shop-new-product { display: grid; gap: 12px; padding: 12px; border: 1px solid var(--le-line); border-radius: 10px; background: var(--le-soft); }
+.le-shop-new-product { display: grid; grid-template-columns: minmax(0, 1fr); min-width: 0; gap: 12px; padding: 12px; border: 1px solid var(--le-line); border-radius: 10px; background: var(--le-soft); }
+/* The upload box's one-line hint is cut with "\u2026", which only works where every box around it may shrink: a grid's own
+   column grows to the line's full width otherwise, and the Shop tab ran past a phone's screen (owner, 2 Nov 2026: "on
+   live edit, add new product create a scroll"). */
+.le-shop-new-product > *, .le-shop-new-categories { min-width: 0; }
 .le-shop-new-product[hidden] { display: none; }
 .le-shop-new-categories { display: grid; gap: 2px; margin: 0; padding: 0; border: 0; }
 .le-shop-new-go { justify-self: start; }

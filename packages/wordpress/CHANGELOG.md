@@ -1,5 +1,9 @@
 # ShipFast Live Edit for WordPress
 
+## 0.16.1
+
+- Shop tab: opening + Add a product no longer makes the editor wider than a phone's screen (the panel scrolled sideways). The form's boxes may shrink, so the upload box's one-line hint is cut with "…" instead.
+
 ## 0.16.0
 
 - A logo uploaded in the Brand tab is stored the weight of a logo: 600px at most on its longest side, as WebP (transparency kept) where that is lighter. A 706KB logo is stored at 27KB. Uploads may say role=logo.
