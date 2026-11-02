@@ -14,6 +14,8 @@
  * this browser until the next import.
  */
 
+import { uploadWidget } from './upload.js';
+
 const el = (tag, className, text) => {
     const node = document.createElement(tag);
     if (className) node.className = className;
@@ -175,7 +177,7 @@ export function renderImport({ ui, config, products = [], save, done, notify, st
     const columns = el('ul', 'le-import-columns');
     for (const [column, what] of [
         ['name', 'The product’s name. Needed.'],
-        ['price', 'As customers read it, with its figure: £24, $189, ₦15,000. Needed.'],
+        ['price', 'As customers read it, with its figure: ₦15,000. Needed.'],
         ['photo', 'A web address of its photo, starting https://. You can change it later in the editor.'],
         ['categories', `Which categories it is in, by name, separated by |. This shop has: ${categories.map((c) => c.title).join(', ') || 'none'}.`],
         ['looks like', 'The name of one of the shop’s products whose page it copies (sizes, details). Leave it empty to use one from its first category.'],
@@ -187,11 +189,10 @@ export function renderImport({ ui, config, products = [], save, done, notify, st
     two.append(el('strong', null, 'Fill in a row for each product'), columns, el('p', 'le-hint', 'Replace the example rows with your own. Save it as CSV.'));
 
     const three = el('li');
-    const file = el('input', 'le-import-file');
-    file.type = 'file';
-    file.accept = '.csv,text/csv';
-    file.setAttribute('aria-label', 'Choose your products file');
-    three.append(el('strong', null, 'Upload it'), el('p', 'le-hint', 'Every row is checked before anything is added.'), file);
+    // The same upload box as every picture and the logo (upload.js), taking a CSV.
+    const box = uploadWidget({ accept: '.csv,text/csv', title: 'Upload your products file', hint: 'A CSV file, or drag one here', label: 'Choose your products file', onFile: (chosen) => readFile(chosen) });
+    box.classList.add('le-import-file');
+    three.append(el('strong', null, 'Upload it'), el('p', 'le-hint', 'Every row is checked before anything is added.'), box);
     steps.append(one, two, three);
 
     const report = el('div', 'le-import-report');
@@ -206,8 +207,7 @@ export function renderImport({ ui, config, products = [], save, done, notify, st
     ui.foot.hidden = false;
 
     let checked = { ready: [], problems: [] };
-    file.addEventListener('change', async () => {
-        const chosen = file.files?.[0];
+    async function readFile(chosen) {
         if (!chosen) return;
         const rows = parseCsv(await chosen.text());
         const room = 500 - (shop.items ?? []).length;
@@ -237,7 +237,7 @@ export function renderImport({ ui, config, products = [], save, done, notify, st
         }
         go.disabled = !checked.ready.length;
         go.textContent = checked.ready.length ? `Import ${checked.ready.length} ${checked.ready.length === 1 ? 'product' : 'products'}` : 'Import products';
-    });
+    }
 
     go.addEventListener('click', async () => {
         go.disabled = true;

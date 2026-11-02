@@ -1,5 +1,11 @@
 # ShipFast Live Edit for WordPress
 
+## 0.15.92
+
+- Shop tab, rebuilt for owners setting up a shop for the first time: Your products (Edit beside each, Remove beside your own, + Add a product with a name, price, photo and categories, and Add many products from a spreadsheet), Categories (Choose products, Copy, Open), Delivery (each delivery choice's name and price, both yours, and free delivery over), How customers pay, and Offers.
+- Every example and placeholder is in naira.
+- Import products and a new product's photo use the editor's one upload box, the same as pictures and the logo.
+
 ## 0.15.91
 
 - Brand tab: a new name or number keeps the spaces the old one had at its ends, so a link's own words and its marked name stay apart ("About Senior Jay Autocare", not "AboutSenior Jay Autocare").

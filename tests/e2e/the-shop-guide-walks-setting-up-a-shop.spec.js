@@ -59,7 +59,7 @@ test('a shop’s help starts with setting it up, and each step rings the real th
     await next(page);
     expect((await ringed(page)).text).toContain('WhatsApp number');
     await next(page);
-    expect((await ringed(page)).text).toContain('Delivery and offers');
+    expect((await ringed(page)).text).toContain('Delivery');
     await next(page);
     await expect(guide(page)).toContainText('Make your first product yours');
     expect((await ringed(page)).product).toBe(true);

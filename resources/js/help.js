@@ -70,7 +70,7 @@ const PROFILES = {
         intro: 'Customers browse your products, add them to the bag and check out. Start in the Shop tab: it gathers how customers pay, your WhatsApp number, delivery prices, offers and every product in one place.',
         start: ['shop-setup', 'shop', 'lists', 'image', 'brand', 'preview'],
         questions: [
-            { q: 'How do I add a product?', a: 'Use the guide for your products list below: copy a product card, then change its name, price and photo. In its panel, press Give it its own page: you get a copy of the product page, sizes and all, to change right there.' },
+            { q: 'How do I add a product?', a: 'Open the Shop tab and press Add a product: give it a name, a price, a photo and its categories. Or copy a product card, change its name, price and photo, and in its panel press Give it its own page: you get a copy of the product page, sizes and all, to change right there.' },
             { q: 'How do I change a price?', a: 'Click the price on the product card or its page and type the new one. The bag and checkout read the price from your words, so they follow it.' },
             { q: 'Do I have to open each product page to change it?', a: 'No. Click a product card and press Edit all details. Its page opens over the shop: click its words, photos or sizes to change them, then press Done.' },
             { q: 'How do I replace the sample products with mine?', a: 'Change a sample into your own with Edit all details, or delete it: Delete this item offers to delete its page too, so nothing is left behind on your website.' },
@@ -226,7 +226,7 @@ const PROFILES = {
  * orders a hosted shop now takes (HOSTED-SITES.md, "A shop's orders").
  */
 export const shopQuestions = () => [
-    { q: 'How do I add a product?', a: 'Click a product card and press Duplicate. Change the copy’s name, photo and price, then press Give it its own page: you get its own product page, sizes and all, ready to change.' },
+    { q: 'How do I add a product?', a: 'Where your site has a Shop tab, press Add a product there. Otherwise click a product card and press Duplicate. Change the copy’s name, photo and price, then press Give it its own page: you get its own product page, sizes and all, ready to change.' },
     { q: 'How do I create a category?', a: 'Open the Shop tab and press New category under Categories. Give it a name, choose which category it looks like, and tick the products it shows, then press Create category. Its page opens with that name in its heading and your menu, beside your other categories. To copy a category, press Duplicate beside it instead.' },
     { q: 'How do I choose the products in a category?', a: 'Open the Shop tab and press Products beside the category. Tick the products it shows and press Save products. A product you leave out stays in your shop and in its other categories.' },
     { q: 'How do I change a product’s sizes or colours?', a: 'Click the product card and press Edit all details. On its page, click the sizes: add one, rename one, delete one, and set each one’s price.' },

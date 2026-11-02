@@ -1,5 +1,9 @@
-/** A styled image picker shared by image and brand uploads. */
-export const uploadWidget = ({ hint = 'PNG, JPG or WEBP, or drag one here', onFile, compact = false } = {}) => {
+/**
+ * The one upload box every upload in the editor uses: pictures, the logo, a product's photo, a products file.
+ * Owner, 2 Nov 2026: a plain browser file input in Import products broke the uniformity, so `accept`, `title`
+ * and `label` let any kind of file use the same box.
+ */
+export const uploadWidget = ({ hint = 'PNG, JPG or WEBP, or drag one here', onFile, compact = false, accept: types = 'image/*', title: heading = 'Upload from your computer', label = '' } = {}) => {
     const wrap = document.createElement('label');
     wrap.className = `le-upload${compact ? ' le-upload-compact' : ''}`;
 
@@ -12,7 +16,7 @@ export const uploadWidget = ({ hint = 'PNG, JPG or WEBP, or drag one here', onFi
     text.className = 'le-upload-text';
     const title = document.createElement('span');
     title.className = 'le-upload-title';
-    title.textContent = 'Upload from your computer';
+    title.textContent = heading;
     const hintEl = document.createElement('span');
     hintEl.className = 'le-upload-hint';
     hintEl.textContent = hint;
@@ -24,7 +28,8 @@ export const uploadWidget = ({ hint = 'PNG, JPG or WEBP, or drag one here', onFi
 
     const input = document.createElement('input');
     input.type = 'file';
-    input.accept = 'image/*';
+    input.accept = types;
+    if (label) input.setAttribute('aria-label', label);
 
     const accept = (file) => {
         if (!file) return;

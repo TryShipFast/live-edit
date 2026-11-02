@@ -1374,6 +1374,15 @@ const bootLiveEdit = () => {
             categoryProducts: window.liveEditPages && window.liveEditShop?.products?.length ? openCategoryProducts : null,
             importProducts: window.liveEditPages?.catalogue ? openImport : null,
             undoImport: window.liveEditPages?.catalogue && (() => { try { return sessionStorage.getItem(UNDO_KEY); } catch { return null; } })() ? undoImport : null,
+            // Add a product and Remove (the owner's own products), written as Import products writes them.
+            catalogue: window.liveEditPages?.catalogue ?? null,
+            taken: window.liveEditPages?.taken ?? [],
+            upload: async (file) => {
+                const body = new FormData();
+                body.append('file', file);
+                const response = await request('/live-edit/upload', { method: 'POST', body });
+                return (await response.json()).url;
+            },
         });
         const renderSeo = () => {
             seoPanel = renderSeoPanel({
@@ -6399,17 +6408,17 @@ const bootLiveEdit = () => {
                     publishStep,
                 ],
                 shop: [
-                    { point: tab('Shop'), title: 'Your shop in one place', copy: 'How customers pay, your WhatsApp number, delivery prices and offers, and every product. The same words as on your pages.' },
+                    { point: tab('Shop'), title: 'Your shop in one place', copy: 'Your products and categories, your delivery choices and prices, how customers pay and your offers. The same words as on your pages.' },
                     publishStep,
                 ],
                 'shop-setup': [
                     { point: shopPart('How customers pay'), title: 'First, how customers pay', copy: 'The Shop tab lists the ways your checkout takes payment. Customers fill in their details, then choose one of these.' },
                     { point: whatsappField, title: 'Your WhatsApp number', copy: 'Type it with the country code, digits only, then press Save shop details. WhatsApp orders arrive there as a message listing what the customer chose.' },
-                    { point: shopPart('Delivery and offers'), title: 'Delivery prices and offers', copy: 'Write each price the way a customer reads it ("$8"). The bag reads the figures from your words, so it adds delivery and takes off offers by itself.' },
-                    { point: productCard, title: 'Make your first product yours', copy: 'Click a product card and change its name, price and photo. A price needs its figure ("$45"): the bag and checkout read it.', elsewhere: onTheShopPage },
+                    { point: shopPart('Delivery'), title: 'Your delivery choices', copy: 'Give each delivery choice the name your customers know ("Lagos, 1 to 2 days") and its price ("₦3,000"). The bag reads the figures, so it adds delivery by itself.' },
+                    { point: productCard, title: 'Make your first product yours', copy: 'Click a product card and change its name, price and photo. A price needs its figure ("₦15,000"): the bag and checkout read it.', elsewhere: onTheShopPage },
                     { point: productCard, title: 'Sizes, colours and the story', copy: 'In the product\'s panel, press Edit all details. Its own page opens over the shop: click a size, colour, photo or word there to change it, then press Done.', elsewhere: onTheShopPage },
-                    { point: productCard, title: 'Add more products', copy: 'In a product\'s panel, press Duplicate, then Give it its own page on the copy. It starts as a full copy, sizes and all, ready to change.', elsewhere: onTheShopPage },
-                    { point: shopPart('Categories'), title: 'Your categories', copy: 'Each category is a page of products. Products beside one ticks the products it shows. New category makes one: give it a name and tick its products, and it opens with that name in its heading and menu. Duplicate copies one.' },
+                    { point: shopPart('Your products'), title: 'Add more products', copy: 'In the Shop tab, press Add a product: give it a name, a price, a photo and its categories. Edit beside it opens its page for the rest. Or, on a product card, press Duplicate, then Give it its own page.' },
+                    { point: shopPart('Categories'), title: 'Your categories', copy: 'Each category is a page of products. Choose products ticks which products it shows (nothing is deleted). New category makes one: give it a name and tick its products, and it opens with that name in its heading and menu. Copy starts one like another.' },
                     { point: bag, title: 'Try your bag as a customer', copy: 'Press Preview, add a product to the bag and go through checkout the way a customer would. Check the prices, delivery and offers add up.', elsewhere: 'Your bag opens from your site\'s header on the shop and product pages.' },
                     publishStep,
                     { point: dashboard, title: 'Where your orders arrive', copy: 'Orders paid online are listed in your dashboard under Orders. Press this mark to open your dashboard in a new tab.' },
@@ -6590,7 +6599,7 @@ const bootLiveEdit = () => {
                 ...(document.querySelector('[data-edit-bg]') ? { background: { title: 'Change a background picture', detail: 'Replace the picture behind a section.' } } : {}),
                 ...(window.liveEditBrand?.tokens?.length ? { brand: { title: 'Your colours and fonts', detail: 'Restyle the whole site from one place.' } } : {}),
                 ...(drawerTabs.Shop || document.querySelector('[data-kit-product]') ? { 'shop-setup': { title: 'Set up your shop', detail: 'Step by step: payment, delivery, your products and their categories, then your first order.' } } : {}),
-                ...(drawerTabs.Shop ? { shop: { title: 'Run your shop', detail: 'How customers pay, delivery prices, offers, your WhatsApp number and products.' } } : {}),
+                ...(drawerTabs.Shop ? { shop: { title: 'Run your shop', detail: 'Your products and categories, delivery choices, how customers pay and offers.' } } : {}),
                 ...(drawerTabs.SEO ? { seo: { title: 'How you look in search', detail: 'A page\'s title, its search description and its sharing picture.' } } : {}),
                 ...(window.liveEditPages ? { pages: { title: 'Add a page', detail: 'Start from a page your site already has.' } } : {}),
                 ...(!ui.languagePicker.hidden ? { languages: { title: 'Edit another language', detail: 'Switch languages and write each one.' } } : {}),

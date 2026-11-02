@@ -30,7 +30,7 @@ describe("a shop's categories", () => {
         const asked = [];
         renderShopPanel({ container, config: { products: [], fields: [] }, save: async () => {}, categories, newCategory: (from) => asked.push(from?.id ?? 'new') });
 
-        expect([...container.querySelectorAll('.le-shop-category a')].map((a) => [a.textContent, a.getAttribute('href')])).toEqual([
+        expect([...container.querySelectorAll('.le-shop-category')].map((row) => [row.querySelector('.le-shop-name').textContent, row.querySelector('a.le-category-open').getAttribute('href')])).toEqual([
             ['All products', '/e/shop'], ['Headphones', '/e/shop/headphones'], ['Speakers', '/e/shop/speakers'],
         ]);
         container.querySelectorAll('.le-category-duplicate')[1].click();

@@ -26,8 +26,9 @@ describe('the shop in one place', () => {
         const container = document.createElement('div');
         renderShopPanel({ container, config, save: async () => {} });
 
-        expect(container.textContent).toContain('Products (1)');
-        expect(container.querySelector('a[href="/edit/products/after-rain"]').textContent).toBe('After Rain');
+        expect(container.textContent).toContain('Your products (1)');
+        expect(container.querySelector('.le-shop-product .le-shop-name').textContent).toBe('After Rain');
+        expect(container.querySelector('a[href="/edit/products/after-rain"]').textContent).toBe('Edit');
         expect(container.textContent).toContain("Needs the shop's WhatsApp number.");
     });
 
@@ -37,12 +38,13 @@ describe('the shop in one place', () => {
         let finished = '';
         const { inputs } = renderShopPanel({ container, config, save: async (key, value) => saved.push([key, value]), done: (m) => { finished = m; } });
 
-        inputs[1].input.value = '$9';
-        inputs[0].input.value = '447700900123';
+        const of = (kind) => inputs.find((i) => i.spec.kind === kind).input;
+        of('text').value = '$9';
+        of('whatsapp').value = '447700900123';
         container.querySelector('button.le-btn').click();
         await new Promise((r) => setTimeout(r, 0));
 
-        expect(saved).toEqual([['wa', 'https://wa.me/447700900123?text=Hello'], ['bag.std', '$9'], ['checkout.std', '$9']]);
+        expect(saved).toEqual([['bag.std', '$9'], ['checkout.std', '$9'], ['wa', 'https://wa.me/447700900123?text=Hello']]);
         expect(finished).toContain('saved');
     });
 
@@ -52,11 +54,128 @@ describe('the shop in one place', () => {
         const said = [];
         const { inputs } = renderShopPanel({ container, config, save: async (k, v) => saved.push(v), notify: (m) => said.push(m) });
 
-        inputs[0].input.value = '123';
+        inputs.find((i) => i.spec.kind === 'whatsapp').input.value = '123';
         container.querySelector('button.le-btn').click();
         await new Promise((r) => setTimeout(r, 0));
 
         expect(saved).toEqual([]);
         expect(said[0]).toContain('too short');
+    });
+
+    it('gives every delivery choice a name and a price the owner sets, and saves each where the pages write it', async () => {
+        const container = document.createElement('div');
+        const saved = [];
+        renderShopPanel({
+            container,
+            config: { products: [], checkout: { modes: [] }, fields: [
+                { keys: ['bag.std', 'checkout.std'], label: 'Royal Mail tracked, 2 to 3 working days', name: 'Royal Mail tracked, 2 to 3 working days', nameKeys: ['checkout.ship-std'], kind: 'rate', value: '£4.50' },
+                { keys: ['footer.free'], label: 'Free delivery over', kind: 'text', value: '£40' },
+            ] },
+            save: async (key, value) => saved.push([key, value]),
+            done: () => {},
+        });
+        const part = container.querySelector('[data-shop-part="delivery"]');
+        expect(part.querySelector('.le-shop-heading').textContent).toBe('Delivery');
+        const [name, price, free] = part.querySelectorAll('input');
+        expect(part.querySelector(`label[for="${name.id}"]`).textContent).toBe('Name customers see');
+        expect(name.value).toBe('Royal Mail tracked, 2 to 3 working days');
+        expect(free.placeholder).toBe('₦50,000');
+        expect(price.placeholder).toBe('₦3,000');
+
+        name.value = 'Lagos, 1 to 2 days';
+        price.value = '£3';
+        container.querySelector('button.le-btn').click();
+        await new Promise((r) => setTimeout(r, 0));
+        expect(saved).toEqual([['checkout.ship-std', 'Lagos, 1 to 2 days'], ['bag.std', '£3'], ['checkout.std', '£3']]);
+    });
+
+    it('refuses a delivery choice without a name', async () => {
+        const container = document.createElement('div');
+        const said = [];
+        renderShopPanel({ container, config: { fields: [{ keys: ['r'], nameKeys: ['n'], name: 'Standard', label: 'Standard', kind: 'rate', value: '₦2,000' }] }, save: async () => {}, notify: (m) => said.push(m) });
+        container.querySelector('[data-shop-part="delivery"] input').value = '  ';
+        container.querySelector('button.le-btn').click();
+        await new Promise((r) => setTimeout(r, 0));
+        expect(said[0]).toContain('needs a name');
+    });
+
+    it('writes every example in naira, never in the sample prices\' currency', () => {
+        const container = document.createElement('div');
+        renderShopPanel({ container, config: { fields: [{ keys: ['r'], label: 'Standard', kind: 'rate', value: '£4.50' }] }, save: async () => {} });
+        expect(container.querySelector('[data-shop-part="delivery"] .le-hint').textContent).toContain('₦3,000');
+        expect([...container.querySelectorAll('input')].map((i) => i.placeholder).join(' ')).not.toMatch(/[£$€]/);
+    });
+
+    it('adds a product from a name, a price and its categories, written as an import writes it', async () => {
+        const container = document.body.appendChild(document.createElement('div'));
+        const saved = [];
+        let finished = '';
+        const categories = [
+            { id: 'shop', title: 'All products', href: '/e/shop', productsKey: 'p:shop', has: ['wax'], copies: ['a'] },
+            { id: 'shop/care', title: 'Care', href: '/e/shop/care', productsKey: 'p:care', has: ['wax'], copies: ['b'] },
+            { id: 'shop/gifts', title: 'Gifts', href: '/e/shop/gifts', productsKey: 'p:gifts', has: [], copies: ['c'] },
+        ];
+        renderShopPanel({
+            container,
+            config: { products: [{ id: 'wax', name: 'Paste wax', href: '/e/products/wax' }], fields: [] },
+            categories,
+            newCategory: () => {},
+            catalogue: { key: 'structure:catalogue', items: [], drawn: [], likes: [{ id: 'products/wax', product: 'wax', title: 'Paste wax', price: '₦12,000' }] },
+            save: async (key, value) => saved.push([key, value]),
+            upload: async () => '/uploads/kit.jpg',
+            done: (m) => { finished = m; },
+        });
+        const add = container.querySelector('.le-shop-add-product');
+        const form = container.querySelector('.le-shop-new-product');
+        expect(form.hidden).toBe(true);
+        add.click();
+        expect(form.hidden).toBe(false);
+        expect([...form.querySelectorAll('.le-check')].map((l) => l.textContent.trim())).toEqual(['Care', 'Gifts']);
+
+        form.querySelector('#le-shop-new-name').value = 'Ceramic coating kit';
+        form.querySelector('#le-shop-new-price').value = '₦45,000';
+        form.querySelectorAll('.le-check input')[1].checked = true;
+        form.querySelector('.le-shop-new-go').click();
+        await new Promise((r) => setTimeout(r, 0));
+
+        expect(saved[0][0]).toBe('structure:catalogue');
+        expect(JSON.parse(saved[0][1])).toEqual([{ id: 'ceramic-coating-kit', name: 'Ceramic coating kit', price: '₦45,000', photo: '', categories: ['shop/gifts'], like: 'products/wax' }]);
+        expect(saved.slice(1)).toEqual([['p:shop', JSON.stringify(['wax', 'ceramic-coating-kit'])], ['p:gifts', JSON.stringify(['ceramic-coating-kit'])]]);
+        expect(finished).toContain('Ceramic coating kit is added');
+    });
+
+    it('says what is wrong with a product before adding it', async () => {
+        const container = document.body.appendChild(document.createElement('div'));
+        const said = [];
+        const saved = [];
+        renderShopPanel({
+            container, config: { products: [], fields: [] }, save: async (k) => saved.push(k), notify: (m) => said.push(m),
+            catalogue: { key: 'c', items: [], drawn: [], likes: [{ id: 'products/wax', product: 'wax', title: 'Wax' }] },
+        });
+        container.querySelector('#le-shop-new-name').value = 'Kit';
+        container.querySelector('#le-shop-new-price').value = 'soon';
+        container.querySelector('.le-shop-new-go').click();
+        await new Promise((r) => setTimeout(r, 0));
+        expect(saved).toEqual([]);
+        expect(said[0]).toBe('Its price "soon" has no figure.');
+    });
+
+    it('removes one of the owner’s own products from the shop and every category showing it', async () => {
+        const container = document.createElement('div');
+        const saved = [];
+        window.confirm = () => true;
+        renderShopPanel({
+            container,
+            config: { products: [], fields: [] },
+            categories: [{ id: 'shop', title: 'All', href: '/e/shop', productsKey: 'p:shop', has: ['kit', 'wax'], copies: [] }],
+            newCategory: () => {},
+            catalogue: { key: 'c', items: [{ id: 'kit', name: 'Kit', price: '₦1', photo: '', categories: [], like: 'products/wax' }], drawn: [{ id: 'kit', href: '/e/products/kit' }], likes: [] },
+            save: async (key, value) => saved.push([key, value]),
+            done: () => {},
+        });
+        expect(container.querySelector('a[href="/e/products/kit"]').textContent).toBe('Edit');
+        container.querySelector('.le-shop-remove').click();
+        await new Promise((r) => setTimeout(r, 0));
+        expect(saved).toEqual([['c', '[]'], ['p:shop', JSON.stringify(['wax'])]]);
     });
 });
