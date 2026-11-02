@@ -341,6 +341,13 @@ return [
     'max_upload_kb' => (int) env('LIVE_EDIT_MAX_UPLOAD_KB', 8192),
 
     /*
+     * The longest side, in pixels, any stored picture is brought down to (ImageFitter::shrink). A phone's photograph is
+     * 4000px and 5MB; a page shows it at most about 1200 CSS pixels wide, so 2400 is sharp on any screen and a tenth
+     * of the weight.
+     */
+    'max_image_edge' => (int) env('LIVE_EDIT_MAX_IMAGE_EDGE', 2400),
+
+    /*
      * How long a tagged page is remembered, in seconds. Zero turns it off.
      *
      * Tagging is the slowest thing on the path to a page's own words - 1.8s of

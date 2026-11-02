@@ -62,6 +62,11 @@ class ImageFitter
 
         [$sourceWidth, $sourceHeight] = $info;
 
+        // A phone's sideways photograph is measured the way it is turned upright (read() turns it).
+        if ($info[2] === IMAGETYPE_JPEG && in_array(self::orientation($path), [5, 6, 7, 8], true)) {
+            [$sourceWidth, $sourceHeight] = [$sourceHeight, $sourceWidth];
+        }
+
         /*
          * `$exact` means the caller measured the picture being replaced rather
          * than the box it sits in.
@@ -144,7 +149,107 @@ class ImageFitter
     }
 
     /** @return \GdImage|null */
+    /**
+     * Any uploaded photograph made fit for a web page: upright, no larger than a page shows it, saved at web quality.
+     *
+     * Owner, 2 Nov 2026: "the images are 5MB each and there's no backend image resize happening". Only a picture
+     * replacing one on the page was fitted (to its box); a logo, a background, a share image or a new product's
+     * photo went up as the camera made it, 4000px and 5MB, and every visitor downloaded it whole. So every stored
+     * picture is turned the way the camera held it, scaled down so its longest side is at most $maxEdge (2400:
+     * twice a wide 1200px column, sharp on any screen), and saved again at quality 82, kept only where that is
+     * smaller. Never enlarged; a GIF (it may move) and an SVG are left alone.
+     */
+    public static function shrink(string $path, int $maxEdge = 2400): bool
+    {
+        if (! extension_loaded('gd') || ! is_file($path)) {
+            return false;
+        }
+
+        $info = @getimagesize($path);
+        if ($info === false || ! in_array($info[2], [IMAGETYPE_JPEG, IMAGETYPE_PNG, IMAGETYPE_WEBP], true)) {
+            return false;
+        }
+
+        [$width, $height] = $info;
+        $before = (int) @filesize($path);
+        $turned = $info[2] === IMAGETYPE_JPEG && self::orientation($path) > 1;
+        $scale = min(1.0, $maxEdge / max($width, $height, 1));
+
+        // Already small, upright and light: nothing to gain.
+        if ($scale >= 1.0 && ! $turned && $before < 400 * 1024) {
+            return false;
+        }
+
+        $source = self::read($path, $info[2]);
+        if ($source === null) {
+            return false;
+        }
+
+        $width = imagesx($source);
+        $height = imagesy($source);
+        $scale = min(1.0, $maxEdge / max($width, $height, 1));
+        $target = $source;
+
+        if ($scale < 1.0) {
+            $target = imagecreatetruecolor((int) round($width * $scale), (int) round($height * $scale));
+            imagealphablending($target, false);
+            imagesavealpha($target, true);
+            imagecopyresampled($target, $source, 0, 0, 0, 0, imagesx($target), imagesy($target), $width, $height);
+        }
+
+        $temporary = $path.'.web';
+        $written = match ($info[2]) {
+            IMAGETYPE_JPEG => @imagejpeg($target, $temporary, 82),
+            IMAGETYPE_PNG => @imagepng($target, $temporary, 9),
+            IMAGETYPE_WEBP => function_exists('imagewebp') && @imagewebp($target, $temporary, 82),
+        };
+
+        if ($target !== $source) {
+            imagedestroy($target);
+        }
+        imagedestroy($source);
+
+        // Kept when it is smaller, or when it had to be turned or scaled to be right at all.
+        if ($written && is_file($temporary) && ($scale < 1.0 || $turned || filesize($temporary) < $before)) {
+            return @rename($temporary, $path);
+        }
+
+        @unlink($temporary);
+
+        return false;
+    }
+
+    /** The EXIF orientation a camera wrote (1 is upright), or 1 where there is none to read. */
+    protected static function orientation(string $path): int
+    {
+        if (! function_exists('exif_read_data')) {
+            return 1;
+        }
+
+        $exif = @exif_read_data($path);
+
+        return is_array($exif) ? (int) ($exif['Orientation'] ?? 1) : 1;
+    }
+
     protected static function read(string $path, int $type)
+    {
+        $image = self::readAsStored($path, $type);
+
+        // A phone keeps its photograph sideways and says which way up it goes; drawn as stored, it came out lying on
+        // its side once it was resized (the browser turns the original, but a resized copy has no EXIF to say so).
+        if ($image !== null && $type === IMAGETYPE_JPEG) {
+            $image = match (self::orientation($path)) {
+                3 => imagerotate($image, 180, 0),
+                6 => imagerotate($image, -90, 0),
+                8 => imagerotate($image, 90, 0),
+                default => $image,
+            } ?: $image;
+        }
+
+        return $image;
+    }
+
+    protected static function readAsStored(string $path, int $type)
     {
         $image = match ($type) {
             IMAGETYPE_JPEG => @imagecreatefromjpeg($path),

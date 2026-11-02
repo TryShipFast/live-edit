@@ -1,5 +1,9 @@
 # ShipFast Live Edit for WordPress
 
+## 0.15.97
+
+- Every uploaded picture is made fit for a page: turned the way the camera held it, brought down to 2400px on its longest side (live-edit.max_image_edge) and saved at web quality. A phone's 5MB photograph is stored at about 400KB. Before, only a picture replacing one on the page was fitted; logos, backgrounds, share images and product photos went up whole.
+
 ## 0.15.96
 
 - On a narrow phone (375px and the like) the editor's bar no longer runs off the screen: Undo and Redo wait under More, and every item gives way before any is cut.

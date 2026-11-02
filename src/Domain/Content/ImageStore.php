@@ -68,6 +68,11 @@ class ImageStore
             ImageFitter::fit($file->getRealPath(), $fitWidth, $fitHeight, $fitExact, $crop);
         }
 
+        // Every picture, fitted or not, upright and no heavier than a page needs (a phone's 5MB photograph was
+        // stored and served whole wherever no box was measured: a logo, a background, a product's photo).
+        ImageFitter::shrink($file->getRealPath(), (int) config('live-edit.max_image_edge', 2400));
+        clearstatcache(true, $file->getRealPath());
+
         // Stored with the headers a CDN needs, at the moment it is written.
         // An object in a bucket is served by the CDN without passing through
         // this application again, so anything not said here cannot be said
