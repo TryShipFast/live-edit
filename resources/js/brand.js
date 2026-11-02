@@ -197,11 +197,13 @@ export const renderBrandPanel = ({ container, config, save, upload, done, notify
         text: node.textContent, src: node.getAttribute('src'), alt: node.getAttribute('alt'), aria: node.getAttribute('aria-label'),
         href: (node.closest('a') ?? null)?.getAttribute('href') ?? null,
     }));
-    // A page that marks its own logo or name keeps them; the header's first link stands in only on a page that marks
-    // neither, where it used to become a 32px picture and a logo uploaded here came out small (2 Nov 2026).
-    const marksItsOwn = Boolean(doc.querySelector('[data-logo], [data-brand-name]'));
+    // A page that marks its own logo image or name keeps them; the header's first link stands in for whichever the page
+    // does not mark (a wordmark in words takes an uploaded logo there). It used to become a 32px picture whatever the
+    // page marked, which is why a logo uploaded here came out small (2 Nov 2026).
+    const marksLogo = Boolean(doc.querySelector('img[data-logo]'));
+    const marksName = Boolean(doc.querySelector('[data-brand-name]'));
     const brandHeaderNodes = () => {
-        if (marksItsOwn) return [...doc.querySelectorAll('[data-brand-header]')];
+        if (marksLogo && marksName) return [...doc.querySelectorAll('[data-brand-header]')];
         const nodes = new Set(doc.querySelectorAll('[data-brand-header]'));
         doc.querySelectorAll('header').forEach((header) => {
             const link = header.querySelector('a');
@@ -247,12 +249,13 @@ export const renderBrandPanel = ({ container, config, save, upload, done, notify
                 if (link && contact.link) link.setAttribute('href', linkTo(contact.link, value, identityOriginal.get(node)?.href ?? link.getAttribute('href') ?? ''));
             });
         });
-        if (name || logo) brandHeaderNodes().forEach((node) => {
-            if (logo) {
+        // the name stands in only where the page marks neither its logo image nor its name
+        if ((name && !marksName && !marksLogo) || (logo && !marksLogo)) brandHeaderNodes().forEach((node) => {
+            if (logo && !marksLogo) {
                 const image = doc.createElement('img');
                 image.src = logo;
                 image.alt = name || 'Business logo';
-                image.style.cssText = 'height:32px;width:auto;max-width:180px;object-fit:contain;display:block';
+                image.style.cssText = 'height:44px;width:auto;max-width:200px;object-fit:contain;display:block';
                 node.replaceChildren(image);
             } else {
                 node.textContent = name;
