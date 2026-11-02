@@ -258,4 +258,16 @@ describe('the shop in one place', () => {
         await new Promise((r) => setTimeout(r, 0));
         expect(saved).toEqual([['price', '₦5,000'], ['bag.price', '₦5,000']]);
     });
+
+    it('sets how many products a shop page shows before Show more products', async () => {
+        const container = document.createElement('div');
+        const saved = [];
+        renderShopPanel({ container, config: { fields: [], pageSize: { key: 'shop.pageSize', value: 12, options: [8, 12, 24] } }, save: async (k, v) => saved.push([k, v]), done: () => {} });
+        const pick = container.querySelector('.le-shop-page-size');
+        expect(pick.value).toBe('12');
+        pick.value = '24';
+        container.querySelector('.le-row button.le-btn').click();
+        await new Promise((r) => setTimeout(r, 0));
+        expect(saved).toEqual([['shop.pageSize', '24']]);
+    });
 });

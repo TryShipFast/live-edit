@@ -1,5 +1,9 @@
 # ShipFast Live Edit for WordPress
 
+## 0.15.95
+
+- Shop tab: Products shown at a time (8, 12, 16, 24 or 48), how many a shop page shows before Show more products.
+
 ## 0.15.94
 
 - Shop tab: Catalogue layout, the template's layouts as small drawings to choose from (filters on top or at the side; a layout for paid plans is shown and chosen only on one).

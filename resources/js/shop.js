@@ -24,6 +24,7 @@
  *   checkout: { href, modes: [{ id, label, needs: [..] }] },
  *   currency: { key, value, options: [{ value, label }] },   // what the shop sells in (naira by default)
  *   layouts:  { key, value, paid?, options: [{ id, label, hint, plan: 'all' | 'paid' }] },  // the catalogue's layouts
+ *   pageSize: { key, value, options: [8, 12, ..] },     // products a shop page shows before Show more products
  *   delivery: { listKey, ids, max, copyOf, source: { nameKeys, priceKeys }, choices: [{ id, standard, name, nameKeys, price, priceKeys }] },
  *             // delivery choices the owner adds and removes, where the checkout's choices are a list
  *   fields:   [{ keys: [..], label, kind: 'rate' | 'text' | 'whatsapp', value, name?, nameKeys? }],
@@ -245,7 +246,30 @@ export const renderShopPanel = ({
         // Saved with the rest: its "input" is the chosen layout.
         inputs.push({ spec, input: { get value() { return holder.value; }, focus() {} }, start: holder.value });
         part.append(group);
+        if (config?.pageSize?.key) part.append(pageSizeField());
         parts.push(part);
+    } else if (config?.pageSize?.key) {
+        const part = section('Catalogue', 'How your shop page shows its products.', 'layout');
+        part.append(pageSizeField());
+        parts.push(part);
+    }
+
+    /* How many products a shop page shows before "Show more products" (the host's TheShopsLayout::PAGE_SIZE). */
+    function pageSizeField() {
+        const wrap = el('div', 'le-field');
+        const tag = el('label', 'le-label', 'Products shown at a time');
+        const pick = el('select', 'le-input le-shop-page-size');
+        pick.id = `le-shop-${inputs.length}`;
+        tag.htmlFor = pick.id;
+        for (const n of config.pageSize.options ?? [12]) {
+            const option = el('option', null, String(n));
+            option.value = String(n);
+            pick.append(option);
+        }
+        pick.value = String(config.pageSize.value ?? 12);
+        inputs.push({ spec: { keys: [config.pageSize.key], kind: 'page-size', value: pick.value }, input: pick, start: pick.value });
+        wrap.append(tag, pick, el('p', 'le-hint', 'A long list shows this many first, then a Show more products button adds as many again.'));
+        return wrap;
     }
 
     // The currency the shop sells in (the host's TheShopsCurrency): one choice, every price follows.
