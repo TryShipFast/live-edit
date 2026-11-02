@@ -1,5 +1,9 @@
 # ShipFast Live Edit for WordPress
 
+## 0.15.91
+
+- Brand tab: a new name or number keeps the spaces the old one had at its ends, so a link's own words and its marked name stay apart ("About Senior Jay Autocare", not "AboutSenior Jay Autocare").
+
 ## 0.15.90
 
 - Brand tab: a link marked for its address only (data-brand-phone="link" and the like) keeps its own words editable; only a marked number or name inside it opens the Brand tab. The v0.15.89 tag was set before this change.

@@ -101,5 +101,16 @@ describe('the Brand tab reads colours the way a browser reports them', () => {
         expect(image.getAttribute('src')).toBe('https://example.test/senior-jay.png');
         expect(document.querySelectorAll('header img')).toHaveLength(1);
     });
+
+    it('keeps the space between a link\'s own words and the marked name', () => {
+        document.body.innerHTML = '<header><a href="about/">About<span data-brand-name> Tidewell Car Care</span></a></header>';
+        const container = document.createElement('div');
+        renderBrandPanel({ container, config: { tokens: [], identity: { nameKey: 'brand.name', logoKey: 'brand.logo', contacts: [] } },
+            save: async () => {}, done: () => {}, notify: () => {} });
+        const name = container.querySelector('[data-brand-field="brand.name"]');
+        name.value = 'Senior Jay Autocare';
+        name.dispatchEvent(new Event('input'));
+        expect(document.querySelector('header a').textContent).toBe('About Senior Jay Autocare');
+    });
 });
 

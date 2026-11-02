@@ -219,6 +219,9 @@ export const renderBrandPanel = ({ container, config, save, upload, done, notify
 
         return (key === identity.nameKey ? identity.name : identity.logo) || '';
     };
+    // The new words in the old ones' place, keeping the spaces they had at their ends (a link's marked name holds the
+    // space between it and the link's own words: "About" + " Tidewell Car Care").
+    const keepingItsSpaces = (was, value) => `${(was.match(/^\s*/) ?? [''])[0]}${value.trim()}${(was.match(/\s*$/) ?? [''])[0]}`;
     const linkTo = (kind, value, was = '') => {
         const digits = value.replace(/\D+/g, '');
         if (kind === 'tel') return `tel:${value.trim().startsWith('+') ? '+' : ''}${digits}`;
@@ -244,7 +247,7 @@ export const renderBrandPanel = ({ container, config, save, upload, done, notify
             const value = identityValue(contact.key).trim();
             if (!value) return;
             doc.querySelectorAll(`[${contact.marker}]`).forEach((node) => {
-                if (node.getAttribute(contact.marker) !== 'link') node.textContent = value;
+                if (node.getAttribute(contact.marker) !== 'link') node.textContent = keepingItsSpaces(identityOriginal.get(node)?.text ?? node.textContent, value);
                 const link = node.closest('a');
                 if (link && contact.link) link.setAttribute('href', linkTo(contact.link, value, identityOriginal.get(node)?.href ?? link.getAttribute('href') ?? ''));
             });
@@ -262,7 +265,7 @@ export const renderBrandPanel = ({ container, config, save, upload, done, notify
             }
         });
         if (name) {
-            doc.querySelectorAll('[data-brand-name]').forEach((node) => { node.textContent = name; });
+            doc.querySelectorAll('[data-brand-name]').forEach((node) => { node.textContent = keepingItsSpaces(identityOriginal.get(node)?.text ?? node.textContent, name); });
             doc.querySelectorAll('[data-logo]').forEach((node) => { node.setAttribute('aria-label', name); if (node.tagName === 'IMG') node.alt = name; });
         }
         if (logo) doc.querySelectorAll('img[data-logo]').forEach((node) => { node.src = logo; });
