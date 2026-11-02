@@ -2,6 +2,7 @@
 
 namespace ShipFast\LiveEdit\Application\Api;
 
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 
 /**
@@ -73,6 +74,14 @@ class FindPhotos
         $found = $provider === 'unsplash'
             ? $this->fromUnsplash($query, $perPage)
             : $this->fromOpenverse($query, $perPage);
+
+        // Remembered for an hour, so a photo chosen from these can be fetched and stored as the site's own picture
+        // (StoreMedia::fromAddress), and only these: nobody can have the server fetch an address of their choosing.
+        foreach ((array) ($found['photos'] ?? []) as $photo) {
+            if (is_string($photo['full'] ?? null)) {
+                Cache::put(self::offeredKey($photo['full']), true, now()->addHour());
+            }
+        }
 
         /*
          * A refused Unsplash key does not have to be the client's problem.
@@ -240,6 +249,17 @@ class FindPhotos
      * has chosen a picture should not wait on our bookkeeping, and should not
      * be stopped by it failing.
      */
+    /** Whether a search offered this photo address in the last hour (so it may be fetched and stored). */
+    public static function offered(string $address): bool
+    {
+        return Cache::has(self::offeredKey($address));
+    }
+
+    private static function offeredKey(string $address): string
+    {
+        return 'live-edit:photo-offered:'.sha1($address);
+    }
+
     public function reportUse(string $downloadLocation): void
     {
         if ($this->unsplashKey() === '' || ! str_starts_with($downloadLocation, $this->base('unsplash'))) {

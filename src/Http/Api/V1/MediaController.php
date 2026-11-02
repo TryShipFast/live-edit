@@ -131,6 +131,11 @@ class MediaController
                 )
                 : null;
 
+            // A free photo chosen in the editor: stored as the site's own, made fit, where the server can fetch it.
+            if ($uploaded === null && trim((string) ($validated['url'] ?? '')) !== '' && ! ($validated['remove'] ?? false)) {
+                $uploaded = $store->fromAddress($site, trim($validated['url']), $validated['fitWidth'] ?? null, $validated['fitHeight'] ?? null, (bool) ($validated['fitExact'] ?? false));
+            }
+
             if ($key === null) {
                 throw_unless(
                     $uploaded,

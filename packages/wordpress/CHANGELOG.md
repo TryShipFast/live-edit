@@ -1,5 +1,9 @@
 # ShipFast Live Edit for WordPress
 
+## 0.15.99
+
+- A free photo chosen in the editor is stored as the site's own picture, made fit for a page (upright, 2400px at most, web quality), instead of being shown from the photo service's server at its full size (Openverse gave the original file, often 5MB). Only addresses a photo search offered in the last hour are fetched.
+
 ## 0.15.98
 
 - A shop's terms on the page (a delivery price, the free-delivery threshold, the code on offer and its percent) open the Shop tab at their field when pressed, where every copy is saved at once; the words around them stay editable on the page.

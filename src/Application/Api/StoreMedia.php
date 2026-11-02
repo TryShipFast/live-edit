@@ -3,6 +3,7 @@
 namespace ShipFast\LiveEdit\Application\Api;
 
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Http;
 use ShipFast\LiveEdit\Domain\Content\ImageStore;
 use ShipFast\LiveEdit\Domain\Content\SiteStore;
 use ShipFast\LiveEdit\Domain\Site\Meter;
@@ -42,5 +43,44 @@ class StoreMedia
         Meter::record($site, Meter::UPLOAD, $bytes);
 
         return ['url' => $this->images->url($path), 'path' => $path];
+    }
+
+    /**
+     * A free photo chosen in the editor, stored as the site's own picture: fetched from the photo service, made fit
+     * for a page and served from the site's own storage. Openverse hands out the original file (often a camera's 5MB);
+     * saved as its address it was served whole, from someone else's server, to every visitor (owner, 2 Nov 2026: "the
+     * images are 5MB each"). Only an address a search offered in the last hour (FindPhotos::offered); null when it
+     * cannot be fetched, and the caller keeps the address as before.
+     *
+     * @return array{url: string, path: string}|null
+     */
+    public function fromAddress(Site $site, string $address, ?int $fitWidth = null, ?int $fitHeight = null, bool $fitExact = false): ?array
+    {
+        if (! FindPhotos::offered($address)) {
+            return null;
+        }
+
+        try {
+            $response = Http::timeout(30)->get($address);
+        } catch (\Throwable) {
+            return null;
+        }
+
+        $type = strtolower(explode(';', (string) $response->header('Content-Type'))[0]);
+        $extension = ['image/jpeg' => 'jpg', 'image/png' => 'png', 'image/webp' => 'webp'][$type] ?? null;
+        $bytes = (string) $response->body();
+
+        if (! $response->successful() || $extension === null || $bytes === '' || strlen($bytes) > 40 * 1048576) {
+            return null;
+        }
+
+        $local = tempnam(sys_get_temp_dir(), 'photo').'.'.$extension;
+        file_put_contents($local, $bytes);
+
+        try {
+            return $this($site, new UploadedFile($local, 'photo.'.$extension, $type, null, true), $fitWidth, $fitHeight, $fitExact);
+        } finally {
+            @unlink($local);
+        }
     }
 }
