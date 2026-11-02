@@ -1,5 +1,9 @@
 # ShipFast Live Edit for WordPress
 
+## 0.15.88
+
+- Every adapter is sold as finished: React and Next.js are no longer marked as a preview, now that lists built from data are editable in both. No change to the WordPress plugin's behaviour.
+
 ## 0.15.87
 
 - Brand tab: every colour and face under "Fine-tune each colour and face" sits in its own bordered row; the border darkens on hover and while the row is being changed.

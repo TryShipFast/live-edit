@@ -308,7 +308,7 @@ is fixed.
 
 ---
 
-## Readiness, as of 2026-09-29
+## Readiness, as of 2026-11-02
 
 Not every adapter is equally finished, and saying so is cheaper than a
 customer finding out on their own site.
@@ -318,11 +318,14 @@ customer finding out on their own site.
 | Laravel | Production. The whole journey driven on a real application. |
 | WordPress | Production, with WordPress owning its own content and media. |
 | Plain HTML | Production. The licence question that qualified this is fixed: an expired licence key still reads, so a lapse costs the editor and not the published words. |
-| React | **Preview.** Repeated data is not editable. |
-| Next.js | **Preview**, for the same reason — React list support is the prerequisite. |
+| React | Production. Lists built from data are editable: rows in client components are edited, added, removed and reordered (LIMITATIONS.md, fixed 2026-09-30). |
+| Next.js | Production, App Router and pages router. Rows in server components are edited; rearranging them needs a client component, as above. |
 
-`Platform::isPreview()` marks the last two, and the platform picker says so at
-the moment somebody chooses, which is the only moment it is cheap to know.
+Until 2 November 2026 React and Next.js were sold as a preview, because
+repeated data was not editable. The owner confirmed every adapter ready once
+list support had closed; `Platform::isPreview()` now answers no for each, and
+stays so a future adapter can be marked while it is unfinished. The history
+below is kept as the record of why the preview existed.
 
 **Preview belongs to one of the two routes, and only one.** The product is
 sold two ways, and the framework question exists in just the first:

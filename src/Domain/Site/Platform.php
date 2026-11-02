@@ -28,23 +28,17 @@ enum Platform: string
     /**
      * Whether this adapter is finished enough to be sold as finished.
      *
-     * React and Next.js are not, and the reason is specific rather than a
-     * general nervousness: the codemod tags a JSX element whose only child is
-     * a plain string, which is the correct rule, and it means anything
-     * rendered from an array is untouched. On a real page that is the
-     * catalogue cards, the categories, the quick links and the testimonials,
-     * which is most of what a visitor reads.
-     *
-     * Said here rather than in a marketing decision somewhere, so that
-     * anybody choosing a platform is told at the moment they choose. Selling
-     * it as equal to Laravel and WordPress and letting a customer discover
-     * the gap on their own site is the expensive way for them to find out.
-     *
-     * See LIMITATIONS.md: "Anything inside a .map() is not editable".
+     * Every adapter is (owner, 2 Nov 2026: "Every adapter is ready"). React and
+     * Next.js were held back while anything rendered from an array was not
+     * editable; that closed on 2026-09-30 (LIMITATIONS.md, "Fixed: anything
+     * inside a .map() was not editable"), with rows in client components
+     * editable, added, removed and reordered, and rows in server components
+     * editable. The method stays, answering no for each, so a caller that asks
+     * keeps working and a future adapter can be marked while it is unfinished.
      */
     public function isPreview(): bool
     {
-        return $this === self::React || $this === self::NextJs;
+        return false;
     }
 
     /**
@@ -83,8 +77,8 @@ enum Platform: string
         return match ($this) {
             self::WordPress => 'A WordPress site, with wp-admin and plugins.',
             self::Laravel => 'A Laravel application, with Blade templates.',
-            self::NextJs => 'A Next.js site, with the app or pages router. Headings and standalone text are editable; lists built from data are not yet.',
-            self::React => 'A React app built with Vite or Create React App. Headings and standalone text are editable; lists built from data are not yet.',
+            self::NextJs => 'A Next.js site, with the app or pages router.',
+            self::React => 'A React app built with Vite or Create React App.',
             self::Html => 'Hand written HTML files, or anything we have not named.',
         };
     }
