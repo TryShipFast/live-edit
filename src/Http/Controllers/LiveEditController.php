@@ -264,6 +264,8 @@ class LiveEditController extends Controller
     {
         $request->validate([
             'file' => ['required', 'image', 'max:8192'],
+            // A logo is stored at the size a logo is shown (ImageFitter::forLogo).
+            'role' => ['nullable', 'in:logo'],
             'fitWidth' => ['nullable', 'integer', 'min:1', 'max:4000'],
             'fitHeight' => ['nullable', 'integer', 'min:1', 'max:4000'],
         ]);
@@ -301,6 +303,7 @@ class LiveEditController extends Controller
                     'height' => (int) $request->input('cropHeight'),
                 ]
                 : null,
+            $request->input('role') === 'logo',
         );
     }
 

@@ -116,4 +116,23 @@ class AnUploadedPhotographIsMadeFitForAPageTest extends TestCase
 
         $this->assertSame([2400, 1800], array_slice((array) getimagesizefromstring(Storage::disk('public')->get($stored)), 0, 2));
     }
+
+    public function test_a_logo_is_made_the_weight_of_a_logo(): void
+    {
+        if (! function_exists('imagewebp')) {
+            $this->markTestSkipped('needs WebP in GD');
+        }
+        // Senior Jay's logo as uploaded: 1268x752, 706KB, shown at 220x80 (Lighthouse, 2 Nov 2026).
+        $path = tempnam(sys_get_temp_dir(), 'logo').'.png';
+        copy(__DIR__.'/Fixtures/a-heavy-logo.png', $path);
+
+        $kept = ImageFitter::forLogo($path);
+        clearstatcache();
+
+        $this->assertStringEndsWith('.webp', $kept);
+        $this->assertSame([600, 356], array_slice((array) getimagesize($kept), 0, 2));
+        $this->assertLessThan(60 * 1024, filesize($kept));
+        @unlink($kept);
+        @unlink($path);
+    }
 }

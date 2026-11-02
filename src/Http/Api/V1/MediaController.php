@@ -93,6 +93,8 @@ class MediaController
              * the size of the one it replaced.
              */
             'fitExact' => ['nullable', 'boolean'],
+            // A logo is stored at the size a logo is shown (ImageFitter::forLogo).
+            'role' => ['nullable', 'in:logo'],
             /*
              * The part of the picture to keep, in the file's own pixels.
              *
@@ -127,7 +129,8 @@ class MediaController
                             'width' => (int) $validated['cropWidth'],
                             'height' => (int) $validated['cropHeight'],
                         ]
-                        : null
+                        : null,
+                    ($validated['role'] ?? null) === 'logo',
                 )
                 : null;
 

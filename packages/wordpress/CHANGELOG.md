@@ -1,5 +1,9 @@
 # ShipFast Live Edit for WordPress
 
+## 0.16.0
+
+- A logo uploaded in the Brand tab is stored the weight of a logo: 600px at most on its longest side, as WebP (transparency kept) where that is lighter. A 706KB logo is stored at 27KB. Uploads may say role=logo.
+
 ## 0.15.99
 
 - A free photo chosen in the editor is stored as the site's own picture, made fit for a page (upright, 2400px at most, web quality), instead of being shown from the photo service's server at its full size (Openverse gave the original file, often 5MB). Only addresses a photo search offered in the last hour are fetched.

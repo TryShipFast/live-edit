@@ -1437,6 +1437,8 @@ const bootLiveEdit = () => {
                 upload: async (file) => {
                     const body = new FormData();
                     body.append('file', file);
+                    // A logo: stored at the size a logo is shown, as WebP where that is lighter (ImageFitter::forLogo).
+                    body.append('role', 'logo');
                     const response = await request('/live-edit/upload', { method: 'POST', body });
                     return (await response.json()).url;
                 },

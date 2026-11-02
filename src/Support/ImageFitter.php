@@ -219,6 +219,44 @@ class ImageFitter
         return false;
     }
 
+    /**
+     * A logo, made the weight of a logo. Owner, 2 Nov 2026, Lighthouse on a Car Wash site: the logo was a 1268x752 PNG
+     * of 706KB, shown at 220x80 in the header and again in the footer, 1.4MB of a 2.2MB page. A logo is never shown
+     * wider than about 240 CSS pixels, so at most 600 pixels on its longest side is sharp on any screen; and a
+     * full-colour PNG with transparency is several times heavier than the same picture as WebP, which keeps the
+     * transparency. Returns the path of the file to store: the WebP beside it where that is lighter, else $path.
+     */
+    public static function forLogo(string $path, int $maxEdge = 600): string
+    {
+        self::shrink($path, $maxEdge);
+        clearstatcache(true, $path);
+
+        $info = @getimagesize($path);
+        if ($info === false || ! in_array($info[2], [IMAGETYPE_PNG, IMAGETYPE_JPEG], true) || ! function_exists('imagewebp')) {
+            return $path;
+        }
+
+        $image = self::readAsStored($path, $info[2]);
+        if ($image === null) {
+            return $path;
+        }
+
+        imagepalettetotruecolor($image);
+        imagealphablending($image, false);
+        imagesavealpha($image, true);
+        $webp = preg_replace('/\.[a-z0-9]+$/i', '', $path).'.webp';
+        $written = @imagewebp($image, $webp, 86);
+        imagedestroy($image);
+
+        if ($written && is_file($webp) && filesize($webp) < filesize($path)) {
+            return $webp;
+        }
+
+        @unlink($webp);
+
+        return $path;
+    }
+
     /** The EXIF orientation a camera wrote (1 is upright), or 1 where there is none to read. */
     protected static function orientation(string $path): int
     {

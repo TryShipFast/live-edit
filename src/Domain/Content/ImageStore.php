@@ -36,7 +36,7 @@ class ImageStore
      *
      * @throws ValidationException
      */
-    public function store(UploadedFile $file, ?int $fitWidth = null, ?int $fitHeight = null, ?string $directory = null, bool $fitExact = false, ?array $crop = null): string
+    public function store(UploadedFile $file, ?int $fitWidth = null, ?int $fitHeight = null, ?string $directory = null, bool $fitExact = false, ?array $crop = null, bool $logo = false): string
     {
         $extension = strtolower($file->getClientOriginalExtension() ?: $file->guessExtension() ?: '');
 
@@ -72,6 +72,14 @@ class ImageStore
         // stored and served whole wherever no box was measured: a logo, a background, a product's photo).
         ImageFitter::shrink($file->getRealPath(), (int) config('live-edit.max_image_edge', 2400));
         clearstatcache(true, $file->getRealPath());
+
+        // A logo: the size a logo is shown, as WebP where that is lighter.
+        if ($logo) {
+            $kept = ImageFitter::forLogo($file->getRealPath());
+            if ($kept !== $file->getRealPath()) {
+                $file = new UploadedFile($kept, pathinfo($file->getClientOriginalName(), PATHINFO_FILENAME).'.webp', 'image/webp', null, true);
+            }
+        }
 
         // Stored with the headers a CDN needs, at the moment it is written.
         // An object in a bucket is served by the CDN without passing through
