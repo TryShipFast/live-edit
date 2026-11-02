@@ -1,5 +1,9 @@
 # ShipFast Live Edit for WordPress
 
+## 0.15.96
+
+- On a narrow phone (375px and the like) the editor's bar no longer runs off the screen: Undo and Redo wait under More, and every item gives way before any is cut.
+
 ## 0.15.95
 
 - Shop tab: Products shown at a time (8, 12, 16, 24 or 48), how many a shop page shows before Show more products.

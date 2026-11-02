@@ -1135,6 +1135,16 @@ select.le-input {
 @media (max-width: 760px) {
   .le-toolbar { gap: 2px; padding: 6px; }
   .le-toolbar .le-bar-btn, .le-toolbar .le-publish { white-space: nowrap; padding-left: 10px; padding-right: 10px; }
+  /* Never wider than the screen: the bar's items give way before any runs off its edge (375px: "Published" was cut). */
+  .le-toolbar { max-width: calc(100vw - 16px); box-sizing: border-box; }
+  .le-toolbar > * { min-width: 0; flex-shrink: 1; }
+  .le-toolbar .le-publish > span:first-child { overflow: hidden; text-overflow: ellipsis; }
+}
+/* A narrow phone (375px and the like): Undo and Redo wait under More with the rest, so Done editing, More and
+   Publish keep their words. */
+@media (max-width: 420px) {
+  .le-toolbar:not(.is-more) .le-round { display: none; }
+  .le-toolbar .le-bar-btn, .le-toolbar .le-publish { padding-left: 8px; padding-right: 8px; }
 }
 
 /* A panel that is only a list's controls (the page's sections): flat, as the grouped ones are. */
