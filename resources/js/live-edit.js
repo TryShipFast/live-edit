@@ -4215,7 +4215,7 @@ const bootLiveEdit = () => {
                 const add = document.createElement('button');
                 add.type = 'button';
                 add.className = 'le-chip-btn';
-                add.textContent = list.tagName === 'SELECT' ? '+ Add a choice' : '+ Add item';
+                add.textContent = list.tagName === 'SELECT' ? '+ Add a choice' : galleryOf(list) ? '+ Add a photo' : '+ Add item';
                 add.disabled = full;
                 add.addEventListener('click', () => {
                     const ids = currentOrder();
@@ -4731,6 +4731,58 @@ const bootLiveEdit = () => {
          * A dropdown: its choices, each opening in the panel as words (editText), with a way back
          * to the rest. Only their words: which choices a form offers belongs to the form builder.
          */
+        /*
+         * A product's photos (a gallery whose slides are a list): every photo in the order shoppers see them, each
+         * opening its own panel to replace, move or remove it, and + Add a photo. Owner, 2 Nov 2026, on a product with
+         * three photos: "i see no where to add more or remove any ... if a novice can't know how to add more images or
+         * remove from it then the info is useless". Pressing a thumbnail, or a photo of the gallery, leads here.
+         */
+        const galleryOf = (node) => {
+            const list = node?.closest?.('[data-edit-list]');
+            return list && [...list.children].some((item) => item.dataset.editItem && item.querySelector('img[data-edit-img]')) ? list : null;
+        };
+        const editGallery = (list) => {
+            current = { kind: 'gallery' };
+            lastOpened = list;
+            drawerTitle.textContent = list.dataset.editListLabel || 'Photos';
+            drawerDelete.classList.add('le-hidden');
+            const hint = document.createElement('p');
+            hint.className = 'le-hint';
+            hint.textContent = 'In the order shoppers see them. Press a photo to replace it, move it or remove it. A photo you add starts as a copy of the last one: press it to put yours in.';
+            const grid = document.createElement('div');
+            grid.className = 'le-gallery-photos';
+            const photos = [...list.children].filter((item) => item.dataset.editItem)
+                .map((item) => item.querySelector('img[data-edit-img]')).filter(Boolean);
+            photos.forEach((photo, i) => {
+                const open = document.createElement('button');
+                open.type = 'button';
+                open.className = 'le-gallery-photo';
+                open.setAttribute('aria-label', `Photo ${i + 1} of ${photos.length}`);
+                const shown = document.createElement('img');
+                shown.src = photo.currentSrc || photo.getAttribute('src') || '';
+                shown.alt = '';
+                open.append(shown);
+                open.addEventListener('click', () => editGalleryPhoto(photo, list));
+                grid.append(open);
+            });
+            drawerFields.replaceChildren(hint, grid);
+            appendListControls(list);
+            setTrail(list);
+            showTab('Edit');
+            ui.drawerFoot.classList.add('le-hidden');
+            openDrawer();
+        };
+        /** One photo of a gallery: its own panel (replace, move, remove), with the way back to all of them. */
+        const editGalleryPhoto = (photo, list) => {
+            editImage(photo);
+            const back = document.createElement('button');
+            back.type = 'button';
+            back.className = 'le-chip-btn';
+            back.textContent = '← All the photos';
+            back.addEventListener('click', () => editGallery(list));
+            drawerFields.prepend(back);
+        };
+
         const editChoices = (dropdown) => {
             current = { kind: 'choices' };
             lastOpened = dropdown;
@@ -5829,7 +5881,7 @@ const bootLiveEdit = () => {
             count: 'This number counts itself from the products on this page. Add or remove a product and it changes.',
             collection: 'This counts the products in the collection it links to and shows the lowest price. Change that collection and it follows.',
             choices: 'These choices come from your products’ own words. Change a product’s type, cloth or colour on its card and the choices follow.',
-            gallery: 'This shows whichever photo a visitor opens from the gallery above it. To change the photos, replace them in the gallery.',
+            gallery: 'This shows the product’s photos. Press a photo to replace, move or remove it, or open the product’s photos to add one.',
             'bag-count': 'This counts what the shopper has in their bag, on every page. It is worked out for each visitor, so there is nothing to type here.',
             bag: 'This line is the shopper’s bag: each product’s name, size and price come from what they added on its page. To change them, edit the product’s page.',
             product: 'This card shows the product its link leads to: its photo, name and price come from that product’s own page. To show another product, change the card’s “See the product” link; to change the words, edit the product’s page.',
@@ -5862,12 +5914,13 @@ const bootLiveEdit = () => {
         const openTarget = ({ element, kind }) => {
             if (kind === 'chart-row') editChartRow(element);
             else if (kind === 'chart') editChart(element);
-            else if (kind === 'image') editImage(element);
+            else if (kind === 'image') { const list = galleryOf(element); if (list) editGalleryPhoto(element, list); else editImage(element); }
             else if (kind === 'icon') void editIcon(element);
             else if (kind === 'svg') editDrawing(element);
             else if (kind === 'text') editText(element);
             else if (kind === 'choices') editChoices(element);
             else if (kind === 'link') editLink(element);
+            else if (kind === 'computed' && computedKind(element) === 'gallery' && galleryOf(element)) editGallery(galleryOf(element));
             else if (kind === 'computed') ui.toast(COMPUTED_SAYS[computedKind(element)] ?? COMPUTED_SAYS.count, 7000);
             else editStyle(element);
         };

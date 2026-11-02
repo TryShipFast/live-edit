@@ -1,5 +1,9 @@
 # ShipFast Live Edit for WordPress
 
+## 0.16.2
+
+- A product's photos are managed in one place: pressing a thumbnail or a photo of a gallery opens the product's photos, each to replace, move or remove, and + Add a photo. Before, a thumbnail only explained itself and the photos a gallery hides could not be reached.
+
 ## 0.16.1
 
 - Shop tab: opening + Add a product no longer makes the editor wider than a phone's screen (the panel scrolled sideways). The form's boxes may shrink, so the upload box's one-line hint is cut with "…" instead.

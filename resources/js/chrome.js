@@ -780,6 +780,10 @@ select.le-input {
 
 /* radio pills, for short option sets */
 .le-choices { display: flex; flex-wrap: wrap; gap: 8px; }
+.le-gallery-photos { display: grid; grid-template-columns: repeat(auto-fill, minmax(72px, 1fr)); gap: 8px; margin: 8px 0 4px; }
+.le-gallery-photo { padding: 0; border: 1px solid var(--le-line); border-radius: 8px; background: var(--le-soft); aspect-ratio: 1; overflow: hidden; cursor: pointer; }
+.le-gallery-photo:hover, .le-gallery-photo:focus-visible { outline: 2px solid var(--le-accent, #2563eb); outline-offset: 1px; }
+.le-gallery-photo img { width: 100%; height: 100%; object-fit: cover; display: block; }
 .le-choice {
   display: inline-flex; align-items: center; gap: 8px; cursor: pointer;
   border: 1px solid var(--le-field); border-radius: 999px; padding: 7px 14px;
