@@ -2,6 +2,14 @@ import { createChrome } from './chrome.js';
 import { keepClearOfTheBar } from './clear-of-the-bar.js';
 import { openDialogsInPlace } from './dialogs-in-place.js';
 import { renderBrandPanel } from './brand.js';
+
+/** The marks a template puts on the business's own facts, each with the Branding setting it shows. */
+const BRAND_FIELDS = [
+    ['data-logo', 'brand.logo'], ['data-brand-name', 'brand.name'], ['data-brand-phone', 'brand.phone'],
+    ['data-brand-phone-2', 'brand.phone-2'], ['data-brand-whatsapp', 'brand.whatsapp'], ['data-brand-email', 'brand.email'],
+    ['data-brand-address', 'brand.address'],
+];
+const BRANDED = BRAND_FIELDS.map(([marker]) => `[${marker}]`).join(', ');
 import { computedOf, computedKind } from './computed.js';
 import { uploadWidget } from './upload.js';
 import { renderSeoPanel } from './seo.js';
@@ -2200,7 +2208,9 @@ const bootLiveEdit = () => {
         };
 
         const editables = () => [...document.querySelectorAll('[data-edit], [data-edit-img], [data-edit-bg], [data-edit-href], [data-edit-icon], [data-edit-svg]')]
-            .filter((element) => mayEditLocked === true || !element.closest('[data-live-lock]'));
+            .filter((element) => mayEditLocked === true || !element.closest('[data-live-lock]'))
+            // set in Branding, where one change reaches every copy (the press opens Branding)
+            .filter((element) => !element.matches(BRANDED));
 
         /**
          * Every icon name the theme's own stylesheets define.
@@ -6111,6 +6121,25 @@ const bootLiveEdit = () => {
                 // Clicks inside the overlay retarget to its shadow host.
                 if (event.target === ui.root || ui.root.contains(event.target)) return;
                 if (event.target.closest('[data-live-create]')) return;
+                /*
+                 * The business's own facts (logo, name, phone, WhatsApp, email, address) are set once in Branding and
+                 * shown wherever the template marks them (TEMPLATE-BRANDING.md, "Business details"). Pressing one opens
+                 * Branding at that field: editing this one copy would be overwritten by the brand at publish, and the
+                 * other copies would keep the old value (owner, 2 Nov 2026).
+                 */
+                const branded = event.target.closest?.(BRANDED);
+                if (branded) {
+                    event.preventDefault();
+                    event.stopImmediatePropagation();
+                    showTab('Brand');
+                    openDrawer();
+                    const field = BRAND_FIELDS.find(([marker]) => branded.hasAttribute(marker))?.[1];
+                    window.setTimeout(() => {
+                        const input = field ? drawer.querySelector(`[data-brand-field="${field}"]`) : null;
+                        (input ?? drawer.querySelector('.le-brand-type input'))?.focus();
+                    }, 0);
+                    return;
+                }
 
                 // Through a link stretched over a card to what is really there; the
                 // link is not followed either way.

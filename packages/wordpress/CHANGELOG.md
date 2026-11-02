@@ -1,5 +1,9 @@
 # ShipFast Live Edit for WordPress
 
+## 0.15.89
+
+- Brand tab: "How customers reach you" sets the phone, second phone, WhatsApp number, email and address once, for every place the page marks them (data-brand-phone and the rest), words and links together. Pressing a marked logo, name or contact opens the Brand tab at that field. A page that marks its own logo keeps it at its own size instead of a small stand-in.
+
 ## 0.15.88
 
 - Every adapter is sold as finished: React and Next.js are no longer marked as a preview, now that lists built from data are editable in both. No change to the WordPress plugin's behaviour.

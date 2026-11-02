@@ -45,4 +45,61 @@ describe('the Brand tab reads colours the way a browser reports them', () => {
         expect(controls.querySelector('.le-upload-compact')).not.toBeNull();
         expect(controls.children).toHaveLength(2);
     });
+
+    /*
+     * The business's facts, set once and shown everywhere the template marks them (owner, 2 Nov 2026: "changing the
+     * brand on the template should cut across everywhere ... same as phone numbers").
+     */
+    const contacts = [
+        { key: 'brand.phone', marker: 'data-brand-phone', label: 'Phone', link: 'tel', value: '' },
+        { key: 'brand.phone-2', marker: 'data-brand-phone-2', label: 'Second phone', link: 'tel', value: '' },
+        { key: 'brand.whatsapp', marker: 'data-brand-whatsapp', label: 'WhatsApp number', link: 'whatsapp', value: '' },
+        { key: 'brand.email', marker: 'data-brand-email', label: 'Email', link: 'mailto', value: '' },
+        { key: 'brand.address', marker: 'data-brand-address', label: 'Address', link: null, value: '' },
+    ];
+    const page = () => {
+        document.body.innerHTML = `<header><a class="brand" href="./"><img class="logo" data-logo src="logo.svg" alt="Tidewell"></a>
+            <a href="tel:+441134960123" data-brand-phone>0113 496 0123</a></header>
+            <footer><a href="tel:+441134960123"><span data-brand-phone>0113 496 0123</span></a>
+            <a href="https://wa.me/441134960199?text=Hi" data-brand-whatsapp>0113 496 0199</a></footer>`;
+        const container = document.createElement('div');
+        renderBrandPanel({ container, config: { tokens: [], identity: { nameKey: 'brand.name', logoKey: 'brand.logo', contacts } },
+            save: async () => {}, done: () => {}, notify: () => {} });
+
+        return container;
+    };
+
+    it('offers only the contacts this page shows', () => {
+        const container = page();
+        const offered = [...container.querySelectorAll('[data-brand-field]')].map((input) => input.dataset.brandField);
+        expect(offered).toEqual(['brand.name', 'brand.logo', 'brand.phone', 'brand.whatsapp']);
+    });
+
+    it('changes every copy of a phone and the link that calls it, keeping a WhatsApp message', () => {
+        const container = page();
+        const phone = container.querySelector('[data-brand-field="brand.phone"]');
+        phone.value = '+234 816 006 6770';
+        phone.dispatchEvent(new Event('input'));
+        const whatsapp = container.querySelector('[data-brand-field="brand.whatsapp"]');
+        whatsapp.value = '+234 816 006 6770';
+        whatsapp.dispatchEvent(new Event('input'));
+
+        const shown = [...document.querySelectorAll('[data-brand-phone]')];
+        expect(shown.map((node) => node.textContent)).toEqual(['+234 816 006 6770', '+234 816 006 6770']);
+        expect(shown.map((node) => node.closest('a').getAttribute('href'))).toEqual(['tel:+2348160066770', 'tel:+2348160066770']);
+        expect(document.querySelector('[data-brand-whatsapp]').getAttribute('href')).toBe('https://wa.me/2348160066770?text=Hi');
+    });
+
+    it('puts a logo into the template\'s own image rather than a small stand-in', () => {
+        const container = page();
+        const logo = container.querySelector('[data-brand-field="brand.logo"]');
+        logo.value = 'https://example.test/senior-jay.png';
+        logo.dispatchEvent(new Event('input'));
+
+        const image = document.querySelector('header img');
+        expect(image.classList.contains('logo')).toBe(true);
+        expect(image.getAttribute('src')).toBe('https://example.test/senior-jay.png');
+        expect(document.querySelectorAll('header img')).toHaveLength(1);
+    });
 });
+

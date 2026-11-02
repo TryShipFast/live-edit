@@ -185,11 +185,23 @@ export const renderBrandPanel = ({ container, config, save, upload, done, notify
     if (block) block.disabled = false;
     const pending = {}; // key -> value ('' = back to the design's own)
     const identity = config.identity ?? {};
+    /*
+     * How the business is reached (phone, second phone, WhatsApp, email, address): each set once here and shown
+     * wherever the template marks it (data-brand-phone and the rest), words and link together. Only the ones this
+     * page marks are offered. Owner, 2 Nov 2026: "address ... same as phone numbers should be under branding".
+     */
+    const contacts = (identity.contacts ?? []).filter((contact) => doc.querySelector(`[${contact.marker}]`));
+    const contactSelector = contacts.map((contact) => `[${contact.marker}]`).join(', ');
     const identityOriginal = new Map();
-    doc.querySelectorAll('[data-brand-name], [data-logo]').forEach((node) => identityOriginal.set(node, {
+    doc.querySelectorAll(['[data-brand-name]', '[data-logo]', contactSelector].filter(Boolean).join(', ')).forEach((node) => identityOriginal.set(node, {
         text: node.textContent, src: node.getAttribute('src'), alt: node.getAttribute('alt'), aria: node.getAttribute('aria-label'),
+        href: (node.closest('a') ?? null)?.getAttribute('href') ?? null,
     }));
+    // A page that marks its own logo or name keeps them; the header's first link stands in only on a page that marks
+    // neither, where it used to become a 32px picture and a logo uploaded here came out small (2 Nov 2026).
+    const marksItsOwn = Boolean(doc.querySelector('[data-logo], [data-brand-name]'));
     const brandHeaderNodes = () => {
+        if (marksItsOwn) return [...doc.querySelectorAll('[data-brand-header]')];
         const nodes = new Set(doc.querySelectorAll('[data-brand-header]'));
         doc.querySelectorAll('header').forEach((header) => {
             const link = header.querySelector('a');
@@ -198,16 +210,42 @@ export const renderBrandPanel = ({ container, config, save, upload, done, notify
         return [...nodes];
     };
     const brandHeaderOriginal = new Map(brandHeaderNodes().map((node) => [node, [...node.childNodes].map((child) => child.cloneNode(true))]));
-    const identityValue = (key) => key in pending ? pending[key] : (key === identity.nameKey ? identity.name : identity.logo) || '';
+    const identityValue = (key) => {
+        if (key in pending) return pending[key];
+        const contact = contacts.find((c) => c.key === key);
+        if (contact) return contact.value || '';
+
+        return (key === identity.nameKey ? identity.name : identity.logo) || '';
+    };
+    const linkTo = (kind, value, was = '') => {
+        const digits = value.replace(/\D+/g, '');
+        if (kind === 'tel') return `tel:${value.trim().startsWith('+') ? '+' : ''}${digits}`;
+        if (kind === 'mailto') return `mailto:${value}`;
+        if (kind === 'whatsapp') return `https://wa.me/${digits}${was.includes('?') ? was.slice(was.indexOf('?')) : ''}`;
+
+        return was;
+    };
+    const restore = (original, node) => {
+        if (node.hasAttribute('data-brand-name') || contacts.some((c) => node.hasAttribute(c.marker) && node.getAttribute(c.marker) !== 'link')) node.textContent = original.text;
+        for (const [attr, value] of [['src', original.src], ['alt', original.alt], ['aria-label', original.aria]]) {
+            if (value === null) node.removeAttribute(attr); else node.setAttribute(attr, value);
+        }
+        const link = node.closest('a');
+        if (link && original.href !== null && contacts.some((c) => node.hasAttribute(c.marker))) link.setAttribute('href', original.href);
+    };
     const previewIdentity = () => {
         const name = identity.nameKey ? identityValue(identity.nameKey) : '';
         const logo = identity.logoKey ? identityValue(identity.logoKey) : '';
         brandHeaderOriginal.forEach((children, node) => node.replaceChildren(...children.map((child) => child.cloneNode(true))));
-        identityOriginal.forEach((original, node) => {
-            if (node.hasAttribute('data-brand-name')) node.textContent = original.text;
-            for (const [attr, value] of [['src', original.src], ['alt', original.alt], ['aria-label', original.aria]]) {
-                if (value === null) node.removeAttribute(attr); else node.setAttribute(attr, value);
-            }
+        identityOriginal.forEach(restore);
+        contacts.forEach((contact) => {
+            const value = identityValue(contact.key).trim();
+            if (!value) return;
+            doc.querySelectorAll(`[${contact.marker}]`).forEach((node) => {
+                if (node.getAttribute(contact.marker) !== 'link') node.textContent = value;
+                const link = node.closest('a');
+                if (link && contact.link) link.setAttribute('href', linkTo(contact.link, value, identityOriginal.get(node)?.href ?? link.getAttribute('href') ?? ''));
+            });
         });
         if (name || logo) brandHeaderNodes().forEach((node) => {
             if (logo) {
@@ -266,12 +304,7 @@ export const renderBrandPanel = ({ container, config, save, upload, done, notify
 
     const unpreview = () => {
         config.tokens.forEach((token) => html.style.removeProperty(token.property));
-        identityOriginal.forEach((original, node) => {
-            if (node.hasAttribute('data-brand-name')) node.textContent = original.text;
-            for (const [attr, value] of [['src', original.src], ['alt', original.alt], ['aria-label', original.aria]]) {
-                if (value === null) node.removeAttribute(attr); else node.setAttribute(attr, value);
-            }
-        });
+        identityOriginal.forEach(restore);
         brandHeaderOriginal.forEach((children, node) => node.replaceChildren(...children.map((child) => child.cloneNode(true))));
     };
 
@@ -298,14 +331,14 @@ export const renderBrandPanel = ({ container, config, save, upload, done, notify
         if (identity.nameKey) {
             const row = el('label', 'le-brand-face');
             row.append(el('span', 'le-brand-label', 'Business name'));
-            const input = el('input', 'le-input'); input.maxLength = 120; input.value = identityValue(identity.nameKey); input.placeholder = 'Business name';
+            const input = el('input', 'le-input'); input.maxLength = 120; input.value = identityValue(identity.nameKey); input.placeholder = 'Business name'; input.dataset.brandField = identity.nameKey;
             input.addEventListener('input', () => { pending[identity.nameKey] = input.value; changed(); });
             row.append(input); fields.append(row);
         }
         if (identity.logoKey) {
             const row = el('div', 'le-brand-face'); row.append(el('span', 'le-brand-label', 'Logo'));
             const logoFields = el('div', 'le-brand-logo-fields');
-            const input = el('input', 'le-input'); input.type = 'url'; input.value = identityValue(identity.logoKey); input.placeholder = 'Paste a logo URL';
+            const input = el('input', 'le-input'); input.type = 'url'; input.value = identityValue(identity.logoKey); input.placeholder = 'Paste a logo URL'; input.dataset.brandField = identity.logoKey;
             input.addEventListener('input', () => { pending[identity.logoKey] = input.value.trim(); changed(); });
             logoFields.append(input);
             if (upload) {
@@ -323,6 +356,26 @@ export const renderBrandPanel = ({ container, config, save, upload, done, notify
             row.append(logoFields);
             fields.append(row);
         }
+        container.append(fields);
+    }
+    if (contacts.length) {
+        container.append(el('div', 'le-section-heading', 'How customers reach you'));
+        container.append(el('p', 'le-hint', 'Set once; it changes everywhere your website shows it, including the links that call, write or open WhatsApp.'));
+        const fields = el('div', 'le-brand-type');
+        contacts.forEach((contact) => {
+            const row = el('label', 'le-brand-face');
+            row.append(el('span', 'le-brand-label', contact.label));
+            const isAddress = contact.key.endsWith('.address');
+            const input = el(isAddress ? 'textarea' : 'input', 'le-input');
+            if (!isAddress) input.type = contact.link === 'mailto' ? 'email' : 'tel';
+            else input.rows = 2;
+            input.maxLength = isAddress ? 240 : (contact.link === 'mailto' ? 120 : 32);
+            input.value = identityValue(contact.key);
+            input.placeholder = (doc.querySelector(`[${contact.marker}]:not([${contact.marker}="link"])`)?.textContent ?? '').trim() || contact.label;
+            input.dataset.brandField = contact.key;
+            input.addEventListener('input', () => { pending[contact.key] = input.value.trim(); changed(); });
+            row.append(input); fields.append(row);
+        });
         container.append(fields);
     }
 
@@ -511,9 +564,13 @@ export const renderBrandPanel = ({ container, config, save, upload, done, notify
         }, 120);
     };
 
+    // What is saved now, to tell a change from a field put back as it was.
+    const savedValue = (key) => chosen[key] ?? (key === identity.nameKey ? identity.name
+        : key === identity.logoKey ? identity.logo : (contacts.find((c) => c.key === key)?.value ?? ''));
+
     const changed = () => {
         paint();
-        apply.disabled = Object.keys(pending).every((key) => pending[key] === (chosen[key] ?? (key === identity.nameKey ? identity.name : key === identity.logoKey ? identity.logo : '')));
+        apply.disabled = Object.keys(pending).every((key) => pending[key] === savedValue(key));
         preview();
     };
 
@@ -524,7 +581,7 @@ export const renderBrandPanel = ({ container, config, save, upload, done, notify
     });
 
     apply.addEventListener('click', async () => {
-        const keys = Object.keys(pending).filter((key) => pending[key] !== (chosen[key] ?? (key === identity.nameKey ? identity.name : key === identity.logoKey ? identity.logo : '')));
+        const keys = Object.keys(pending).filter((key) => pending[key] !== savedValue(key));
         if (!keys.length) return;
         apply.disabled = true;
         apply.textContent = 'Saving…';
