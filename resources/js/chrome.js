@@ -668,6 +668,21 @@ a.le-mark:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
 .le-shop-new-product[hidden] { display: none; }
 .le-shop-new-categories { display: grid; gap: 2px; margin: 0; padding: 0; border: 0; }
 .le-shop-new-go { justify-self: start; }
+.le-shop-layouts { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; }
+.le-shop-layout { position: relative; display: grid; gap: 8px; padding: 10px; border: 1px solid var(--le-field); border-radius: 10px; cursor: pointer; font-size: 13px; color: var(--le-body); }
+.le-shop-layout:has(input:checked) { border-color: var(--le-blue); box-shadow: 0 0 0 1px var(--le-blue); }
+.le-shop-layout:has(input:focus-visible) { outline: 2px solid var(--le-blue); outline-offset: 2px; }
+.le-shop-layout input { position: absolute; opacity: 0; pointer-events: none; }
+.le-shop-layout.is-locked { cursor: not-allowed; opacity: .6; }
+.le-shop-layout-words { display: grid; gap: 2px; }
+.le-shop-layout-words strong { color: var(--le-ink); }
+.le-shop-layout-words .le-hint { margin: 0; }
+.le-shop-layout-plan { justify-self: start; padding: 1px 8px; border-radius: 999px; background: var(--le-soft); font-size: 11px; font-weight: 600; }
+.le-shop-layout-drawing { display: grid; gap: 4px; height: 64px; padding: 6px; border-radius: 6px; background: var(--le-soft); }
+.le-shop-layout-drawing.is-top { grid-template-rows: 10px 1fr; }
+.le-shop-layout-drawing.is-side { grid-template-columns: 26% 1fr; }
+.le-shop-layout-filters { border-radius: 3px; background: var(--le-blue); opacity: .45; }
+.le-shop-layout-grid { border-radius: 3px; background: repeating-linear-gradient(90deg, var(--le-field) 0 22%, transparent 22% 26%); }
 .le-product-picker { display: grid; gap: 8px; }
 .le-product-picker-head { display: flex; align-items: baseline; justify-content: space-between; }
 .le-product-list { display: grid; gap: 2px; max-height: 260px; overflow-y: auto; padding: 4px; border: 1px solid var(--le-field); border-radius: 10px; }

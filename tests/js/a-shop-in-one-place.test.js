@@ -195,4 +195,67 @@ describe('the shop in one place', () => {
         await new Promise((r) => setTimeout(r, 0));
         expect(saved).toEqual([['shop.currency', 'GHS']]);
     });
+
+    it('offers the template\'s catalogue layouts as drawings, a paid one shown but not chosen on a free plan', async () => {
+        const container = document.createElement('div');
+        const saved = [];
+        renderShopPanel({
+            container,
+            config: { fields: [], layouts: { key: 'shop.layout', value: 'top', options: [
+                { id: 'top', label: 'Filters on top', hint: '', plan: 'all' },
+                { id: 'side', label: 'Filters at the side', hint: '', plan: 'all' },
+                { id: 'mosaic', label: 'Mosaic', hint: '', plan: 'paid' },
+            ] } },
+            save: async (key, value) => saved.push([key, value]),
+            done: () => {},
+        });
+        const radios = [...container.querySelectorAll('[data-shop-part="layout"] input[type="radio"]')];
+        expect(radios.map((r) => [r.value, r.checked, r.disabled])).toEqual([['top', true, false], ['side', false, false], ['mosaic', false, true]]);
+        expect(container.querySelector('.le-shop-layout.is-locked').textContent).toContain('On paid plans');
+        radios[1].checked = true;
+        radios[1].dispatchEvent(new Event('change'));
+        container.querySelector('button.le-btn').click();
+        await new Promise((r) => setTimeout(r, 0));
+        expect(saved).toEqual([['shop.layout', 'side']]);
+    });
+
+    it('adds and removes a delivery choice the way Duplicate and Delete do on the page', async () => {
+        const container = document.body.appendChild(document.createElement('div'));
+        const saved = [];
+        let finished = '';
+        window.confirm = () => true;
+        const delivery = {
+            listKey: 'list', ids: ['t1', 'nold_t1'], max: 6, copyOf: 't1', source: { nameKeys: ['name'], priceKeys: ['price'] },
+            choices: [
+                { id: 't1', standard: true, name: 'Doorstep delivery', nameKeys: ['name'], price: '₦4,500', priceKeys: ['price', 'bag.price'] },
+                { id: 'nold_t1', standard: false, name: 'Pick up in Ikeja', nameKeys: ['name@nold_t1'], price: '₦0', priceKeys: ['price@nold_t1'] },
+            ],
+        };
+        renderShopPanel({ container, config: { fields: [], delivery }, save: async (key, value) => saved.push([key, value]), done: (m) => { finished = m; } });
+
+        const part = container.querySelector('[data-shop-part="delivery"]');
+        expect([...part.querySelectorAll('legend')].map((l) => l.textContent)).toEqual(['Standard delivery', 'Delivery choice 2']);
+        expect(part.querySelectorAll('.le-shop-remove-choice')).toHaveLength(1);
+
+        part.querySelector('.le-shop-add-choice').click();
+        part.querySelector('#le-shop-new-choice-name').value = 'Lagos express, next day';
+        part.querySelector('#le-shop-new-choice-price').value = '₦8,000';
+        part.querySelector('.le-shop-new-choice .le-shop-new-go').click();
+        await new Promise((r) => setTimeout(r, 0));
+        const id = saved[0][0].split('@')[1];
+        expect(id).toMatch(/^n[0-9a-z]+_t1$/);
+        expect(saved).toEqual([[`name@${id}`, 'Lagos express, next day'], [`price@${id}`, '₦8,000'], ['list', JSON.stringify(['t1', 'nold_t1', id])]]);
+        expect(finished).toContain('is added');
+
+        saved.length = 0;
+        part.querySelector('.le-shop-remove-choice').click();
+        await new Promise((r) => setTimeout(r, 0));
+        expect(saved).toEqual([['list', JSON.stringify(['t1'])]]);
+
+        saved.length = 0;
+        part.querySelectorAll('input')[1].value = '₦5,000';
+        container.querySelector('.le-row button.le-btn').click();
+        await new Promise((r) => setTimeout(r, 0));
+        expect(saved).toEqual([['price', '₦5,000'], ['bag.price', '₦5,000']]);
+    });
 });

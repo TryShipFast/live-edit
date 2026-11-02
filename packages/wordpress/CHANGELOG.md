@@ -1,5 +1,10 @@
 # ShipFast Live Edit for WordPress
 
+## 0.15.94
+
+- Shop tab: Catalogue layout, the template's layouts as small drawings to choose from (filters on top or at the side; a layout for paid plans is shown and chosen only on one).
+- Shop tab: + Add a delivery choice and Remove, where the checkout's delivery choices are a list, saved as the page's own Duplicate and Delete save it.
+
 ## 0.15.93
 
 - Shop tab: Currency, one choice for what every price is shown and charged in (Naira by default); only the sign changes, never an amount.

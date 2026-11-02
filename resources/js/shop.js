@@ -3,6 +3,7 @@
  *
  *   1. Your products: each one with Edit (its page), the owner's own with Remove, and Add a product.
  *   2. Categories: each one with Choose products (which products it shows), Copy and Open.
+ *   Catalogue layout: the template's layouts as drawings (filters on top, at the side; more on paid plans).
  *   Currency: what every price is shown and charged in, Naira by default.
  *   3. Delivery: every delivery choice with the name and price customers see, both the owner's, and
  *      the free-delivery threshold.
@@ -22,6 +23,9 @@
  *   products: [{ id, name, href }],          // the design's products, each with its page in the editor
  *   checkout: { href, modes: [{ id, label, needs: [..] }] },
  *   currency: { key, value, options: [{ value, label }] },   // what the shop sells in (naira by default)
+ *   layouts:  { key, value, paid?, options: [{ id, label, hint, plan: 'all' | 'paid' }] },  // the catalogue's layouts
+ *   delivery: { listKey, ids, max, copyOf, source: { nameKeys, priceKeys }, choices: [{ id, standard, name, nameKeys, price, priceKeys }] },
+ *             // delivery choices the owner adds and removes, where the checkout's choices are a list
  *   fields:   [{ keys: [..], label, kind: 'rate' | 'text' | 'whatsapp', value, name?, nameKeys? }],
  *             // a term written on several pages (the bag's delivery price and the checkout's) is one field
  *             // saved to every copy; a delivery choice's name (`name`, saved under `nameKeys`) is the words
@@ -209,6 +213,41 @@ export const renderShopPanel = ({
         parts.push(groups);
     }
 
+    // How the catalogue is laid out (the host's TheShopsLayout): the template's own layouts, as small drawings to pick
+    // from. A layout for paid plans is shown, and chosen only on one (owner: "for paid account, we can add more").
+    if (config?.layouts?.key && (config.layouts.options ?? []).length > 1) {
+        const part = section('Catalogue layout', 'How your shop page shows its products and filters. You can change it any time.', 'layout');
+        const group = el('div', 'le-shop-layouts');
+        group.setAttribute('role', 'radiogroup');
+        group.setAttribute('aria-label', 'Catalogue layout');
+        const holder = { value: config.layouts.value };
+        const spec = { keys: [config.layouts.key], kind: 'layout', value: holder.value };
+        for (const option of config.layouts.options) {
+            const locked = option.plan === 'paid' && !config.layouts.paid;
+            const card = el('label', `le-shop-layout${locked ? ' is-locked' : ''}`);
+            const radio = el('input');
+            radio.type = 'radio';
+            radio.name = 'le-shop-layout';
+            radio.value = option.id;
+            radio.checked = option.id === holder.value;
+            radio.disabled = locked;
+            const drawing = el('span', `le-shop-layout-drawing is-${option.id === 'side' ? 'side' : option.id === 'top' ? 'top' : 'other'}`);
+            drawing.setAttribute('aria-hidden', 'true');
+            drawing.append(el('span', 'le-shop-layout-filters'), el('span', 'le-shop-layout-grid'));
+            const words = el('span', 'le-shop-layout-words');
+            words.append(el('strong', null, option.label));
+            if (option.hint) words.append(el('span', 'le-hint', option.hint));
+            if (locked) words.append(el('span', 'le-shop-layout-plan', 'On paid plans'));
+            radio.addEventListener('change', () => { if (radio.checked) holder.value = option.id; });
+            card.append(radio, drawing, words);
+            group.append(card);
+        }
+        // Saved with the rest: its "input" is the chosen layout.
+        inputs.push({ spec, input: { get value() { return holder.value; }, focus() {} }, start: holder.value });
+        part.append(group);
+        parts.push(part);
+    }
+
     // The currency the shop sells in (the host's TheShopsCurrency): one choice, every price follows.
     if (config?.currency?.key && (config.currency.options ?? []).length) {
         const part = section('Currency', 'What your prices are shown and charged in. Changing it changes the sign on every price, not the amounts: check your prices afterwards.', 'currency');
@@ -232,7 +271,83 @@ export const renderShopPanel = ({
     // 3. Delivery: each choice's name and price are the owner's, as customers see them at checkout.
     const rates = fields.filter((f) => f.part === 'rate');
     const free = fields.filter((f) => f.part === 'free');
-    if (rates.length || free.length) {
+    const list = config?.delivery?.listKey ? config.delivery : null;
+    if (list) {
+        // Choices the owner adds and removes (the host's TheShopTheyRun::deliveryChoices): a list on the checkout
+        // page, saved as Live Edit's Duplicate and Delete save it, so the page and this tab never disagree.
+        const part = section('Delivery', `The delivery choices customers pick at checkout. Name each the way your customers know it, with its price: “Lagos, 1 to 2 days” ${example(3000)}. The first is your standard delivery, the one free delivery is for.`, 'delivery');
+        list.choices.forEach((choice, i) => {
+            const box = el('fieldset', 'le-shop-choice');
+            box.append(el('legend', 'le-label', choice.standard ? 'Standard delivery' : `Delivery choice ${i + 1}`));
+            if (choice.nameKeys?.length) box.append(input({ keys: choice.nameKeys }, { label: 'Name customers see', value: choice.name, keys: choice.nameKeys, kind: 'name', placeholder: 'Lagos, 1 to 2 days' }));
+            box.append(input({ keys: choice.priceKeys }, { label: 'Price', value: choice.price, keys: choice.priceKeys, kind: 'rate', placeholder: example(3000) }));
+            if (!choice.standard) {
+                const remove = button('le-link-btn le-shop-remove le-shop-remove-choice', 'Remove this choice', `Remove ${choice.name || 'this delivery choice'}`);
+                remove.addEventListener('click', async () => {
+                    const win = doc.defaultView ?? window;
+                    if (!win.confirm(`Remove “${choice.name}” from your checkout?`)) return;
+                    try {
+                        await save(list.listKey, JSON.stringify(list.ids.filter((id) => id !== choice.id)));
+                        done?.(`“${choice.name}” is removed from your checkout.`);
+                    } catch (error) {
+                        notify(error.message);
+                    }
+                });
+                box.append(remove);
+            }
+            part.append(box);
+        });
+        if (list.ids.length < (list.max ?? 6)) {
+            const add = button('le-btn-outline le-wide le-shop-add-choice', '+ Add a delivery choice');
+            const form = el('form', 'le-shop-new-product le-shop-new-choice');
+            form.noValidate = true;
+            form.hidden = true;
+            const name = el('input', 'le-input');
+            const price = el('input', 'le-input');
+            name.id = 'le-shop-new-choice-name';
+            price.id = 'le-shop-new-choice-price';
+            name.placeholder = 'Lagos express, next day';
+            price.placeholder = example(8000);
+            for (const [box, words] of [[name, 'Name customers see'], [price, 'Price']]) {
+                const wrap = el('div', 'le-field');
+                const tag = el('label', 'le-label', words);
+                tag.htmlFor = box.id;
+                wrap.append(tag, box);
+                form.append(wrap);
+            }
+            const go = el('button', 'le-btn le-shop-new-go', 'Add this choice');
+            go.type = 'submit';
+            form.append(go);
+            add.setAttribute('aria-expanded', 'false');
+            add.addEventListener('click', () => {
+                form.hidden = !form.hidden;
+                add.setAttribute('aria-expanded', String(!form.hidden));
+                if (!form.hidden) name.focus();
+            });
+            form.addEventListener('submit', async (event) => {
+                event.preventDefault();
+                if (!name.value.trim()) { notify('A delivery choice needs a name customers recognise.'); name.focus(); return; }
+                if (!/\d/.test(price.value)) { notify(`Write its price with its figure: ${example(8000)}, or ${example(0)} for free.`); price.focus(); return; }
+                go.disabled = true;
+                go.textContent = 'Adding…';
+                // A copy of the design's first choice, named as Live Edit's Duplicate names one.
+                const id = `n${Date.now().toString(36)}_${list.copyOf}`;
+                try {
+                    for (const key of list.source.nameKeys ?? []) await save(`${key}@${id}`, name.value.trim());
+                    for (const key of list.source.priceKeys ?? []) await save(`${key}@${id}`, price.value.trim());
+                    await save(list.listKey, JSON.stringify([...list.ids, id]));
+                    done?.(`“${name.value.trim()}” is added to your checkout.`);
+                } catch (error) {
+                    notify(error.message);
+                    go.disabled = false;
+                    go.textContent = 'Add this choice';
+                }
+            });
+            part.append(add, form);
+        }
+        free.forEach((f) => part.append(input(f, { label: 'Free delivery on orders over', value: f.value, keys: f.keys, placeholder: example(50000), hint: 'Customers pay no standard delivery when their order reaches this amount.' })));
+        parts.push(part);
+    } else if (rates.length || free.length) {
         const part = section('Delivery', `The delivery choices customers pick at checkout. Name each the way your customers know it, with its price: “Lagos, 1 to 2 days” ${example(3000)}.`, 'delivery');
         rates.forEach((f, i) => {
             const choice = el('fieldset', 'le-shop-choice');
