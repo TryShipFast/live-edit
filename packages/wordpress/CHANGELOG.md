@@ -1,5 +1,9 @@
 # ShipFast Live Edit for WordPress
 
+## 0.15.93
+
+- Shop tab: Currency, one choice for what every price is shown and charged in (Naira by default); only the sign changes, never an amount.
+
 ## 0.15.92
 
 - Shop tab, rebuilt for owners setting up a shop for the first time: Your products (Edit beside each, Remove beside your own, + Add a product with a name, price, photo and categories, and Add many products from a spreadsheet), Categories (Choose products, Copy, Open), Delivery (each delivery choice's name and price, both yours, and free delivery over), How customers pay, and Offers.

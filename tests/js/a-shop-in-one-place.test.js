@@ -178,4 +178,21 @@ describe('the shop in one place', () => {
         await new Promise((r) => setTimeout(r, 0));
         expect(saved).toEqual([['c', '[]'], ['p:shop', JSON.stringify(['wax'])]]);
     });
+
+    it('sets the currency every price is shown and charged in, Naira until the owner chooses', async () => {
+        const container = document.createElement('div');
+        const saved = [];
+        renderShopPanel({
+            container,
+            config: { fields: [], currency: { key: 'shop.currency', value: 'NGN', options: [{ value: 'NGN', label: 'Naira (₦)' }, { value: 'GHS', label: 'Ghana cedi (GH₵)' }] } },
+            save: async (key, value) => saved.push([key, value]),
+            done: () => {},
+        });
+        const pick = container.querySelector('[data-shop-part="currency"] select');
+        expect(pick.value).toBe('NGN');
+        pick.value = 'GHS';
+        container.querySelector('button.le-btn').click();
+        await new Promise((r) => setTimeout(r, 0));
+        expect(saved).toEqual([['shop.currency', 'GHS']]);
+    });
 });

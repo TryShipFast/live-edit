@@ -3,6 +3,7 @@
  *
  *   1. Your products: each one with Edit (its page), the owner's own with Remove, and Add a product.
  *   2. Categories: each one with Choose products (which products it shows), Copy and Open.
+ *   Currency: what every price is shown and charged in, Naira by default.
  *   3. Delivery: every delivery choice with the name and price customers see, both the owner's, and
  *      the free-delivery threshold.
  *   4. How customers pay: the checkout's ways, and the WhatsApp number orders go to.
@@ -20,6 +21,7 @@
  * config = {
  *   products: [{ id, name, href }],          // the design's products, each with its page in the editor
  *   checkout: { href, modes: [{ id, label, needs: [..] }] },
+ *   currency: { key, value, options: [{ value, label }] },   // what the shop sells in (naira by default)
  *   fields:   [{ keys: [..], label, kind: 'rate' | 'text' | 'whatsapp', value, name?, nameKeys? }],
  *             // a term written on several pages (the bag's delivery price and the checkout's) is one field
  *             // saved to every copy; a delivery choice's name (`name`, saved under `nameKeys`) is the words
@@ -205,6 +207,26 @@ export const renderShopPanel = ({
         add.addEventListener('click', () => newCategory(null));
         groups.append(rows, add);
         parts.push(groups);
+    }
+
+    // The currency the shop sells in (the host's TheShopsCurrency): one choice, every price follows.
+    if (config?.currency?.key && (config.currency.options ?? []).length) {
+        const part = section('Currency', 'What your prices are shown and charged in. Changing it changes the sign on every price, not the amounts: check your prices afterwards.', 'currency');
+        const wrap = el('div', 'le-field');
+        const tag = el('label', 'le-label', 'Your shop sells in');
+        const pick = el('select', 'le-input le-shop-currency');
+        pick.id = `le-shop-${inputs.length}`;
+        tag.htmlFor = pick.id;
+        for (const option of config.currency.options) {
+            const choice = el('option', null, option.label);
+            choice.value = option.value;
+            pick.append(choice);
+        }
+        pick.value = config.currency.value ?? 'NGN';
+        inputs.push({ spec: { keys: [config.currency.key], kind: 'currency', value: pick.value }, input: pick, start: pick.value });
+        wrap.append(tag, pick);
+        part.append(wrap);
+        parts.push(part);
     }
 
     // 3. Delivery: each choice's name and price are the owner's, as customers see them at checkout.
