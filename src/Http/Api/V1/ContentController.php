@@ -7,6 +7,7 @@ use Illuminate\Http\Request;
 use Illuminate\Validation\ValidationException;
 use ShipFast\LiveEdit\Application\Api\ApplyEdit;
 use ShipFast\LiveEdit\Application\Api\ApplyStyle;
+use ShipFast\LiveEdit\Domain\Content\EditPolicy;
 use ShipFast\LiveEdit\Application\Api\AssistWithText;
 use ShipFast\LiveEdit\Application\Api\ExportMarkup;
 use ShipFast\LiveEdit\Application\Api\FindPhotos;
@@ -127,7 +128,8 @@ class ContentController
     {
         $validated = $request->validate([
             'key' => ['required', 'string', 'max:200'],
-            'value' => ['nullable', 'string', 'max:10000'],
+            // How long is the policy's to say (EditPolicy::longestValue), asked with the key below.
+            'value' => ['nullable', 'string', 'max:'.app(EditPolicy::class)->longestValue((string) $request->input('key'))],
             'locale' => ['nullable', 'string', 'max:10'],
         ]);
 

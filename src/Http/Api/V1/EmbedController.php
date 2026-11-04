@@ -65,6 +65,9 @@ class EmbedController
         'computed.js' => 'computed.js',
         'dialogs-in-place.js' => 'dialogs-in-place.js',
         'site-address.js' => 'site-address.js',
+        'collection-search.js' => 'collection-search.js',
+        'collections.js' => 'collections.js',
+        'collections-panel.js' => 'collections-panel.js',
         // The built bundle, resolved to resources/dist rather than to a
         // sibling of the modules.
         'bundle.js' => 'bundle.js',

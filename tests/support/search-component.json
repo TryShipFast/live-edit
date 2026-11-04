@@ -1,0 +1,60 @@
+{
+    "from": "kit.search.parts",
+    "label": "Search: Aircraft parts",
+    "page": "Search",
+    "kind": "search",
+    "collection": {
+        "id": "parts",
+        "name": "Aircraft parts",
+        "one": "part",
+        "many": "parts",
+        "title": "name",
+        "fields": [
+            {
+                "key": "part_number",
+                "label": "Part number",
+                "type": "text",
+                "code": true
+            },
+            {
+                "key": "name",
+                "label": "Name",
+                "type": "text"
+            },
+            {
+                "key": "aircraft",
+                "label": "Aircraft type",
+                "type": "choice",
+                "options": [
+                    "ATR 72",
+                    "B737-800",
+                    "Dash 8"
+                ]
+            },
+            {
+                "key": "condition",
+                "label": "Condition",
+                "type": "choice",
+                "options": [
+                    "NE",
+                    "OH",
+                    "SV",
+                    "AR"
+                ]
+            },
+            {
+                "key": "quantity",
+                "label": "Quantity",
+                "type": "number"
+            },
+            {
+                "key": "certificate",
+                "label": "Certificate",
+                "type": "yesno"
+            }
+        ],
+        "pages": 1,
+        "records": []
+    },
+    "markup": "<section class=\"kit-search\" data-component=\"search.collection\" data-instance=\"__INSTANCE__\" data-label=\"Search: Aircraft parts\" data-search=\"parts\" data-search-index=\"/search/parts.json\" data-search-quote=\"/edit/contact\" data-search-missed=\"/search/missed/abc\" data-search-choices=\"[{&quot;attr&quot;:&quot;data-search-filters&quot;,&quot;label&quot;:&quot;Filters visitors see&quot;,&quot;many&quot;:true,&quot;options&quot;:[{&quot;value&quot;:&quot;aircraft&quot;,&quot;label&quot;:&quot;Aircraft type&quot;},{&quot;value&quot;:&quot;condition&quot;,&quot;label&quot;:&quot;Condition&quot;},{&quot;value&quot;:&quot;quantity&quot;,&quot;label&quot;:&quot;Quantity&quot;},{&quot;value&quot;:&quot;certificate&quot;,&quot;label&quot;:&quot;Certificate&quot;}]},{&quot;attr&quot;:&quot;data-search-layout&quot;,&quot;label&quot;:&quot;Results shown as&quot;,&quot;options&quot;:[{&quot;value&quot;:&quot;cards&quot;,&quot;label&quot;:&quot;Cards&quot;},{&quot;value&quot;:&quot;rows&quot;,&quot;label&quot;:&quot;Rows, one under another&quot;}]}]\"><div class=\"kit-search__in\"><div class=\"kit-search__head\" data-search-part=\"search\"><h2 class=\"kit-search__title\" data-edit=\"text\" data-field=\"title\">Find a part</h2><p class=\"kit-search__lead\" data-edit=\"text\" data-field=\"lead\">Parts we have now. Search by part number, with or without dashes, then filter what you see.</p></div><form class=\"kit-search__form\" role=\"search\" method=\"get\" action=\"\" data-search-part=\"search\" data-search-settings data-search-filters=\"aircraft condition quantity certificate\" data-search-layout=\"cards\"><label class=\"kit-search__label\" for=\"kit-search---instance--\"><span data-edit=\"text\" data-field=\"label\">Part number, name or maker</span></label><div class=\"kit-search__box\"><input class=\"kit-search__input\" id=\"kit-search---instance--\" type=\"search\" name=\"q\" autocomplete=\"off\" enterkeyhint=\"search\"><button class=\"kit-search__go\" type=\"submit\"><span data-edit=\"text\" data-field=\"go\">Search</span></button></div><div class=\"kit-search__filters\" data-search-filter-area></div></form><div class=\"kit-search__bar\" data-search-part=\"search\"><p class=\"kit-search__count\" aria-live=\"polite\" data-search-count><span data-search-number data-kit-computed=\"search\"></span> <span data-edit=\"text\" data-field=\"count-many\" data-search-many>parts found</span><span data-edit=\"text\" data-field=\"count-one\" data-search-one>part found</span></p></div><ul class=\"kit-search__results\" data-search-results></ul><div class=\"kit-search__empty\" data-search-empty hidden><p class=\"kit-search__empty-title\" data-edit=\"text\" data-field=\"empty-title\">Nothing found</p><p data-edit=\"text\" data-field=\"empty-text\">Check the spelling or try fewer words. If you cannot find the part you need, ask us: we may be able to get it.</p></div><p class=\"kit-search__words\" data-search-words><span data-edit=\"text\" data-field=\"word-details\" data-search-word=\"details\">View details</span><span data-edit=\"text\" data-field=\"word-quote\" data-search-word=\"quote\">Request a quote</span><span data-edit=\"text\" data-field=\"word-back\" data-search-word=\"back\">Back to the search</span><span data-edit=\"text\" data-field=\"word-more\" data-search-word=\"more\">Show more</span><span data-edit=\"text\" data-field=\"word-all\" data-search-word=\"all\">All</span><span data-edit=\"text\" data-field=\"word-from\" data-search-word=\"from\">From</span><span data-edit=\"text\" data-field=\"word-to\" data-search-word=\"to\">To</span><span data-edit=\"text\" data-field=\"word-only\" data-search-word=\"only\">Only with</span><span data-edit=\"text\" data-field=\"word-sort\" data-search-word=\"sort\">Sort by</span><span data-edit=\"text\" data-field=\"word-best\" data-search-word=\"best\">Best match</span><span data-edit=\"text\" data-field=\"word-filters\" data-search-word=\"filters\">Filters</span><span data-edit=\"text\" data-field=\"word-clear\" data-search-word=\"clear\">Clear filters</span></p></div></section>"
+}

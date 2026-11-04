@@ -24,6 +24,13 @@ export function kindSays(kind) {
             'It arrives with sample rows to replace.',
         ];
     }
+    if (kind === 'search') {
+        return [
+            'A search over one of your collections: a box for words or a part number (found with or without dashes and spaces), and filters made from the collection\'s fields.',
+            'Visitors see how many were found, cards or rows, each with its own page and Request a quote. You change every word, which filters show and how results look.',
+            'Its records are the collection\'s: change them in the Search tab, then publish.',
+        ];
+    }
     const spec = KINDS[kind];
     if (!spec) return [];
     const rules = {

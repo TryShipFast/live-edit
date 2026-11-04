@@ -16,9 +16,9 @@ import { createHost } from './fake-host.js';
 
 const RUNTIME = fileURLToPath(new URL('../../resources/dist/live-edit.js', import.meta.url));
 
-export async function serveFakeHost({ removable = false, library = false, outside = false, data = false } = {}) {
+export async function serveFakeHost({ removable = false, library = false, outside = false, data = false, search = false } = {}) {
     const window = new Window();
-    const host = createHost({ makeDocument: (html) => new window.DOMParser().parseFromString(html, 'text/html'), removable, library, outside, data });
+    const host = createHost({ makeDocument: (html) => new window.DOMParser().parseFromString(html, 'text/html'), removable, library, outside, data, search });
 
     const json = (response, status, body) => {
         response.writeHead(status, { 'Content-Type': 'application/json' });
@@ -38,6 +38,20 @@ export async function serveFakeHost({ removable = false, library = false, outsid
             if (url.pathname === '/kit-data.js') {
                 response.writeHead(200, { 'Content-Type': 'text/javascript' });
                 response.end(readFileSync(fileURLToPath(new URL('./kit-data.js', import.meta.url))));
+
+                return;
+            }
+            if (url.pathname === '/kit-search.js') {
+                response.writeHead(200, { 'Content-Type': 'text/javascript' });
+                response.end(readFileSync(fileURLToPath(new URL('../../resources/dist/kit-search.js', import.meta.url))));
+
+                return;
+            }
+            // A collection's index, as the host's editor route gives it: the drafts over what is published.
+            const index = url.pathname.match(/^\/search\/([a-z0-9-]+)\.json$/);
+            if (index) {
+                const found = host.collections().find((c) => c.id === index[1]);
+                json(response, found ? 200 : 404, found ? { v: 1, ...found } : {});
 
                 return;
             }

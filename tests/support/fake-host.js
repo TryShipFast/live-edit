@@ -24,6 +24,7 @@ import { readFileSync } from 'node:fs';
  */
 
 import { applyContent, applyStyles } from '../../resources/js/content.js';
+import { collectionsIn } from '../../resources/js/collections.js';
 
 /* ------------------------------ the design ------------------------------ */
 
@@ -228,6 +229,20 @@ const keyMarkers = (doc, name, bandsAreShared = true) => {
 // From the repository root (vitest's root): under happy-dom import.meta.url is not a file: URL, which readFileSync refuses.
 export const DATA_COMPONENTS = JSON.parse(readFileSync(join(process.cwd(), 'tests/support/data-components.json'), 'utf8'));
 
+/** A search over a collection (the host's TheSearchComponent), written out by it into search-component.json. */
+export const SEARCH_COMPONENT = JSON.parse(readFileSync(join(process.cwd(), 'tests/support/search-component.json'), 'utf8'));
+
+/** searchesTheKitNames: a search's settings (its filters and layout), keyed on its form. */
+const nameSearches = (doc, page) => {
+    for (const search of doc.querySelectorAll('[data-search][data-search-choices]')) {
+        const settings = search.querySelector('[data-search-settings]');
+        if (!settings) continue;
+        search.setAttribute('data-edit-choices', search.getAttribute('data-search-choices'));
+        const owner = search.closest('[data-instance]')?.getAttribute('data-instance') ?? '';
+        if (!settings.hasAttribute('data-edit-choice')) settings.setAttribute('data-edit-choice', `setting:tpl:${hash(`page:${page}/search:${owner}/settings`)}`);
+    }
+};
+
 /** chartsTheKitNames: a chart's settings, keyed on its data-chart-settings element. */
 const nameCharts = (doc, page) => {
     for (const chart of doc.querySelectorAll('[data-chart][data-chart-choices]')) {
@@ -259,6 +274,7 @@ const nameListsAndSections = (doc, page) => {
     }
 
     nameCharts(doc, page);
+    nameSearches(doc, page);
 
     const containers = new Set();
     for (const section of doc.querySelectorAll('[data-instance]:not([data-edit-section])')) {
@@ -294,7 +310,7 @@ const nameListsAndSections = (doc, page) => {
  * `outside` hands over no page builder at all: an outside site (the plugin or
  * another adapter), which gets in-place editing only.
  */
-export function createHost({ makeDocument, serialise = (doc) => `<!doctype html>${doc.documentElement.outerHTML}`, removable = false, library = false, outside = false, data = false } = {}) {
+export function createHost({ makeDocument, serialise = (doc) => `<!doctype html>${doc.documentElement.outerHTML}`, removable = false, library = false, outside = false, data = false, search = false } = {}) {
     const settings = {};
     const styles = {};
     const saves = [];
@@ -314,11 +330,13 @@ export function createHost({ makeDocument, serialise = (doc) => `<!doctype html>
     const addedTo = (id) => {
         try { return JSON.parse(settings[`structure:page:${id === '' ? 'home' : id}`] ?? '{}').added ?? {}; } catch { return {}; }
     };
+    // The collections kept, as the host reads them (TheCollectionsASiteKeeps), and handed to the editor.
+    const collections = () => collectionsIn(settings);
     const fileOf = (instance) => Object.keys(DESIGN).find((id) => DESIGN[id].html.includes(`data-instance="${instance}"`)) ?? null;
 
     /** One design section, keyed as a copy named `added:<page>/<id>` and renamed for its new page (keysOnly, cut). */
     const sectionAdded = (doc, page, id, from) => {
-        const offered = data ? DATA_COMPONENTS.find((entry) => entry.from === from) : null;
+        const offered = data ? DATA_COMPONENTS.find((entry) => entry.from === from) : (search && from === SEARCH_COMPONENT.from && collections().some((c) => c.id === 'parts') ? SEARCH_COMPONENT : null);
         if (offered) {
             const owner = page === '' ? 'home' : page;
             const source = makeDocument(`<!doctype html><html><body>${offered.markup.replace('__INSTANCE__', `${owner}.${id}`)}</body></html>`);
@@ -385,6 +403,7 @@ export function createHost({ makeDocument, serialise = (doc) => `<!doctype html>
         library: [
             ...(library ? LIBRARY.map(({ file, ...section }) => ({ ...section, at: `${editorBase}${file}` })) : []),
             ...(data ? DATA_COMPONENTS.map(({ markup, ...offered }) => ({ ...offered, at: null })) : []),
+            ...(search && collections().some((c) => c.id === 'parts') ? [{ from: SEARCH_COMPONENT.from, label: SEARCH_COMPONENT.label, page: SEARCH_COMPONENT.page, kind: 'search', at: null }] : []),
         ],
         starts: [],
         ...(removable ? { removedKey: 'structure:removed', removed: removed() } : {}),
@@ -396,6 +415,7 @@ export function createHost({ makeDocument, serialise = (doc) => `<!doctype html>
         saves,
         draw,
         builderFor,
+        collections,
         made,
         removed,
         /** The editor's page, as markup, with what the editor is handed. */
@@ -412,6 +432,14 @@ export function createHost({ makeDocument, serialise = (doc) => `<!doctype html>
                 + `window.liveEditContent=${JSON.stringify({ base: api, site: 'demo', key: 'kbs_demo' })};`
                 + 'window.liveEditPublishing={pending:0};');
             if (!outside) script(`window.liveEditPages=${JSON.stringify(builderFor(id, editorBase))};`);
+            // Only a hosted template that gets search is handed its collections; an outside site never.
+            if (search && !outside) script(`window.liveEditCollections=${JSON.stringify({ collections: collections(), missed: { href: '/dashboard#search', count: 0 } })};`);
+            if (doc.querySelector('[data-search]')) {
+                const tag = doc.createElement('script');
+                tag.setAttribute('src', '/kit-search.js');
+                tag.setAttribute('data-kit-search', '');
+                doc.body.append(tag);
+            }
             // TheDataKitScript: what draws a chart or a table, on a page that holds one.
             if (doc.querySelector('[data-chart], [data-kit-table]')) {
                 const tag = doc.createElement('script');

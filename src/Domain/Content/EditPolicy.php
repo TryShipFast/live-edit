@@ -110,6 +110,16 @@ class EditPolicy
     /**
      * @throws ValidationException
      */
+    /**
+     * The most characters one value under this key may hold: 10,000, the size of any words on a page.
+     * A host that keeps larger values under keys of its own (a page of a collection's records) says so
+     * here; the API asks before anything else, so a longer value never reaches the store.
+     */
+    public function longestValue(string $key): int
+    {
+        return 10000;
+    }
+
     public function assertKey(string $key): void
     {
         throw_unless($this->permitsKey($key), ValidationException::withMessages(['key' => 'Unknown setting.']));
@@ -161,6 +171,10 @@ class EditPolicy
     public function assert(string $key, string $value): void
     {
         $this->assertKey($key);
+        throw_if(
+            mb_strlen($value) > $this->longestValue($key),
+            ValidationException::withMessages(['value' => 'The value may not be greater than '.$this->longestValue($key).' characters.'])
+        );
         $this->assertValue($key, $value);
     }
 

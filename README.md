@@ -367,6 +367,31 @@ the page, and anything that reads it (a bag's total) follows. A term written on
 several pages is one field saved to every key. A WhatsApp field edits the number
 inside the link and keeps the message after it.
 
+### The Search tab (search over a collection)
+
+A host that keeps collections for visitors to search hands them over (`window.liveEditCollections`), and the bar
+gains **Search** and the drawer a **Search** tab (`resources/js/collections-panel.js`):
+
+```js
+window.liveEditCollections = {
+  collections: [{ id: 'aircraft-parts', name: 'Aircraft parts', one: 'part', many: 'parts', title: 'name', pages: 1,
+    fields: [{ key: 'part_number', label: 'Part number', type: 'text', code: true }, { key: 'condition', label: 'Condition', type: 'choice', options: ['NE', 'OH'] }],
+    records: [{ id: 'r1', part_number: '2-1586-3', condition: 'OH' }] }],
+  missed: { href: '/dashboard#search', count: 3 },   // where the searches that found nothing are listed
+};
+```
+
+Each collection opens as a table, takes rows from a spreadsheet (every refused row said with its number), and
+goes out as CSV; a new one is made from a spreadsheet or empty. Saved through the ordinary setting save as
+`collection:<id>` and `collection:<id>:rows:<n>` (pages of rows that each fit one value; `collections.js`), so a
+draft until published. A host keeping values longer than 10,000 characters under keys of its own says so in
+`EditPolicy::longestValue()`. A library entry with `kind: "search"` is a search section the host draws; pressing
+its box, filters or results opens its panel (the filters visitors see and cards or rows, declared in
+`data-edit-choices` on the section). The visitor's search is `resources/dist/kit-search.js`, built from
+`collection-search.js` with no dependencies, which a host publishes beside the site with each collection's index.
+The host's contract is in the website's LIVE-EDIT-STRUCTURE.md, "Search over a collection". `?search` on the
+editor's address opens the tab.
+
 ### Links the editor steers
 
 A host that serves pages in its own editor can keep the visitor's address in

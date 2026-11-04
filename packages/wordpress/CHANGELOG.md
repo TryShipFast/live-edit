@@ -1,5 +1,9 @@
 # ShipFast Live Edit for WordPress
 
+## 0.17.0
+
+- Search over a collection, for a host that hands the editor its collections (`window.liveEditCollections`; a hosted template whose plan includes it, never a plugin website). A **Search** button and tab keep each collection: open it as a table (a box of the right kind per cell, add, delete, find, Fields to add, rename, retype, reorder and remove fields), add from a spreadsheet (columns matched to fields by their headings, every refused row said with its row number), download as CSV, or make a new one from a spreadsheet. A collection is saved as settings in pages of rows, so it is a draft until published. A search section from the library (`kind: "search"`) opens its own panel: the filters visitors see and cards or rows. `resources/dist/kit-search.js` is the visitor's search (part numbers found with or without dashes, filters from the data's shape, a record's own page, a quote request carried into the form, searches that found nothing told to the host). `EditPolicy::longestValue()` lets a host allow longer values under keys of its own.
+
 ## 0.16.2
 
 - A product's photos are managed in one place: pressing a thumbnail or a photo of a gallery opens the product's photos, each to replace, move or remove, and + Add a photo. Before, a thumbnail only explained itself and the photos a gallery hides could not be reached.

@@ -36,7 +36,8 @@ class LiveEditController extends Controller
     {
         $validated = $request->validate([
             'key' => ['required', 'string', 'max:200'],
-            'value' => ['nullable', 'string', 'max:10000'],
+            // How long is the policy's to say (EditPolicy::longestValue), asked with the key below.
+            'value' => ['nullable', 'string', 'max:'.app(EditPolicy::class)->longestValue((string) $request->input('key'))],
             'locale' => ['nullable', 'string', 'in:'.implode(',', array_keys(config('live-edit.locales', [])))],
         ]);
 

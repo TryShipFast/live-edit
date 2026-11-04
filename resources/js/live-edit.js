@@ -24,6 +24,7 @@ import { computedOf, computedKind } from './computed.js';
 import { uploadWidget } from './upload.js';
 import { renderSeoPanel } from './seo.js';
 import { renderShopPanel } from './shop.js';
+import { renderCsvImport, renderNewCollection, renderSearchPanel, renderTableEditor } from './collections-panel.js';
 import { renderImport, undoTheLastImport, UNDO_KEY } from './catalogue.js';
 import { addedWith, describeStructure, hrefTo, newAddedId, orderWith, pageBase, pageOfLink, renderCategoryProducts, renderNewCategory, renderNewPage, renderSectionBrowser } from './pages.js';
 import { insertionNear, sectionName, sectionUnder, shownSectionLists, shownSections } from './section-inserter.js';
@@ -1256,6 +1257,7 @@ const bootLiveEdit = () => {
             if (name === 'SEO') renderSeo();
             else seoPanel?.unpreview();
             if (name === 'Shop') renderShop();
+            if (name === 'Search') renderSearch();
         };
 
         /*
@@ -1367,6 +1369,114 @@ const bootLiveEdit = () => {
             });
 
             return handle;
+        };
+
+        /*
+         * The Search tab (collections-panel.js): the collections visitors search, each opened as a table in a
+         * window as wide as the screen, filled from a spreadsheet, downloaded as CSV. Only where the host hands
+         * them over (window.liveEditCollections). Every save is the ordinary setting save, so a draft.
+         */
+        const collectionsHere = () => window.liveEditCollections?.collections ?? [];
+        const afterCollectionSave = (message) => {
+            sessionStorage.setItem('tb_editing', '1');
+            try { sessionStorage.setItem('le-open-tab', 'Search'); } catch { /* the tab is a convenience */ }
+            reloadWithToast(message);
+        };
+        const openCollectionImport = (collection = null) => {
+            closeDrawer(true);
+            const handle = ui.modal({ title: 'Add from a spreadsheet', size: 'is-wide' });
+            renderCsvImport({
+                ui: handle,
+                collection,
+                taken: collectionsHere().map((c) => c.id),
+                save: saveSetting,
+                done: (message) => { handle.close(); afterCollectionSave(message); },
+                notify,
+            });
+
+            return handle;
+        };
+        const openCollectionTable = (collection) => {
+            closeDrawer(true);
+            const handle = ui.modal({ title: collection.name, size: 'is-full' });
+            handle.card.classList.add('le-collection-table');
+            renderTableEditor({
+                ui: handle,
+                collection,
+                save: saveSetting,
+                done: (message) => { handle.close(); afterCollectionSave(message); },
+                notify,
+                openImport: () => { handle.close(); openCollectionImport(collection); },
+            });
+
+            return handle;
+        };
+        const openNewCollection = () => {
+            closeDrawer(true);
+            const handle = ui.modal({ title: 'New collection', size: 'is-medium' });
+            renderNewCollection({
+                ui: handle,
+                taken: collectionsHere().map((c) => c.id),
+                fromSpreadsheet: () => { handle.close(); openCollectionImport(null); },
+                save: saveSetting,
+                done: (message) => { handle.close(); afterCollectionSave(message); },
+                notify,
+            });
+
+            return handle;
+        };
+        const renderSearch = () => renderSearchPanel({
+            container: drawerFields,
+            config: window.liveEditCollections,
+            openTable: openCollectionTable,
+            openImport: openCollectionImport,
+            openNew: openNewCollection,
+        });
+        /** A search section on the page: which filters visitors see, how results look, and its collection's table. */
+        const editSearch = (section) => {
+            current = { kind: 'search' };
+            lastOpened = section;
+            const collection = collectionsHere().find((c) => c.id === section.getAttribute('data-search'));
+            drawerTitle.textContent = section.getAttribute('data-label') || 'Search';
+            drawerDelete.classList.add('le-hidden');
+            const wrap = document.createElement('div');
+            wrap.className = 'le-data le-search-section';
+            const hint = document.createElement('p');
+            hint.className = 'le-hint';
+            hint.textContent = collection
+                ? `Visitors search ${collection.name} here (${collection.records.length.toLocaleString('en-NG')} ${collection.records.length === 1 ? collection.one : collection.many}). Click any words on the search to change them; the results come from the collection.`
+                : 'This search shows one of your collections. Click any words on it to change them.';
+            wrap.append(hint);
+            const settings = section.querySelector('[data-edit-choice]');
+            const choices = settings ? renderChoice({ item: settings, list: section, save: saveSetting, notify, hint: 'A filter switched off is not offered to visitors. Nothing in the collection changes.' }) : null;
+            if (choices) {
+                const heading = document.createElement('div');
+                heading.className = 'le-section-heading';
+                heading.textContent = 'What visitors see';
+                wrap.append(heading, choices);
+            }
+            if (collection) {
+                const open = document.createElement('button');
+                open.type = 'button';
+                open.className = 'le-btn-outline le-wide le-search-open-table';
+                open.textContent = `Open the table of ${collection.name}`;
+                open.addEventListener('click', () => openCollectionTable(collection));
+                wrap.append(open);
+            }
+            drawerFields.replaceChildren(wrap);
+            const holder = section.closest('[data-edit-item]');
+            if (holder) {
+                const move = document.createElement('button');
+                move.type = 'button';
+                move.className = 'le-chip-btn';
+                move.textContent = 'Move, hide or remove this section';
+                move.addEventListener('click', () => editStyle(holder));
+                drawerFields.append(move);
+            }
+            setTrail(section);
+            showTab('Edit');
+            ui.drawerFoot.classList.add('le-hidden');
+            openDrawer();
         };
 
         let brandPanel = null;
@@ -5826,6 +5936,14 @@ const bootLiveEdit = () => {
              * its rows, opened in the kind's own words; anywhere else on the drawing is the chart.
              * Its title, readout and headings are words like any others, below.
              */
+            /*
+             * A search over a collection (kit-search.js): its results, filters and box are drawn from the
+             * collection, so pressing them opens the search's own panel; its words are words, below.
+             */
+            const searched = node.closest('[data-search]');
+            if (searched && !node.closest('[data-edit]') && node.closest('[data-kit-computed="search"], .kit-search__box, .kit-search__filters, [data-search-results], [data-search-record]')) {
+                return { element: searched, kind: 'search', label: searched.getAttribute('data-label') || 'Search' };
+            }
             const chart = chartOf(node);
             if (chart && chartKindOf(chart) && !node.closest('[data-chart-units], .kit-data__head, figcaption, summary, thead')) {
                 const row = chartRowOf(node);
@@ -5912,7 +6030,8 @@ const bootLiveEdit = () => {
         };
 
         const openTarget = ({ element, kind }) => {
-            if (kind === 'chart-row') editChartRow(element);
+            if (kind === 'search') editSearch(element);
+            else if (kind === 'chart-row') editChartRow(element);
             else if (kind === 'chart') editChart(element);
             else if (kind === 'image') { const list = galleryOf(element); if (list) editGalleryPhoto(element, list); else editImage(element); }
             else if (kind === 'icon') void editIcon(element);
@@ -6364,6 +6483,12 @@ const bootLiveEdit = () => {
             if (!document.body.classList.contains('editing')) setEditing(true);
 
             showTab('Brand');
+            openDrawer();
+        });
+
+        ui.searchButton?.addEventListener('click', () => {
+            if (!document.body.classList.contains('editing')) setEditing(true);
+            showTab('Search');
             openDrawer();
         });
 
@@ -7498,7 +7623,7 @@ const bootLiveEdit = () => {
         });
 
         const params = new URLSearchParams(window.location.search);
-        const directPanelOpen = params.has('brand') || params.has('pages');
+        const directPanelOpen = params.has('brand') || params.has('pages') || (params.has('search') && Boolean(window.liveEditCollections));
         if (detailMode) {
             // A card's page in the window over its list: the detail and nothing else, ready to click.
             showOnlyTheDetail(document);
@@ -7523,8 +7648,20 @@ const bootLiveEdit = () => {
             const query = params.toString();
             window.history.replaceState(null, '', window.location.pathname + (query ? `?${query}` : ''));
             setEditing(true);
+        } else if (params.has('search') && drawerTabs.Search) {
+            // Arriving to keep a collection (the dashboard's "Open in Live Edit"): straight to the Search tab.
+            params.delete('search');
+            const query = params.toString();
+            window.history.replaceState(null, '', window.location.pathname + (query ? `?${query}` : ''));
+            setEditing(true);
+            showTab('Search');
+            openDrawer();
         } else {
             setEditing(sessionStorage.getItem('tb_editing') === '1');
+            // Back from saving a collection: the Search tab, where the owner was.
+            let back = null;
+            try { back = sessionStorage.getItem('le-open-tab'); sessionStorage.removeItem('le-open-tab'); } catch { /* a convenience */ }
+            if (back === 'Search' && drawerTabs.Search) { showTab('Search'); openDrawer(); }
         }
         if (!detailMode && !directPanelOpen && document.body.classList.contains('editing')) startWalkthrough();
     }

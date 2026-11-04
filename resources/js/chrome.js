@@ -711,6 +711,46 @@ a.le-mark:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
 .le-import-ready .le-hint { grid-column: 1 / -1; margin: 0; }
 .le-import-name { color: var(--le-ink); font-weight: 600; }
 .le-import-problems { margin: 0; padding-left: 18px; color: #A1260D; font-size: 13px; display: grid; gap: 4px; }
+/* The Search tab's collections and their table (collections-panel.js). */
+.le-collection { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 12px; padding: 8px 0; border-bottom: 1px solid var(--le-line); }
+.le-collection:last-child { border-bottom: 0; }
+.le-collection-table .le-modal-body { padding: 0 24px 16px; overflow: auto; display: flex; flex-direction: column; gap: 12px; }
+.le-collection-table .le-link-btn { color: var(--le-blue); font-size: 13px; font-weight: 600; text-decoration: none; }
+.le-table-tools { display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: center; position: sticky; top: 0; z-index: 2; padding: 12px 0 8px; background: #fff; }
+.le-table-find { flex: 1 1 220px; min-width: 0; max-width: 360px; }
+.le-table-scroll { overflow: auto; border: 1px solid var(--le-line); border-radius: 10px; flex: 1 1 auto; min-height: 160px; }
+.le-table { border-collapse: separate; border-spacing: 0; font-size: 13px; min-width: 100%; }
+.le-table th { position: sticky; top: 0; z-index: 1; background: var(--le-soft); text-align: left; font-weight: 650; color: var(--le-ink); padding: 8px 10px; border-bottom: 1px solid var(--le-line); white-space: nowrap; }
+.le-table-type { display: block; font-weight: 500; font-size: 11px; color: var(--le-muted); }
+.le-table td { padding: 4px 6px; border-bottom: 1px solid var(--le-line); vertical-align: middle; }
+.le-table .le-cell { min-width: 120px; width: 100%; padding: 6px 8px; font-size: 13px; }
+.le-table .le-cell[aria-invalid="true"] { border-color: var(--le-danger); box-shadow: 0 0 0 1px var(--le-danger); }
+.le-table .le-cell-check { width: 18px; height: 18px; accent-color: var(--le-accent); }
+.le-table-actions { white-space: nowrap; }
+.le-table-delete { color: #A1260D !important; }
+.le-table-more { align-self: center; }
+.le-table-more[hidden] { display: none; }
+.le-table-why { display: grid; gap: 4px; }
+.le-table-status { margin-right: auto; }
+.le-fields { display: grid; gap: 12px; padding-top: 12px; }
+.le-fields-list { display: grid; gap: 10px; margin: 0; padding-left: 22px; }
+.le-field-row { display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 1fr); gap: 6px 10px; padding: 10px; border: 1px solid var(--le-line); border-radius: 10px; }
+.le-field-row > .le-hint, .le-field-row > .le-check, .le-field-row > .le-shop-actions, .le-field-options { grid-column: 1 / -1; margin: 0; }
+.le-field-row .le-link-btn { color: var(--le-blue); font-weight: 600; text-decoration: none; }
+.le-field-row .le-shop-remove { color: #A1260D; }
+.le-import-map { border-collapse: collapse; font-size: 13px; width: 100%; }
+.le-import-map th { text-align: left; font-weight: 600; color: var(--le-ink); padding: 6px 10px 6px 0; overflow-wrap: anywhere; }
+.le-import-map td { padding: 4px 6px; }
+.le-import-map .le-hint { margin: 0; }
+.le-import-how { display: grid; gap: 2px; margin: 8px 0 0; padding: 0; border: 0; }
+.le-import-plan { display: grid; gap: 10px; margin-top: 14px; }
+.le-new-collection { display: grid; gap: 8px; margin-top: 18px; }
+@media (max-width: 640px) {
+  .le-collection-table .le-modal-body { padding: 0 12px 12px; }
+  .le-field-row { grid-template-columns: minmax(0, 1fr); }
+  .le-import-map, .le-import-map tbody, .le-import-map tr, .le-import-map th, .le-import-map td { display: block; }
+  .le-import-map tr { padding: 8px 0; border-bottom: 1px solid var(--le-line); }
+}
 .le-card-setting { display: grid; gap: 6px; }
 .le-card-setting-boxes { display: grid; gap: 4px; }
 .le-check { display: flex; align-items: center; gap: 8px; min-height: 32px; font-size: 13px; color: var(--le-body); cursor: pointer; }
@@ -1500,6 +1540,12 @@ export function createChrome() {
     brandButton.title = 'Your colours and type, across the whole website';
     brandButton.hidden = !window.liveEditBrand?.tokens?.length;
 
+    /* The collections visitors search (the Search tab), where the host hands them over. */
+    const searchButton = el('button', 'le-bar-btn le-when-roomy le-bar-search', 'Search');
+    searchButton.type = 'button';
+    searchButton.title = 'The lists visitors search, like your parts: keep them as tables';
+    searchButton.hidden = !window.liveEditCollections;
+
     /* One way to add a page, named for what it does. There were two buttons
        here ("Pages" and "Create page") opening the same form, and the second
        was never wired up, so half the ways in did nothing. */
@@ -1563,6 +1609,7 @@ export function createChrome() {
         pagesButton,
         sectionsButton,
         brandButton,
+        searchButton,
         changesButton,
         helpButton,
         previewButton,
@@ -1624,6 +1671,8 @@ export function createChrome() {
     if (window.liveEditSeo?.title?.key || window.liveEditSeo?.descriptionKey) tabNames.push('SEO');
     // A shop's facts in one place, where the host gathers them (window.liveEditShop, shop.js).
     if (window.liveEditShop?.products?.length || window.liveEditShop?.fields?.length) tabNames.push('Shop');
+    // The collections visitors search, where the host hands them over (window.liveEditCollections, collections-panel.js).
+    if (window.liveEditCollections) tabNames.push('Search');
     tabNames.forEach((name) => {
         const tab = el('button', 'le-tab', name);
         tab.type = 'button';
@@ -1841,6 +1890,7 @@ export function createChrome() {
         publishCount,
         previewButton,
         brandButton,
+        searchButton,
         pagesButton,
         sectionsButton,
         sectionInsert,
