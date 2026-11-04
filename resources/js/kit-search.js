@@ -108,6 +108,7 @@ const BASE = [
     '.kit-search .kit-search__filter{display:block;width:auto;max-width:100%;margin:0;padding:0;border:0;min-width:0}',
     '.kit-search .kit-search__chips{display:flex;flex-wrap:wrap;gap:6px}',
     '.kit-search .kit-search__chip{width:auto;margin:0;flex:none}',
+    '.kit-search .kit-search__chip[aria-pressed="true"]{background:var(--brand-ink,#0f2447);color:var(--brand-surface,#fff);border-color:var(--brand-ink,#0f2447)}',
     '.kit-search .kit-search__range{display:flex;flex-wrap:wrap;gap:6px;align-items:center}',
     '.kit-search .kit-search__range>span{display:inline;margin:0}',
     '.kit-search .kit-search__number{width:7.5em;flex:none;margin:0;box-sizing:border-box}',
