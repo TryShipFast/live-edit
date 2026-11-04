@@ -693,6 +693,40 @@ and "Paste rows"; a table's cell (`data-kit-table`) opens with its row and colum
 every row kept in step by one saved order of columns. The host's contract is in the website's
 LIVE-EDIT-STRUCTURE.md, section 7, "Charts and tables the owner adds".
 
+### Forms the owner shapes
+
+When the host sets `window.liveEditForms`, each form it marks (`form[data-kit-form="<page>/<instance>"]`) is shaped
+in a builder (`resources/js/forms.js`, `form-builder.js`). Only a host that has it hands it over (the website hands it
+to its hosted templates on a plan with the form builder); an outside site never sees the builder or its handle.
+
+```js
+window.liveEditForms = {
+  types: ['text', 'email', 'phone', 'number', 'date', 'time', 'choice', 'radios', 'checkbox', 'checkboxes', 'longtext'],
+  forms: {
+    'book/book.your-enquiry': {
+      key: 'book/book.your-enquiry', settingKey: 'form:book/book.your-enquiry', label: 'Your enquiry',
+      purpose: 'booking-request', workflow: 'booking', saved: false, submissions: 3,
+      fields: [{ key: 'email', label: 'Email address', type: 'email', required: true, help: '', retired: false, options: [],
+                 seeded: true, choices: null, protected: 'Needed for bookings', answers: 3, answeredAs: 'email' }],
+    },
+  },
+};
+```
+
+- Pressing a box of the form, or a question the builder holds (`[data-kit-form-field]`), opens the builder at that
+  question; an **Edit form** handle sits on the form; a heading or label still edited as words offers "Edit this
+  form's questions". A form the host handed nothing for is read from its markup (`seedForm`).
+- The builder: move up and down, rename, help text, kind, required, choices (the builder's own; a dropdown whose
+  choices are the page's words keeps them, edited by pressing it), **+ Add a question**, **Start blank**, **Taken off
+  the form** with **Put it back**. **Save the form** saves `settingKey` once as `{"fields":[{key,label,type,required,help,
+  retired,options}]}` and opens the page again with the builder on the form, which the host draws in the template's
+  own form kit.
+- What it keeps, said before anything is changed: a question `protected` by the workflow is renamed and moved only;
+  one with `answers` keeps its kind and is taken off (`retired`), never deleted; a picked choice is retired; required
+  applies to new answers only; a checkout takes no new questions yet. The host holds the same rules on save. The
+  website's contract is LIVE-EDIT-STRUCTURE.md, "Forms the owner shapes".
+- A library entry with `kind: 'form'` and `says` (lines describing it) is a form the host adds from the library.
+
 ## If something is wrong
 
 **Start here.** One command, safe on production, that says where this site's

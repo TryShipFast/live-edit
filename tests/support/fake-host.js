@@ -131,6 +131,24 @@ export const DESIGN = {
     'journal/salt-air': { title: 'Salt air', html: page('Salt air', post('salt-air', 'Salt air')) },
 };
 
+/** A contact page with a form an owner shapes (Forms the owner shapes), drawn only for a host that hands the builder over. */
+export const FORM_PAGE = {
+    title: 'Contact',
+    html: page('Contact', `
+<main>
+  <section data-instance="contact.form" data-component="form.contact" data-label="Write to us">
+    <h2 data-edit="text">Write to us</h2>
+    <form class="enquiry" action="https://formspree.io/f/your-form-id" method="POST">
+      <input type="hidden" name="_subject" value="Contact">
+      <label class="field"><span data-edit="text">Your name</span><input name="name" required></label>
+      <label class="field"><span data-edit="text">Email</span><input name="email" type="email" required></label>
+      <label class="field"><span data-edit="text">Message</span><textarea name="message"></textarea></label>
+      <button type="submit" data-edit="text">Send</button>
+    </form>
+  </section>
+</main>`, '../'),
+};
+
 /** The design's sections an owner can add to any page (TheKit::library), with the page each one is kept on. */
 export const LIBRARY = [
     { from: 'aster-veil.story', label: 'Story', page: 'Aster Veil', file: 'products/aster-veil' },
@@ -310,7 +328,7 @@ const nameListsAndSections = (doc, page) => {
  * `outside` hands over no page builder at all: an outside site (the plugin or
  * another adapter), which gets in-place editing only.
  */
-export function createHost({ makeDocument, serialise = (doc) => `<!doctype html>${doc.documentElement.outerHTML}`, removable = false, library = false, outside = false, data = false, search = false } = {}) {
+export function createHost({ makeDocument, serialise = (doc) => `<!doctype html>${doc.documentElement.outerHTML}`, removable = false, library = false, outside = false, data = false, search = false, forms = null } = {}) {
     const settings = {};
     const styles = {};
     const saves = [];
@@ -360,7 +378,33 @@ export function createHost({ makeDocument, serialise = (doc) => `<!doctype html>
     const draw = (id) => {
         if (removed().includes(id)) return null;
         let doc;
-        if (DESIGN[id]) {
+        if (forms && id === 'contact') {
+            doc = makeDocument(FORM_PAGE.html);
+            keyMarkers(doc, id);
+            // The host marks each form the builder can shape, and draws a saved one (TheFormsAPageHolds).
+            const form = doc.querySelector('[data-instance="contact.form"] form');
+            form.setAttribute('data-kit-form', 'contact/contact.form');
+            const saved = settings['form:contact/contact.form'];
+            if (saved) {
+                const fields = JSON.parse(saved).fields.filter((field) => !field.retired);
+                form.querySelectorAll('label.field').forEach((label) => label.remove());
+                const button = form.querySelector('button');
+                for (const field of fields) {
+                    const label = doc.createElement('label');
+                    label.className = 'field';
+                    label.setAttribute('data-kit-form-field', field.key);
+                    const words = doc.createElement('span');
+                    words.textContent = field.label;
+                    const control = doc.createElement(field.type === 'longtext' ? 'textarea' : 'input');
+                    control.setAttribute('name', field.key);
+                    if (field.type === 'phone') control.setAttribute('type', 'tel');
+                    if (field.type === 'email') control.setAttribute('type', 'email');
+                    if (field.required) control.setAttribute('required', '');
+                    label.append(words, control);
+                    form.insertBefore(label, button);
+                }
+            }
+        } else if (DESIGN[id]) {
             doc = makeDocument(DESIGN[id].html);
             keyMarkers(doc, id);
         } else {
@@ -439,6 +483,19 @@ export function createHost({ makeDocument, serialise = (doc) => `<!doctype html>
                 tag.setAttribute('src', '/kit-search.js');
                 tag.setAttribute('data-kit-search', '');
                 doc.body.append(tag);
+            }
+            // Forms the owner shapes: handed over only by a host that has it. With nothing saved, the editor reads the form itself.
+            if (forms && !outside) {
+                const saved = settings['form:contact/contact.form'];
+                const answered = forms.answered ?? {};
+                const handed = saved ? {
+                    'contact/contact.form': {
+                        key: 'contact/contact.form', settingKey: 'form:contact/contact.form', label: 'Write to us', purpose: 'contact', workflow: null, saved: true,
+                        submissions: forms.submissions ?? 0,
+                        fields: JSON.parse(saved).fields.map((field) => ({ ...field, seeded: ['name', 'email', 'message'].includes(field.key), protected: null, choices: 'own', answers: answered[field.key] ?? 0, answeredAs: answered[field.key] ? field.type : null })),
+                    },
+                } : {};
+                script(`window.liveEditForms=${JSON.stringify({ types: ['text', 'email', 'phone', 'number', 'date', 'time', 'choice', 'radios', 'checkbox', 'checkboxes', 'longtext'], forms: handed })};`);
             }
             // TheDataKitScript: what draws a chart or a table, on a page that holds one.
             if (doc.querySelector('[data-chart], [data-kit-table]')) {
