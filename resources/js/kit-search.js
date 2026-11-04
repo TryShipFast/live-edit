@@ -96,9 +96,14 @@ const BASE = [
     '.kit-search .kit-search__box{display:flex;flex-wrap:wrap;gap:8px;width:100%;margin:0}',
     '.kit-search .kit-search__input{flex:1 1 220px;width:auto;min-width:0;max-width:100%;margin:0;box-sizing:border-box}',
     '.kit-search .kit-search__go{flex:0 0 auto;width:auto;margin:0}',
-    '.kit-search .kit-search__go,.kit-search .kit-search__quote{color:var(--kit-search-on-accent,var(--brand-surface,#fff))}',
-    '.kit-search .kit-search__go:hover,.kit-search .kit-search__quote:hover{color:var(--kit-search-on-accent,var(--brand-surface,#fff));filter:brightness(.92)}',
-    '.kit-search .kit-search__details,.kit-search .kit-search__details:hover{color:var(--brand-ink,inherit)}',
+    '.kit-search:not([data-search-buttons]) .kit-search__go,.kit-search:not([data-search-buttons]) .kit-search__quote{color:var(--kit-search-on-accent,var(--brand-surface,#fff))}',
+    '.kit-search:not([data-search-buttons]) .kit-search__go:hover,.kit-search:not([data-search-buttons]) .kit-search__quote:hover{color:var(--kit-search-on-accent,var(--brand-surface,#fff));filter:brightness(.92)}',
+    '.kit-search:not([data-search-buttons]) .kit-search__details,.kit-search:not([data-search-buttons]) .kit-search__details:hover{color:var(--brand-ink,inherit)}',
+    // A card's two ways onward, one under the other, each the card's width: a long label never breaks a button in two.
+    '.kit-search .kit-search__card .kit-search__ways{display:flex;flex-direction:column;align-items:stretch;gap:8px}',
+    '.kit-search .kit-search__card .kit-search__ways>a{display:flex;width:100%;box-sizing:border-box;justify-content:center;text-align:center;margin:0;white-space:normal}',
+    '.kit-search[data-layout="rows"] .kit-search__card .kit-search__ways{flex-direction:row;flex-wrap:wrap;width:auto}',
+    '.kit-search[data-layout="rows"] .kit-search__card .kit-search__ways>a{width:auto}',
     '.kit-search .kit-search__filters{display:flex;flex-wrap:wrap;gap:12px 20px;align-items:flex-end;margin:16px 0 0;padding:0;grid-template-columns:none}',
     '.kit-search .kit-search__filter{display:block;width:auto;max-width:100%;margin:0;padding:0;border:0;min-width:0}',
     '.kit-search .kit-search__chips{display:flex;flex-wrap:wrap;gap:6px}',
@@ -122,6 +127,15 @@ const BASE = [
     '.kit-search .kit-search__filters.is-open>.kit-search__filters-toggle{align-self:flex-start}}',
 ].join('');
 
+/** The design's own button classes (data-search-buttons, from the host), added to a search's buttons. */
+const styled = (node, section, which) => {
+    try {
+        const classes = JSON.parse(section.getAttribute('data-search-buttons') || 'null')?.[which];
+        if (typeof classes === 'string') for (const name of classes.split(/\s+/)) if (/^[A-Za-z][\w-]*$/.test(name)) node.classList.add(name);
+    } catch { /* the base look stays */ }
+
+    return node;
+};
 const said = (section, name, fallback) => (section.querySelector(`[data-search-word="${name}"]`)?.textContent ?? '').trim() || fallback;
 const make = (doc, tag, className, text) => {
     const node = doc.createElement(tag);
@@ -188,6 +202,9 @@ export function mount(section, data, { win = window, send = null } = {}) {
         detail.hidden = true;
         list?.parentNode?.insertBefore(detail, list);
     }
+
+    const go = section.querySelector('.kit-search__go');
+    if (go) styled(go, section, 'primary');
 
     if (input && collection.rows[0] && !input.placeholder) {
         const code = collection.fields.find((f) => f.type === 'text' && f.code);
@@ -312,7 +329,7 @@ export function mount(section, data, { win = window, send = null } = {}) {
         }
         if (facts.children.length) li.append(facts);
         const ways = make(doc, 'div', 'kit-search__ways');
-        const open = make(doc, 'a', 'kit-search__details', words('details', 'View details'));
+        const open = styled(make(doc, 'a', 'kit-search__details', words('details', 'View details')), section, 'secondary');
         const params = new URLSearchParams();
         params.set('record', recordId(item));
         open.href = addressWith(win, params);
@@ -327,7 +344,7 @@ export function mount(section, data, { win = window, send = null } = {}) {
         ways.append(open);
         const quote = quoteHref(section, item, collection);
         if (quote) {
-            const ask = make(doc, 'a', 'kit-search__quote', words('quote', 'Request a quote'));
+            const ask = styled(make(doc, 'a', 'kit-search__quote', words('quote', 'Request a quote')), section, 'primary');
             ask.href = quote;
             ways.append(ask);
         }
@@ -374,7 +391,7 @@ export function mount(section, data, { win = window, send = null } = {}) {
         words_.append(all);
         const quote = quoteHref(section, record, collection);
         if (quote) {
-            const ask = make(doc, 'a', 'kit-search__quote', words('quote', 'Request a quote'));
+            const ask = styled(make(doc, 'a', 'kit-search__quote', words('quote', 'Request a quote')), section, 'primary');
             ask.href = quote;
             words_.append(ask);
         }
@@ -429,7 +446,7 @@ export function mount(section, data, { win = window, send = null } = {}) {
 
     let more = section.querySelector('[data-search-more]');
     if (!more && list) {
-        more = make(doc, 'button', 'kit-search__more');
+        more = styled(make(doc, 'button', 'kit-search__more'), section, 'secondary');
         more.type = 'button';
         more.setAttribute('data-search-more', '');
         list.after(more);
@@ -495,6 +512,21 @@ export function carry(doc = document, win = window) {
     const message = form.querySelector('[data-carry-pn]') ?? form.querySelector('textarea[name*="message" i], textarea[name*="detail" i], textarea[name*="enquir" i]') ?? form.querySelector('textarea');
     const words = `Request a quote for: ${about}`;
     if (message && !message.value.trim()) message.value = message.matches('[data-carry-pn]') ? about : words;
+    // What the request is for, where the form asks (Owena's "I want to"): the template's own default for a
+    // record (an option marked data-search-purpose), else the one option that plainly means buying. Two or none
+    // that could be it: left for the visitor, never guessed.
+    for (const select of form.querySelectorAll('select')) {
+        if (select.value) continue;
+        const options = [...select.options].filter((o) => o.value);
+        const marked = options.filter((o) => o.hasAttribute('data-search-purpose'));
+        const buying = options.filter((o) => /\b(buy|buying|purchase|order)\b/i.test(o.textContent));
+        const pick = marked.length === 1 ? marked[0] : (marked.length === 0 && buying.length === 1 ? buying[0] : null);
+        if (pick) {
+            select.value = pick.value;
+            select.dispatchEvent(new Event('change', { bubbles: true }));
+            break;
+        }
+    }
     const kept = form.querySelector('[data-carried-field]');
     if (kept && !kept.value) kept.value = about;
     if (id && !form.querySelector('input[name="search_record"]')) {

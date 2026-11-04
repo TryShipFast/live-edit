@@ -189,3 +189,44 @@ describe('the owner\'s words, changed in the editor', () => {
         expect([...section.querySelectorAll('.kit-search__quote')].map((a) => a.textContent)).toEqual(Array(4).fill('Request a quote for this part'));
     });
 });
+
+describe('the design\'s own buttons, and what the request is for', () => {
+    it('a search\'s buttons take the design\'s own button classes, and a card\'s two buttons stack', () => {
+        window.history.replaceState(null, '', '/parts/');
+        const section = page();
+        section.setAttribute('data-search-buttons', JSON.stringify({ primary: 'btn btn--ink', secondary: 'btn btn--line' }));
+        mount(section, data);
+        const card = section.querySelector('[data-search-hit="r1"]');
+        expect([...card.querySelector('.kit-search__quote').classList]).toEqual(['kit-search__quote', 'btn', 'btn--ink']);
+        expect([...card.querySelector('.kit-search__details').classList]).toEqual(['kit-search__details', 'btn', 'btn--line']);
+        expect(section.querySelector('.kit-search__go').classList.contains('btn--ink')).toBe(true);
+    });
+
+    it('a class that is not a class name is never added', () => {
+        const section = page();
+        section.setAttribute('data-search-buttons', JSON.stringify({ primary: 'btn "><script>', secondary: '' }));
+        mount(section, data);
+        expect([...section.querySelector('.kit-search__quote').classList]).toEqual(['kit-search__quote', 'btn']);
+    });
+
+    it('the form\'s purpose is chosen when one option plainly means buying', () => {
+        window.history.replaceState(null, '', '/contact/?from=search&record=r1&about=2-1586-3');
+        document.body.innerHTML = '<section data-component="form.rfq"><form><select name="ow_intent"><option value="">Choose one</option><option>Buy aircraft spare parts</option><option>Sell aircraft spare parts</option><option>Report an AOG</option></select><textarea name="details"></textarea></form></section>';
+        carry(document, window);
+        expect(document.querySelector('select').value).toBe('Buy aircraft spare parts');
+    });
+
+    it('two options that could be it, or none, are left for the visitor', () => {
+        window.history.replaceState(null, '', '/contact/?from=search&record=r1&about=2-1586-3');
+        document.body.innerHTML = '<section data-component="form.quote"><form><select name="a"><option value="">Choose</option><option>Buy new</option><option>Buy used</option></select><select name="b"><option value="">Vehicle</option><option>Saloon</option><option>SUV</option></select><textarea name="m"></textarea></form></section>';
+        carry(document, window);
+        expect([...document.querySelectorAll('select')].map((s) => s.value)).toEqual(['', '']);
+    });
+
+    it('a template\'s own default for a record wins', () => {
+        window.history.replaceState(null, '', '/contact/?from=search&record=r1&about=2-1586-3');
+        document.body.innerHTML = '<section data-component="form.quote"><form><select name="a"><option value="">Choose</option><option>Buy new</option><option data-search-purpose>Buy used</option></select><textarea name="m"></textarea></form></section>';
+        carry(document, window);
+        expect(document.querySelector('select').value).toBe('Buy used');
+    });
+});
