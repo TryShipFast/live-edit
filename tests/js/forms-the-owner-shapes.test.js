@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
     addField, addOption, copyOf, definitionOf, limitsSaid, moveField, removeOption, rename, restoreField, retireField,
-    seedForm, setHelp, setRequired, setType, startBlank, typeLockedBecause, workflowOf,
+    seedForm, setHelp, setRequired, setType, startBlank, typeLockedBecause, unfinished, workflowOf,
 } from '../../resources/js/forms.js';
 
 /*
@@ -100,6 +100,9 @@ describe('a form, read from its markup the first time', () => {
         expect(form.workflow).toBe('checkout');
         expect(form.fields.map((f) => f.key)).toEqual(['checkout_name', 'checkout_email', 'checkout_addr']);
         expect(form.fields.every((f) => f.protected === 'Needed for the checkout')).toBe(true);
+        // Its own questions wait: the shop's script sends the order with the fields it knows.
+        expect(addField(form, 'longtext')).toBeNull();
+        expect(form.fields).toHaveLength(3);
     });
 
     it('says what a purpose feeds', () => {
@@ -130,12 +133,16 @@ describe('shaping it', () => {
         expect(setRequired(form, phone, true)).toBeNull();
         expect(rename(form, phone, 'Mobile number')).toBeNull();
         const choice = addField(form, 'choice', seq());
+        // A field of choices starts with none: saving says so until the owner types one.
+        expect(unfinished(form)).toBe('“Choose one” needs at least one choice. Type one under it and press Add.');
         expect(addOption(form, choice, 'A friend')).toBeNull();
+        expect(addOption(form, choice, 'Search online')).toBeNull();
+        expect(unfinished(form)).toBeNull();
         expect(addOption(form, choice, 'A friend')).toBe('That choice is there already.');
         const saved = definitionOf(form);
         const added = saved.fields.find((f) => f.key === phone);
         expect(added).toEqual({ key: phone, label: 'Mobile number', type: 'phone', required: true, help: '', retired: false, options: [] });
-        expect(saved.fields.find((f) => f.key === choice).options.map((o) => o.label)).toEqual(['First choice', 'Second choice', 'A friend']);
+        expect(saved.fields.find((f) => f.key === choice).options.map((o) => o.label)).toEqual(['A friend', 'Search online']);
         // Only the definition is saved: never the reasons and counts the host works out.
         expect(Object.keys(added)).not.toContain('protected');
     });
@@ -177,9 +184,11 @@ describe('shaping it', () => {
         expect(form.fields.find((f) => f.key === 'message').retired).toBe(false);
 
         const choice = addField(form, 'radios', seq());
-        expect(removeOption(form, choice, 'First choice')).toBeNull();
-        expect(form.fields.find((f) => f.key === choice).options.find((o) => o.value === 'First choice').retired).toBe(true);
-        expect(removeOption(form, choice, 'Second choice')).toBe('A field of choices keeps at least one choice.');
+        addOption(form, choice, 'Just me');
+        addOption(form, choice, 'Two of us');
+        expect(removeOption(form, choice, 'Just me')).toBeNull();
+        expect(form.fields.find((f) => f.key === choice).options.find((o) => o.value === 'Just me').retired).toBe(true);
+        expect(removeOption(form, choice, 'Two of us')).toBe('A field of choices keeps at least one choice.');
     });
 
     it('lets a question nobody answered change its kind, and a new one go away for good', () => {

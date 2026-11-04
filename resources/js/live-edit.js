@@ -5979,35 +5979,36 @@ const bootLiveEdit = () => {
             drawerFields.append(open);
         };
 
-        // A form on the page: a handle at its corner opens its builder.
-        const formHandle = document.createElement('button');
-        formHandle.type = 'button';
-        formHandle.className = 'le-form-handle';
-        formHandle.textContent = 'Edit form';
-        formHandle.setAttribute('aria-label', 'Edit this form’s questions');
-        linkHandle.parentNode?.append(formHandle);
-        let formHandleFor = null;
-        formHandle.addEventListener('click', (event) => {
-            event.preventDefault();
-            event.stopPropagation();
-            if (formHandleFor) openFormBuilder(formHandleFor);
-        });
-        document.addEventListener('pointerover', (event) => {
-            if (!formsAreShaped() || !document.body.classList.contains('editing')) return;
-            if (event.target === formHandle) return;
-            const shaped = event.target.closest?.('form[data-kit-form]');
-            if (!shaped) {
-                if (!ui.root.contains(event.target)) formHandle.classList.remove('is-visible');
+        // A form on the page: a handle at its corner opens its builder. Only where the host handed the builder over.
+        if (formsAreShaped()) {
+            const formHandle = document.createElement('button');
+            formHandle.type = 'button';
+            formHandle.className = 'le-form-handle';
+            formHandle.textContent = 'Edit form';
+            formHandle.setAttribute('aria-label', 'Edit this form’s questions');
+            linkHandle.parentNode?.append(formHandle);
+            let formHandleFor = null;
+            formHandle.addEventListener('click', (event) => {
+                event.preventDefault();
+                event.stopPropagation();
+                if (formHandleFor) openFormBuilder(formHandleFor);
+            });
+            document.addEventListener('pointerover', (event) => {
+                if (!document.body.classList.contains('editing') || event.target === formHandle) return;
+                const shaped = event.target.closest?.('form[data-kit-form]');
+                if (!shaped) {
+                    if (!ui.root.contains(event.target)) formHandle.classList.remove('is-visible');
 
-                return;
-            }
-            formHandleFor = shaped;
-            const rect = shaped.getBoundingClientRect();
-            formHandle.style.top = `${Math.max(rect.top, 64) + 6}px`;
-            formHandle.style.left = `${Math.max(8, Math.min(rect.right - 110, window.innerWidth - 118))}px`;
-            formHandle.classList.add('is-visible');
-        });
-        window.addEventListener('scroll', () => formHandle.classList.remove('is-visible'), { passive: true });
+                    return;
+                }
+                formHandleFor = shaped;
+                const rect = shaped.getBoundingClientRect();
+                formHandle.style.top = `${Math.max(rect.top, 64) + 6}px`;
+                formHandle.style.left = `${Math.max(8, Math.min(rect.right - 110, window.innerWidth - 118))}px`;
+                formHandle.classList.add('is-visible');
+            });
+            window.addEventListener('scroll', () => formHandle.classList.remove('is-visible'), { passive: true });
+        }
 
         // Back from a save: the builder opens again on the form, as drawn now.
         try {

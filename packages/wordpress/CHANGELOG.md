@@ -1,5 +1,9 @@
 # ShipFast Live Edit for WordPress
 
+## 0.17.0 (not released yet)
+
+- Forms the owner shapes: where the host hands it over (`window.liveEditForms`, our hosted templates only), pressing a form opens a builder: add, rename, reorder and take off questions, choose each one's kind, whether it must be filled in, its help and its choices, or start blank. Saved once as the form's setting and drawn by the host in the template's own form style. A question a workflow needs (a checkout's, a booking's, an application's) is renamed and moved only; one with answers keeps its kind and is taken off rather than deleted, said in plain words. Read from the markup the first time (`forms.js`, `seedForm`). Changes lists a form's added and removed questions; the section library describes a form entry (`kind: 'form'`).
+
 ## 0.16.2
 
 - A product's photos are managed in one place: pressing a thumbnail or a photo of a gallery opens the product's photos, each to replace, move or remove, and + Add a photo. Before, a thumbnail only explained itself and the photos a gallery hides could not be reached.

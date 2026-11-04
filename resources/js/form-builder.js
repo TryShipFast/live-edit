@@ -8,8 +8,8 @@
  */
 
 import {
-    HAS_OPTIONS, TYPE_NAMES, addField, addOption, copyOf, definitionOf, limitsSaid, moveField, removeOption, rename,
-    renameOption, requiredLockedBecause, restoreField, retireField, setHelp, setRequired, setType, startBlank, staysBecause,
+    HAS_OPTIONS, TYPE_NAMES, addField, addingWaitsBecause, addOption, copyOf, definitionOf, limitsSaid, moveField, removeOption, rename,
+    renameOption, requiredLockedBecause, unfinished, restoreField, retireField, setHelp, setRequired, setType, startBlank, staysBecause,
     typeLockedBecause,
 } from './forms.js';
 
@@ -150,6 +150,7 @@ export function renderFormBuilder({ ui, form: handed, types, save, saved, open =
                 });
                 adding.append(input, add);
                 choices.append(adding);
+                if (!field.options.some((o) => !o.retired)) choices.append(el('p', 'le-hint', 'Type the first choice and press Add.'));
                 const gone = field.options.filter((o) => o.retired);
                 if (gone.length) choices.append(el('p', 'le-hint', `Taken off the list, kept for earlier answers: ${gone.map((o) => o.label).join(', ')}.`));
             }
@@ -214,7 +215,9 @@ export function renderFormBuilder({ ui, form: handed, types, save, saved, open =
         if (!shown.length) body.push(el('p', 'le-hint', 'This form asks nothing yet. Add a question below.'));
         body.push(list);
 
+        const waits = addingWaitsBecause(form);
         const adder = el('div', 'le-fb-add');
+        if (waits) adder.hidden = true;
         const kind = el('select', 'le-input');
         kind.setAttribute('aria-label', 'Kind of question to add');
         for (const type of types) {
@@ -230,7 +233,7 @@ export function renderFormBuilder({ ui, form: handed, types, save, saved, open =
             draw();
             ui.body.querySelector(`[data-field="${key}"] input`)?.focus();
         }));
-        body.push(adder);
+        body.push(waits ? el('p', 'le-hint', waits) : adder);
 
         if (off.length) {
             const gone = el('div', 'le-fb-off-list');
@@ -266,6 +269,12 @@ export function renderFormBuilder({ ui, form: handed, types, save, saved, open =
     const keep = button('Save the form', 'le-btn le-btn-publish', async () => {
         if (!changed && handed.saved) {
             ui.close();
+
+            return;
+        }
+        const missing = unfinished(form);
+        if (missing) {
+            tell(missing);
 
             return;
         }

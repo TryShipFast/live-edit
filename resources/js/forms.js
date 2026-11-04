@@ -311,12 +311,17 @@ export const newFieldKey = (fields, random = Math.random) => {
 
 export const copyOf = (form) => JSON.parse(JSON.stringify(form));
 
-/** Add a field of a kind at the end of what is on the form, and return its key. */
+/** Why this form takes no new questions, or null. A checkout's own questions wait: its script sends only the fields it knows. */
+export const CHECKOUT_WAITS = 'Questions of your own on the checkout are coming. For now its questions can be renamed and moved.';
+export const addingWaitsBecause = (form) => (form.workflow === 'checkout' ? CHECKOUT_WAITS : null);
+
+/** Add a field of a kind at the end of what is on the form, and return its key (null when the form takes none). */
 export function addField(form, type, random = Math.random) {
+    if (addingWaitsBecause(form)) return null;
     const key = newFieldKey(form.fields, random);
     const field = {
         key, label: PRESET_LABEL[type] ?? 'New question', type, required: false, help: '', retired: false,
-        options: HAS_OPTIONS.has(type) ? [{ value: 'First choice', label: 'First choice', retired: false }, { value: 'Second choice', label: 'Second choice', retired: false }] : [],
+        options: [],
         seeded: false, choices: HAS_OPTIONS.has(type) ? 'own' : null, protected: null, answers: 0, answeredAs: null,
     };
     const lastShown = form.fields.map((f) => !f.retired).lastIndexOf(true);
@@ -371,10 +376,7 @@ export function setType(form, key, type) {
     const why = typeLockedBecause(field);
     if (why) return why;
     field.type = type;
-    if (HAS_OPTIONS.has(type) && field.options.filter((o) => !o.retired).length === 0) {
-        field.options = [{ value: 'First choice', label: 'First choice', retired: false }, { value: 'Second choice', label: 'Second choice', retired: false }];
-        field.choices = 'own';
-    }
+    if (HAS_OPTIONS.has(type)) field.choices = field.choices ?? 'own';
 
     return null;
 }
@@ -458,6 +460,13 @@ export function startBlank(form) {
         if (!field.protected && !field.retired) retireField(form, field.key);
     }
 }
+
+/** Why the form cannot be saved as it is, or null: a field of choices on the form needs at least one. */
+export const unfinished = (form) => {
+    const empty = form.fields.find((f) => !f.retired && HAS_OPTIONS.has(f.type) && f.choices !== 'template' && !f.options.some((o) => !o.retired));
+
+    return empty ? `“${empty.label}” needs at least one choice. Type one under it and press Add.` : null;
+};
 
 /** What is saved: only the definition, never the reasons and counts the host works out again. */
 export const definitionOf = (form) => ({
