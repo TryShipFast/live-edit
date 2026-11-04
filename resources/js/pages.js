@@ -16,7 +16,11 @@
 import { KINDS } from './data-kit.js';
 
 /** What a chart of a kind, or a table, holds and keeps to, for choosing one before it is added. */
-export function kindSays(kind) {
+export function kindSays(kind, section = {}) {
+    // A form the host offers (a contact or quote form): what it asks, as the host says it.
+    if (kind === 'form') {
+        return [...(Array.isArray(section.says) ? section.says : []), 'It is drawn with your website’s own form style, and posts to your enquiries.'];
+    }
     if (kind === 'table') {
         return [
             'A table, for what is compared across columns: plans, fees, a timetable.',
@@ -229,6 +233,22 @@ export function describeStructure(key, before, after, { library = [], pages = []
         const otherwise = now.length ? `Your pages: ${listed(now)}` : 'The pages you made changed';
 
         return { label: 'Pages', before: was.length ? `Your pages: ${listed(was)}` : 'No pages of your own', after: said || otherwise };
+    }
+
+    // A form the owner shaped (form-builder.js): its questions, before and after.
+    if (String(key ?? '').startsWith('form:')) {
+        const questions = (value) => (parsed(value, { fields: [] }).fields ?? []).filter((field) => !field.retired).map((field) => field.label);
+        const was = questions(before);
+        const now = questions(after);
+        const added = now.filter((label) => !was.includes(label));
+        const gone = was.filter((label) => !now.includes(label));
+        const said = [added.length ? `Added ${listed(added)}` : '', gone.length ? `Took off ${listed(gone)}` : ''].filter(Boolean).join('. ');
+
+        return {
+            label: 'Form questions',
+            before: was.length ? listed(was) : 'The questions the design asks',
+            after: said || (now.length ? listed(now) : 'No questions'),
+        };
     }
 
     if (!String(key ?? '').startsWith('structure:page:')) return null;
@@ -801,7 +821,7 @@ export function renderSectionBrowser({ container, library, add, multiple = false
         list.querySelectorAll('.le-library-item').forEach((row) => row.classList.toggle('is-looking', row.dataset.from === section.from));
         // A chart or a table (data-kit.js): what it holds and the rules it keeps, since it is not on any page yet.
         if (section.kind) {
-            view.replaceChildren(...kindSays(section.kind).map((line) => el('p', 'le-hint', line)));
+            view.replaceChildren(...kindSays(section.kind, section).map((line) => el('p', 'le-hint', line)));
 
             return;
         }

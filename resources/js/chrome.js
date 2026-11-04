@@ -386,6 +386,38 @@ a.le-mark:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
 .le-data-said { display: flex; flex-direction: column; gap: 6px; }
 .le-data-said .le-hint { margin: 0; }
 .le-data-note { color: var(--le-ink); }
+/* The form builder (form-builder.js): a form's questions, each opening its own settings. */
+.le-fb-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.le-fb-field { border: 1px solid var(--le-line); border-radius: 12px; background: #fff; min-width: 0; }
+.le-fb-head { display: flex; align-items: center; gap: 6px; padding: 6px 8px 6px 4px; }
+.le-fb-name { flex: 1; min-width: 0; display: flex; flex-direction: column; align-items: flex-start; gap: 2px; padding: 6px 8px; border: 0; background: none; text-align: left; cursor: pointer; font: inherit; color: var(--le-ink); border-radius: 8px; }
+.le-fb-name:hover, .le-fb-name:focus-visible { background: var(--le-soft); }
+.le-fb-label { font-weight: 600; font-size: 14px; overflow-wrap: anywhere; }
+.le-fb-about { font-size: 12px; color: var(--le-muted); }
+.le-fb-badge { font-size: 11px; font-weight: 600; color: #8a4b00; background: #fff4e0; border-radius: 999px; padding: 2px 8px; margin-top: 2px; }
+.le-fb-move { min-width: 36px; min-height: 36px !important; padding: 0 !important; flex: none; }
+.le-fb-move:disabled { opacity: .35; cursor: default; }
+.le-fb-edit { display: flex; flex-direction: column; gap: 12px; padding: 4px 14px 14px; border-top: 1px solid var(--le-line); margin-top: 2px; padding-top: 14px; }
+.le-fb-edit .le-hint { margin: 0; }
+.le-fb-choices { display: flex; flex-direction: column; gap: 8px; }
+.le-fb-sub { font-size: 12px; font-weight: 700; color: var(--le-muted); text-transform: uppercase; letter-spacing: .04em; }
+.le-fb-option { display: flex; gap: 8px; align-items: center; min-width: 0; }
+.le-fb-option .le-input { flex: 1; min-width: 0; }
+.le-fb-option .le-fb-label { flex: 1; min-width: 0; }
+.le-fb-option-list { margin: 0; padding-left: 18px; font-size: 13px; color: var(--le-body); }
+.le-fb-small { min-height: 34px !important; flex: none; }
+.le-fb-off { align-self: flex-start; color: var(--le-danger) !important; }
+.le-fb-add { display: flex; gap: 8px; align-items: center; margin-top: 12px; flex-wrap: wrap; }
+.le-fb-add select { flex: 1 1 160px; min-width: 0; }
+.le-fb-off-list { display: flex; flex-direction: column; gap: 8px; margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--le-line); }
+.le-fb-off-list .le-hint { margin: 0; }
+.le-fb-notice { margin: 0 0 10px; padding: 10px 12px; border-radius: 10px; background: #eef4ff; color: var(--le-ink); font-size: 13px; line-height: 1.45; }
+.le-fb-error { margin: 12px 0 0; padding: 10px 12px; border-radius: 10px; background: #fdecec; color: var(--le-danger); font-size: 13px; }
+.le-fb-error[hidden] { display: none; }
+.le-fb-gap { flex: 1; }
+.le-modal-foot:has(.le-fb-gap) { flex-wrap: wrap; gap: 8px; }
+.le-form-handle { position: fixed; z-index: 2147483000; display: none; align-items: center; gap: 6px; padding: 6px 12px; border-radius: 999px; border: 0; background: var(--le-accent, #2563eb); color: #fff; font: 600 13px/1.2 system-ui, sans-serif; box-shadow: 0 4px 14px rgba(15,23,42,.18); cursor: pointer; }
+.le-form-handle.is-visible { display: inline-flex; }
 .le-library { display: flex; flex-direction: column; gap: 10px; text-transform: none; letter-spacing: normal; }
 .le-library-list { display: flex; flex-direction: column; gap: 2px; max-height: 46vh; overflow: auto; margin: 0 -6px; padding: 0 2px; }
 .le-library-page { margin: 12px 6px 4px; font-size: 12px; font-weight: 600; color: var(--le-muted); }

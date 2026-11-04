@@ -29,6 +29,8 @@ import { addedWith, describeStructure, hrefTo, newAddedId, orderWith, pageBase, 
 import { insertionNear, sectionName, sectionUnder, shownSectionLists, shownSections } from './section-inserter.js';
 import { DETAIL_MODE, copiedItemSettings, copiedStyles, copyPageForCard, deletablePage, deletePage, detailAddress, keyMap, linksTo, linksWarning, showOnlyTheDetail } from './card-page.js';
 import { renderChoice } from './choice.js';
+import { TYPES as FORM_TYPES, seedForm } from './forms.js';
+import { renderFormBuilder } from './form-builder.js';
 import { chartRowOf, renderChartPanel, renderChartRow, renderTableControls } from './data-panel.js';
 import { KINDS as CHART_KINDS, chartData, chartOf, itemContext as chartItemContext, kindOf as chartKindOf } from './data-kit.js';
 import { commonQuestions, listGuides, profileFor, shopQuestions } from './help.js';
@@ -5851,6 +5853,20 @@ const bootLiveEdit = () => {
              */
             const dropdown = node.closest('select');
             if (dropdown && choicesOfDropdown(dropdown).length > 0) return { element: dropdown, kind: 'choices' };
+            /*
+             * A form the owner shapes (forms.js): its boxes, and its questions once the builder holds them,
+             * open the form builder at that question. Its heading, button and messages stay words.
+             */
+            const shaped = formsAreShaped() ? node.closest('form[data-kit-form]') : null;
+            if (shaped) {
+                const field = node.closest('[data-kit-form-field]');
+                const control = node.closest('input, textarea, select');
+                if (control || (field && !node.closest('[data-edit]'))) {
+                    const key = field?.dataset.kitFormField ?? (control?.getAttribute('name') ?? '').replace(/\[\]$/, '');
+
+                    return { element: shaped, kind: 'form', field: key || null, box: field ?? control, label: 'A question: press to shape this form' };
+                }
+            }
             const text = node.closest('[data-edit]');
             if (text) return { element: text, kind: 'text' };
             /*
@@ -5911,14 +5927,117 @@ const bootLiveEdit = () => {
             return below ?? node;
         };
 
-        const openTarget = ({ element, kind }) => {
+        /* ---------------------------------------------------------- forms the owner shapes (form-builder.js) */
+
+        // Only where the host hands the builder over: our hosted templates, on a plan that has it.
+        const formsAreShaped = () => Boolean(window.liveEditForms);
+        const FORM_REOPEN = 'le_form_reopen';
+
+        /** A form's builder, on the form as the host handed it (or as its markup has it). */
+        const openFormBuilder = (formElement, field = null) => {
+            const key = formElement.dataset.kitForm;
+            const instance = formElement.closest('[data-component^="form."]') ?? formElement;
+            const handed = window.liveEditForms?.forms?.[key]
+                ?? { ...seedForm(instance), key, settingKey: `form:${key}`, saved: false };
+            if (!handed?.fields) return;
+            if (!document.body.classList.contains('editing')) setEditing(true);
+            closeDrawer(true);
+            const handle = ui.modal({
+                title: `Form: ${handed.label || formElement.dataset.kitFormLabel || 'Your form'}`,
+                subtitle: 'The questions visitors answer, drawn in your website’s own style. Saved as a draft until you publish.',
+                size: 'is-medium',
+            });
+            handle.card.classList.add('le-form-builder');
+            renderFormBuilder({
+                ui: handle,
+                form: handed,
+                types: window.liveEditForms?.types ?? FORM_TYPES.filter((type) => type !== 'file'),
+                open: field,
+                save: (definition) => saveSetting(handed.settingKey, JSON.stringify(definition)),
+                saved: () => {
+                    // The host draws the form in the template's own kit: the page is opened again, the builder with it.
+                    try {
+                        sessionStorage.setItem(FORM_REOPEN, key);
+                        sessionStorage.setItem('tb_editing', '1');
+                    } catch { /* the page still opens, without the builder */ }
+                    window.location.reload();
+                },
+            });
+
+            return handle;
+        };
+
+        /** On a form's words (its heading, a label not yet the builder's): the way to its questions. */
+        const offerTheFormBuilder = (element) => {
+            const shaped = formsAreShaped() ? element.closest?.('form[data-kit-form]') : null;
+            if (!shaped) return;
+            const open = document.createElement('button');
+            open.type = 'button';
+            open.className = 'le-chip-btn';
+            open.textContent = 'Edit this form’s questions';
+            open.addEventListener('click', () => openFormBuilder(shaped, element.closest('[data-kit-form-field]')?.dataset.kitFormField ?? null));
+            drawerFields.append(open);
+        };
+
+        // A form on the page: a handle at its corner opens its builder.
+        const formHandle = document.createElement('button');
+        formHandle.type = 'button';
+        formHandle.className = 'le-form-handle';
+        formHandle.textContent = 'Edit form';
+        formHandle.setAttribute('aria-label', 'Edit this form’s questions');
+        linkHandle.parentNode?.append(formHandle);
+        let formHandleFor = null;
+        formHandle.addEventListener('click', (event) => {
+            event.preventDefault();
+            event.stopPropagation();
+            if (formHandleFor) openFormBuilder(formHandleFor);
+        });
+        document.addEventListener('pointerover', (event) => {
+            if (!formsAreShaped() || !document.body.classList.contains('editing')) return;
+            if (event.target === formHandle) return;
+            const shaped = event.target.closest?.('form[data-kit-form]');
+            if (!shaped) {
+                if (!ui.root.contains(event.target)) formHandle.classList.remove('is-visible');
+
+                return;
+            }
+            formHandleFor = shaped;
+            const rect = shaped.getBoundingClientRect();
+            formHandle.style.top = `${Math.max(rect.top, 64) + 6}px`;
+            formHandle.style.left = `${Math.max(8, Math.min(rect.right - 110, window.innerWidth - 118))}px`;
+            formHandle.classList.add('is-visible');
+        });
+        window.addEventListener('scroll', () => formHandle.classList.remove('is-visible'), { passive: true });
+
+        // Back from a save: the builder opens again on the form, as drawn now.
+        try {
+            const again = sessionStorage.getItem(FORM_REOPEN);
+            if (again) {
+                sessionStorage.removeItem(FORM_REOPEN);
+                const shaped = [...document.querySelectorAll('form[data-kit-form]')].find((form) => form.dataset.kitForm === again);
+                if (shaped && formsAreShaped()) {
+                    window.setTimeout(() => {
+                        shaped.scrollIntoView({ block: 'center' });
+                        openFormBuilder(shaped);
+                        ui.toast?.('Form saved. It is a draft until you publish.', 5000);
+                    }, 400);
+                }
+            }
+        } catch { /* nothing to open again */ }
+
+        const openTarget = ({ element, kind, field = null }) => {
+            if (kind === 'form') {
+                openFormBuilder(element, field);
+
+                return;
+            }
             if (kind === 'chart-row') editChartRow(element);
             else if (kind === 'chart') editChart(element);
             else if (kind === 'image') { const list = galleryOf(element); if (list) editGalleryPhoto(element, list); else editImage(element); }
             else if (kind === 'icon') void editIcon(element);
             else if (kind === 'svg') editDrawing(element);
-            else if (kind === 'text') editText(element);
-            else if (kind === 'choices') editChoices(element);
+            else if (kind === 'text') { editText(element); offerTheFormBuilder(element); }
+            else if (kind === 'choices') { editChoices(element); offerTheFormBuilder(element); }
             else if (kind === 'link') editLink(element);
             else if (kind === 'computed' && computedKind(element) === 'gallery' && galleryOf(element)) editGallery(galleryOf(element));
             else if (kind === 'computed') ui.toast(COMPUTED_SAYS[computedKind(element)] ?? COMPUTED_SAYS.count, 7000);
