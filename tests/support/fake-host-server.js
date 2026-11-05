@@ -57,6 +57,8 @@ export async function serveFakeHost({ removable = false, library = false, outsid
         for (const key of Object.keys(host.styles)) delete host.styles[key];
         Object.assign(host.settings, answer.settings ?? {});
         Object.assign(host.styles, answer.styles ?? {});
+
+        return answer.pending ?? 0;
     };
 
     const server = createServer(async (request, response) => {
@@ -80,8 +82,8 @@ export async function serveFakeHost({ removable = false, library = false, outsid
 
                     return;
                 }
-                await loadContent(token);
-                const html = host.editorPage(page, { editorBase: `http://${request.headers.host}/edit/`, api: `http://${request.headers.host}/api`, runtime: '/dist/live-edit.js', token, visitor });
+                const pending = await loadContent(token);
+                const html = host.editorPage(page, { editorBase: `http://${request.headers.host}/edit/`, api: `http://${request.headers.host}/api`, runtime: '/dist/live-edit.js', token, visitor, pending });
                 response.writeHead(html ? 200 : 404, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store' });
                 response.end(html ?? 'Not found');
 

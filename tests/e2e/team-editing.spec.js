@@ -123,7 +123,7 @@ const changesFor = async (who) => (await fetch(`${site.url}/api/demo/changes`, {
 
 const openChanges = async (page, half = 'Changes') => {
     await ui(page).locator('.le-toolbar').getByRole('button', { name: /Changes/ }).first().click();
-    if (half === 'History') await ui(page).getByRole('tab', { name: 'History' }).click();
+    if (half === 'History') await ui(page).locator('.le-subtabs').getByRole('tab', { name: 'Published' }).click();
     await settle(page);
 };
 

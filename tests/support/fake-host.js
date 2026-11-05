@@ -463,7 +463,7 @@ export function createHost({ makeDocument, serialise = (doc) => `<!doctype html>
         made,
         removed,
         /** The editor's page, as markup, with what the editor is handed. */
-        editorPage(id, { editorBase, api, runtime, token = 'kbs_demo', visitor = false }) {
+        editorPage(id, { editorBase, api, runtime, token = 'kbs_demo', visitor = false, pending = 0 }) {
             const doc = draw(id);
             if (!doc) return null;
             // What a visitor gets: the page with the published words and no editor.
@@ -476,7 +476,7 @@ export function createHost({ makeDocument, serialise = (doc) => `<!doctype html>
             };
             script(`window.liveEditApi=${JSON.stringify({ base: api, site: 'demo', token })};`
                 + `window.liveEditContent=${JSON.stringify({ base: api, site: 'demo', key: token })};`
-                + 'window.liveEditPublishing={pending:0};');
+                + `window.liveEditPublishing={pending:${Number(pending) || 0}};`);
             if (!outside) script(`window.liveEditPages=${JSON.stringify(builderFor(id, editorBase))};`);
             // Only a hosted template that gets search is handed its collections; an outside site never.
             if (search && !outside) script(`window.liveEditCollections=${JSON.stringify({ collections: collections(), missed: { href: '/dashboard#search', count: 0 } })};`);
