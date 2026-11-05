@@ -400,6 +400,39 @@ A host that serves pages in its own editor can keep the visitor's address in
 link field always shows and saves the `href`, so the address a customer
 publishes is never the editor's.
 
+## The toolbar
+
+The bar at the foot of the screen carries the editor's controls (Edit or Done, Undo, Redo, New page,
+Sections, Brand, Search, Changes, Help, Preview, Publish) and any links the host adds, then Log out:
+
+```html
+<script>
+  window.liveEditToolbar = {
+    links: [
+      { label: 'Dashboard', href: '/dashboard', icon: 'dashboard' },
+      { label: 'Tracking and ads', href: '/sites/acme#tracking', icon: 'tracking' },
+      { label: 'Docs', href: '/docs', title: 'How the editor works' },
+    ],
+    logout: { href: '/logout', method: 'post' },
+  };
+</script>
+```
+
+A link with an `icon` is drawn as a round icon button: its `label` is the name a screen reader reads
+and the tooltip shown on hover and on keyboard focus, and it is a 44px target. The icons are
+`dashboard`, `tracking`, `settings`, `help`, `external` and `logout`. A link without an `icon` (or
+with a name not in that list) keeps its words, as before, with `title` as its tooltip. Log out is
+always an icon.
+
+The bar keeps one row. When everything would not fit (always on a phone, 760px and under; on a
+tablet or a narrow desktop when needed) it folds: Edit or Done, Undo, Publish with its count and a
+**More** button stay, and the rest moves into the More sheet as labelled icons, the least used first
+(Log out, then the host's links, Help, Search, Brand, Sections, Preview, New page, the language,
+Changes, Redo). The sheet closes on a tap outside it, Escape or Back, keeps the keyboard inside it
+while it is open, and hands it back to More. The bar and the sheet keep clear of the iPhone's home
+bar, and a site's own fixed bar at the foot of the screen (a phone's Call bar) is lifted above the
+bar while editing. The icons and the sheet's contents are in `resources/js/toolbar-icons.js`.
+
 ## Help (the ? button)
 
 Help is written for somebody who has never edited a website. It opens on what this kind of site is

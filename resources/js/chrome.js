@@ -12,6 +12,8 @@
  * the body `data-admin` and (optionally) declare toolbar extras.
  */
 
+import { linkIcon, sheetEntries, toolbarIcon } from './toolbar-icons.js';
+
 /** Styles for the overlay itself — scoped to the shadow root. */
 const CHROME_CSS = `
 :host { all: initial; }
@@ -1192,8 +1194,7 @@ select.le-input {
 .le-section-rows { display: grid; gap: 6px; }
 .le-section-rows .le-chip-btn { justify-content: flex-start; text-align: left; border-radius: 10px; width: 100%; }
 /* A phone: the drawer is a sheet over the lower half, so what is being edited stays in view,
-   and the bar is one row with the rest under More. */
-.le-more { display: none; }
+   and the bar is one row with the rest under More (the More sheet, below). */
 @media (max-width: 760px) {
   .le-drawer {
     top: auto; left: 0; right: 0; bottom: 0; width: 100%; max-height: min(62vh, 560px); height: auto;
@@ -1202,10 +1203,6 @@ select.le-input {
   .le-drawer.is-open { animation: le-rise .24s cubic-bezier(.2,.7,.2,1); }
   .le-drawer::before { content: ''; align-self: center; width: 40px; height: 4px; margin-top: 8px; border-radius: 4px; background: var(--le-field); flex: none; }
   .le-toolbar { flex-wrap: nowrap; justify-content: space-between; border-radius: 16px; }
-  .le-toolbar .le-when-roomy { display: none; }
-  .le-toolbar.is-more { flex-wrap: wrap; }
-  .le-toolbar.is-more .le-when-roomy { display: inline-flex; }
-  .le-more { display: inline-flex; }
   /* No floating guide pill on a phone: every corner belongs to the site (its menu button, its Book bar)
      or to our bar. The guide is under More, behind "?". */
   .le-walkthrough-pill { display: none !important; }
@@ -1235,11 +1232,79 @@ select.le-input {
   .le-toolbar > * { min-width: 0; flex-shrink: 1; }
   .le-toolbar .le-publish > span:first-child { overflow: hidden; text-overflow: ellipsis; }
 }
-/* A narrow phone (375px and the like): Undo and Redo wait under More with the rest, so Done editing, More and
-   Publish keep their words. */
 @media (max-width: 420px) {
-  .le-toolbar:not(.is-more) .le-round { display: none; }
   .le-toolbar .le-bar-btn, .le-toolbar .le-publish { padding-left: 8px; padding-right: 8px; }
+}
+
+/* ---- folding, icon links, tooltip and the More sheet (0.17.1) ----
+   Folded (a phone, or a bar that would not fit on one line): Edit or Done, Undo, Publish and More; the rest
+   are offered in the More sheet. */
+.le-more { display: none; }
+.le-toolbar.is-folded .le-more { display: inline-flex; }
+.le-toolbar .le-out { display: none !important; }
+.le-toolbar.is-tight .le-status > span:not(.le-dot) { display: none; }
+.le-toolbar.is-tight .le-status { padding: 0 2px; gap: 0; }
+/* A one-glyph link (Dashboard, Tracking and ads, Log out): a 44px target drawn as the bar's round buttons,
+   its outer 5px reaching into the bar's padding so the bar is no taller. */
+.le-icon-link { width: 44px; height: 44px; margin: -5px -3px; color: #cbd5e1; text-decoration: none; }
+.le-icon-link:hover { color: #fff; }
+.le-logout { display: inline-flex; margin: 0; }
+.le-tip {
+  position: fixed; z-index: 2147483002; pointer-events: none; max-width: 240px;
+  padding: 6px 10px; border-radius: 8px; background: #fff; color: #0B0C0F;
+  font-size: 12px; font-weight: 500; line-height: 1.3; white-space: nowrap;
+  box-shadow: 0 8px 24px -8px rgba(11,12,15,.35), 0 0 0 1px rgba(11,12,15,.08);
+}
+.le-sheet-scrim { position: fixed; inset: 0; z-index: 2147483001; background: rgba(11,12,15,.32); }
+.le-sheet {
+  position: fixed; z-index: 2147483001; left: 50%; transform: translateX(-50%);
+  bottom: calc(84px + env(safe-area-inset-bottom, 0px)); width: min(420px, calc(100vw - 24px));
+  max-height: calc(100vh - 120px - env(safe-area-inset-bottom, 0px)); overflow-y: auto; overscroll-behavior: contain;
+  background: #fff; color: var(--le-ink); border-radius: 18px; padding: 8px 12px 14px;
+  box-shadow: 0 30px 80px -20px rgba(11,12,15,.45);
+}
+.le-sheet-head { display: flex; align-items: center; justify-content: space-between; padding: 0 0 4px 6px; }
+.le-sheet-title { margin: 0; font-size: 15px; font-weight: 600; color: var(--le-ink); }
+.le-sheet-close { width: 44px; height: 44px; color: var(--le-ink); }
+.le-sheet-close:hover { background: #F4F5F7; }
+.le-sheet-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(88px, 1fr)); gap: 6px; }
+.le-sheet-links { margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--le-line); }
+.le-sheet-item {
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px;
+  min-height: 72px; min-width: 44px; padding: 10px 6px; border: 0; border-radius: 12px;
+  background: #F4F5F7; color: var(--le-ink); cursor: pointer; text-decoration: none; text-align: center;
+  font-size: 13px; font-weight: 500; line-height: 1.2;
+}
+.le-sheet-item:hover { background: #EBECEF; }
+.le-sheet-item:disabled { color: #6B6F78; cursor: default; background: #F4F5F7; }
+.le-sheet-item:disabled svg { opacity: .45; }
+.le-sheet :is(button, a, select):focus-visible { outline: 2px solid var(--le-blue); outline-offset: 2px; }
+.le-sheet-field { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 10px; padding: 0 6px; font-size: 13px; color: var(--le-body); }
+.le-sheet-field .le-lang { min-height: 44px; }
+@media (prefers-reduced-motion: no-preference) {
+  .le-sheet:not([hidden]) { animation: le-sheet-rise .2s cubic-bezier(.2,.7,.2,1); }
+}
+@keyframes le-sheet-rise { from { opacity: 0; transform: translate(-50%, 12px); } to { opacity: 1; transform: translateX(-50%); } }
+/* A phone: the sheet is the width of the screen, at its foot, clear of the iPhone's home bar; the bar is clear of
+   it too, and its controls are 44px targets. */
+@media (max-width: 760px) {
+  .le-toolbar { bottom: calc(10px + env(safe-area-inset-bottom, 0px)); padding: 4px 6px; gap: 4px; }
+  .le-toolbar .le-round, .le-toolbar .le-bar-btn, .le-toolbar .le-publish { min-height: 44px; }
+  .le-toolbar .le-round, .le-toolbar a.le-mark { width: 44px; height: 44px; flex: none; }
+  .le-sheet {
+    left: 0; right: 0; bottom: 0; transform: none; width: 100%;
+    max-height: calc(100vh - 56px); border-radius: 18px 18px 0 0;
+    padding: 6px 12px calc(16px + env(safe-area-inset-bottom, 0px));
+  }
+  .le-sheet::before { content: ''; display: block; width: 40px; height: 4px; margin: 2px auto 4px; border-radius: 4px; background: var(--le-field); }
+  .le-sheet-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  @keyframes le-sheet-rise { from { opacity: 0; transform: translateY(24px); } to { opacity: 1; transform: none; } }
+}
+/* The narrowest phones: the mark gives its room to the controls (the dashboard is in More, where the host links it). */
+@media (max-width: 359px) {
+  .le-toolbar.is-folded .le-mark { display: none; }
+  .le-toolbar { left: 6px; right: 6px; max-width: calc(100vw - 12px); gap: 2px; padding: 4px; }
+  .le-toolbar .le-publish { gap: 6px; }
 }
 
 /* A panel that is only a list's controls (the page's sections): flat, as the grouped ones are. */
@@ -1620,23 +1685,41 @@ export function createChrome() {
     publishCount.hidden = true;
     publishButton.append(publishLabel, publishCount);
 
-    // On a phone the bar is one row: Done, Undo, Redo and Publish, and the rest under More.
-    const moreButton = el('button', 'le-bar-btn le-more', 'More');
+    /*
+     * Folding (owner, 5 Nov 2026: "dashboard can change to icon to create less space same as ads and tracking";
+     * "they are not responsive on mobile").
+     *
+     * The bar keeps one row. On a phone, or whenever everything would not fit on one line (a tablet, the panel
+     * open beside it), it folds: Edit or Done, Undo, Publish and More stay, and every other control is offered
+     * in the More sheet as a labelled icon. The controls themselves stay where they are (hidden while folded),
+     * so whatever listens to them, and whatever hides or disables them, goes on working; the sheet presses them.
+     */
+
+    // A tooltip of our own for the one-glyph controls: the bar scrolls sideways when it must, which clips anything
+    // drawn outside it, and a native title shows late and never on focus.
+    const tipped = (node, text) => {
+        node.dataset.tip = text;
+        node.removeAttribute('title');
+    };
+    tipped(undoButton, 'Undo');
+    tipped(redoButton, 'Redo');
+    tipped(helpButton, 'Help');
+
+    const moreButton = el('button', 'le-round le-more');
     moreButton.type = 'button';
+    moreButton.innerHTML = toolbarIcon('more', 20);
+    moreButton.setAttribute('aria-label', 'More');
+    moreButton.setAttribute('aria-haspopup', 'dialog');
     moreButton.setAttribute('aria-expanded', 'false');
-    moreButton.addEventListener('click', () => {
-        const open = toolbar.classList.toggle('is-more');
-        moreButton.setAttribute('aria-expanded', String(open));
-        moreButton.textContent = open ? 'Less' : 'More';
-    });
+    moreButton.setAttribute('aria-controls', 'le-more-sheet');
+    tipped(moreButton, 'More');
 
     toolbar.append(
         el('span', 'le-sep'),
         toggleButton,
         undoButton,
         redoButton,
-        moreButton,
-        el("span", "le-sep"),
+        el('span', 'le-sep'),
         languagePicker,
         pagesButton,
         sectionsButton,
@@ -1648,32 +1731,292 @@ export function createChrome() {
         publishButton,
     );
 
+    /* The host's own links. One that names an icon is a round icon button, its label the name a screen reader
+       reads and the tooltip shows; one that does not keeps its words (other hosts and adapters). */
+    const hostLinks = [];
     (config.links ?? []).forEach((link) => {
-        const anchor = el('a', 'le-btn-ghost', link.label);
+        if (!link?.href) return;
+        const icon = linkIcon(link);
+        const anchor = el('a', icon ? 'le-round le-icon-link' : 'le-btn-ghost', icon ? null : link.label);
         anchor.href = link.href;
-        if (link.title) anchor.title = link.title;
+        if (icon) {
+            anchor.innerHTML = toolbarIcon(icon);
+            anchor.setAttribute('aria-label', link.label);
+            anchor.dataset.tip = link.label;
+        } else if (link.title) {
+            anchor.title = link.title;
+        }
+        hostLinks.push({ anchor, label: link.label, icon: icon ?? 'external' });
         toolbar.append(anchor);
     });
 
+    // Log out: an icon, named and tipped like the links.
+    let logout = null;
     if (config.logout?.href) {
-        if ((config.logout.method ?? 'get').toLowerCase() === 'post') {
+        const post = (config.logout.method ?? 'get').toLowerCase() === 'post';
+        const button = el(post ? 'button' : 'a', 'le-round le-icon-link');
+        button.innerHTML = toolbarIcon('logout');
+        button.setAttribute('aria-label', 'Log out');
+        button.dataset.tip = 'Log out';
+        if (post) {
             const form = document.createElement('form');
             form.method = 'POST';
             form.action = config.logout.href;
+            form.className = 'le-logout';
             const token = document.createElement('input');
             token.type = 'hidden';
             token.name = '_token';
             token.value = document.body.dataset.csrf ?? '';
-            const submit = el('button', 'le-btn-ghost', 'Log out');
-            submit.type = 'submit';
-            form.append(token, submit);
+            button.type = 'submit';
+            form.append(token, button);
             toolbar.append(form);
+            logout = { node: form, press: () => (form.requestSubmit ? form.requestSubmit() : form.submit()) };
         } else {
-            const anchor = el('a', 'le-btn-ghost', 'Log out');
-            anchor.href = config.logout.href;
-            toolbar.append(anchor);
+            button.href = config.logout.href;
+            toolbar.append(button);
+            logout = { node: button, href: config.logout.href };
         }
     }
+
+    toolbar.append(moreButton);
+
+    /* What gives way first when the bar is short of room, in order: words that only describe (the greeting, the
+       status sentence, the dividers), then the links out, then the tools reached for least. On a phone all of it is
+       under More. Edit or Done, Undo, Publish and More never fold. */
+    const foldQuiet = [toolbar.querySelector('.le-hello'), ...toolbar.querySelectorAll(':scope > .le-sep')].filter(Boolean);
+    const foldOrder = [
+        logout?.node,
+        ...hostLinks.map(({ anchor }) => anchor).reverse(),
+        helpButton, searchButton, brandButton, sectionsButton, previewButton, pagesButton,
+        localeSelect, languagePicker, changesButton, redoButton,
+    ].filter(Boolean);
+    const isOut = (node) => Boolean(node?.classList.contains('le-out'));
+
+    // ---- the tooltip ---------------------------------------------------------
+    const tip = el('div', 'le-tip');
+    tip.setAttribute('aria-hidden', 'true');
+    tip.hidden = true;
+    let tipFor = null;
+    const hideTip = () => {
+        tip.hidden = true;
+        tipFor = null;
+    };
+    const showTip = (node) => {
+        if (!node?.dataset.tip || node.disabled) { hideTip(); return; }
+        tipFor = node;
+        tip.textContent = node.dataset.tip;
+        tip.hidden = false;
+        const at = node.getBoundingClientRect();
+        const own = tip.getBoundingClientRect();
+        const left = Math.min(Math.max(8, at.left + at.width / 2 - own.width / 2), window.innerWidth - own.width - 8);
+        tip.style.left = `${Math.round(left)}px`;
+        tip.style.top = `${Math.round(Math.max(8, at.top - own.height - 8))}px`;
+    };
+    const tipTarget = (event) => event.target?.closest?.('[data-tip]') ?? null;
+    toolbar.addEventListener('pointerover', (event) => { const node = tipTarget(event); if (node && node !== tipFor) showTip(node); });
+    toolbar.addEventListener('pointerout', (event) => { if (tipFor && !tipFor.contains(event.relatedTarget)) hideTip(); });
+    toolbar.addEventListener('focusin', (event) => { const node = tipTarget(event); if (node) showTip(node); else hideTip(); });
+    toolbar.addEventListener('focusout', hideTip);
+    toolbar.addEventListener('click', hideTip);
+    // Esc puts a tooltip away without moving the keyboard (WCAG 1.4.13).
+    toolbar.addEventListener('keydown', (event) => { if (event.key === 'Escape' && !tip.hidden) hideTip(); });
+    window.addEventListener('scroll', hideTip, { passive: true });
+
+    // ---- the More sheet --------------------------------------------------------
+    const sheetScrim = el('div', 'le-sheet-scrim');
+    sheetScrim.hidden = true;
+    const sheet = el('div', 'le-sheet');
+    sheet.id = 'le-more-sheet';
+    sheet.hidden = true;
+    sheet.setAttribute('role', 'dialog');
+    sheet.setAttribute('aria-modal', 'true');
+    sheet.setAttribute('aria-labelledby', 'le-more-sheet-title');
+    const sheetHead = el('div', 'le-sheet-head');
+    const sheetTitle = el('h2', 'le-sheet-title', 'More');
+    sheetTitle.id = 'le-more-sheet-title';
+    const sheetClose = el('button', 'le-round le-sheet-close');
+    sheetClose.type = 'button';
+    sheetClose.innerHTML = toolbarIcon('close', 20);
+    sheetClose.setAttribute('aria-label', 'Close');
+    sheetHead.append(sheetTitle, sheetClose);
+    const sheetBody = el('div', 'le-sheet-body');
+    sheet.append(sheetHead, sheetBody);
+
+    const sheetTools = () => sheetEntries([
+        { control: redoButton, label: 'Redo', icon: 'redo' },
+        { control: pagesButton, label: 'New page', icon: 'page' },
+        { control: sectionsButton, label: 'Sections', icon: 'section' },
+        { control: brandButton, label: 'Brand', icon: 'brand' },
+        { control: searchButton, label: 'Search', icon: 'search' },
+        { control: changesButton, label: 'Changes', icon: 'changes' },
+        { control: helpButton, label: 'Help', icon: 'help' },
+        { control: previewButton, label: 'Preview', icon: 'preview' },
+    ]);
+
+    let sheetOpen = false;
+    let sheetHistory = false;
+    const sheetItem = (tag, label, icon) => {
+        const item = el(tag, 'le-sheet-item');
+        if (tag === 'button') item.type = 'button';
+        item.innerHTML = toolbarIcon(icon, 22);
+        item.append(el('span', 'le-sheet-label', label));
+
+        return item;
+    };
+    const closeSheet = ({ focus = true, fromHistory = false, leaving = false } = {}) => {
+        if (!sheetOpen) return;
+        sheetOpen = false;
+        sheet.hidden = true;
+        sheetScrim.hidden = true;
+        moreButton.setAttribute('aria-expanded', 'false');
+        document.removeEventListener('keydown', onSheetKey, true);
+        // The entry pushed when it opened is taken off again, unless Back did that already or a link is leaving.
+        if (sheetHistory && !fromHistory && !leaving) history.back();
+        sheetHistory = false;
+        if (focus && toolbar.contains(moreButton) && getComputedStyle(moreButton).display !== 'none') moreButton.focus();
+    };
+    const fillSheet = () => {
+        sheetBody.replaceChildren();
+        const grid = el('div', 'le-sheet-grid');
+        sheetTools().filter(({ control }) => isOut(control)).forEach(({ control, label, icon }) => {
+            const item = sheetItem('button', label, icon);
+            item.disabled = Boolean(control.disabled);
+            item.addEventListener('click', () => {
+                closeSheet();
+                control.click();
+            });
+            grid.append(item);
+        });
+        if (grid.children.length) sheetBody.append(grid);
+
+        // Which language is edited: a native select, as on the bar, passing the choice to the bar's own.
+        [[languagePicker, 'Language you are editing'], [localeSelect, 'Language']].forEach(([picker, label]) => {
+            if (!picker || picker.hidden || !isOut(picker) || picker.options.length < 2) return;
+            const field = el('label', 'le-sheet-field');
+            const copy = el('select', 'le-lang');
+            [...picker.options].forEach((option) => {
+                const mine = el('option', null, option.textContent);
+                mine.value = option.value;
+                copy.append(mine);
+            });
+            copy.value = picker.value;
+            copy.addEventListener('change', () => {
+                picker.value = copy.value;
+                closeSheet();
+                picker.dispatchEvent(new Event('change', { bubbles: true }));
+            });
+            field.append(el('span', 'le-sheet-label', label), copy);
+            sheetBody.append(field);
+        });
+
+        const away = el('div', 'le-sheet-grid le-sheet-links');
+        hostLinks.filter(({ anchor }) => isOut(anchor)).forEach(({ anchor, label, icon }) => {
+            const item = sheetItem('a', label, icon);
+            item.setAttribute('href', anchor.getAttribute('href'));
+            item.addEventListener('click', () => closeSheet({ focus: false, leaving: true }));
+            away.append(item);
+        });
+        if (logout && isOut(logout.node)) {
+            const item = sheetItem(logout.href ? 'a' : 'button', 'Log out', 'logout');
+            if (logout.href) {
+                item.href = logout.href;
+                item.addEventListener('click', () => closeSheet({ focus: false, leaving: true }));
+            } else {
+                item.addEventListener('click', () => { closeSheet({ focus: false, leaving: true }); logout.press(); });
+            }
+            away.append(item);
+        }
+        if (away.children.length) sheetBody.append(away);
+    };
+    const sheetFocusables = () => [...sheet.querySelectorAll('button, a[href], select')].filter((node) => !node.disabled && node.getClientRects().length);
+    const onSheetKey = (event) => {
+        if (!sheetOpen) return;
+        if (event.key === 'Escape') {
+            event.preventDefault();
+            event.stopPropagation();
+            closeSheet();
+            return;
+        }
+        if (event.key !== 'Tab') return;
+        const nodes = sheetFocusables();
+        if (!nodes.length) return;
+        const active = shadow.activeElement;
+        const at = nodes.indexOf(active);
+        if (event.shiftKey && (at <= 0)) {
+            event.preventDefault();
+            nodes[nodes.length - 1].focus();
+        } else if (!event.shiftKey && (at === -1 || at === nodes.length - 1)) {
+            event.preventDefault();
+            nodes[0].focus();
+        }
+    };
+    const openSheet = () => {
+        if (sheetOpen) return;
+        hideTip();
+        fillSheet();
+        sheetOpen = true;
+        sheet.hidden = false;
+        sheetScrim.hidden = false;
+        moreButton.setAttribute('aria-expanded', 'true');
+        document.addEventListener('keydown', onSheetKey, true);
+        // Back (a phone's back gesture) closes the sheet rather than leaving the page.
+        try {
+            history.pushState({ ...(history.state ?? {}), leMoreSheet: true }, '');
+            sheetHistory = true;
+        } catch {
+            sheetHistory = false;
+        }
+        (sheetFocusables()[0] ?? sheetClose).focus();
+    };
+    window.addEventListener('popstate', () => { if (sheetOpen) closeSheet({ fromHistory: true }); });
+    moreButton.addEventListener('click', () => (sheetOpen ? closeSheet() : openSheet()));
+    sheetClose.addEventListener('click', () => closeSheet());
+    sheetScrim.addEventListener('click', () => closeSheet());
+
+    // ---- folding -------------------------------------------------------------
+    const phone = window.matchMedia?.('(max-width: 760px)') ?? null;
+    let foldWatch = null;
+    const fit = () => {
+        // Hidden (a preview, or not mounted yet): nothing to measure.
+        if (!toolbar.isConnected || !toolbar.getClientRects().length || toolbar.style.display === 'none') return;
+        const overflows = () => toolbar.scrollWidth > toolbar.clientWidth + 1;
+        [...foldQuiet, ...foldOrder].forEach((node) => node.classList.remove('le-out'));
+        toolbar.classList.remove('is-tight', 'is-folded');
+        let fold = false;
+        if (phone?.matches) {
+            fold = true;
+            toolbar.classList.add('is-tight', 'is-folded');
+            [...foldQuiet, ...foldOrder].forEach((node) => node.classList.add('le-out'));
+        } else if (overflows()) {
+            toolbar.classList.add('is-tight');
+            foldQuiet.forEach((node) => node.classList.add('le-out'));
+            if (overflows()) {
+                fold = true;
+                toolbar.classList.add('is-folded');
+                for (const node of foldOrder) {
+                    if (!overflows()) break;
+                    node.classList.add('le-out');
+                }
+            }
+        }
+        // Our own change of class is not a reason to measure again.
+        foldWatch?.takeRecords();
+        if (!fold && sheetOpen) closeSheet({ focus: false });
+    };
+    let fitQueued = false;
+    const refit = () => {
+        if (fitQueued) return;
+        fitQueued = true;
+        requestAnimationFrame(() => { fitQueued = false; fit(); });
+    };
+    if (typeof MutationObserver === 'function') {
+        foldWatch = new MutationObserver(refit);
+        foldWatch.observe(toolbar, { subtree: true, childList: true, characterData: true, attributes: true, attributeFilter: ['hidden', 'class', 'style', 'disabled'] });
+    }
+    window.addEventListener('resize', refit);
+    phone?.addEventListener?.('change', refit);
+    document.fonts?.ready?.then(refit).catch?.(() => {});
+    refit();
 
     // ---- drawer ------------------------------------------------------------
     const drawer = el('div', 'le-drawer');
@@ -1785,7 +2128,7 @@ export function createChrome() {
     const sectionInsert = inserter('');
     const sectionInsertEnd = inserter('le-insert-end');
 
-    shadow.append(toolbar, drawer, linkHandle, bgHandle, hoverBox, sectionInsert.line, sectionInsertEnd.line);
+    shadow.append(toolbar, sheetScrim, sheet, tip, drawer, linkHandle, bgHandle, hoverBox, sectionInsert.line, sectionInsertEnd.line);
 
     // "Saved" can go by in a second; "this didn't take effect" is a sentence
     // somebody has to finish reading before it disappears.
@@ -1903,6 +2246,11 @@ export function createChrome() {
         toggleButton,
         undoButton,
         redoButton,
+        moreButton,
+        moreSheet: sheet,
+        foldOrder,
+        openMoreSheet: openSheet,
+        closeMoreSheet: closeSheet,
         languagePicker,
         statusText,
         dot,

@@ -41,8 +41,13 @@ const open = async (page, width) => {
     await expect.poll(() => page.evaluate(() => document.body.classList.contains('editing'))).toBe(true);
     const end = ui(page).locator('.le-walkthrough-end');
     if (await end.isVisible().catch(() => false)) await end.click();
-    if (width < 700) await ui(page).getByRole('button', { name: 'More' }).click();
-    await ui(page).getByRole('button', { name: 'Help with Live Edit' }).click();
+    // on a phone, Help is in the More sheet
+    if (width < 700) {
+        await ui(page).getByRole('button', { name: 'More' }).click();
+        await ui(page).locator('#le-more-sheet').getByRole('button', { name: 'Help', exact: true }).click();
+    } else {
+        await ui(page).getByRole('button', { name: 'Help with Live Edit' }).click();
+    }
 };
 const next = (page) => guide(page).locator('.le-walkthrough-actions .le-btn').click();
 
