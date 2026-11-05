@@ -405,4 +405,32 @@ class TeamEditingTest extends TestCase
         $this->assertSame(['section:home.story'], SectionLock::query()->pluck('unit')->all());
         $this->assertSame(2, Draft::query()->count(), 'drafts are never pruned');
     }
+
+    public function test_a_revoked_key_is_refused_at_once_even_where_keys_are_remembered(): void
+    {
+        $this->getJson($this->url('/team'), $this->headers($this->ada))->assertOk();
+
+        \ShipFast\LiveEdit\Domain\Site\ApiToken::query()->where('holder_ref', 'u1')->first()->revoke();
+
+        $this->getJson($this->url('/team'), $this->headers($this->ada))->assertStatus(401);
+    }
+
+    public function test_what_visitors_read_is_remembered_but_a_publish_shows_at_once(): void
+    {
+        [, $public] = $this->site->issueToken(TokenType::Publishable, 'Web');
+
+        $this->assertSame('Welcome', $this->getJson($this->url('/content'), $this->headers($public))->assertOk()->json('settings')['hero.title']);
+
+        $queries = 0;
+        DB::listen(function () use (&$queries) {
+            $queries++;
+        });
+        $this->getJson($this->url('/content'), $this->headers($public))->assertOk();
+        $this->assertLessThanOrEqual(3, $queries, 'a repeated visitor read is the key check, not the content');
+
+        $this->save($this->ada, 'hero.title', 'Fresh', 'section:home.hero')->assertOk();
+        $this->postJson($this->url('/publish'), [], $this->headers($this->ada))->assertOk();
+
+        $this->assertSame('Fresh', $this->getJson($this->url('/content'), $this->headers($public))->assertOk()->json('settings')['hero.title']);
+    }
 }

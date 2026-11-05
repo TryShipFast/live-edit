@@ -435,10 +435,17 @@ export function createTeam({ send, ui, doc = document, win = window, onChanged =
         }, delay);
     };
 
+    // Somebody typing in a panel for a long time without saving still holds their section:
+    // a heartbeat at most once a minute while they are active and hold something.
+    let lastBeat = Date.now();
     const noteActivity = () => {
         const wasIdle = Date.now() - lastActivity >= 120000;
         lastActivity = Date.now();
         if (wasIdle) schedule();
+        if (available && youId() && Date.now() - lastBeat > 60000 && state.locks.some((lock) => lock.holder === youId())) {
+            lastBeat = Date.now();
+            void send('/live-edit/team/heartbeat', { method: 'POST' }).catch(() => {});
+        }
     };
 
     doc.addEventListener('visibilitychange', () => {

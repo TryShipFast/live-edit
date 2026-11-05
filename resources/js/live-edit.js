@@ -6302,7 +6302,8 @@ const bootLiveEdit = () => {
         const openTarget = ({ element, kind, field = null }) => {
             // A section a teammate is working on does not open; it says who.
             if (team && !team.beforeEdit(element, { onRefused: () => closeDrawer(true) })) return;
-            team?.setWhat(describeElement(element));
+            // What the change is called in History; never a reason not to open the panel.
+            try { team?.setWhat(describeElement(element)); } catch { /* named later, or not at all */ }
             if (kind === 'form') {
                 openFormBuilder(element, field);
 

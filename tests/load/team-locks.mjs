@@ -104,6 +104,33 @@ const started = Date.now();
 await Promise.all([...Array(CONCURRENCY)].map(worker));
 await writing;
 const seconds = (Date.now() - started) / 1000;
+
+/*
+ * One request at a time, so the cost of each kind can be compared without the
+ * queueing above: an unchanged poll, a changed poll, and a visitor reading the
+ * site's words (the published-site hot path).
+ */
+const alone = async (url, headers) => {
+    const times = [];
+    let queries = 0;
+    for (let i = 0; i < 40; i += 1) {
+        const at = performance.now();
+        const response = await fetch(url, { headers: { Accept: 'application/json', ...headers() } });
+        await response.arrayBuffer();
+        times.push(performance.now() - at);
+        queries += Number(response.headers.get('x-queries') ?? 0);
+    }
+
+    return { median_ms: [...times].sort((a, b) => a - b)[20].toFixed(1), queries_each: Number((queries / 40).toFixed(2)) };
+};
+const one = pollers[0];
+const fresh = await fetch(`${base}/demo/team`, { headers: { Authorization: `Bearer ${one.token}` } });
+const tag = fresh.headers.get('etag');
+const sequential = {
+    unchanged_poll_304: await alone(`${base}/demo/team`, () => ({ Authorization: `Bearer ${one.token}`, 'If-None-Match': tag })),
+    changed_poll_200: await alone(`${base}/demo/team`, () => ({ Authorization: `Bearer ${one.token}` })),
+    visitor_content_read: await alone(`${base}/demo/content`, () => ({ Authorization: `Bearer ${seeded.demo.visitor}` })),
+};
 server.kill();
 
 const pct = (list, p) => {
@@ -130,6 +157,7 @@ const report = {
     writes: stats.writes,
     db_queries_per_save: Number((stats.writeQueries / Math.max(1, stats.writes)).toFixed(1)),
     save_latency_ms: { p50: pct(stats.writeLatencies, 0.5), p95: pct(stats.writeLatencies, 0.95) },
+    one_at_a_time: sequential,
 };
 
 console.log(JSON.stringify(report, null, 2));
