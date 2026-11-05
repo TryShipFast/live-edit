@@ -2,7 +2,7 @@
 
 namespace ShipFast\LiveEdit\Domain\Team;
 
-use Illuminate\Support\Carbon;
+use Carbon\CarbonInterface;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Str;
 use ShipFast\LiveEdit\Domain\Site\Site;
@@ -437,7 +437,7 @@ class SectionLocks
         return $label !== '' ? mb_substr($label, 0, 191) : LockUnit::fallbackLabel($unit);
     }
 
-    private function cutoff(): Carbon
+    private function cutoff(): CarbonInterface
     {
         return now()->subMinutes(self::idleMinutes());
     }

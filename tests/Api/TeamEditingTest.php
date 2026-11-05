@@ -116,6 +116,21 @@ class TeamEditingTest extends TestCase
         $this->assertSame('Hello from Ada', Draft::query()->where('subject', 'hero.title')->first()->payload['value']);
     }
 
+    public function test_locks_work_in_an_app_that_uses_immutable_dates(): void
+    {
+        // Laravel apps often call Date::use(CarbonImmutable::class); now() then returns an
+        // immutable date and every save must still work (0.19.0 answered 500 here).
+        \Illuminate\Support\Facades\Date::use(\Carbon\CarbonImmutable::class);
+
+        try {
+            $this->save($this->ada, 'hero.title', 'Hello from Ada', 'section:home.hero', 'Hero')->assertOk();
+            $this->save($this->tunde, 'hero.title', 'Tunde was here', 'section:home.hero', 'Hero')->assertStatus(409);
+            $this->getJson($this->url('/team'), $this->headers($this->ada))->assertOk();
+        } finally {
+            \Illuminate\Support\Facades\Date::useDefault();
+        }
+    }
+
     public function test_a_stale_browser_that_declares_no_section_still_meets_the_lock(): void
     {
         $this->save($this->ada, 'hero.title', 'Hello from Ada', 'section:home.hero', 'Hero')->assertOk();

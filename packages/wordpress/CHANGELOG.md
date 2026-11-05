@@ -1,5 +1,9 @@
 # ShipFast Live Edit for WordPress
 
+## 0.19.1
+
+- Fixed: in 0.19.0 every save answered "Content service answered 500" in a Laravel app that uses immutable dates (`Date::use(CarbonImmutable::class)`, as many do). The section-lock check expected a mutable date. It now takes either, and a test runs team editing with immutable dates. The whole suite also passes with immutable dates switched on everywhere.
+
 ## 0.19.0
 
 0.18.0 was tagged by mistake on the 0.17.0 code; it is identical to 0.17.0.
