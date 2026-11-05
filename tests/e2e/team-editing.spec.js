@@ -340,7 +340,7 @@ test('the owner takes over a section, and the person who had it is told', async 
     await ada.page.reload();
     await ada.page.locator(PRODUCT).first().click({ force: true });
     await expect(ada.page.getByRole('button', { name: 'Save changes' })).toBeVisible();
-    await expect.poll(async () => (await team('ada')).locks.find((l) => l.label === 'Product')?.name).toBe('Ada');
+    await expect.poll(async () => (await team('ada')).locks.find((l) => l.label === 'Product')?.name, { timeout: 15000 }).toBe('Ada');
 
     for (const one of [ada, tunde, olu]) await one.context.close();
 });

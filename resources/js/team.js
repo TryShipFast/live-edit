@@ -412,6 +412,12 @@ export function createTeam({ send, ui, doc = document, win = window, onChanged =
         if (!response.ok) return state;
 
         const payload = await jsonOf(response);
+        if (!payload || !('you' in payload)) {
+            // Not an answer about a team (a host that answers every address with nothing).
+            available = false;
+
+            return state;
+        }
         etag = response.headers?.get?.('ETag') ?? null;
         state = { ...state, ...payload, locks: payload.locks ?? [], left: payload.left ?? [] };
         draw();
@@ -476,9 +482,22 @@ export function createTeam({ send, ui, doc = document, win = window, onChanged =
             return false;
         }
 
-        if (!youId()) return true;
+        // Opened before the first answer arrived (a slow connection): ask who
+        // this is first, then claim. A save would claim it anyway on the server.
+        const claim = async () => {
+            if (!state.you) await refresh();
+            if (!youId()) return;
+            const again = lockOn(where.unit);
+            if (again && again.holder !== youId()) {
+                onRefused();
+                explain(again);
 
-        void send('/live-edit/team/claim', {
+                return;
+            }
+            await claimNow();
+        };
+
+        const claimNow = () => send('/live-edit/team/claim', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ unit: where.unit, label: where.label }),
@@ -496,6 +515,8 @@ export function createTeam({ send, ui, doc = document, win = window, onChanged =
                 offerLeft(where.unit, where.label, payload.left);
             }
         }).catch(() => {});
+
+        void claim().catch(() => {});
 
         return true;
     };
