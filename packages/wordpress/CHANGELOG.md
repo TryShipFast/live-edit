@@ -1,5 +1,9 @@
 # ShipFast Live Edit for WordPress
 
+## 0.19.3
+
+- Fixed: a drawing whose classes look like an icon font's (`<svg class="icon icon-arrow">`, as Car Wash and seven other templates draw their arrows) was read as an icon font once the page came back from the server, so pressing it opened "Icon name: this theme loads its icons from somewhere this page cannot read" instead of the drawing library. An `<svg>`, or anything already offered as a drawing, is never an icon font now. Present since 0.17.
+
 ## 0.19.2
 
 - Help answers what owners now ask: how to add a section; move, hide or remove one; add a new form (contact, quote or start blank); change a form's questions; where form answers go; add a chart or a table; whether the team can edit together; and, on a shop, how to keep count of stock. The answer on adding a page names the bar's Pages button (0.19.0 renamed New page). Sections, forms and charts are answered where the website has the page builder, the team where it publishes.

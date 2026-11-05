@@ -1836,6 +1836,12 @@ class MarkupScanner
      */
     protected function iconTokenOf(DOMElement $el): ?string
     {
+        // A drawing is never an icon font, whatever its classes say ("icon icon-arrow" on an <svg>): it is
+        // swapped from the drawing library (data-edit-svg), not by renaming a glyph class.
+        if (strtolower($el->localName ?? $el->tagName) === 'svg' || $el->hasAttribute('data-edit-svg')) {
+            return null;
+        }
+
         $classes = preg_split('/\s+/', trim($el->getAttribute('class'))) ?: [];
 
         foreach ($classes as $class) {

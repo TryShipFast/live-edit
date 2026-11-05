@@ -537,6 +537,19 @@ class MarkupScannerTest extends TestCase
         $this->assertStringContainsString('data-edit-icon-current="fa-gem"', $html);
     }
 
+    public function test_a_drawing_named_icon_something_is_a_drawing_not_an_icon_font(): void
+    {
+        // Car Wash draws its arrows as <svg class="icon icon-arrow">: a drawing the owner swaps from the
+        // library, not a font glyph. Read as an icon font, a press on it opened "Icon name: this theme loads
+        // its icons from somewhere this page cannot read" once the page came back from the server.
+        $html = (new MarkupScanner)->apply('<a href="/x">More <svg class="icon icon-arrow" data-edit-svg="setting:auto:abc123abc123" viewBox="0 0 24 24"><path d="M0 0"/></svg></a><svg class="icon icon-inline"><path d="M0 0"/></svg>', ['text'], true)['html'];
+
+        $this->assertStringNotContainsString('data-edit-icon=', $html);
+        $this->assertStringNotContainsString('data-edit-icon-current', $html);
+        // A font icon on an empty span is still one.
+        $this->assertStringContainsString('data-edit-icon-current="fa-gem"', (new MarkupScanner)->apply('<span class="icon fa-gem"></span>', ['text'], true)['html']);
+    }
+
     public function test_apply_overrides_swaps_the_icon_class_and_leaves_the_rest(): void
     {
         $tagged = (new MarkupScanner)->apply('<span class="icon fa-gem major"></span>', ['text'], true)['html'];
