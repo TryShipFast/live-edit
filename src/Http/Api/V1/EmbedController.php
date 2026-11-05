@@ -51,6 +51,8 @@ class EmbedController
         'upload.js' => 'upload.js',
         'seo.js' => 'seo.js',
         'pages.js' => 'pages.js',
+        'pages-list.js' => 'pages-list.js',
+        'unsaved.js' => 'unsaved.js',
         'dropdown-trigger.js' => 'dropdown-trigger.js',
         'linked-detail-scope.js' => 'linked-detail-scope.js',
         'card-page.js' => 'card-page.js',

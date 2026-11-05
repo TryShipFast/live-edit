@@ -386,7 +386,7 @@ export function renderPagesList({ ui, config, menu = [], save, go, addPage, ask,
                     title: `Delete ${row.title}?`,
                     subtitle: row.made
                         ? 'The page and its words go, and it leaves your menu. Until you publish, Changes can bring it back.'
-                        : 'It leaves your website when you publish. Until then, Changes can bring it back.',
+                        : `It leaves your website when you publish. Until then, Changes can bring it back.${row.inMenu ? ' Your design’s menu link to it stays until you take the link out.' : ''}`,
                     yes: 'Delete page',
                     no: 'Keep it',
                     danger: true,

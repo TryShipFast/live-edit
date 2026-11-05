@@ -200,7 +200,7 @@ for (const width of [320, 375, 390, 430, 768, 1024, 1440]) {
                 await expect(ui(page).locator('.le-drawer.is-open')).toBeVisible();
                 await closeDrawer();
 
-                await press(page, '+ New page', 'New page');
+                await press(page, 'Pages', 'Pages');
                 await expect(ui(page).locator('.le-scrim')).toBeVisible();
                 await page.keyboard.press('Escape');
                 await expect(ui(page).locator('.le-scrim')).toHaveCount(0);

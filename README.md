@@ -402,7 +402,7 @@ publishes is never the editor's.
 
 ## The toolbar
 
-The bar at the foot of the screen carries the editor's controls (Edit or Done, Undo, Redo, New page,
+The bar at the foot of the screen carries the editor's controls (Edit or Done, Undo, Redo, Pages,
 Sections, Brand, Search, Changes, Help, Preview, Publish) and any links the host adds, then Log out:
 
 ```html
@@ -427,11 +427,32 @@ always an icon.
 The bar keeps one row. When everything would not fit (always on a phone, 760px and under; on a
 tablet or a narrow desktop when needed) it folds: Edit or Done, Undo, Publish with its count and a
 **More** button stay, and the rest moves into the More sheet as labelled icons, the least used first
-(Log out, then the host's links, Help, Search, Brand, Sections, Preview, New page, the language,
+(Log out, then the host's links, Help, Search, Brand, Sections, Preview, Pages, the language,
 Changes, Redo). The sheet closes on a tap outside it, Escape or Back, keeps the keyboard inside it
 while it is open, and hands it back to More. The bar and the sheet keep clear of the iPhone's home
 bar, and a site's own fixed bar at the foot of the screen (a phone's Call bar) is lifted above the
 bar while editing. The icons and the sheet's contents are in `resources/js/toolbar-icons.js`.
+
+## Unsaved changes
+
+Words typed into the panel and not saved (or a Brand or SEO panel whose Save is waiting) are asked
+about before they are lost, the way Shopify admin and Google Docs ask (`resources/js/unsaved.js`):
+
+- closing the tab, reloading or typing another address: the browser's own "Leave site?" question
+  (`beforeunload`, the only thing a page may do there);
+- leaving from inside the editor (a link in the bar or the More sheet, **Open** in Pages, the
+  **Pages** button) and **Done editing**: the editor's own dialog, **You have unsaved changes**,
+  "Leave without saving?", **Leave** or **Stay** (Stay is focused; Escape, × and a tap outside
+  mean Stay). After Leave the browser does not ask a second time;
+- closing the panel: "Discard what you typed?", **Discard** or **Keep editing**.
+
+Nothing is asked when nothing is unsaved. The panel's buttons are **Discard** and **Save changes**
+(Shopify's save bar), in the element panel, Brand and SEO alike.
+
+Words only a screen reader hears (`.visually-hidden`, `.sr-only`, `.screen-reader-text` and the
+like, holding `data-edit`) stay hidden while editing, whatever the design's stylesheet does with
+`body.editing`: a ", home" beside the logo read as a mistake on the page. They are offered in the
+panel of what holds them, under **Read aloud by screen readers**.
 
 ## Help (the ? button)
 
@@ -631,11 +652,12 @@ window.liveEditBrand = {
   the design's own. The host validates the values and applies the chosen
   brand to the page it renders.
 
-## The page builder (New page)
+## The page builder (Pages and New page)
 
-When the host sets `window.liveEditPages` before the editor loads, a **+ New
-page** button appears in the toolbar. It opens a window of two steps; `?pages`
-in the address opens the editor on it. The host builds pages; the editor only
+When the host sets `window.liveEditPages` before the editor loads, a **Pages**
+button appears in the toolbar. It opens the Pages list (below), whose **+ Add
+page** opens New page, a window of two steps; `?pages` in the address opens the
+editor on New page. The host builds pages; the editor only
 says what the owner chose, as settings.
 
 ```js
@@ -679,6 +701,45 @@ window.liveEditPages = {
   saved as a list of product ids, which the host draws as the design's own cards. The host names the
   page and places its menu link beside the other categories (the website's LIVE-EDIT-STRUCTURE.md,
   "A shop's categories").
+- **Pages** (`resources/js/pages-list.js`; Wix's "Pages & Menu", Squarespace's
+  Pages): every page in one list, in the order the menu shows them. The order is
+  the design's main menu as drawn on the page (`data-kit-menu="main"`, else the
+  header's `nav`; never the phone copy or a row of categories), with Home first
+  and the owner's pages in their `pagesKey` order. Three groups: **In your
+  menu**, **Not in your menu**, and, folded away, **Pages your website uses**:
+  a checkout, a bag, search results, a brand sheet, a 404, account pages,
+  privacy and terms, and the record pages of a collection (`products/…`,
+  `journal/…`, the catalogue's own products). Each row has **Open** (asked
+  first when something is unsaved). What else a row offers is what the host
+  can keep:
+  - the owner's pages (`made`): **Rename** (the title in `pagesKey`), the **In
+    menu** switch, **↑ / ↓** and drag to move them among the menu's other pages
+    you made, **Duplicate**, **Delete** (asked first; saves `structure:page:<id>`
+    as `{"added":{}}` then `pagesKey` without it);
+  - the design's own pages: **Duplicate** (where `starts` gives its sections)
+    and **Delete** (only with `removedKey`; never Home or the 404; the id is
+    added to `removed`). Their title and place in the menu are the design's:
+    the list says so instead of offering buttons that would do nothing;
+  - the pages a website uses: Open only.
+
+  A duplicate is a new page of the owner's at a free address
+  (`<title>-copy`), titled "<title> (copy)", with the same sections and out of
+  the menu. Every save is a draft and shows under Changes (`structure:removed`
+  is described as "Deleted the page About"). The menu on the page shows a change
+  once the page is drawn again: the list says so and offers **Reload to see
+  it**, which reopens the list.
+
+  A host may say what a page is (`kind` on a page in `pages`: `page`,
+  `internal`, `legal` or `record`, or `internal: true`); otherwise it is read
+  from the address and title. New page never offers an internal page, a notice
+  or one record as a kind of page to start from.
+
+  **What the host decides, not built here.** Renaming or reordering the design's
+  own menu entries, taking one out of the menu, and redirecting the old address
+  of a renamed or deleted page need host work: the design draws its menu, and
+  no setting moves an entry it wrote. Duplicating one of the owner's pages
+  other than the one open needs its sections (`made[].added`; the editor strips
+  it before saving, since `pagesKey` holds only `id`, `title` and `menu`).
 - **New page, step 1: a page like one you have.** The design's pages are shown
   as small live pictures (`starts`, each drawn from its page's `href`; without
   `starts`, the library grouped by `page`). Pages made of the same sections are
