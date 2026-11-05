@@ -1344,7 +1344,12 @@ const bootLiveEdit = () => {
             if (!document.body.classList.contains('editing')) setEditing(true);
             const handle = ui.modal({ title: 'Pages', size: 'is-pages' });
             const builder = window.liveEditPages;
+            // Team editing: the list of pages is one unit ("pages"); a teammate holding it is said once.
+            const held = team?.lockOn('pages');
+            const lockedBy = held && held.holder !== team.you?.id ? (held.name || 'Someone') : null;
+            team?.setCurrent('pages', 'Pages');
             renderPagesList({
+                lockedBy,
                 ui: handle,
                 config: builder,
                 menu: menuOrder(document, builder.pages ?? [], pageBase(builder, window.location.href)),
@@ -4439,9 +4444,30 @@ const bootLiveEdit = () => {
          * The same on every page: a page the design came with takes sections
          * just as a page the owner made does.
          */
+        /*
+         * Team editing: a page's arrangement (its sections added, moved, taken off) is one unit,
+         * "arrangement:<page>". When a teammate holds it, say who before anything is chosen,
+         * rather than letting the save be refused afterwards. Returns true when it is free.
+         */
+        const arrangementIsFree = () => {
+            const key = window.liveEditPages?.structureKey ?? '';
+            if (!team || !key.startsWith('structure:page:')) return true;
+            const unit = `arrangement:${key.slice('structure:page:'.length)}`;
+            team.setCurrent(unit, 'Page layout');
+            const held = team.lockOn(unit);
+            if (held && held.holder !== team.you?.id) {
+                team.explain(held);
+
+                return false;
+            }
+
+            return true;
+        };
+
         const openSectionPicker = ({ list, after = null }) => {
             const builder = window.liveEditPages;
             if (!canAddSections() || !list?.dataset?.editList) return null;
+            if (!arrangementIsFree()) return null;
             const below = after ? [...list.children].find((child) => child.dataset.editItem === after) : null;
             const where = below ? `below “${sectionName(below)}”` : shownSections(list).length ? 'at the end of this page' : 'on this page';
             const handle = ui.modal({ title: 'Add a section', subtitle: `It goes ${where}. Point at one to see it.`, size: 'is-wide' });
@@ -4615,6 +4641,7 @@ const bootLiveEdit = () => {
                     remove.className = 'le-btn-danger';
                     remove.textContent = 'Remove this section';
                     remove.addEventListener('click', async () => {
+                        if (!arrangementIsFree()) return;
                         if (!window.confirm('Remove this section and what you wrote in it?')) return;
                         try {
                             await saveSetting(builder.structureKey, addedWith(builder.added, addedId, null));

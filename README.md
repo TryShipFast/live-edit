@@ -146,7 +146,7 @@ jobs:
 ## Team editing: one person per section
 
 When a website has a team (editors invited on Pro and Agency), two people can
-have the editor open at once. Before 0.18.0 they silently overwrote each
+have the editor open at once. Before 0.19.0 they silently overwrote each
 other: a change was one shared draft per key, the last save won, and whoever
 pressed Publish put everybody's half-finished work live. Now each part of the
 site belongs to one person while they work on it.
@@ -193,7 +193,7 @@ the moment their grant changes.
 
 A site with one person editing works exactly as before: everything is theirs
 and Publish publishes everything. So does any session that does not say who it
-is (the site's own keys, and every session minted before 0.18.0).
+is (the site's own keys, and every session minted before 0.19.0).
 
 **Lock units.** One person holds one unit at a time:
 
@@ -287,7 +287,7 @@ minute per person, in one statement over all their locks. Indexes:
 `(site_id, unit)` unique, `(site_id, holder)`, `(site_id, taken_from)`,
 `last_active_at`; drafts `(site_id, author)` and `(site_id, unit)`.
 
-**What else is cached** (audit, 0.18.0):
+**What else is cached** (audit, 0.19.0):
 
 | Path | Before | Now |
 | --- | --- | --- |

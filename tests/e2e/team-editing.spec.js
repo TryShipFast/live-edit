@@ -122,10 +122,14 @@ const team = async (who) => (await fetch(`${site.url}/api/demo/team`, { headers:
 const changesFor = async (who) => (await fetch(`${site.url}/api/demo/changes`, { headers: { Authorization: `Bearer ${tokens[who]}`, Accept: 'application/json' } })).json();
 
 const openChanges = async (page, half = 'Changes') => {
-    const button = ui(page).locator('.le-toolbar').getByRole('button', { name: 'Changes', exact: true });
-    // On a phone the bar keeps it under More.
-    if (!(await button.isVisible())) await ui(page).locator('.le-toolbar').getByRole('button', { name: 'More' }).click();
-    await button.click();
+    // On the bar where it fits; folded into the More sheet otherwise (the-bar-folds-into-more).
+    const direct = ui(page).locator('.le-toolbar').getByRole('button', { name: 'Changes', exact: true });
+    if (await direct.isVisible()) {
+        await direct.click();
+    } else {
+        await ui(page).getByRole('button', { name: 'More' }).click();
+        await ui(page).locator('#le-more-sheet').getByRole('button', { name: 'Changes', exact: true }).click();
+    }
     if (half === 'History') await ui(page).locator('.le-subtabs').getByRole('tab', { name: 'Published', exact: true }).click();
     await settle(page);
 };
@@ -388,6 +392,40 @@ test('an admin who is not the owner can take over, and loses it the moment they 
     await shot(kemi.page, '20-demoted-admin-asks-an-admin-1440');
 
     for (const one of [ada, tunde, kemi]) await one.context.close();
+});
+
+test('the list of pages is one part of the site: while a teammate changes it, the others can open pages but not change the list', async ({ browser }) => {
+    // Ada makes a page of her own: the list of pages ("pages") is hers until she publishes.
+    const made = await fetch(`${site.url}/api/demo/content`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${tokens.ada}`, 'Content-Type': 'application/json', Accept: 'application/json' },
+        body: JSON.stringify({ key: 'structure:pages', value: JSON.stringify([{ id: 'about-us', title: 'About us', menu: true }]) }),
+    });
+    expect(made.status).toBe(200);
+    expect((await team('tunde')).locks.map((l) => [l.unit, l.name])).toEqual([['pages', 'Ada']]);
+
+    // A stale save of the list from Tunde is refused by the server.
+    const stale = await fetch(`${site.url}/api/demo/content`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${tokens.tunde}`, 'Content-Type': 'application/json', Accept: 'application/json' },
+        body: JSON.stringify({ key: 'structure:pages', value: '[]' }),
+    });
+    expect(stale.status).toBe(409);
+
+    const tunde = await member(browser, 'tunde');
+    await tunde.page.waitForTimeout(1500); // the first answer about who holds what
+    const direct = ui(tunde.page).locator('.le-toolbar').getByRole('button', { name: 'Pages', exact: true });
+    if (await direct.isVisible()) await direct.click();
+    else {
+        await ui(tunde.page).getByRole('button', { name: 'More' }).click();
+        await ui(tunde.page).locator('#le-more-sheet').getByRole('button', { name: 'Pages', exact: true }).click();
+    }
+    const pages = ui(tunde.page).locator('.le-modal[aria-label="Pages"]');
+    await expect(pages).toContainText('Ada is changing your pages right now', { timeout: 12000 });
+    await expect(pages.getByRole('button', { name: '+ Add page' })).toBeDisabled();
+    await expect(pages.locator('.le-page-open').first()).toBeEnabled();
+    await shot(tunde.page, '21-pages-list-while-ada-changes-it-1440');
+    await tunde.context.close();
 });
 
 test('undoing one person\'s published version leaves the other person\'s work', async ({ browser }) => {

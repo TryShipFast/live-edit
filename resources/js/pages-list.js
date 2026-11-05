@@ -199,7 +199,7 @@ const el = (tag, className, text) => {
  *   ask({ title, subtitle, yes, no, danger })  resolves true for yes
  *   menu               the page ids the menu links, in order (menuOrder)
  */
-export function renderPagesList({ ui, config, menu = [], save, go, addPage, ask, notify = () => {} }) {
+export function renderPagesList({ ui, config, menu = [], save, go, addPage, ask, notify = () => {}, lockedBy = null }) {
     ui.title('Pages');
     ui.subtitle('Your website’s pages, in the order your menu shows them.');
 
@@ -221,6 +221,18 @@ export function renderPagesList({ ui, config, menu = [], save, go, addPage, ask,
 
     const lists = el('div', 'le-pages-lists');
     wrap.append(top, said, lists);
+
+    /*
+     * Team editing: the list of pages is one part of the site (the "pages" unit), and somebody
+     * else is changing it. Every page still opens; adding, renaming, moving, duplicating and
+     * deleting wait until they publish, said once at the top rather than refused one by one.
+     */
+    if (lockedBy) {
+        const held = el('p', 'le-hint le-pages-locked', `${lockedBy} is changing your pages right now. You can open any page; adding, renaming, moving and deleting pages opens up again when ${lockedBy} publishes.`);
+        held.setAttribute('role', 'note');
+        wrap.insertBefore(held, top);
+        add.disabled = true;
+    }
     ui.body.replaceChildren(wrap);
     ui.foot.hidden = true;
 
@@ -235,7 +247,7 @@ export function renderPagesList({ ui, config, menu = [], save, go, addPage, ask,
 
     /** Save the owner's pages (and anything with them), then draw the list again. */
     const keep = async (made, words, { menuChanged = false, before = [] } = {}) => {
-        if (busy) return false;
+        if (busy || lockedBy) return false;
         busy = true;
         try {
             for (const [key, value] of before) await save(key, value);
@@ -264,6 +276,11 @@ export function renderPagesList({ ui, config, menu = [], save, go, addPage, ask,
         button.type = 'button';
         if (label) button.setAttribute('aria-label', label);
         button.addEventListener('click', onClick);
+        // Somebody else holds the list: only Open stays (see lockedBy above).
+        if (lockedBy && className !== 'le-page-open') {
+            button.disabled = true;
+            button.title = `${lockedBy} is changing your pages`;
+        }
 
         return button;
     };
@@ -273,7 +290,7 @@ export function renderPagesList({ ui, config, menu = [], save, go, addPage, ask,
         item.dataset.page = row.id;
         const line = el('div', 'le-page-line');
 
-        if (row.canMove) {
+        if (row.canMove && !lockedBy) {
             const handle = el('span', 'le-page-handle', '⠿');
             handle.setAttribute('aria-hidden', 'true');
             handle.title = 'Drag to move it in the menu';

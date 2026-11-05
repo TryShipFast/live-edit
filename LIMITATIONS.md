@@ -22,7 +22,7 @@ Toy pages agree with whatever the code already does.
 built into the content API (hosted and static sites, and anything that edits
 through it). A site that keeps its own content (the self-hosted Laravel
 fallback with `DraftStore`, and WordPress) has no locks: two people editing it
-still last-save-wins, as before 0.18.0. Records edited through the Laravel
+still last-save-wins, as before 0.19.0. Records edited through the Laravel
 record endpoints are immediate writes and are not locked either.
 
 **Smaller edges.**

@@ -10,8 +10,8 @@
  * versions are the engine's and not a copy of them.
  *
  *   LIVE_EDIT_TEAM_DIR   where the database, cache and clock live (required)
- *   LIVE_EDIT_AUTOLOAD   a different autoloader (this machine runs PHP 8.3, and
- *                        vendor/autoload.php refuses anything below 8.4)
+ *   LIVE_EDIT_AUTOLOAD   a different autoloader (optional; autoload.php beside
+ *                        this file copes with PHP below 8.4 on its own)
  *
  * The clock: a file "now" in that directory holding a number of seconds to
  * add to the real time, so a journey can step forward thirty minutes.
@@ -22,7 +22,7 @@ use ShipFast\LiveEdit\Domain\Content\EditPolicy;
 use ShipFast\LiveEdit\LiveEditServiceProvider;
 
 $root = dirname(__DIR__, 3);
-require getenv('LIVE_EDIT_AUTOLOAD') ?: $root.'/vendor/autoload.php';
+require getenv('LIVE_EDIT_AUTOLOAD') ?: __DIR__.'/autoload.php';
 
 $dir = rtrim((string) getenv('LIVE_EDIT_TEAM_DIR'), '/');
 if ($dir === '') {
