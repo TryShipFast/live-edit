@@ -37,7 +37,7 @@ await new Promise((resolve) => setTimeout(resolve, 800));
 
 // Who polls: 50 people on "demo", one on each other site.
 const pollers = [];
-for (const [key, token] of Object.entries(seeded.demo)) if (key !== 'visitor') pollers.push({ site: 'demo', token, etag: null });
+for (const [key, token] of Object.entries(seeded.demo)) if (key !== 'visitor' && key !== 'secret') pollers.push({ site: 'demo', token, etag: null });
 for (const [site, tokens] of Object.entries(seeded)) if (site !== 'demo') pollers.push({ site, token: tokens.ada, etag: null });
 const writers = Object.entries(seeded.demo).filter(([key]) => key.startsWith('e')).slice(0, 5).map(([, token]) => token);
 

@@ -18,8 +18,8 @@ use ShipFast\LiveEdit\Http\Api\ApiContext;
  *   POST /team/claim         take a section before editing it {unit, label, continue}
  *   POST /team/heartbeat     still here (renews at most once a minute)
  *   POST /team/release       let go of sections {units?}
- *   POST /team/take-over     owner only: take a section from whoever has it {unit}
- *   POST /team/discard-left  owner only: throw away what somebody left in a section {unit}
+ *   POST /team/take-over     owner or admin: take a section from whoever has it {unit}
+ *   POST /team/discard-left  owner or admin: throw away what somebody left in a section {unit}
  *   POST /team/discard       throw away my own unpublished changes and let go of my sections
  */
 class TeamController
@@ -99,8 +99,9 @@ class TeamController
     {
         $validated = $request->validate(['unit' => ['required', 'string', 'max:191'], 'label' => ['nullable', 'string', 'max:191']]);
 
+        // Asked fresh: a demoted admin loses the power on their next request.
         return $this->answer(fn () => ['lock' => (new SectionLocks(ApiContext::site($request)))->takeOver(
-            $this->person($request), $validated['unit'], $validated['label'] ?? null
+            Person::fresh(ApiContext::token($request)), $validated['unit'], $validated['label'] ?? null
         )]);
     }
 
@@ -109,7 +110,7 @@ class TeamController
         $validated = $request->validate(['unit' => ['required', 'string', 'max:191']]);
 
         return $this->answer(fn () => ['discarded' => (new SectionLocks(ApiContext::site($request)))->discardLeft(
-            $this->person($request), $validated['unit']
+            Person::fresh(ApiContext::token($request)), $validated['unit']
         )]);
     }
 

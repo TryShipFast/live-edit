@@ -157,7 +157,7 @@ test('two people edit two sections at once, and each publish puts live only its 
     await tunde.page.locator(PRODUCT).first().click({ force: true });
     const told = ui(tunde.page).locator('.le-modal');
     await expect(told).toContainText('Ada is editing this section');
-    await expect(told).toContainText('Ask the owner to take over');
+    await expect(told).toContainText('Ask an admin to take over');
     await expect(ui(tunde.page).getByRole('button', { name: 'Take over' })).toHaveCount(0);
     await shot(tunde.page, '03-tunde-is-told-ada-is-editing-1440');
     await told.getByRole('button', { name: 'OK' }).click();
@@ -166,6 +166,12 @@ test('two people edit two sections at once, and each publish puts live only its 
     await edit(tunde.page, STORY, 'Tunde rewrote the story.');
     await expect(lockLabel(ada.page)).toHaveText('Tunde is editing this section', { timeout: 12000 });
     await shot(ada.page, '04-ada-sees-tunde-on-story-1440');
+
+    // Her Publish button counts only what pressing it publishes: her one change, not Tunde's.
+    await ada.page.reload();
+    await expect.poll(() => ada.page.evaluate(() => document.body.classList.contains('editing'))).toBe(true);
+    await expect(ui(ada.page).locator('.le-publish-count')).toHaveText('1');
+    expect((await changesFor('olu')).count).toBe(2);
 
     // Ada's Changes: hers, and Tunde's (not included).
     await openChanges(ada.page);
@@ -257,7 +263,7 @@ test('two people open the same section at the same moment: one gets it, the othe
         body: JSON.stringify({ key: key.replace(/^setting:/, ''), value: 'Overwritten?' }),
     });
     expect(stale.status).toBe(409);
-    expect((await stale.json()).error.message).toBe(`${winner} is editing Product right now. Ask the owner to take over if it cannot wait.`);
+    expect((await stale.json()).error.message).toBe(`${winner} is editing Product right now. Ask an admin to take over if it cannot wait.`);
 
     const drafts = (await changesFor('olu')).changes;
     expect(drafts.map((c) => [c.author_name, c.after])).toEqual([[winner, `${winner} named it`]]);
@@ -315,7 +321,7 @@ test('the owner takes over a section, and the person who had it is told', async 
     expect((await team('olu')).locks.find((l) => l.label === 'Product')).toMatchObject({ name: 'Olu', taken_from_name: 'Ada' });
 
     // Ada is told on her next look.
-    await expect(ui(ada.page).locator('.le-toast').filter({ hasText: 'The owner took over Product' })).toBeVisible({ timeout: 12000 });
+    await expect(ui(ada.page).locator('.le-toast').filter({ hasText: 'Olu took over Product' })).toBeVisible({ timeout: 12000 });
     await shot(ada.page, '15-ada-told-owner-took-over-1440');
 
     // The owner finishes and publishes: Product goes live, Tunde's Story does not.
@@ -337,6 +343,51 @@ test('the owner takes over a section, and the person who had it is told', async 
     await expect.poll(async () => (await team('ada')).locks.find((l) => l.label === 'Product')?.name).toBe('Ada');
 
     for (const one of [ada, tunde, olu]) await one.context.close();
+});
+
+test('an admin who is not the owner can take over, and loses it the moment they are demoted', async ({ browser }) => {
+    const ada = await member(browser, 'ada');
+    const tunde = await member(browser, 'tunde');
+    await edit(ada.page, PRODUCT, 'Ada on the product');
+    await edit(tunde.page, STORY, 'Tunde on the story');
+
+    // Kemi is an admin the owner made.
+    const kemi = await member(browser, 'kemi');
+    expect((await team('kemi')).you.role).toBe('admin');
+    await expect(lockLabel(kemi.page)).toHaveCount(2, { timeout: 12000 });
+    await kemi.page.locator(PRODUCT).first().click({ force: true });
+    const ask = ui(kemi.page).locator('.le-modal');
+    await expect(ask.getByRole('button', { name: 'Take over' })).toBeVisible();
+    await shot(kemi.page, '19-admin-can-take-over-1440');
+    await ask.getByRole('button', { name: 'Take over' }).click();
+    await settle(kemi.page);
+    expect((await team('kemi')).locks.find((l) => l.label === 'Product')).toMatchObject({ name: 'Kemi', taken_from_name: 'Ada' });
+    await expect(ui(ada.page).locator('.le-toast').filter({ hasText: 'Kemi took over Product' })).toBeVisible({ timeout: 12000 });
+
+    // The host demotes her. Her next request has no admin power left.
+    const demoted = await fetch(`http://127.0.0.1:${API_PORT}/api/live-edit/v1/demo/sessions/role`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${tokens.secret}`, 'Content-Type': 'application/json', Accept: 'application/json' },
+        body: JSON.stringify({ id: 'u-kemi', role: 'editor' }),
+    });
+    expect(demoted.status).toBe(200);
+    const refused = await fetch(`${site.url}/api/demo/team/take-over`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${tokens.kemi}`, 'Content-Type': 'application/json', Accept: 'application/json' },
+        body: JSON.stringify({ unit: 'section:aster-veil.story' }),
+    });
+    expect(refused.status).toBe(403);
+
+    await kemi.page.reload();
+    await expect.poll(async () => (await team('kemi')).you.role).toBe('editor');
+    await kemi.page.locator(STORY).first().click({ force: true });
+    const told = ui(kemi.page).locator('.le-modal');
+    await expect(told).toContainText('Tunde is editing this section');
+    await expect(told).toContainText('Ask an admin to take over');
+    await expect(told.getByRole('button', { name: 'Take over' })).toHaveCount(0);
+    await shot(kemi.page, '20-demoted-admin-asks-an-admin-1440');
+
+    for (const one of [ada, tunde, kemi]) await one.context.close();
 });
 
 test('undoing one person\'s published version leaves the other person\'s work', async ({ browser }) => {

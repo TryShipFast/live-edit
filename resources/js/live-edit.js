@@ -1979,8 +1979,8 @@ const bootLiveEdit = () => {
                 drawerFields.append(el('p', 'le-team-sub', `${name}: ${theirs.length} change${theirs.length === 1 ? '' : 's'}`));
                 theirs.forEach((change) => {
                     const row = rowFor(change);
-                    // Putting back a teammate's change is theirs to do, or the owner's.
-                    if (!team?.isOwner()) row.querySelector('.le-chip-btn')?.remove();
+                    // Putting back a teammate's change is theirs to do, or an admin's.
+                    if (!team?.mayManage()) row.querySelector('.le-chip-btn')?.remove();
                     drawerFields.append(row);
                 });
             }

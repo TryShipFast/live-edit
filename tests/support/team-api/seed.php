@@ -22,7 +22,7 @@ $sites = max(1, (int) ($argv[1] ?? 1));
 $people = [
     'ada' => ['id' => 'u-ada', 'name' => 'Ada', 'role' => 'editor'],
     'tunde' => ['id' => 'u-tunde', 'name' => 'Tunde', 'role' => 'editor'],
-    'kemi' => ['id' => 'u-kemi', 'name' => 'Kemi', 'role' => 'editor'],
+    'kemi' => ['id' => 'u-kemi', 'name' => 'Kemi', 'role' => 'admin'],
     'olu' => ['id' => 'u-olu', 'name' => 'Olu', 'role' => 'owner'],
 ];
 $extra = max(0, (int) ($argv[2] ?? 0));
@@ -35,7 +35,8 @@ for ($n = 0; $n < $sites; $n++) {
     $slug = $n === 0 ? 'demo' : 'demo'.$n;
     $site = Site::query()->create(['slug' => $slug, 'name' => 'Vellum '.$n, 'allowed_origins' => []]);
     [, $publishable] = $site->issueToken(TokenType::Publishable, 'Web');
-    $tokens = ['visitor' => $publishable];
+    [, $secret] = $site->issueToken(TokenType::Secret, 'Host server');
+    $tokens = ['visitor' => $publishable, 'secret' => $secret];
     foreach ($people as $key => $person) {
         if ($n > 0 && ! in_array($key, ['ada', 'olu'], true)) {
             continue;

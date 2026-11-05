@@ -27,18 +27,19 @@ record endpoints are immediate writes and are not locked either.
 
 **Smaller edges.**
 
-- The Publish button's count is every unpublished change on the site; the
-  publish window then says how many are yours and publishes only those.
 - The Brand, Shop and SEO panels are claimed by the first save made in them,
   not by opening them.
 - A change outside any section on a site that has sections (rare on a Kit
   site) is locked per element (`key:<key>`).
-- Restoring a whole version is still all or nothing for what is live: it says
-  whose published work it takes back, but it does take it back. **Undo these
-  changes** on one version is the team-safe way.
-- Roles: an editor whose grant has no `role` and whose session was not started
-  with one is an editor, not the owner. The host must say who owns the site
-  (README, "What the host passes").
+- Restoring a whole version (API only, owner or admin) is still all or nothing
+  for what is live: it says whose published work it takes back, but it does
+  take it back. **Undo these changes** on one version is the team-safe way.
+- Roles: somebody whose grant has no `role` and whose session was not started
+  with one is an editor. The host must say who the owner is (README, "What the
+  host passes"); the engine does not make the first person the owner by itself.
+- Who is editing what can show an old role for up to a minute if the host
+  changes a grant without going through Eloquent (a raw SQL update). The
+  powers themselves are always checked fresh.
 
 **What closing it would take.** For WordPress and the Laravel fallback, the
 same locks table and checks in their own save routes (`LiveEditController`

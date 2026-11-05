@@ -192,8 +192,8 @@ class SectionLocks
      */
     public function takeOver(Person $owner, string $unit, ?string $label = null): array
     {
-        if (! $owner->isOwner()) {
-            throw new LockRefused('Only the website owner can take over a section.', [], 'not_owner');
+        if (! $owner->mayManage()) {
+            throw new LockRefused('Only an admin can take over a section. Ask an admin to take over.', [], 'not_owner');
         }
 
         $lock = $this->locks()->where('unit', $unit)->first();
@@ -224,8 +224,8 @@ class SectionLocks
     /** The owner throws away what somebody else left in a part of the site. Returns how many changes. */
     public function discardLeft(Person $owner, string $unit): int
     {
-        if (! $owner->isOwner()) {
-            throw new LockRefused('Only the website owner can throw away somebody else\'s changes.', [], 'not_owner');
+        if (! $owner->mayManage()) {
+            throw new LockRefused('Only an admin can throw away somebody else\'s changes.', [], 'not_owner');
         }
 
         $live = $this->locks()->where('unit', $unit)->where('last_active_at', '>=', $this->cutoff())->first();
@@ -421,11 +421,11 @@ class SectionLocks
         $label = $described['label'];
 
         if ($lock->taken_from === $person->id) {
-            return new LockRefused("The owner took over {$label}. Your changes there are now theirs to publish.", $described, 'taken_over');
+            return new LockRefused("{$described['name']} took over {$label}. Your changes there are now theirs to publish.", $described, 'taken_over');
         }
 
         $name = $described['name'] !== '' ? $described['name'] : 'Someone';
-        $advice = $person->isOwner() ? 'You can take it over.' : 'Ask the owner to take over if it cannot wait.';
+        $advice = $person->mayManage() ? 'You can take it over.' : 'Ask an admin to take over if it cannot wait.';
 
         return new LockRefused("{$name} is editing {$label} right now. {$advice}", $described, 'locked');
     }

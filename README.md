@@ -157,28 +157,39 @@ site belongs to one person while they work on it.
   becomes yours until you publish, discard, or leave it alone for 30 minutes.
 - A section a teammate is working on has a quiet dashed outline and a label,
   "Ada is editing this section". Pressing anything in it says so in plain words
-  instead of opening it. An editor is told to ask the owner to take over; the
-  website owner gets a **Take over** button.
+  instead of opening it. An editor is told to ask an admin to take over; the
+  owner and admins get a **Take over** button.
+- The **Publish** button counts only your own changes, which is what pressing
+  it puts live.
 - **Publish** puts live only your own sections, then lets go of them. A
   teammate's unfinished section stays a draft, still theirs and still locked,
   until they publish it. The publish window lists "Your changes (these go live
   when you publish)" and "Others' changes (not included)", by name.
-- **Changes** shows the same split. Only the author, or the owner, can put back
+- **Changes** shows the same split. Only the author, or an admin, can put back
   somebody's change.
 - A section left alone for 30 minutes opens up. Its changes stay saved and
   still belong to their author. The next person to open it is told "Ada left
   unpublished changes here" and can **Continue from them** (they become theirs)
-  or, for the owner, **Discard them**.
-- **Take over** (owner only) takes the section and the holder's unpublished
-  changes in it. The holder is told "The owner took over Hero" on their next
-  look.
+  or, for an admin, **Discard them**.
+- **Take over** (owner and admins) takes the section and the holder's
+  unpublished changes in it. The holder is told "Olu took over Hero" on their
+  next look.
 - **History** says who did what, newest first: "Ada published 2 changes",
   then each change under its section, "Ada changed the headline in Hero". Each
   version has **Undo these changes**, which puts back only what that publish
   changed and leaves anything somebody changed again since (it says so).
-  Restoring a whole version (`POST /restore`) still works and now says whose
-  published work it takes back, and it no longer throws away a teammate's
-  unpublished drafts.
+  Putting the whole website back to an earlier version is not in History: it
+  is `POST /restore` only, for the owner and admins (403 for an editor). It
+  says whose published work it takes back, and it no longer throws away a
+  teammate's unpublished drafts.
+
+**Roles.** The first person on the site is the owner. The owner can make
+anybody an admin, and an admin is promoted or demoted the same way. The owner
+and admins may take over a section, throw away changes somebody left, put back
+a teammate's change and restore a whole version; an editor may not. A role
+change counts on the person's next request: every action that needs the power
+reads the role fresh, and the cached "who is editing" answer forgets a person
+the moment their grant changes.
 
 A site with one person editing works exactly as before: everything is theirs
 and Publish publishes everything. So does any session that does not say who it
@@ -216,23 +227,29 @@ after) and `undoes`. `Domain\Team\SectionLocks` is the authority; the editor
 | `POST /team/claim` `{unit, label, continue}` | take a section (409 with who holds it) |
 | `POST /team/heartbeat` | still here (renews at most once a minute) |
 | `POST /team/release` `{units?}` | let go |
-| `POST /team/take-over` `{unit}` | owner only |
-| `POST /team/discard-left` `{unit}` | owner only: throw away what somebody left |
+| `POST /team/take-over` `{unit}` | owner or admin |
+| `POST /team/discard-left` `{unit}` | owner or admin: throw away what somebody left |
 | `POST /team/discard` | throw away my own unpublished changes and let go |
 | `POST /versions/{n}/undo` | undo one published version (publish key) |
+| `POST /restore` `{version}` | the whole site back to a version: owner or admin only |
+| `POST /sessions/role` `{id, role}` | secret key: promote or demote a person the host named |
 
 Any save into a section somebody else holds is refused with **409** and a
-sentence ("Ada is editing Hero right now. Ask the owner to take over if it
+sentence ("Ada is editing Hero right now. Ask an admin to take over if it
 cannot wait."), even from a stale page. Two first edits at the same moment are
 decided by the unique index: one gets the section, the other is told who.
 
 **What the host passes.** Who the person is, when it starts the session:
 
-- signed in with us or started with `EditorSession::begin($site, $editor, $role)`:
-  the editor's name, and `'owner'` for the website's owner (or the grant's
-  `role` column on `live_edit_editor_site`);
+- somebody we know (signed in with us, or `EditorSession::begin($site,
+  $editor, $role)`): their name, and their role on their grant
+  (`live_edit_editor_site.role`: `owner`, `admin` or `editor`; `begin` writes
+  the role it is given there). Promote or demote by changing the grant
+  (`$editor->sites()->updateExistingPivot($site->id, ['role' => 'admin'])`);
 - minted by the host (`POST /sessions`): `editor: {id, name, role}`, where `id`
-  is the host's own id for its user and `role` is `owner` or `editor`.
+  is the host's own id for its user and `role` is `owner`, `admin` or
+  `editor`; promote or demote with `POST /sessions/role {id, role}` and every
+  session of theirs changes on its next request.
 
 Settings: `live-edit.team.idle_minutes` (30), `poll_active_seconds` (5),
 `poll_idle_seconds` (30). `live-edit:prune-locks` runs every ten minutes on the

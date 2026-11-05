@@ -104,6 +104,7 @@ class Site extends Model
     public function editors(): BelongsToMany
     {
         return $this->belongsToMany(Editor::class, 'live_edit_editor_site', 'site_id', 'editor_id')
+            ->using(EditorGrant::class)
             ->withPivot(['may_publish', 'may_edit_locked', 'last_seen_at', 'role'])
             ->withTimestamps();
     }

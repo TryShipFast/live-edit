@@ -32,14 +32,14 @@ class SessionController
             /*
              * Who this is, for team editing (one person per section). The
              * host's own id for its user, the name teammates will see ("Ada
-             * is editing this section"), and whether they own the website.
+             * is editing this section"), and their role: owner, admin or editor.
              * Absent means the session is the website itself, which edits as
              * it always did: everything is its own.
              */
             'editor' => ['nullable', 'array'],
             'editor.id' => ['required_with:editor', 'string', 'max:100'],
             'editor.name' => ['nullable', 'string', 'max:120'],
-            'editor.role' => ['nullable', 'string', 'in:owner,editor'],
+            'editor.role' => ['nullable', 'string', 'in:owner,admin,editor'],
         ]);
 
         $session = $issue(
@@ -106,5 +106,34 @@ class SessionController
                 'may_edit_locked' => $usable ? $token->mayEditLocked() : false,
             ],
         ])->withHeaders(['Cache-Control' => 'no-store, private']);
+    }
+
+    /**
+     * Promote or demote somebody the host named when it minted their session.
+     *
+     * A secret-key act, like minting. Every session of theirs on this site
+     * takes the new role on its next request, so a demoted admin does not keep
+     * the power for the rest of a session. (Somebody we know as an editor has
+     * their role on their grant instead, EditorGrant.)
+     */
+    public function role(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'id' => ['required', 'string', 'max:100'],
+            'role' => ['required', 'string', 'in:owner,admin,editor'],
+        ]);
+
+        $changed = 0;
+        \ShipFast\LiveEdit\Domain\Site\ApiToken::query()
+            ->where('site_id', ApiContext::site($request)->id)
+            ->where('holder_ref', $validated['id'])
+            ->get()
+            ->each(function ($token) use ($validated, &$changed) {
+                // Saved one by one so each remembered key is forgotten (ApiToken::booted).
+                $token->forceFill(['holder_role' => $validated['role']])->save();
+                $changed++;
+            });
+
+        return response()->json(['sessions' => $changed, 'role' => $validated['role']])->withHeaders(['Cache-Control' => 'no-store']);
     }
 }

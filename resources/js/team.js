@@ -9,11 +9,11 @@
  *
  *   - a section a teammate is working on has a quiet outline and a label,
  *     "Ada is editing this section", and pressing anything in it says so
- *     instead of opening it (with "Take over" for the owner);
+ *     instead of opening it (with "Take over" for the owner and admins);
  *   - the first thing they open or change in a section makes it theirs until
  *     they publish or discard, or go quiet for half an hour;
  *   - opening a section somebody left unfinished says "Ada left unpublished
- *     changes here" and offers to continue from them (or, for the owner, to
+ *     changes here" and offers to continue from them (or, for an admin, to
  *     throw them away).
  *
  * The server is the authority (SectionLocks): this file only shows what it
@@ -208,7 +208,8 @@ export function createTeam({ send, ui, doc = document, win = window, onChanged =
     ui?.shadow?.append(layer);
 
     const youId = () => state.you?.id ?? null;
-    const isOwner = () => state.you?.role === 'owner';
+    // The owner, or an admin they made, may take over and throw away left changes.
+    const mayManage = () => ['owner', 'admin'].includes(state.you?.role);
     const othersLocks = () => state.locks.filter((lock) => lock.holder !== youId());
     const lockOn = (unit) => state.locks.find((lock) => lock.unit === unit) ?? null;
 
@@ -284,7 +285,7 @@ export function createTeam({ send, ui, doc = document, win = window, onChanged =
             if (seen || announced.has(id)) continue;
             announced.add(id);
             try { win.sessionStorage?.setItem(`le-taken:${id}`, '1'); } catch { /* private window */ }
-            ui?.toast?.(`The owner took over ${lock.label}. Your changes there are now theirs to publish.`, 8000);
+            ui?.toast?.(`${lock.name || 'An admin'} took over ${lock.label}. Your changes there are now theirs to publish.`, 8000);
         }
     };
 
@@ -315,7 +316,7 @@ export function createTeam({ send, ui, doc = document, win = window, onChanged =
         ok.textContent = 'OK';
         ok.addEventListener('click', () => sheet.close());
 
-        if (isOwner()) {
+        if (mayManage()) {
             const take = doc.createElement('button');
             take.type = 'button';
             take.className = 'le-btn-publish';
@@ -342,7 +343,7 @@ export function createTeam({ send, ui, doc = document, win = window, onChanged =
             });
             sheet.foot.append(ok, take);
         } else {
-            sheet.body.append(p('Cannot wait? Ask the owner to take over. The owner can take over any section.'));
+            sheet.body.append(p('Cannot wait? Ask an admin to take over. An admin can take over any section.'));
             sheet.foot.append(ok);
         }
     };
@@ -370,7 +371,7 @@ export function createTeam({ send, ui, doc = document, win = window, onChanged =
             void refresh();
         });
 
-        if (isOwner()) {
+        if (mayManage()) {
             const bin = doc.createElement('button');
             bin.type = 'button';
             bin.className = 'le-btn-outline';
@@ -526,7 +527,7 @@ export function createTeam({ send, ui, doc = document, win = window, onChanged =
         get state() { return state; },
         get you() { return state.you; },
         get available() { return available; },
-        isOwner,
+        mayManage,
         lockOn,
         unitOf,
         beforeEdit,

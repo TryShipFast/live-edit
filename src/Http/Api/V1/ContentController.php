@@ -52,6 +52,9 @@ class ContentController
         $payload = $read($site, $locale, $editing);
 
         if ($editing) {
+            // What pressing Publish will put live: this person's own changes.
+            $payload['pending'] = $this->yours($request, $payload['pending'] ?? 0);
+
             // Never cached, by anything. This is one person's unfinished work,
             // and a cache that kept it would serve a half-typed sentence to
             // the next visitor.
@@ -85,7 +88,7 @@ class ContentController
             'locale' => $payload['locale'],
             // So an editor can be offered a way to release held work rather
             // than being left to wonder where it went.
-            'pending' => $payload['pending'] ?? 0,
+            'pending' => $editing ? $this->yours($request, $payload['pending'] ?? 0) : ($payload['pending'] ?? 0),
             // What a consumer should key a cache on. A version alone is not
             // enough: a site with publishing off changes its words without
             // moving one.
@@ -309,12 +312,23 @@ class ContentController
         $validated = $request->validate(['version' => ['required', 'integer', 'min:1']]);
 
         $site = ApiContext::site($request);
+        $person = Person::fresh(ApiContext::token($request));
+
+        // Putting the whole site back takes back everybody's published work,
+        // so it is for an admin or the owner, and only through the API: History
+        // offers "Undo these changes" on one version instead.
+        if (! $person->mayManage()) {
+            return response()->json(['error' => [
+                'type' => 'forbidden',
+                'message' => 'Only an admin can put the whole website back to an earlier version.',
+            ]], 403);
+        }
 
         // Whose published work going back undoes, said before it is gone.
         $undoes = Version::query()->where('site_id', $site->id)->where('number', '>', (int) $validated['version'])
             ->whereNotNull('published_by')->distinct()->pluck('published_by')->values()->all();
 
-        $changed = (new SiteStore($site))->restore((int) $validated['version'], Person::fromToken(ApiContext::token($request)));
+        $changed = (new SiteStore($site))->restore((int) $validated['version'], $person);
 
         if ($changed === null) {
             return response()->json([
@@ -605,7 +619,7 @@ class ContentController
         ]);
 
         $site = ApiContext::site($request);
-        $person = Person::fromToken(ApiContext::token($request));
+        $person = Person::fresh(ApiContext::token($request));
 
         $drafts = Draft::query()
             ->where('site_id', $site->id)
@@ -613,19 +627,19 @@ class ContentController
             ->when($validated['kind'] ?? null, fn ($query, $kind) => $query->where('kind', $kind))
             ->get();
 
-        // Only your own changes; the website owner may put back anybody's.
+        // Only your own changes; an admin (or the owner) may put back anybody's.
         $mine = (new SiteStore($site))->ownedBy($person, $drafts);
 
-        if ($mine->count() < $drafts->count() && ! $person->isOwner()) {
+        if ($mine->count() < $drafts->count() && ! $person->mayManage()) {
             $other = $drafts->first(fn (Draft $d) => ! $mine->contains('id', $d->id));
 
             return response()->json(['error' => [
                 'type' => 'section_locked',
-                'message' => ($other?->author_name ?: 'A teammate').' made that change. Only they, or the website owner, can put it back.',
+                'message' => ($other?->author_name ?: 'A teammate').' made that change. Only they, or an admin, can put it back.',
             ]], 409);
         }
 
-        $removed = $person->isOwner()
+        $removed = $person->mayManage()
             ? Draft::query()->whereIn('id', $drafts->pluck('id'))->delete()
             : Draft::query()->whereIn('id', $mine->pluck('id'))->delete();
 
@@ -753,6 +767,24 @@ class ContentController
         $result = $export(ApiContext::site($request), $validated['html'], $validated['page'] ?? '');
 
         return response()->json($result)->withHeaders(['Cache-Control' => 'no-store, private']);
+    }
+
+    /**
+     * How many unpublished changes are this person's (team editing): the
+     * Publish button's count. Everything, for the website itself, which is
+     * the count it always was.
+     */
+    private function yours(Request $request, int $all): int
+    {
+        $person = Person::fromToken(ApiContext::token($request));
+
+        if (! $person->isSomeone() || $all === 0) {
+            return $all;
+        }
+
+        $site = ApiContext::site($request);
+
+        return (new SiteStore($site))->ownedBy($person, Draft::query()->where('site_id', $site->id)->get())->count();
     }
 
     private function locale(Request $request): ?string

@@ -219,6 +219,13 @@ Route::prefix(config('live-edit.api.prefix', 'api/live-edit/v1').'/{site}')
             ThrottleApi::class.':session',
         ])->post('/sessions', [SessionController::class, 'store'])->name('live-edit.api.sessions');
 
+        // Promoting or demoting a person the host named (team editing roles).
+        Route::middleware([
+            ThrottleApi::class.':session',
+            AuthenticateApiToken::class.':mint',
+            ThrottleApi::class.':session',
+        ])->post('/sessions/role', [SessionController::class, 'role'])->name('live-edit.api.sessions.role');
+
         Route::middleware([
             ThrottleApi::class.':publish',
             AuthenticateApiToken::class.':publish',

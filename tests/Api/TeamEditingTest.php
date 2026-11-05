@@ -110,7 +110,7 @@ class TeamEditingTest extends TestCase
         $refused->assertStatus(409)
             ->assertJsonPath('error.type', 'section_locked')
             ->assertJsonPath('error.lock.name', 'Ada')
-            ->assertJsonPath('error.message', 'Ada is editing Hero right now. Ask the owner to take over if it cannot wait.');
+            ->assertJsonPath('error.message', 'Ada is editing Hero right now. Ask an admin to take over if it cannot wait.');
 
         $this->assertStringNotContainsString("\u{2014}", $refused->json('error.message'));
         $this->assertSame('Hello from Ada', Draft::query()->where('subject', 'hero.title')->first()->payload['value']);
@@ -261,7 +261,7 @@ class TeamEditingTest extends TestCase
         $this->save($this->ada, 'hero.title', 'Mine!', 'section:home.hero')
             ->assertStatus(409)
             ->assertJsonPath('error.reason', 'taken_over')
-            ->assertJsonPath('error.message', 'The owner took over Hero. Your changes there are now theirs to publish.');
+            ->assertJsonPath('error.message', 'Olu took over Hero. Your changes there are now theirs to publish.');
     }
 
     public function test_discard_throws_away_only_my_changes_and_releases_my_sections(): void
@@ -339,6 +339,9 @@ class TeamEditingTest extends TestCase
         $this->save($this->ada, 'hero.title', 'Ada hero', 'section:home.hero')->assertOk();
         $this->postJson($this->url('/publish'), [], $this->headers($this->ada))->assertOk();
         $this->save($this->tunde, 'story.body', 'Tunde draft', 'section:home.story')->assertOk();
+
+        // Putting the whole site back is for an admin or the owner, never an editor.
+        $this->postJson($this->url('/restore'), ['version' => 1], $this->headers($this->tunde))->assertStatus(403);
 
         $this->postJson($this->url('/restore'), ['version' => 1], $this->headers($this->owner))
             ->assertOk()->assertJsonPath('undoes_work_of', []);
@@ -432,5 +435,59 @@ class TeamEditingTest extends TestCase
         $this->postJson($this->url('/publish'), [], $this->headers($this->ada))->assertOk();
 
         $this->assertSame('Fresh', $this->getJson($this->url('/content'), $this->headers($public))->assertOk()->json('settings')['hero.title']);
+    }
+
+    public function test_an_admin_who_is_not_the_owner_may_take_over_and_a_demoted_one_loses_it_at_once(): void
+    {
+        $kemi = app(IssueEditSession::class)($this->site, 'Kemi', null, true, ['id' => 'u3', 'name' => 'Kemi', 'role' => 'admin'])['token'];
+        [, $secret] = $this->site->issueToken(TokenType::Secret, 'Server');
+
+        $this->save($this->ada, 'hero.title', 'Ada hero', 'section:home.hero', 'Hero')->assertOk();
+        $this->save($this->tunde, 'story.body', 'Tunde story', 'section:home.story', 'Story')->assertOk();
+
+        $this->getJson($this->url('/team'), $this->headers($kemi))->assertOk()->assertJsonPath('you.role', 'admin');
+        $this->postJson($this->url('/team/take-over'), ['unit' => 'section:home.hero'], $this->headers($kemi))
+            ->assertOk()->assertJsonPath('lock.name', 'Kemi');
+        $this->save($this->ada, 'hero.title', 'Mine', 'section:home.hero')
+            ->assertStatus(409)->assertJsonPath('error.message', 'Kemi took over Hero. Your changes there are now theirs to publish.');
+
+        // The host demotes her: the very next request has no admin power left.
+        $this->postJson('/api/live-edit/v1/team/sessions/role', ['id' => 'u3', 'role' => 'editor'], ['Authorization' => 'Bearer '.$secret])
+            ->assertOk()->assertJsonPath('sessions', 1);
+        $this->postJson($this->url('/team/take-over'), ['unit' => 'section:home.story'], $this->headers($kemi))->assertStatus(403);
+        $this->postJson($this->url('/restore'), ['version' => 1], $this->headers($kemi))->assertStatus(403);
+        $this->getJson($this->url('/team'), $this->headers($kemi))->assertOk()->assertJsonPath('you.role', 'editor');
+    }
+
+    public function test_an_editor_we_know_is_promoted_and_demoted_on_their_grant(): void
+    {
+        $editor = Editor::query()->create(['email' => 'bisi@example.test', 'name' => 'Bisi']);
+        $editor->sites()->attach($this->site->id, ['may_publish' => true, 'role' => 'editor']);
+        $token = EditorSession::begin($this->site, $editor)['token'];
+
+        $this->save($this->ada, 'hero.title', 'Ada hero', 'section:home.hero', 'Hero')->assertOk();
+        $this->getJson($this->url('/team'), $this->headers($token))->assertJsonPath('you.role', 'editor');
+        $this->postJson($this->url('/team/take-over'), ['unit' => 'section:home.hero'], $this->headers($token))->assertStatus(403);
+
+        $editor->sites()->updateExistingPivot($this->site->id, ['role' => 'admin']);
+        $this->getJson($this->url('/team'), $this->headers($token))->assertJsonPath('you.role', 'admin');
+        $this->postJson($this->url('/team/take-over'), ['unit' => 'section:home.hero'], $this->headers($token))->assertOk();
+
+        $editor->sites()->updateExistingPivot($this->site->id, ['role' => 'editor']);
+        $this->postJson($this->url('/team/discard-left'), ['unit' => 'section:home.hero'], $this->headers($token))->assertStatus(403);
+        $this->getJson($this->url('/team'), $this->headers($token))->assertJsonPath('you.role', 'editor');
+    }
+
+    public function test_the_publish_count_is_only_your_own_changes(): void
+    {
+        $this->save($this->ada, 'hero.title', 'Ada hero', 'section:home.hero')->assertOk();
+        $this->save($this->tunde, 'story.body', 'Tunde story', 'section:home.story')->assertOk();
+        $this->save($this->tunde, 'loose.key', 'More', 'section:home.story')->assertOk();
+
+        $this->getJson($this->url('/content'), $this->headers($this->ada))->assertOk()->assertJsonPath('pending', 1);
+        $this->getJson($this->url('/content'), $this->headers($this->tunde))->assertOk()->assertJsonPath('pending', 2);
+        $this->getJson($this->url('/content/version'), $this->headers($this->ada))->assertOk()->assertJsonPath('pending', 1);
+        // The website itself still counts everything.
+        $this->getJson($this->url('/content'), $this->headers($this->website))->assertOk()->assertJsonPath('pending', 3);
     }
 }

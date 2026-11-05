@@ -21,8 +21,8 @@ eachother works".
 - A lapsed section keeps its changes, still attributed to their author; the
   next person is told "Ada left unpublished changes here" and can continue from
   them, or (owner) discard them.
-- The website owner can take over any section, with its unpublished changes;
-  the holder is told "The owner took over Hero".
+- The owner or an admin can take over any section, with its unpublished
+  changes; the holder is told "Olu took over Hero".
 - Changes and the publish window are split into "Your changes (these go live
   when you publish)" and "Others' changes (not included)", by name.
 - History says who published each version and lists its changes by section and
@@ -36,6 +36,23 @@ eachother works".
   `POST /versions/{n}/undo`, `live-edit:prune-locks` (scheduled every ten
   minutes), config `live-edit.team.*`, migration
   `2026_11_05_120000_one_person_per_section`.
+
+### Roles: owner, admin, editor
+
+Owner, 5 Nov 2026: "the first person to open is the admin, but can also add
+other team member as admin or someone can be promoted to admin".
+
+- `admin` is accepted wherever a role is read (the grant's `role`,
+  `editor.role` on `POST /sessions`, `EditorSession::begin`). The owner and
+  admins may take over, throw away left changes, put back a teammate's change
+  and restore a whole version; an editor may not ("Ask an admin to take over").
+- A role change counts on the next request: powers are checked fresh, the
+  cached who-is-editing answer forgets a person when their grant changes, and
+  `POST /sessions/role` changes a host-named person's sessions at once.
+- The Publish button (`pending` on `/content` and `/content/version` for an
+  editor) counts only your own changes, what pressing it will publish.
+- Restoring a whole version stays out of History, API only, and is refused
+  (403) for an editor.
 
 ### Caching and load
 

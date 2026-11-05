@@ -26,10 +26,10 @@ final class EditorSession
      * @return array{token: string, editor: Editor, expires_at: string}
      */
     /**
-     * @param  string|null  $role  "owner" when this person owns the website (team
-     *                             editing: only the owner may take over a section).
-     *                             Null reads the grant's own role, and "editor" when
-     *                             it has none.
+     * @param  string|null  $role  "owner", "admin" or "editor", written to this
+     *                             person's grant on this site, which is where the role
+     *                             lives (so a later promotion or demotion is one change
+     *                             to the grant). Null leaves the grant's role as it is.
      */
     public static function begin(Site $site, Editor $editor, ?string $role = null): array
     {
@@ -49,8 +49,8 @@ final class EditorSession
             $editor->id,
         );
 
-        if (in_array($role, ['owner', 'editor'], true)) {
-            $token->forceFill(['holder_role' => $role])->save();
+        if (in_array($role, \ShipFast\LiveEdit\Domain\Team\Person::ROLES, true)) {
+            $editor->sites()->updateExistingPivot($site->id, ['role' => $role]);
         }
 
         return [

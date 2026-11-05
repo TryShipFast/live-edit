@@ -155,7 +155,20 @@ describe('the team layer in an open editor', () => {
         const allowed = team.beforeEdit(doc.querySelector('[data-edit="setting:hero"]'));
         expect(allowed).toBe(false);
         expect(ui.opened[0].title).toBe('Ada is editing this section');
-        expect(ui.opened[0].body.textContent).toContain('Ask the owner to take over');
+        expect(ui.opened[0].body.textContent).toContain('Ask an admin to take over');
+        team.stop();
+    });
+
+    it('offers an admin who is not the owner a way to take over too', async () => {
+        const doc = page();
+        const ui = fakeUi();
+        const send = vi.fn(async () => response(200, { ...state, you: { id: 'h:3', name: 'Kemi', role: 'admin' } }));
+        const team = createTeam({ send, ui, doc });
+        await team.refresh();
+
+        expect(team.mayManage()).toBe(true);
+        team.beforeEdit(doc.querySelector('[data-edit="setting:hero"]'));
+        expect([...ui.opened[0].foot.querySelectorAll('button')].map((b) => b.textContent)).toContain('Take over');
         team.stop();
     });
 
@@ -228,7 +241,7 @@ describe('the team layer in an open editor', () => {
         const team = createTeam({ send: async () => response(200, taken), ui, doc });
         await team.refresh();
 
-        expect(ui.toasts[0]).toBe('The owner took over Hero. Your changes there are now theirs to publish.');
+        expect(ui.toasts[0]).toBe('Olu took over Hero. Your changes there are now theirs to publish.');
         team.stop();
     });
 });

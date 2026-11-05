@@ -31,8 +31,8 @@ class IssueEditSession
     /**
      * @param  array{id?: string|int|null, name?: string|null, role?: string|null}|null  $person
      *                              Who this is, for team editing: the host's own id for
-     *                              its user, the name teammates see, and "owner" or
-     *                              "editor". Without it the session is "the website"
+     *                              its user, the name teammates see, and "owner",
+     *                              "admin" or "editor". Without it the session is "the website"
      *                              and behaves as before team editing.
      */
     public function __invoke(Site $site, ?string $label = null, ?int $ttlSeconds = null, bool $mayEditLocked = true, ?array $person = null): array
@@ -68,7 +68,7 @@ class IssueEditSession
             $token->forceFill([
                 'holder_ref' => mb_substr($ref, 0, 100),
                 'holder_name' => mb_substr(trim((string) ($person['name'] ?? '')), 0, 120) ?: null,
-                'holder_role' => ($person['role'] ?? null) === 'owner' ? 'owner' : 'editor',
+                'holder_role' => \ShipFast\LiveEdit\Domain\Team\Person::role($person['role'] ?? null),
             ])->save();
         }
 
