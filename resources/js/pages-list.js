@@ -94,7 +94,12 @@ export function reordered(made, ids) {
     const queue = ids.filter((id) => made.some((page) => page.id === id));
     const moving = new Set(queue);
 
-    return made.map((page) => (moving.has(page.id) ? made.find((other) => other.id === queue.shift()) : page));
+    return made.map((page) => {
+        if (!moving.has(page.id)) return page;
+        const next = queue.shift();
+
+        return made.find((other) => other.id === next);
+    });
 }
 
 /** The owner's pages with one moved a step up (-1) or down (+1) among those in the menu. */
@@ -148,13 +153,18 @@ export function pageRows(config = {}, menu = []) {
         };
     });
 
-    const position = (row) => {
-        if (row.home) return -1;
-        const at = menu.indexOf(row.id);
-        if (at !== -1) return at;
-        // In the menu by the owner's say, not yet drawn there: after the rest, in their order.
-        return menu.length + made.findIndex((entry) => entry.id === row.id);
-    };
+    /*
+     * The order: the menu as drawn, with the owner's pages in the order they are now stored (moving one
+     * here is shown at once, before the page is drawn again); one put in the menu and not drawn there
+     * yet comes after the rest.
+     */
+    const madeIds = new Set(made.map((entry) => entry.id));
+    const queue = made.filter((entry) => entry.menu === true).map((entry) => entry.id);
+    const order = menu
+        .filter((id) => !madeIds.has(id) || queue.includes(id))
+        .map((id) => (madeIds.has(id) ? queue.shift() : id));
+    order.push(...queue);
+    const position = (row) => (row.home ? -1 : (order.indexOf(row.id) === -1 ? order.length : order.indexOf(row.id)));
     const inMenu = rows.filter((row) => row.inMenu && row.kind === 'page').sort((a, b) => position(a) - position(b));
     const others = rows.filter((row) => !row.inMenu && row.kind === 'page');
     const needed = rows.filter((row) => row.kind !== 'page');
@@ -409,9 +419,6 @@ export function renderPagesList({ ui, config, menu = [], save, go, addPage, ask,
                 }
             }, `Delete ${row.title}`));
         }
-        if (!row.made && !row.home && row.kind === 'page' && row.inMenu) {
-            actions.append(el('span', 'le-hint le-page-why', 'Its name and place in the menu come from your design: click its menu link on the page to rename it.'));
-        }
         if (actions.childElementCount) item.append(actions);
         list.append(item);
     };
@@ -434,9 +441,13 @@ export function renderPagesList({ ui, config, menu = [], save, go, addPage, ask,
     function draw() {
         const { inMenu, others, needed } = pageRows(config, menu.filter((id) => (config.pages ?? []).some((page) => page.id === id)));
         const movable = inMenu.filter((row) => row.canMove);
-        const fixedToo = inMenu.some((row) => !row.canMove && !row.home);
+        const fixedToo = inMenu.some((row) => !row.made && !row.home);
+        const note = [
+            fixedToo ? 'Your design’s own pages keep their name and place in the menu: to rename one, click its menu link on the page.' : '',
+            movable.length > 1 ? 'Pages you made move up and down.' : '',
+        ].filter(Boolean).join(' ');
         const parts = [
-            group('In your menu', inMenu, { movable, note: movable.length > 1 && fixedToo ? 'Pages you made move up and down; your design’s own keep their place.' : '' }),
+            group('In your menu', inMenu, { movable, note }),
             group('Not in your menu', others),
         ];
         if (needed.length) {
