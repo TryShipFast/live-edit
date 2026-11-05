@@ -29,13 +29,25 @@ class SessionController
              * new service.
              */
             'may_edit_locked' => ['nullable', 'boolean'],
+            /*
+             * Who this is, for team editing (one person per section). The
+             * host's own id for its user, the name teammates will see ("Ada
+             * is editing this section"), and whether they own the website.
+             * Absent means the session is the website itself, which edits as
+             * it always did: everything is its own.
+             */
+            'editor' => ['nullable', 'array'],
+            'editor.id' => ['required_with:editor', 'string', 'max:100'],
+            'editor.name' => ['nullable', 'string', 'max:120'],
+            'editor.role' => ['nullable', 'string', 'in:owner,editor'],
         ]);
 
         $session = $issue(
             ApiContext::site($request),
             $validated['label'] ?? null,
             null,
-            (bool) ($validated['may_edit_locked'] ?? true)
+            (bool) ($validated['may_edit_locked'] ?? true),
+            $validated['editor'] ?? null,
         );
 
         // Never cached, anywhere, by anyone. This response is a credential.

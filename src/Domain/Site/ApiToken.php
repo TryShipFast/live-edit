@@ -32,6 +32,14 @@ class ApiToken extends Model
     /** Neither of these is something a caller should be able to ask for. */
     protected $hidden = ['secret_hash', 'public_text'];
 
+    /** A remembered key (TokenAuthenticator::remembered) is forgotten the moment it changes. */
+    protected static function booted(): void
+    {
+        $forget = fn (self $token) => \Illuminate\Support\Facades\Cache::forget(TokenAuthenticator::rememberKey((string) $token->public_id));
+        static::saved($forget);
+        static::deleted($forget);
+    }
+
     /** The person a session was issued to; nothing, for a site's own keys. */
     public function editor(): BelongsTo
     {

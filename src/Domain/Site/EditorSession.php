@@ -25,14 +25,20 @@ final class EditorSession
     /**
      * @return array{token: string, editor: Editor, expires_at: string}
      */
-    public static function begin(Site $site, Editor $editor): array
+    /**
+     * @param  string|null  $role  "owner" when this person owns the website (team
+     *                             editing: only the owner may take over a section).
+     *                             Null reads the grant's own role, and "editor" when
+     *                             it has none.
+     */
+    public static function begin(Site $site, Editor $editor, ?string $role = null): array
     {
         $editor->forceFill(['last_seen_at' => now()])->save();
         $editor->sawOn($site);
 
         $expiresAt = now()->addSeconds(max(60, (int) config('live-edit.api.session_ttl', 1800)));
 
-        [, $plain] = $site->issueToken(
+        [$token, $plain] = $site->issueToken(
             TokenType::Session,
             $editor->name ?: $editor->email,
             // From the grant on this site, never from the person. Trusting
@@ -42,6 +48,10 @@ final class EditorSession
             $expiresAt,
             $editor->id,
         );
+
+        if (in_array($role, ['owner', 'editor'], true)) {
+            $token->forceFill(['holder_role' => $role])->save();
+        }
 
         return [
             'token' => $plain,

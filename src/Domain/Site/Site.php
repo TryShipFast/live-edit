@@ -104,7 +104,7 @@ class Site extends Model
     public function editors(): BelongsToMany
     {
         return $this->belongsToMany(Editor::class, 'live_edit_editor_site', 'site_id', 'editor_id')
-            ->withPivot(['may_publish', 'may_edit_locked', 'last_seen_at'])
+            ->withPivot(['may_publish', 'may_edit_locked', 'last_seen_at', 'role'])
             ->withTimestamps();
     }
 
@@ -142,6 +142,16 @@ class Site extends Model
      */
     protected static function booted(): void
     {
+        // The allowed addresses EnforceCors remembers, forgotten when they may have changed.
+        $forgetOrigins = function (self $site) {
+            \Illuminate\Support\Facades\Cache::forget(\ShipFast\LiveEdit\Http\Api\Middleware\EnforceCors::originsKey((string) $site->slug));
+            if ($site->isDirty('slug') && $site->getOriginal('slug')) {
+                \Illuminate\Support\Facades\Cache::forget(\ShipFast\LiveEdit\Http\Api\Middleware\EnforceCors::originsKey((string) $site->getOriginal('slug')));
+            }
+        };
+        static::saved($forgetOrigins);
+        static::deleted($forgetOrigins);
+
         static::deleting(function (self $site) {
             // Their published files too. A departed customer's words sitting
             // in a bucket are data nobody has a right to hold, and a CDN would
@@ -152,6 +162,7 @@ class Site extends Model
             SiteStyle::query()->where('site_id', $site->id)->delete();
             Draft::query()->where('site_id', $site->id)->delete();
             Version::query()->where('site_id', $site->id)->delete();
+            \ShipFast\LiveEdit\Models\SectionLock::query()->where('site_id', $site->id)->delete();
             ApiToken::query()->where('site_id', $site->id)->delete();
         });
     }

@@ -28,12 +28,19 @@ class IssueEditSession
      *                               The host decides: they know which of their
      *                               users this is and we have no way to.
      */
-    public function __invoke(Site $site, ?string $label = null, ?int $ttlSeconds = null, bool $mayEditLocked = true): array
+    /**
+     * @param  array{id?: string|int|null, name?: string|null, role?: string|null}|null  $person
+     *                              Who this is, for team editing: the host's own id for
+     *                              its user, the name teammates see, and "owner" or
+     *                              "editor". Without it the session is "the website"
+     *                              and behaves as before team editing.
+     */
+    public function __invoke(Site $site, ?string $label = null, ?int $ttlSeconds = null, bool $mayEditLocked = true, ?array $person = null): array
     {
         $ttl = $ttlSeconds ?? (int) config('live-edit.api.session_ttl', 1800);
         $expiresAt = now()->addSeconds(max(60, $ttl));
 
-        [, $plain] = $site->issueToken(
+        [$token, $plain] = $site->issueToken(
             TokenType::Session,
             $label !== null && $label !== '' ? mb_substr($label, 0, 100) : 'Edit session',
             // Publish too, and deliberately.
@@ -54,6 +61,16 @@ class IssueEditSession
             null,
             $mayEditLocked,
         );
+
+        $ref = trim((string) ($person['id'] ?? ''));
+
+        if ($ref !== '') {
+            $token->forceFill([
+                'holder_ref' => mb_substr($ref, 0, 100),
+                'holder_name' => mb_substr(trim((string) ($person['name'] ?? '')), 0, 120) ?: null,
+                'holder_role' => ($person['role'] ?? null) === 'owner' ? 'owner' : 'editor',
+            ])->save();
+        }
 
         $this->forgetExpired($site);
 

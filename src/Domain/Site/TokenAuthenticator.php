@@ -2,6 +2,7 @@
 
 namespace ShipFast\LiveEdit\Domain\Site;
 
+use Illuminate\Support\Facades\Cache;
 use SensitiveParameter;
 
 /**
@@ -13,10 +14,14 @@ use SensitiveParameter;
  */
 class TokenAuthenticator
 {
+    /** How long a remembered key is trusted without asking the database again. */
+    public const REMEMBERED_SECONDS = 30;
+
     public function authenticate(
         #[SensitiveParameter] ?string $presented,
         ?string $origin = null,
         ?Ability $needs = null,
+        bool $remembered = false,
     ): AuthenticationResult {
         if ($presented === null || trim($presented) === '') {
             return AuthenticationResult::denied(Denial::Missing);
@@ -28,7 +33,7 @@ class TokenAuthenticator
             return AuthenticationResult::denied(Denial::Malformed);
         }
 
-        $token = ApiToken::query()->with('site')->where('public_id', $value->id)->first();
+        $token = $remembered ? $this->remembered($value->id) : ApiToken::query()->with('site')->where('public_id', $value->id)->first();
 
         if ($token === null) {
             // Hash anyway. Answering "no such key" faster than "wrong secret"
@@ -121,5 +126,38 @@ class TokenAuthenticator
         }
 
         return AuthenticationResult::allowed($token, $site);
+    }
+
+    /**
+     * The key and its site, from cache for a few seconds.
+     *
+     * Only for reads that are polled (who is editing what): many open editors
+     * asking every few seconds should not each cost a database lookup. Every
+     * check above still runs on the remembered row, the secret is still
+     * compared, and a key that is revoked or changed is forgotten at once
+     * (ApiToken's saved and deleted events). What can lag, by at most this
+     * many seconds, is a change to the site itself, such as a suspension.
+     */
+    private function remembered(string $publicId): ?ApiToken
+    {
+        $row = Cache::remember(self::rememberKey($publicId), self::REMEMBERED_SECONDS, function () use ($publicId) {
+            $token = ApiToken::query()->with('site')->where('public_id', $publicId)->first();
+
+            return $token === null ? false : ['token' => $token->getAttributes(), 'site' => $token->site?->getAttributes()];
+        });
+
+        if (! is_array($row)) {
+            return null;
+        }
+
+        $token = (new ApiToken)->newFromBuilder($row['token']);
+        $token->setRelation('site', $row['site'] === null ? null : (new Site)->newFromBuilder($row['site']));
+
+        return $token;
+    }
+
+    public static function rememberKey(string $publicId): string
+    {
+        return 'live-edit.auth.'.$publicId;
     }
 }

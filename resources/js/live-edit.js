@@ -1,4 +1,5 @@
 import { createChrome } from './chrome.js';
+import { createTeam, groupLines, sentenceFor, splitChanges, TEAM_CSS, versionHeadline } from './team.js';
 import { keepClearOfTheBar } from './clear-of-the-bar.js';
 import { openDialogsInPlace } from './dialogs-in-place.js';
 import { renderBrandPanel } from './brand.js';
@@ -171,6 +172,8 @@ const bootLiveEdit = () => {
         // The editor's UI is the package's own overlay in a shadow root, so the
         // host theme's CSS can neither style it nor be broken by it.
         const ui = createChrome();
+        // Team editing (team.js); set once the request helpers exist.
+        let team = null;
         // The site's own fixed things (a phone's Book bar, a cookie notice) lifted clear of the bar while editing.
         keepClearOfTheBar({
             bar: ui.toolbar,
@@ -1252,6 +1255,12 @@ const bootLiveEdit = () => {
                 sub.setAttribute('aria-selected', label === name ? 'true' : 'false');
             });
 
+            // A whole panel is one part of the site for team editing.
+            if (name === 'Brand') team?.setCurrent('panel:brand', 'Brand');
+            if (name === 'SEO') team?.setCurrent(`panel:seo:${window.location.pathname}`, 'Search and sharing');
+            if (name === 'Shop') team?.setCurrent('panel:shop', 'Shop');
+            if (name === 'Search') team?.setCurrent(null);
+
             if (name === 'Changes') void renderChanges();
             if (name === 'History') void renderHistory();
             if (name === 'Brand') renderBrand();
@@ -1893,9 +1902,9 @@ const bootLiveEdit = () => {
 
             drawerFields.replaceChildren();
 
-            changes.forEach((change) => {
+            const rowFor = (change) => {
                 const row = document.createElement('div');
-                row.className = 'le-change';
+                row.className = change.mine === false ? 'le-change is-others' : 'le-change';
 
                 const head = document.createElement('div');
                 head.className = 'le-row le-change-head';
@@ -1912,12 +1921,18 @@ const bootLiveEdit = () => {
                 head.append(label, revert);
                 row.append(head);
 
+                // Whose it is and where, once more than one person is working.
+                if (change.author_name && teamShown) {
+                    const who = document.createElement('p');
+                    who.className = 'le-change-who';
+                    who.textContent = [change.mine === false ? change.author_name : 'You', change.unit_label ? `in ${change.unit_label}` : ''].filter(Boolean).join(' ');
+                    row.append(who);
+                }
+
                 if (isAPictureChange(change)) {
                     row.append(picturesChanged(change));
 
-                    drawerFields.append(row);
-
-                    return;
+                    return row;
                 }
 
                 // The old words struck through, the new ones under them. A
@@ -1934,8 +1949,41 @@ const bootLiveEdit = () => {
                 after.textContent = arrangement(change)?.after ?? (readsOnThePageAs(change) || '(empty)');
                 row.append(after);
 
-                drawerFields.append(row);
-            });
+                return row;
+            };
+
+            /*
+             * Team editing: what goes live when this person publishes, and
+             * everybody else's, by name. One person alone sees the list as it
+             * always was.
+             */
+            const { yours, others } = splitChanges(changes);
+            const teamShown = others.size > 0;
+
+            if (!teamShown) {
+                changes.forEach((change) => drawerFields.append(rowFor(change)));
+
+                return;
+            }
+
+            const heading = (text, sub = null) => {
+                drawerFields.append(el('p', 'le-team-head', text));
+                if (sub) drawerFields.append(el('p', 'le-team-sub', sub));
+            };
+
+            heading('Your changes', yours.length ? 'These go live when you publish.' : 'You have no unpublished changes.');
+            yours.forEach((change) => drawerFields.append(rowFor(change)));
+
+            heading("Others' changes (not included)", 'They go live when each person publishes their own.');
+            for (const [name, theirs] of others) {
+                drawerFields.append(el('p', 'le-team-sub', `${name}: ${theirs.length} change${theirs.length === 1 ? '' : 's'}`));
+                theirs.forEach((change) => {
+                    const row = rowFor(change);
+                    // Putting back a teammate's change is theirs to do, or the owner's.
+                    if (!team?.isOwner()) row.querySelector('.le-chip-btn')?.remove();
+                    drawerFields.append(row);
+                });
+            }
         };
 
         const trim = (value) => {
@@ -2156,6 +2204,47 @@ const bootLiveEdit = () => {
 
         let historyPage = 1;
 
+        /*
+         * Taking back one published version, and only that one.
+         *
+         * Says whose work it undoes before it does it, and what it will leave
+         * because somebody changed it again since, so one person's rollback
+         * never quietly takes away another person's work.
+         */
+        const undoVersion = async (version, button) => {
+            const by = version.published_by ? `${version.published_by}'s` : 'the';
+            const sheet = ui.modal({ title: `Undo ${by} changes from version ${version.number}?`, subtitle: 'Only what that publish changed is put back. Anything somebody changed again since is left as it is.', size: 'is-narrow is-fit' });
+            const list = el('div', 'le-version-lines');
+            for (const group of groupLines(version.lines ?? [])) {
+                list.append(el('p', 'le-version-group', group.label));
+                group.lines.forEach((line) => list.append(el('p', 'le-version-line', sentenceFor(line, team?.you?.id ?? null))));
+            }
+            sheet.body.append(list);
+            sheet.foot.hidden = false;
+            const keep = el('button', 'le-btn-outline', 'Keep them');
+            keep.type = 'button';
+            keep.addEventListener('click', () => sheet.close());
+            const go = el('button', 'le-btn-publish', 'Undo and publish');
+            go.type = 'button';
+            go.addEventListener('click', async () => {
+                go.disabled = true;
+                go.textContent = 'Undoing\u2026';
+                try {
+                    const response = await request(`/live-edit/versions/${version.number}/undo`, { method: 'POST' });
+                    const result = await response.json();
+                    sheet.close();
+                    const kept = (result.kept ?? []).length;
+                    reloadWithToast(kept ? `Undone. ${kept} change${kept === 1 ? ' was' : 's were'} kept because someone changed ${kept === 1 ? 'it' : 'them'} again later.` : 'Undone \u2713');
+                } catch (error) {
+                    go.disabled = false;
+                    go.textContent = 'Try again';
+                    sheet.body.replaceChildren(note(plainly(error, 'undo that')));
+                }
+            });
+            sheet.foot.append(keep, go);
+            button.blur();
+        };
+
         const renderHistory = async () => {
             drawerFields.replaceChildren(note('Loading…'));
 
@@ -2196,15 +2285,38 @@ const bootLiveEdit = () => {
                 const text = document.createElement('div');
                 const what = document.createElement('p');
                 what.className = 'le-change-after';
-                what.textContent = version.restored_from
-                    ? `Restored version ${version.restored_from}`
-                    : `Published ${version.changes ?? 0} change${version.changes === 1 ? '' : 's'}`;
+                // Who, and what: "Ada published 2 changes", newest first.
+                what.textContent = versionHeadline(version, team?.you?.id ?? null);
 
                 const when = document.createElement('p');
                 when.className = 'le-change-when';
                 when.textContent = ago(version.published_at);
 
                 text.append(what, when);
+
+                /*
+                 * Each change under the section it was in, with who made it:
+                 * "Ada changed the headline in Hero". A version recorded
+                 * before team editing has no lines and reads as it always did.
+                 */
+                if ((version.lines ?? []).length > 0) {
+                    const lines = document.createElement('div');
+                    lines.className = 'le-version-lines';
+                    for (const group of groupLines(version.lines)) {
+                        lines.append(el('p', 'le-version-group', group.label));
+                        group.lines.forEach((line) => lines.append(el('p', 'le-version-line', sentenceFor(line, team?.you?.id ?? null))));
+                    }
+                    text.append(lines);
+
+                    // Undo this one publish, and nobody else's work since.
+                    if (!version.undoes && !version.restored_from && version.changes > 0) {
+                        const undo = el('button', 'le-chip-btn le-version-undo', 'Undo these changes');
+                        undo.type = 'button';
+                        undo.addEventListener('click', () => void undoVersion(version, undo));
+                        text.append(undo);
+                    }
+                }
+
                 row.append(dot, text);
                 drawerFields.append(row);
             });
@@ -2577,7 +2689,13 @@ const bootLiveEdit = () => {
             window.location.reload();
         };
 
-        const request = async (url, options) => {
+        const request = async (url, rawOptions) => {
+            // Team editing: a change says which part of the page it is in, so
+            // the server can keep one person per section (team.js).
+            const writes = rawOptions?.method && rawOptions.method !== 'GET';
+            const options = writes && team?.available
+                ? { ...rawOptions, headers: { ...team.headers(), ...(rawOptions.headers ?? {}) } }
+                : rawOptions;
             // Same-origin with a session cookie on a Laravel page; the content
             // API with a bearer key when the editor is running inside a site
             // this application does not serve.
@@ -2630,6 +2748,14 @@ const bootLiveEdit = () => {
                 // page copied, key by key), which waits out a "too many" rather than stopping halfway.
                 refused.status = response.status;
                 refused.retryAfter = Number(data.error?.retry_after ?? response.headers?.get?.('Retry-After')) || null;
+                // Somebody else is working on this part of the page: show who,
+                // rather than "Could not save".
+                if (response.status === 409 && data.error?.type === 'section_locked') {
+                    refused.lock = data.error.lock ?? null;
+                    refused.reason = data.error.reason ?? 'locked';
+                    refused.sectionLocked = true;
+                    team?.refused(refused);
+                }
                 throw refused;
             }
             if (!isJsonResponse(response)) {
@@ -2638,6 +2764,32 @@ const bootLiveEdit = () => {
 
             return response;
         };
+
+        /*
+         * Team editing: one person per section (team.js). Only over the
+         * content API, where the server keeps the locks; a site keeping its
+         * own content answers 404 and the layer stays out of the way.
+         */
+        const teamSend = async (path, options = {}) => {
+            const api = window.liveEditApi;
+            const mapped = apiRequestFor(path, options, api);
+
+            return fetch(mapped.url, { ...mapped.init, signal: givesUpAfter(15000) });
+        };
+        team = window.liveEditApi?.token
+            ? createTeam({
+                send: teamSend,
+                ui,
+                isEditing: () => document.body.classList.contains('editing'),
+                onChanged: ({ reload } = {}) => { if (reload) reloadWithToast('Done \u2713'); },
+            })
+            : null;
+        if (team) {
+            const teamStyle = document.createElement('style');
+            teamStyle.textContent = TEAM_CSS;
+            ui.shadow?.append(teamStyle);
+            void team.start();
+        }
 
         /**
          * What the page should show once this save has been applied.
@@ -6145,6 +6297,9 @@ const bootLiveEdit = () => {
         } catch { /* nothing to open again */ }
 
         const openTarget = ({ element, kind, field = null }) => {
+            // A section a teammate is working on does not open; it says who.
+            if (team && !team.beforeEdit(element, { onRefused: () => closeDrawer(true) })) return;
+            team?.setWhat(describeElement(element));
             if (kind === 'form') {
                 openFormBuilder(element, field);
 
@@ -7162,10 +7317,11 @@ const bootLiveEdit = () => {
                     const response = await request('/live-edit/changes', { method: 'GET' });
                     const payload = await response.json();
                     const changes = payload?.changes ?? [];
+                    // Team editing: only your own go live; others' wait for them.
+                    const { yours, others } = splitChanges(changes);
 
                     const list = el('div', 'le-review');
-
-                    changes.forEach((change) => {
+                    const reviewRow = (change) => {
                         const row = el('div', 'le-review-row');
                         row.append(
                             // The same words the Changes tab uses, so the list
@@ -7174,10 +7330,26 @@ const bootLiveEdit = () => {
                             el('div', 'le-review-what', labelForChange(change)),
                             el('div', 'le-review-to', readsOnThePageAs(change) || '(empty)'),
                         );
-                        list.append(row);
-                    });
 
-                    sheet.body.replaceChildren(changes.length > 0 ? list : note('Nothing is waiting.'));
+                        return row;
+                    };
+
+                    if (others.size === 0) {
+                        changes.forEach((change) => list.append(reviewRow(change)));
+                        sheet.body.replaceChildren(changes.length > 0 ? list : note('Nothing is waiting.'));
+                    } else {
+                        const mine = yours.length;
+                        sheet.title(`Publish your ${mine} change${mine === 1 ? '' : 's'}`);
+                        list.append(el('p', 'le-team-head', 'Your changes (these go live when you publish)'));
+                        yours.forEach((change) => list.append(reviewRow(change)));
+                        if (mine === 0) list.append(note('You have no unpublished changes.'));
+                        list.append(el('p', 'le-team-head', "Others' changes (not included)"));
+                        for (const [name, theirs] of others) {
+                            list.append(el('p', 'le-team-sub', `${name}: ${theirs.length} change${theirs.length === 1 ? '' : 's'}${theirs[0]?.unit_label ? ` in ${[...new Set(theirs.map((c) => c.unit_label).filter(Boolean))].join(', ')}` : ''}. They go live when ${name} publishes.`));
+                        }
+                        sheet.body.replaceChildren(list);
+                        go.disabled = mine === 0;
+                    }
                 } catch (error) {
                     sheet.body.replaceChildren(note(plainly(error, 'list what is waiting')));
                 }

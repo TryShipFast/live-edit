@@ -10,6 +10,7 @@ use ShipFast\LiveEdit\Domain\Site\ApiToken;
 use ShipFast\LiveEdit\Domain\Site\Meter;
 use ShipFast\LiveEdit\Domain\Site\OverLimit;
 use ShipFast\LiveEdit\Domain\Site\Site;
+use ShipFast\LiveEdit\Domain\Team\TeamWrite;
 use ShipFast\LiveEdit\Models\EditRevision;
 use ShipFast\LiveEdit\Support\DraftStore;
 use ShipFast\LiveEdit\Support\OneAction;
@@ -37,7 +38,7 @@ class ApplyStyle
      *
      * @throws ValidationException
      */
-    public function __invoke(Site $site, ApiToken $token, string $key, array $props): array
+    public function __invoke(Site $site, ApiToken $token, string $key, array $props, ?TeamWrite $team = null): array
     {
         throw_unless(
             $this->policy->permitsKey($key),
@@ -66,7 +67,10 @@ class ApplyStyle
 
         $hold = DraftStore::enabled();
 
-        (new SiteStore($site))->putStyle($key, $clean, $hold);
+        // One person per section, as for words (ApplyEdit).
+        [$unit, $unitLabel] = $team?->claimFor($site, 'style', $key, $key) ?? [null, null];
+
+        (new SiteStore($site))->putStyle($key, $clean, $hold, $team?->person, $unit, $unitLabel, $team?->what);
 
         EditRevision::query()->create([
             'batch' => OneAction::by($site->slug, (string) $token->public_id),

@@ -11,10 +11,10 @@ class Version extends Model
 
     protected $table = 'live_edit_versions';
 
-    protected $fillable = ['site_id', 'number', 'locales', 'changes', 'restored_from', 'published_by'];
+    protected $fillable = ['site_id', 'number', 'locales', 'changes', 'restored_from', 'published_by', 'published_by_id', 'summary', 'undoes'];
 
     protected function casts(): array
     {
-        return ['locales' => 'array'];
+        return ['locales' => 'array', 'summary' => 'array'];
     }
 }

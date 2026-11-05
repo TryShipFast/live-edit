@@ -10,6 +10,7 @@ use ShipFast\LiveEdit\Domain\Site\ApiToken;
 use ShipFast\LiveEdit\Domain\Site\Meter;
 use ShipFast\LiveEdit\Domain\Site\OverLimit;
 use ShipFast\LiveEdit\Domain\Site\Site;
+use ShipFast\LiveEdit\Domain\Team\TeamWrite;
 use ShipFast\LiveEdit\Models\EditRevision;
 use ShipFast\LiveEdit\Support\DraftStore;
 use ShipFast\LiveEdit\Support\OneAction;
@@ -30,7 +31,7 @@ class ApplyEdit
      *
      * @throws ValidationException
      */
-    public function __invoke(Site $site, ApiToken $token, string $key, string $value, ?string $locale = null): array
+    public function __invoke(Site $site, ApiToken $token, string $key, string $value, ?string $locale = null, ?TeamWrite $team = null): array
     {
         $this->policy->assert($key, $value);
 
@@ -65,7 +66,13 @@ class ApplyEdit
         $stored = $this->policy->localeKey($key, $locale, $site->writtenIn());
         $hold = DraftStore::enabled();
 
-        (new SiteStore($site))->put($stored, $value, $hold);
+        // One person per section: refused (409) when a teammate is working
+        // here, otherwise this part of the site becomes theirs until they
+        // publish. Asked after every other rule so a refusal for another
+        // reason never takes a lock.
+        [$unit, $unitLabel] = $team?->claimFor($site, 'setting', $key, $stored) ?? [null, null];
+
+        (new SiteStore($site))->put($stored, $value, $hold, $team?->person, $unit, $unitLabel, $team?->what);
 
         // Recorded against the key that made the change and the site it
         // belongs to, not a user: a site's own people are not accounts here.

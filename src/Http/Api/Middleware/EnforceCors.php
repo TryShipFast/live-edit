@@ -4,6 +4,8 @@ namespace ShipFast\LiveEdit\Http\Api\Middleware;
 
 use Closure;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
+use ShipFast\LiveEdit\Domain\Site\OriginPolicy;
 use ShipFast\LiveEdit\Domain\Site\Site;
 use Symfony\Component\HttpFoundation\Response;
 
@@ -36,8 +38,7 @@ class EnforceCors
         }
 
         $origin = $request->headers->get('Origin');
-        $site = $this->siteFor($request);
-        $allowed = $site?->originPolicy()->headerFor($origin);
+        $allowed = $this->originsFor($request)?->headerFor($origin);
 
         if ($request->getMethod() === 'OPTIONS') {
             // A preflight is answered and goes no further: there is nothing to
@@ -70,7 +71,7 @@ class EnforceCors
             // Revert then failed on every WordPress and static site with
             // "failed to fetch", which reads as the network being down.
             $response->headers->set('Access-Control-Allow-Methods', 'GET, POST, PATCH, DELETE, OPTIONS');
-            $response->headers->set('Access-Control-Allow-Headers', 'Authorization, Content-Type, If-None-Match, Idempotency-Key');
+            $response->headers->set('Access-Control-Allow-Headers', 'Authorization, Content-Type, If-None-Match, Idempotency-Key, X-Live-Edit-Unit, X-Live-Edit-Unit-Label, X-Live-Edit-What');
             $response->headers->set('Access-Control-Max-Age', '600');
         }
 
@@ -95,12 +96,33 @@ class EnforceCors
      * Running this early means the router has not matched yet, so the site is
      * read from the path rather than from a route parameter.
      */
-    private function siteFor(Request $request): ?Site
+    private function originsFor(Request $request): ?OriginPolicy
     {
         $prefix = trim((string) config('live-edit.api.prefix', 'api/live-edit/v1'), '/');
         $rest = trim(substr(trim($request->path(), '/'), strlen($prefix)), '/');
         $slug = explode('/', $rest)[0] ?? '';
 
-        return $slug !== '' ? Site::query()->where('slug', $slug)->first() : null;
+        if ($slug === '') {
+            return null;
+        }
+
+        /*
+         * Remembered for a minute, because every API request asks: a page
+         * reading content, an editor polling who is editing what. Forgotten
+         * the moment the site is saved (Site::booted), so a newly allowed
+         * address works at once.
+         */
+        $origins = Cache::remember(self::originsKey($slug), 60, function () use ($slug) {
+            $site = Site::query()->where('slug', $slug)->first();
+
+            return $site === null ? false : (array) ($site->allowed_origins ?? []);
+        });
+
+        return $origins === false ? null : new OriginPolicy($origins);
+    }
+
+    public static function originsKey(string $slug): string
+    {
+        return 'live-edit.cors.'.$slug;
     }
 }

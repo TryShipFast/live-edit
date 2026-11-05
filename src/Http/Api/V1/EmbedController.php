@@ -50,6 +50,7 @@ class EmbedController
         'brand.js' => 'brand.js',
         'upload.js' => 'upload.js',
         'seo.js' => 'seo.js',
+        'team.js' => 'team.js',
         'pages.js' => 'pages.js',
         'dropdown-trigger.js' => 'dropdown-trigger.js',
         'linked-detail-scope.js' => 'linked-detail-scope.js',
