@@ -91,12 +91,24 @@ const bootLiveEdit = () => {
     // change they cannot save. Host-authenticated adapters already decide who
     // may edit, and have no remote session token to ask about.
     let mayEditLocked = true;
+    /*
+     * Whether this person may publish: false only when somebody says so (the session's
+     * `may_publish`, from their grant's "Can publish", or the host's
+     * `liveEditPublishing.mayPublish`). Unknown is allowed, as before; the server decides anyway.
+     */
+    let mayPublish = window.liveEditPublishing?.mayPublish === false ? false : null;
+    const publishRightKnown = new Set();
+    const learnedPublishRight = (value) => {
+        if (value === false) mayPublish = false;
+        publishRightKnown.forEach((tell) => tell());
+    };
     if (api?.base && api?.site && api?.token) {
         mayEditLocked = null;
         fetch(`${String(api.base).replace(/\/$/, '')}/${api.site}/session`, {
             headers: { Accept: 'application/json', Authorization: `Bearer ${api.token}` },
         }).then((response) => response.ok ? response.json() : null).then((payload) => {
             mayEditLocked = payload?.session?.valid ? payload.session.may_edit_locked === true : false;
+            if (payload?.session?.valid) learnedPublishRight(payload.session.may_publish);
         }).catch(() => { mayEditLocked = false; });
     }
 
@@ -7182,7 +7194,23 @@ const bootLiveEdit = () => {
                 ui.publishButton.title = pending > 0
                     ? `Put ${pending} change${pending === 1 ? '' : 's'} live`
                     : 'Nothing is waiting to be published';
+                /*
+                 * Somebody whose grant does not include "Can publish": the familiar "submit for
+                 * review" (WordPress's Contributor, Google Docs' suggesting) instead of a Publish
+                 * that the server refuses with "Could not publish… try again in a moment".
+                 */
+                ui.publishButton.classList.toggle('is-for-review', mayPublish === false);
+                ui.publishButton.removeAttribute('aria-label');
+                if (mayPublish === false && pending > 0) {
+                    // "Ask to publish", or "Review" where the bar is folded on a phone; one name for both.
+                    const long = el('span', 'le-review-long', 'Ask to publish');
+                    const short = el('span', 'le-review-short', 'Review');
+                    ui.publishLabel.replaceChildren(long, short);
+                    ui.publishButton.setAttribute('aria-label', `Ask to publish, ${pending} change${pending === 1 ? '' : 's'} saved`);
+                    ui.publishButton.title = `${pending} change${pending === 1 ? ' is' : 's are'} saved. Someone who can publish puts them live.`;
+                }
             };
+            publishRightKnown.add(showPending);
             document.addEventListener('live-edit:pending', (event) => {
                 if (typeof event.detail?.pending !== 'number') return;
                 pending = event.detail.pending;
@@ -7291,8 +7319,29 @@ const bootLiveEdit = () => {
 
             };
 
+            /* What publishing means for somebody who may not: saved, and an admin puts it live. */
+            const explainReview = () => {
+                const sheet = ui.modal({
+                    title: 'Ask an admin to publish',
+                    subtitle: `Your ${pending === 1 ? 'change is' : `${pending} changes are`} saved. Your account can edit this website but not publish it, so visitors see ${pending === 1 ? 'it' : 'them'} once someone who can publish puts ${pending === 1 ? 'it' : 'them'} live.`,
+                    size: 'is-narrow',
+                });
+                const ok = el('button', 'le-btn', 'OK');
+                ok.type = 'button';
+                ok.addEventListener('click', () => sheet.close());
+                sheet.foot.hidden = false;
+                sheet.foot.append(ok);
+                ok.focus();
+            };
+
             ui.publishButton.addEventListener('click', () => {
                 if (pending === 0) return;
+                if (mayPublish === false) {
+                    document.activeElement?.blur?.();
+                    explainReview();
+
+                    return;
+                }
 
                 // Whatever is being typed right now counts as a change, and
                 // it is not saved until the box loses focus.

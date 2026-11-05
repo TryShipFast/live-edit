@@ -16,8 +16,9 @@ import { createHost } from './fake-host.js';
 
 const RUNTIME = fileURLToPath(new URL('../../resources/dist/live-edit.js', import.meta.url));
 
-export async function serveFakeHost({ removable = false, library = false, outside = false, data = false, search = false, forms = null, pagesList = false } = {}) {
+export async function serveFakeHost({ removable = false, library = false, outside = false, data = false, search = false, forms = null, pagesList = false, mayPublish } = {}) {
     const window = new Window();
+    let publishAsked = 0;
     const host = createHost({ makeDocument: (html) => new window.DOMParser().parseFromString(html, 'text/html'), removable, library, outside, data, search, forms, pagesList });
 
     const json = (response, status, body) => {
@@ -87,8 +88,12 @@ export async function serveFakeHost({ removable = false, library = false, outsid
                     const { key, props } = await bodyOf(request);
                     host.saveStyle(key, props ?? {});
                     json(response, 200, { saved: true, key });
+                } else if (route === 'publish' || route.startsWith('publish')) {
+                    // Counted, so a test can say no publish was ever asked for.
+                    publishAsked += 1;
+                    json(response, mayPublish === false ? 403 : 200, mayPublish === false ? { error: { type: 'forbidden', message: 'This session may not publish.' } } : { published: true });
                 } else if (route === 'session') {
-                    json(response, 200, { session: { valid: true, may_edit_locked: true } });
+                    json(response, 200, { session: { valid: true, may_edit_locked: true, ...(mayPublish === undefined ? {} : { may_publish: mayPublish }) } });
                 } else {
                     json(response, 200, {});
                 }
@@ -108,6 +113,7 @@ export async function serveFakeHost({ removable = false, library = false, outsid
     return {
         url: `http://127.0.0.1:${port}`,
         host,
+        publishAsked: () => publishAsked,
         close: () => new Promise((resolve) => { server.closeAllConnections?.(); server.close(resolve); }),
     };
 }

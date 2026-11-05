@@ -296,6 +296,9 @@ a.le-mark:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
 .le-start-own-plus { display: grid; place-items: center; width: 34px; height: 34px; margin-bottom: auto; border-radius: 50%; background: var(--le-soft); color: var(--le-ink); font-size: 20px; line-height: 1; }
 .le-starts-none { grid-column: 1 / -1; }
 .le-modal.is-pages { max-width: 720px; }
+.le-review-short { display: none; }
+.le-toolbar.is-folded .le-review-long { display: none; }
+.le-toolbar.is-folded .le-review-short { display: inline; }
 /* Pages (pages-list.js): one row a page, in menu order; its buttons wrap under its name on a phone. */
 .le-pages-top { display: flex; justify-content: flex-start; margin-bottom: 6px; }
 .le-pages-said { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 12px; min-height: 22px; margin-bottom: 8px; }

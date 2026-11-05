@@ -256,6 +256,11 @@ for (const width of [320, 375, 390, 430, 768, 1024, 1440]) {
                 const dashboard = (await sheet(page).isVisible()) && !checked.includes('Dashboard')
                     ? sheet(page).getByRole('link', { name: 'Dashboard' })
                     : bar(page).getByRole('link', { name: 'Dashboard' });
+                // Dashboard on the bar while the sheet holds the rest (Log out): the sheet is closed first.
+                if ((await sheet(page).isVisible()) && checked.includes('Dashboard')) {
+                    await page.keyboard.press('Escape');
+                    await expect(sheet(page)).toBeHidden();
+                }
                 await dashboard.click();
                 await expect(page).toHaveURL(/\/dashboard$/);
             } finally {

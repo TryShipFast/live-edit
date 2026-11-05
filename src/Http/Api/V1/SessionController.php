@@ -5,6 +5,7 @@ namespace ShipFast\LiveEdit\Http\Api\V1;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use ShipFast\LiveEdit\Application\Api\IssueEditSession;
+use ShipFast\LiveEdit\Domain\Site\Ability;
 use ShipFast\LiveEdit\Domain\Site\TokenType;
 use ShipFast\LiveEdit\Http\Api\ApiContext;
 
@@ -92,6 +93,14 @@ class SessionController
                 // that the API will refuse at save time. Keep the API as the
                 // authority; this only controls editor affordances.
                 'may_edit_locked' => $usable ? $token->mayEditLocked() : false,
+                /*
+                 * Whether this person may put changes live (their grant's "Can publish").
+                 * Only said for somebody who signed in with us: a session a host minted
+                 * has nobody behind it, and that host publishes in its own way, so null
+                 * (not known here) leaves Publish as it was. The API refuses a publish
+                 * regardless; this only spares an editor a button that cannot work.
+                 */
+                'may_publish' => ! $usable ? false : ($token->editor_id === null ? null : $token->can(Ability::Publish)),
             ],
         ])->withHeaders(['Cache-Control' => 'no-store, private']);
     }
