@@ -122,7 +122,10 @@ const team = async (who) => (await fetch(`${site.url}/api/demo/team`, { headers:
 const changesFor = async (who) => (await fetch(`${site.url}/api/demo/changes`, { headers: { Authorization: `Bearer ${tokens[who]}`, Accept: 'application/json' } })).json();
 
 const openChanges = async (page, half = 'Changes') => {
-    await ui(page).locator('.le-toolbar').getByRole('button', { name: /Changes/ }).first().click();
+    const button = ui(page).locator('.le-toolbar').getByRole('button', { name: 'Changes', exact: true });
+    // On a phone the bar keeps it under More.
+    if (!(await button.isVisible())) await ui(page).locator('.le-toolbar').getByRole('button', { name: 'More' }).click();
+    await button.click();
     if (half === 'History') await ui(page).locator('.le-subtabs').getByRole('tab', { name: 'Published', exact: true }).click();
     await settle(page);
 };

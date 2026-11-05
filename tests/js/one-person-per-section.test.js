@@ -179,7 +179,7 @@ describe('the team layer in an open editor', () => {
         await team.refresh();
 
         expect(team.beforeEdit(doc.querySelector('[data-edit="setting:story"]'))).toBe(true);
-        team.setWhat('the paragraph');
+        team.setWhat('Paragraph');
         await Promise.resolve();
 
         const claim = send.mock.calls.find(([path]) => path === '/live-edit/team/claim');

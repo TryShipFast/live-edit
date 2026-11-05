@@ -526,7 +526,8 @@ export function createTeam({ send, ui, doc = document, win = window, onChanged =
         headers,
         refused,
         setCurrent: (unit, label, describe = null) => { current = unit ? { unit, label, what: describe } : null; },
-        setWhat: (describe) => { if (current) current.what = describe; },
+        // "Name" from the panel becomes "the name", so History reads "Ada changed the name in Product".
+        setWhat: (describe) => { if (current && describe) current.what = `the ${describe.charAt(0).toLowerCase()}${describe.slice(1)}`; },
         refresh,
         start: async () => { await refresh(); schedule(); },
         stop: () => { win.clearTimeout(timer); layer.remove(); },
@@ -547,6 +548,7 @@ export const TEAM_CSS = `
 .le-team-head:first-child { margin-top: 0; }
 .le-team-sub { margin: -2px 0 8px; font-size: 12px; color: #6b7280; }
 .le-change.is-others { opacity: .85; }
+.le-fields:has(> .le-version), .le-fields:has(> .le-change), .le-fields:has(> .le-team-head) { align-content: start; }
 .le-change-who { font-size: 11px; color: #6b7280; margin-top: 2px; }
 .le-version-lines { margin: 6px 0 0; padding: 0; list-style: none; }
 .le-version-group { font-size: 12px; font-weight: 700; color: #374151; margin-top: 6px; }
