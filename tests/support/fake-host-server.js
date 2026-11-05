@@ -47,6 +47,13 @@ export async function serveFakeHost({ removable = false, library = false, outsid
 
                 return;
             }
+            // Its look, beside it: what kit-search.js links when the page's head does not hold it.
+            if (url.pathname === '/kit-search.css') {
+                response.writeHead(200, { 'Content-Type': 'text/css' });
+                response.end(readFileSync(fileURLToPath(new URL('../../resources/dist/kit-search.css', import.meta.url))));
+
+                return;
+            }
             // A collection's index, as the host's editor route gives it: the drafts over what is published.
             const index = url.pathname.match(/^\/search\/([a-z0-9-]+)\.json$/);
             if (index) {

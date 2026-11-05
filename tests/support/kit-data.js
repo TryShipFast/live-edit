@@ -30,6 +30,7 @@
      * The base of the chart and table kits, at no specificity (:where), so a template's own
      * site.css wins wherever it says anything. Every colour is a brand token or mixed from one.
      */
+    /* kit-data:base */
     var BASE = [
         ':where(.kit-data){--kit-chart-1:var(--brand-accent,#2e6b9f);--kit-chart-2:var(--brand-ink,#0f2447);',
         '--kit-chart-3:color-mix(in srgb,var(--brand-accent,#2e6b9f) 55%,var(--brand-surface,#fff));',
@@ -73,9 +74,27 @@
         '@keyframes kit-grow{from{transform:scale(var(--kit-from-x,1),var(--kit-from-y,0));opacity:0}to{transform:none;opacity:1}}',
         '@keyframes kit-trace{to{stroke-dashoffset:0}}'
     ].join('');
+    /* /kit-data:base */
 
+    // Where this file was loaded from, for the stylesheet published beside a build that carries no base (below).
+    var ownAddress = (document.currentScript && document.currentScript.src) || '';
+
+    /*
+     * The base, first in the head. A host that publishes the page puts it there itself (<style data-kit-data-base>,
+     * from resources/kit/dist/kit-data.css), so a chart's room is kept from the first paint and its build of this
+     * file carries no copy (BASE is empty): a page without it then gets the stylesheet beside the file.
+     */
     var baseIn = function (doc) {
-        if (doc.querySelector('style[data-kit-data-base]')) return;
+        if (doc.querySelector('style[data-kit-data-base], link[data-kit-data-base]')) return;
+        if (!BASE) {
+            if (!/\.js(\?|$)/.test(ownAddress)) return;
+            var link = doc.createElement('link');
+            link.rel = 'stylesheet';
+            link.href = ownAddress.replace(/\.js(\?.*)?$/, '.css');
+            link.setAttribute('data-kit-data-base', '');
+            doc.head.insertBefore(link, doc.head.firstChild);
+            return;
+        }
         var style = doc.createElement('style');
         style.setAttribute('data-kit-data-base', '');
         style.textContent = BASE;
@@ -222,17 +241,43 @@
         return out;
     };
 
-    var measureText = function (svg, said) {
-        var t = text(svg, 0, 0, said, { 'font-size': 12, visibility: 'hidden' });
+    // Words measured at the size and weight they are drawn at, in the template's own face.
+    var measureText = function (svg, said, size, weight) {
+        var t = text(svg, 0, 0, said, { 'font-size': size || 12, 'font-weight': weight || null, visibility: 'hidden' });
         var w = 0;
-        try { w = t.getComputedTextLength(); } catch (e) { w = said.length * 7; }
+        try { w = t.getComputedTextLength(); } catch (e) { w = 0; }
         svg.removeChild(t);
-        return w || said.length * 7;
+        return w || said.length * (size || 12) * 0.6;
     };
 
-    var shortLabel = function (said, room) {
-        var max = Math.max(3, Math.floor(room / 6.5));
-        return said.length > max ? said.slice(0, max - 1) + '…' : said;
+    /*
+     * A label that fits its room: whole when it does, else cut at a word or a letter with an ellipsis, measured
+     * rather than guessed (a long store name in a wide face was drawn past the chart's edge). The whole label is
+     * the figures table's, and the drawing's name says every row.
+     */
+    var fit = function (svg, said, room, size, weight) {
+        said = String(said || '');
+        if (room <= 0) return '';
+        if (measureText(svg, said, size, weight) <= room) return said;
+        var lo = 0;
+        var hi = said.length;
+        while (lo < hi) {
+            var mid = (lo + hi + 1) >> 1;
+            if (measureText(svg, said.slice(0, mid).replace(/\s+$/, '') + '…', size, weight) <= room) lo = mid; else hi = mid - 1;
+        }
+        return lo ? said.slice(0, lo).replace(/\s+$/, '') + '…' : '';
+    };
+
+    // The room a legend takes: its entries in lines across the width, as drawLegend draws them.
+    var legendRoom = function (svg, labels, width) {
+        var lines = 1;
+        var cx = 0;
+        labels.forEach(function (label) {
+            var w = Math.min(width, measureText(svg, label, 13) + 34);
+            if (cx + w > width && cx > 0) { lines++; cx = 0; }
+            cx += w;
+        });
+        return lines * 22 + 8;
     };
 
     var grow = function (el, axis, originX, originY) {
@@ -276,10 +321,11 @@
         var cx = x;
         var cy = y;
         entries.forEach(function (entry) {
-            var w = measureText(svg, entry.label) + 34;
+            var said = fit(svg, entry.label, width - 34, 13);
+            var w = measureText(svg, said, 13) + 34;
             if (cx + w > x + width && cx > x) { cx = x; cy += 22; }
             make('rect', { x: cx, y: cy - 10, width: 12, height: 12, rx: 2, fill: entry.colour }, g);
-            text(g, cx + 18, cy, entry.label);
+            text(g, cx + 18, cy, said);
             cx += w;
         });
         return cy - y + 22;
@@ -297,12 +343,14 @@
         var axis = ticks(Math.min(0, Math.min.apply(null, all.concat([0]))), Math.max.apply(null, all.concat([0])), 4);
         var lo = axis[0];
         var hi = axis[axis.length - 1];
-        var legend = series.length > 1 && settings.legend !== 'off' ? 30 : 0;
+        var legend = series.length > 1 && settings.legend !== 'off' ? legendRoom(svg, series.map(function (s) { return data.series[s]; }), width - 48) : 0;
         if (across) {
-            var labelRoom = Math.min(width * 0.35, Math.max.apply(null, rows.map(function (r) { return measureText(svg, r.label); }).concat([40])) + 12);
+            var labelRoom = Math.min(width * 0.35, Math.max.apply(null, rows.map(function (r) { return measureText(svg, r.label, 13); }).concat([40])) + 14);
             var rowH = Math.max(28, 12 + 18 * series.length);
             var height = rows.length * rowH + 30 + legend;
-            var box = { left: labelRoom, right: width - 56, top: legend, bottom: height - 24 };
+            // Room on the right for the longest figure written at the end of its bar.
+            var figureRoom = 10 + Math.max.apply(null, [24].concat(all.map(function (v) { return measureText(svg, withUnit(v, unit, data.places), 12); })));
+            var box = { left: labelRoom, right: width - Math.min(figureRoom, width * 0.3), top: legend, bottom: height - 24 };
             var x = function (v) { return box.left + (v - lo) / (hi - lo) * (box.right - box.left); };
             var g = make('g', { 'font-size': 12, fill: 'var(--kit-chart-muted)' }, svg);
             axis.forEach(function (v) {
@@ -311,7 +359,7 @@
             });
             rows.forEach(function (r, i) {
                 var y0 = box.top + i * rowH;
-                text(svg, labelRoom - 10, y0 + rowH / 2 + 4, shortLabel(r.label, labelRoom), { 'text-anchor': 'end', 'font-size': 13, fill: 'var(--kit-chart-ink)' });
+                text(svg, labelRoom - 10, y0 + rowH / 2 + 4, fit(svg, r.label, labelRoom - 12, 13), { 'text-anchor': 'end', 'font-size': 13, fill: 'var(--kit-chart-ink)' });
                 series.forEach(function (s, k) {
                     var v = r.values[s];
                     if (v == null) return;
@@ -341,7 +389,7 @@
                 var rect = make('rect', { class: 'kit-chart__mark', 'data-chart-item': r.id, x: x0 + (band - inner) / 2 + k * w, y: Math.min(y(0), y(v)), width: Math.max(1, w - 2), height: Math.max(1, Math.abs(y(v) - y(0))), rx: 2, fill: colour(k) }, svg);
                 grow(rect, 'y', 'center', 'bottom');
             });
-            if (i % every === 0) text(svg, x0 + band / 2, b.bottom + 18, shortLabel(r.label, band * every), { 'text-anchor': 'middle', 'font-size': 12, fill: 'var(--kit-chart-muted)' });
+            if (i % every === 0) text(svg, x0 + band / 2, b.bottom + 18, fit(svg, r.label, Math.min(band * every, 2 * Math.min(x0 + band / 2, width - x0 - band / 2)) - 6, 12), { 'text-anchor': 'middle', 'font-size': 12, fill: 'var(--kit-chart-muted)' });
         });
         if (legend && settings.legend !== 'off') drawLegend(svg, series.map(function (s, k) { return { label: data.series[s], colour: colour(k) }; }), b.left, 14, b.right - b.left);
         return height2;
@@ -352,7 +400,7 @@
         var totals = rows.map(function (r) { return series.reduce(function (sum, s) { return sum + Math.max(0, r.values[s] || 0); }, 0); });
         var axis = ticks(0, Math.max.apply(null, totals.concat([1])), 3);
         var hi = axis[axis.length - 1];
-        var legend = series.length > 1 && settings.legend !== 'off' ? 30 : 0;
+        var legend = series.length > 1 && settings.legend !== 'off' ? legendRoom(svg, series.map(function (s) { return data.series[s]; }), width - 48) : 0;
         var height = Math.round(Math.min(420, Math.max(220, width * 0.4))) + legend;
         var b = plotBox(svg, width, height, data, unit, axis);
         b.top = 10 + legend;
@@ -371,7 +419,7 @@
                 grow(rect, 'y', 'center', 'bottom');
                 at += v;
             });
-            if (i % every === 0) text(svg, x0 + w / 2, b.bottom + 18, shortLabel(r.label, band * every), { 'text-anchor': 'middle', 'font-size': 12, fill: 'var(--kit-chart-muted)' });
+            if (i % every === 0) text(svg, x0 + w / 2, b.bottom + 18, fit(svg, r.label, Math.min(band * every, 2 * Math.min(x0 + w / 2, width - x0 - w / 2)) - 6, 12), { 'text-anchor': 'middle', 'font-size': 12, fill: 'var(--kit-chart-muted)' });
         });
         if (legend && settings.legend !== 'off') drawLegend(svg, series.map(function (s, k) { return { label: data.series[s], colour: colour(k) }; }), b.left, 14, b.right - b.left);
         return height;
@@ -389,7 +437,7 @@
         var axis = small ? [min, max] : ticks(area ? Math.min(0, min) : (min >= 0 && min < (max - min) ? 0 : min), max, 4);
         var lo = axis[0];
         var hi = axis[axis.length - 1] === lo ? lo + 1 : axis[axis.length - 1];
-        var legend = !small && series.length > 1 && settings.legend !== 'off' ? 30 : 0;
+        var legend = !small && series.length > 1 && settings.legend !== 'off' ? legendRoom(svg, series.map(function (s) { return data.series[s]; }), width - 48) : 0;
         var height = small ? 56 : Math.round(Math.min(420, Math.max(240, width * 0.48))) + legend;
         var b = small ? { left: 4, right: width - 8, top: 6, bottom: height - 6 } : plotBox(svg, width, height, data, unit, axis);
         if (!small) b.top = 10 + legend;
@@ -399,13 +447,13 @@
             drawAxes(svg, b, y, unit, axis);
             // Labels where they fit: the first, the last, and as many between as leave room.
             var room = 0;
-            rows.forEach(function (r) { room = Math.max(room, measureText(svg, r.label) + 16); });
+            rows.forEach(function (r) { room = Math.max(room, measureText(svg, r.label, 12) + 16); });
             var every = Math.max(1, Math.ceil(room / Math.max(1, (b.right - b.left) / Math.max(1, rows.length - 1))));
             rows.forEach(function (r, i) {
                 var last = i === rows.length - 1;
                 if (i % every !== 0 && !last) return;
                 if (!last && i > 0 && x(rows.length - 1) - x(i) < room * 1.5) return;
-                text(svg, x(i), b.bottom + 18, r.label, { 'text-anchor': i === 0 ? 'start' : (last ? 'end' : 'middle'), 'font-size': 12, fill: 'var(--kit-chart-muted)' });
+                text(svg, x(i), b.bottom + 18, fit(svg, r.label, i === 0 || last ? (b.right - b.left) / 2 : room * 1.5, 12), { 'text-anchor': i === 0 ? 'start' : (last ? 'end' : 'middle'), 'font-size': 12, fill: 'var(--kit-chart-muted)' });
             });
         }
         series.forEach(function (s, k) {
@@ -472,8 +520,9 @@
         rows.forEach(function (row, i) {
             var y = ly + i * 28;
             make('rect', { x: lx, y: y - 11, width: 14, height: 14, rx: 3, fill: colour(i) }, g);
-            text(g, lx + 24, y, shortLabel(row.label, lw - 90));
-            text(g, lx + lw, y, withUnit(row.values[0], unit, data.places), { 'text-anchor': 'end', 'font-weight': 600 });
+            var figure = withUnit(row.values[0], unit, data.places);
+            text(g, lx + 24, y, fit(svg, row.label, lw - 24 - measureText(svg, figure, 14, 600) - 12, 14));
+            text(g, lx + lw, y, figure, { 'text-anchor': 'end', 'font-weight': 600 });
         });
         return side ? ly + rows.length * 28 : Math.max(size + 8, ly + rows.length * 28);
     };
@@ -495,29 +544,38 @@
             rect.setAttribute('fill', i === 0 ? 'var(--kit-chart-2)' : 'var(--kit-chart-1)');
             rect.setAttribute('fill-opacity', String(1 - Math.min(0.5, i * 0.12)));
             grow(rect, 'x', 'center', 'center');
-            text(svg, 0, stacked ? y + 14 : y + rowH / 2 - 2, shortLabel(row.label, (stacked ? width : labelRoom) - 12), { 'font-size': 14, fill: 'var(--kit-chart-ink)', 'font-weight': 600 });
+            text(svg, 0, stacked ? y + 14 : y + rowH / 2 - 2, fit(svg, row.label, (stacked ? width : labelRoom) - 12, 14, 600), { 'font-size': 14, fill: 'var(--kit-chart-ink)', 'font-weight': 600 });
             var prev = i ? rows[i - 1].values[0] : null;
             var said = withUnit(row.values[0], unit, data.places) + (prev ? ' · ' + Math.round(row.values[0] / prev * 100) + '% of the stage before' : '');
-            text(svg, 0, stacked ? y + 32 : y + rowH / 2 + 15, said, { 'font-size': 12, fill: 'var(--kit-chart-muted)' });
+            text(svg, 0, stacked ? y + 32 : y + rowH / 2 + 15, fit(svg, said, (stacked ? width : labelRoom) - 4, 12), { 'font-size': 12, fill: 'var(--kit-chart-muted)' });
         });
         return rows.length * rowH;
     };
 
     var progress = function (svg, width, data, settings, unit) {
         var rows = data.rows;
-        var rowH = 64;
+        var said = rows.map(function (row) {
+            var v = row.values[0] || 0;
+            var target = row.values[1] || 0;
+            var share = target ? Math.round(v / target * 100) : null;
+            return withUnit(v, unit, data.places) + (target ? ' of ' + withUnit(target, unit, data.places) + (share != null ? ' · ' + share + '%' : '') : '');
+        });
+        // The name and its figures on one line where both fit whole; on a narrow screen, one under the other.
+        var twoLines = rows.some(function (row, i) { return measureText(svg, row.label, 14, 600) + measureText(svg, said[i], 13) + 16 > width; });
+        var rowH = twoLines ? 82 : 64;
+        var barAt = twoLines ? 46 : 28;
         rows.forEach(function (row, i) {
             var y = i * rowH;
             var v = row.values[0] || 0;
             var target = row.values[1] || 0;
             var top = Math.max(v, target, 1);
-            var share = target ? Math.round(v / target * 100) : null;
-            text(svg, 0, y + 18, shortLabel(row.label, width * 0.55), { 'font-size': 14, 'font-weight': 600, fill: 'var(--kit-chart-ink)' });
-            text(svg, width, y + 18, withUnit(v, unit, data.places) + (target ? ' of ' + withUnit(target, unit, data.places) + (share != null ? ' · ' + share + '%' : '') : ''), { 'font-size': 13, 'text-anchor': 'end', fill: 'var(--kit-chart-muted)' });
-            make('rect', { x: 0, y: y + 28, width: width, height: 12, rx: 6, fill: 'var(--kit-chart-track)' }, svg);
-            var fill = make('rect', { class: 'kit-chart__mark', 'data-chart-item': row.id, x: 0, y: y + 28, width: Math.max(0, v / top * width), height: 12, rx: 6, fill: v >= target && target ? 'var(--kit-chart-2)' : 'var(--kit-chart-1)' }, svg);
+            text(svg, 0, y + 18, fit(svg, row.label, twoLines ? width : width - measureText(svg, said[i], 13) - 16, 14, 600), { 'font-size': 14, 'font-weight': 600, fill: 'var(--kit-chart-ink)' });
+            if (twoLines) text(svg, 0, y + 36, fit(svg, said[i], width, 13), { 'font-size': 13, fill: 'var(--kit-chart-muted)' });
+            else text(svg, width, y + 18, said[i], { 'font-size': 13, 'text-anchor': 'end', fill: 'var(--kit-chart-muted)' });
+            make('rect', { x: 0, y: y + barAt, width: width, height: 12, rx: 6, fill: 'var(--kit-chart-track)' }, svg);
+            var fill = make('rect', { class: 'kit-chart__mark', 'data-chart-item': row.id, x: 0, y: y + barAt, width: Math.max(0, v / top * width), height: 12, rx: 6, fill: v >= target && target ? 'var(--kit-chart-2)' : 'var(--kit-chart-1)' }, svg);
             grow(fill, 'x', 'left', 'center');
-            if (target) make('rect', { x: Math.min(width - 3, target / top * width - 1.5), y: y + 22, width: 3, height: 24, rx: 1, fill: 'var(--kit-chart-ink)' }, svg);
+            if (target) make('rect', { x: Math.min(width - 3, target / top * width - 1.5), y: y + barAt - 6, width: 3, height: 24, rx: 1, fill: 'var(--kit-chart-ink)' }, svg);
         });
         return rows.length * rowH;
     };
@@ -601,15 +659,21 @@
     var pending = new Set();
     var scheduled = false;
 
+    // A frame's worth at a time (12 ms), the rest in the next frame: many charts never make one long task.
+    var clock = function () { return window.performance && performance.now ? performance.now() : Date.now(); };
     var flush = function () {
         scheduled = false;
+        var started = clock();
         var now = Array.from(pending);
-        pending.clear();
-        now.forEach(function (el) {
-            if (!el.isConnected) return;
-            if (el.hasAttribute('data-chart')) drawChart(el, false);
+        for (var i = 0; i < now.length; i++) {
+            if (i > 0 && clock() - started > 12) { if (!scheduled) { scheduled = true; (window.requestAnimationFrame || setTimeout)(flush); } return; }
+            var el = now[i];
+            pending.delete(el);
+            if (!el.isConnected) continue;
+            if (el.hasAttribute('data-chart')) drawChart(el, el.__kitFirst === true);
             else fitTable(el.matches('table') ? el : el.querySelector('table'));
-        });
+            el.__kitFirst = false;
+        }
     };
     var later = function (el) {
         pending.add(el);
@@ -644,9 +708,12 @@
     var draw = function (root) {
         var scope = root || document;
         if (scope.ownerDocument || scope === document) baseIn(scope.ownerDocument || document);
+        var started = clock();
         [].slice.call(scope.querySelectorAll('[data-chart]')).forEach(function (chart) {
             var first = !(watched && watched.has(chart));
-            drawChart(chart, first);
+            // The first charts at once, so what is on the screen is drawn before it is seen; the rest a frame later.
+            if (clock() - started < 12) drawChart(chart, first);
+            else { chart.__kitFirst = first; later(chart); }
             watch(chart);
         });
         [].slice.call(scope.querySelectorAll('[data-kit-table]')).forEach(function (block) {
@@ -657,11 +724,13 @@
         });
     };
 
-    window.kitData = { version: '1.0.0', draw: draw, figure: figure, withUnit: withUnit, dataOf: dataOf };
+    window.kitData = { version: '1.0.0', base: BASE, draw: draw, figure: figure, withUnit: withUnit, dataOf: dataOf };
 
     // A chart or table that arrives later (an editor adding a section in place) is drawn too.
     var start = function () {
         draw(document);
+        // Labels are measured in the template's face: drawn again once its fonts have come, so none outgrows its room.
+        if (document.fonts && document.fonts.ready) document.fonts.ready.then(function () { [].slice.call(document.querySelectorAll('[data-chart]')).forEach(later); });
         if (typeof MutationObserver === 'function') {
             new MutationObserver(function (records) {
                 for (var i = 0; i < records.length; i++) {

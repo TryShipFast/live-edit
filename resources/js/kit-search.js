@@ -26,107 +26,9 @@ import { filtersFor, fromParams, prepare, recordId, search, shown, sortsFor, sum
 
 const MOST_SHOWN = 24;
 
-const BASE = [
-    ':where(.kit-search){display:block;padding-block:var(--kit-section-space,clamp(48px,7vw,96px));color:var(--brand-body,#374151);font-family:var(--font-body,inherit)}',
-    ':where(.kit-search__in){width:min(100% - 2*var(--kit-gutter,clamp(16px,4vw,48px)),var(--kit-measure,1200px));margin-inline:auto}',
-    ':where(.kit-search__head){max-width:44rem;margin-bottom:clamp(20px,3vw,32px)}',
-    ':where(.kit-search__title){font-family:var(--font-display,inherit);color:var(--brand-ink,inherit);margin:0 0 .4em}',
-    ':where(.kit-search__lead){margin:0;color:var(--brand-muted,#6b7280)}',
-    ':where(.kit-search__label){display:block;font-weight:600;color:var(--brand-ink,inherit);margin-bottom:8px}',
-    ':where(.kit-search__box){display:flex;gap:8px;flex-wrap:wrap}',
-    ':where(.kit-search__input){flex:1 1 220px;min-width:0;min-height:48px;padding:10px 14px;font:inherit;font-size:max(16px,1rem);color:var(--brand-ink,inherit);background:var(--brand-surface,#fff);border:1px solid var(--brand-line,#cbd5e1);border-radius:var(--kit-radius,6px)}',
-    ':where(.kit-search__input:focus-visible,.kit-search button:focus-visible,.kit-search a:focus-visible,.kit-search select:focus-visible,.kit-search input:focus-visible){outline:3px solid var(--brand-accent,#2e6b9f);outline-offset:2px}',
-    ':where(.kit-search__go,.kit-search__quote){min-height:48px;padding:10px 20px;font:inherit;font-weight:600;color:var(--brand-surface,#fff);background:var(--brand-accent,#2e6b9f);border:0;border-radius:var(--kit-radius,6px);cursor:pointer;text-decoration:none;display:inline-flex;align-items:center;justify-content:center}',
-    ':where(.kit-search__filters){display:flex;flex-wrap:wrap;gap:12px 20px;margin-top:16px;align-items:flex-end}',
-    ':where(.kit-search__filter){border:0;padding:0;margin:0;min-width:0;max-width:100%}',
-    ':where(.kit-search__filter legend,.kit-search__filter>label>span:first-child){display:block;font-size:.875rem;font-weight:600;color:var(--brand-ink,inherit);margin-bottom:6px;padding:0}',
-    ':where(.kit-search__chips){display:flex;flex-wrap:wrap;gap:6px}',
-    ':where(.kit-search__chip){min-height:40px;padding:6px 12px;font:inherit;font-size:.9375rem;color:var(--brand-ink,inherit);background:var(--brand-surface,#fff);border:1px solid var(--brand-line,#cbd5e1);border-radius:999px;cursor:pointer}',
-    ':where(.kit-search__chip[aria-pressed="true"]){background:var(--brand-ink,#0f2447);color:var(--brand-surface,#fff);border-color:var(--brand-ink,#0f2447)}',
-    ':where(.kit-search__select,.kit-search__number,.kit-search__date){min-height:40px;padding:6px 10px;font:inherit;font-size:max(16px,.9375rem);color:var(--brand-ink,inherit);background:var(--brand-surface,#fff);border:1px solid var(--brand-line,#cbd5e1);border-radius:var(--kit-radius,6px);max-width:100%}',
-    ':where(.kit-search__number){width:7.5em}',
-    ':where(.kit-search__range){display:flex;gap:6px;align-items:center;flex-wrap:wrap}',
-    ':where(.kit-search__toggle){display:inline-flex;gap:8px;align-items:center;min-height:40px;cursor:pointer}',
-    ':where(.kit-search__toggle input){width:20px;height:20px;accent-color:var(--brand-accent,#2e6b9f)}',
-    ':where(.kit-search__clear){min-height:40px;padding:6px 4px;font:inherit;color:var(--brand-accent,#2e6b9f);background:none;border:0;text-decoration:underline;cursor:pointer}',
-    ':where(.kit-search__bar){display:flex;flex-wrap:wrap;justify-content:space-between;align-items:center;gap:12px;margin:24px 0 12px}',
-    ':where(.kit-search__count){margin:0;font-weight:600;color:var(--brand-ink,inherit)}',
-    ':where(.kit-search__count [data-search-one],.kit-search__count [data-search-many]){display:none}',
-    ':where(.kit-search__count.is-one [data-search-one],.kit-search__count.is-many [data-search-many]){display:inline}',
-    ':where(.kit-search__results){display:grid;gap:16px;grid-template-columns:repeat(auto-fill,minmax(min(100%,260px),1fr));list-style:none;margin:0;padding:0}',
-    ':where(.kit-search[data-layout="rows"] .kit-search__results){grid-template-columns:1fr;gap:0}',
-    ':where(.kit-search__card){display:flex;flex-direction:column;gap:8px;padding:16px;background:var(--brand-surface,#fff);border:1px solid var(--brand-line,#d1d9e2);border-radius:var(--kit-radius,8px);min-width:0}',
-    ':where(.kit-search[data-layout="rows"] .kit-search__card){flex-direction:row;flex-wrap:wrap;align-items:center;border-width:0 0 1px;border-radius:0;padding:14px 0;gap:8px 20px}',
-    ':where(.kit-search__photo){width:100%;aspect-ratio:4/3;object-fit:cover;border-radius:calc(var(--kit-radius,8px) - 2px);background:var(--brand-raised,#eef2f6)}',
-    ':where(.kit-search[data-layout="rows"] .kit-search__photo){width:72px;aspect-ratio:1}',
-    ':where(.kit-search__code){margin:0;font-family:var(--font-mono,ui-monospace,monospace);font-size:.875rem;color:var(--brand-muted,#6b7280);overflow-wrap:anywhere}',
-    ':where(.kit-search__name){margin:0;font-family:var(--font-display,inherit);font-size:1.125rem;color:var(--brand-ink,inherit);overflow-wrap:anywhere}',
-    ':where(.kit-search[data-layout="rows"] .kit-search__name){flex:1 1 200px}',
-    ':where(.kit-search__facts){display:flex;flex-wrap:wrap;gap:4px 14px;margin:0;font-size:.875rem}',
-    ':where(.kit-search__facts div){display:flex;gap:4px}',
-    ':where(.kit-search__facts dt){color:var(--brand-muted,#6b7280)}',
-    ':where(.kit-search__facts dd){margin:0;color:var(--brand-ink,inherit);font-weight:600}',
-    ':where(.kit-search__ways){display:flex;flex-wrap:wrap;gap:8px;margin-top:auto;padding-top:4px}',
-    ':where(.kit-search__details){min-height:44px;display:inline-flex;align-items:center;padding:8px 14px;font-weight:600;color:var(--brand-ink,inherit);border:1px solid var(--brand-line,#cbd5e1);border-radius:var(--kit-radius,6px);text-decoration:none}',
-    ':where(.kit-search__more){display:block;margin:20px auto 0;min-height:44px;padding:8px 20px;font:inherit;font-weight:600;color:var(--brand-ink,inherit);background:var(--brand-surface,#fff);border:1px solid var(--brand-line,#cbd5e1);border-radius:var(--kit-radius,6px);cursor:pointer}',
-    ':where(.kit-search__empty){padding:24px;background:var(--brand-raised,#eef2f6);border-radius:var(--kit-radius,8px)}',
-    ':where(.kit-search__empty-title){margin:0 0 4px;font-weight:600;color:var(--brand-ink,inherit)}',
-    ':where(.kit-search__empty p:last-child){margin:0}',
-    ':where(.kit-search__record){display:grid;gap:24px;grid-template-columns:minmax(0,1fr)}',
-    '@media (min-width:768px){:where(.kit-search__record.has-photo){grid-template-columns:minmax(0,2fr) minmax(0,3fr)}}',
-    ':where(.kit-search__record .kit-search__photo){aspect-ratio:4/3}',
-    ':where(.kit-search__record h3){margin:0 0 12px;font-family:var(--font-display,inherit);font-size:clamp(1.5rem,3vw,2rem);color:var(--brand-ink,inherit);overflow-wrap:anywhere}',
-    ':where(.kit-search__all){display:grid;grid-template-columns:minmax(0,1fr) minmax(0,2fr);gap:8px 16px;margin:0 0 20px}',
-    ':where(.kit-search__all dt){color:var(--brand-muted,#6b7280)}',
-    ':where(.kit-search__all dd){margin:0;color:var(--brand-ink,inherit);font-weight:600;overflow-wrap:anywhere}',
-    ':where(.kit-search__back){display:inline-flex;align-items:center;min-height:44px;margin-bottom:16px;color:var(--brand-accent,#2e6b9f);font-weight:600}',
-    ':where(.kit-search__words){display:none}',
-    ':where(body.editing .kit-search__words){display:flex;flex-wrap:wrap;gap:6px 12px;margin-top:24px;padding:12px;border:1px dashed var(--brand-line,#cbd5e1);font-size:.875rem}',
-    ':where(body.editing .kit-search__words)::before{content:attr(data-said);width:100%;color:var(--brand-muted,#6b7280)}',
-    ':where(body.editing .kit-search__count [data-search-one],body.editing .kit-search__count [data-search-many]){display:inline}',
-    ':where(body.editing .kit-search__count [data-search-one])::before{content:" / "}',
-    '[data-search] [hidden]{display:none!important}',
-    /*
-     * The layout itself, one class above a template's own element rules (a form drawn as a grid, every input
-     * a full-width block, every link in the brand's ink): without it the search inherits the template's
-     * contact form. Colours and faces stay at no specificity above, so a template's search kit sets them.
-     */
-    '.kit-search .kit-search__form{display:block;margin:0;padding:0;border:0;background:none;box-shadow:none;max-width:none}',
-    '.kit-search .kit-search__label{display:block;width:auto;margin:0 0 8px}',
-    '.kit-search .kit-search__box{display:flex;flex-wrap:wrap;gap:8px;width:100%;margin:0}',
-    '.kit-search .kit-search__input{flex:1 1 220px;width:auto;min-width:0;max-width:100%;margin:0;box-sizing:border-box}',
-    '.kit-search .kit-search__go{flex:0 0 auto;width:auto;margin:0}',
-    '.kit-search:not([data-search-buttons]) .kit-search__go,.kit-search:not([data-search-buttons]) .kit-search__quote{color:var(--kit-search-on-accent,var(--brand-surface,#fff))}',
-    '.kit-search:not([data-search-buttons]) .kit-search__go:hover,.kit-search:not([data-search-buttons]) .kit-search__quote:hover{color:var(--kit-search-on-accent,var(--brand-surface,#fff));filter:brightness(.92)}',
-    '.kit-search:not([data-search-buttons]) .kit-search__details,.kit-search:not([data-search-buttons]) .kit-search__details:hover{color:var(--brand-ink,inherit)}',
-    // A card's two ways onward, one under the other, each the card's width: a long label never breaks a button in two.
-    '.kit-search .kit-search__card .kit-search__ways{display:flex;flex-direction:column;align-items:stretch;gap:8px}',
-    '.kit-search .kit-search__card .kit-search__ways>a{display:flex;width:100%;box-sizing:border-box;justify-content:center;text-align:center;margin:0;white-space:normal}',
-    '.kit-search[data-layout="rows"] .kit-search__card .kit-search__ways{flex-direction:row;flex-wrap:wrap;width:auto}',
-    '.kit-search[data-layout="rows"] .kit-search__card .kit-search__ways>a{width:auto}',
-    '.kit-search .kit-search__filters{display:flex;flex-wrap:wrap;gap:12px 20px;align-items:flex-end;margin:16px 0 0;padding:0;grid-template-columns:none}',
-    '.kit-search .kit-search__filter{display:block;width:auto;max-width:100%;margin:0;padding:0;border:0;min-width:0}',
-    '.kit-search .kit-search__chips{display:flex;flex-wrap:wrap;gap:6px}',
-    '.kit-search .kit-search__chip{width:auto;margin:0;flex:none}',
-    '.kit-search .kit-search__chip[aria-pressed="true"]{background:var(--brand-ink,#0f2447);color:var(--brand-surface,#fff);border-color:var(--brand-ink,#0f2447)}',
-    '.kit-search .kit-search__range{display:flex;flex-wrap:wrap;gap:6px;align-items:center}',
-    '.kit-search .kit-search__range>span{display:inline;margin:0}',
-    '.kit-search .kit-search__number{width:7.5em;flex:none;margin:0;box-sizing:border-box}',
-    '.kit-search .kit-search__date{width:auto;flex:none;margin:0}',
-    '.kit-search .kit-search__select{width:auto;max-width:100%;margin:0}',
-    '.kit-search .kit-search__toggle{display:inline-flex;flex-direction:row;align-items:center;gap:8px;width:auto;margin:0}',
-    '.kit-search .kit-search__toggle input{width:20px;height:20px;min-height:0;margin:0;padding:0;flex:none;appearance:auto;-webkit-appearance:checkbox}',
-    '.kit-search .kit-search__clear{width:auto;margin:0}',
-    '.kit-search .kit-search__results{list-style:none;margin:0;padding:0}',
-    '.kit-search .kit-search__card{margin:0}',
-    '.kit-search .kit-search__facts{padding:0}',
-    '.kit-search .kit-search__all{padding:0;margin:0 0 20px}',
-    ':where(.kit-search__filters-toggle){display:none;min-height:44px;padding:8px 16px;font:inherit;font-weight:600;color:var(--brand-ink,inherit);background:var(--brand-surface,#fff);border:1px solid var(--brand-line,#cbd5e1);border-radius:var(--kit-radius,6px);cursor:pointer}',
-    '@media (max-width:640px){.kit-search .kit-search__filters-toggle{display:inline-flex;align-items:center;width:auto;margin:0}',
-    '.kit-search .kit-search__filters:not(.is-open)>:not(.kit-search__filters-toggle){display:none}',
-    '.kit-search .kit-search__filters.is-open{flex-direction:column;align-items:stretch}',
-    '.kit-search .kit-search__filters.is-open>.kit-search__filters-toggle{align-self:flex-start}}',
-].join('');
+import { carry } from './kit-carry.js';
+
+export { carry };
 
 /** The design's own button classes (data-search-buttons, from the host), added to a search's buttons. */
 const styled = (node, section, which) => {
@@ -462,6 +364,8 @@ export function mount(section, data, { win = window, send = null } = {}) {
     }
 
     if (input) {
+        // Words typed while the index was on its way are the search, unless the address asks for another.
+        if (!asked.query && input.value.trim()) asked.query = input.value;
         input.value = asked.query;
         input.addEventListener('input', () => { asked.query = input.value; limit = MOST_SHOWN; draw(); if (!editing()) win.history.replaceState(win.history.state, '', addressWith(win, toParams(asked, collection.fields))); });
     }
@@ -494,77 +398,96 @@ export function mount(section, data, { win = window, send = null } = {}) {
     return { search: (query) => { asked.query = query; if (input) input.value = query; draw(); return search(collection, asked); }, collection };
 }
 
-/** On a form's page: the record a visitor asked about, carried into the form. */
-export function carry(doc = document, win = window) {
-    const params = new URLSearchParams(win.location.search);
-    if (params.get('from') !== 'search' || !params.get('about')) return false;
-    const about = params.get('about').slice(0, 200);
-    const id = (params.get('record') ?? '').replace(/[^A-Za-z0-9_-]/g, '').slice(0, 64);
-    const forms = [...doc.querySelectorAll('[data-component^="form."] form, form[data-component^="form."], form')]
-        .filter((form) => !form.closest('[data-search]') && !/newsletter|search/.test(form.closest('[data-component]')?.getAttribute('data-component') ?? '') && form.querySelector('textarea, input[type="text"]'));
-    const order = ['quote', 'rfq', 'enquiry', 'contact', 'booking'];
-    const purpose = (form) => form.closest('[data-component]')?.getAttribute('data-component') ?? form.getAttribute('data-component') ?? '';
-    forms.sort((a, b) => {
-        const rank = (form) => { const at = order.findIndex((word) => purpose(form).includes(word)); return at < 0 ? order.length : at; };
-        return rank(a) - rank(b);
+/** Records from an index: objects (v1, and the editor's), or columns and rows (v2, as published: half the bytes). */
+export function recordsOf(index) {
+    if (Array.isArray(index?.records)) return index.records;
+    if (!Array.isArray(index?.keys) || !Array.isArray(index?.rows)) return [];
+    const keys = index.keys;
+    return index.rows.map((row) => {
+        const record = {};
+        for (let i = 0; i < keys.length; i++) if (row[i] !== null && row[i] !== undefined) record[keys[i]] = row[i];
+        return record;
     });
-    const form = forms[0];
-    if (!form) return false;
-    const message = form.querySelector('[data-carry-pn]') ?? form.querySelector('textarea[name*="message" i], textarea[name*="detail" i], textarea[name*="enquir" i]') ?? form.querySelector('textarea');
-    const words = `Request a quote for: ${about}`;
-    if (message && !message.value.trim()) message.value = message.matches('[data-carry-pn]') ? about : words;
-    // What the request is for, where the form asks (Owena's "I want to"): the template's own default for a
-    // record (an option marked data-search-purpose), else the one option that plainly means buying. Two or none
-    // that could be it: left for the visitor, never guessed.
-    for (const select of form.querySelectorAll('select')) {
-        if (select.value) continue;
-        const options = [...select.options].filter((o) => o.value);
-        const marked = options.filter((o) => o.hasAttribute('data-search-purpose'));
-        const buying = options.filter((o) => /\b(buy|buying|purchase|order)\b/i.test(o.textContent));
-        const pick = marked.length === 1 ? marked[0] : (marked.length === 0 && buying.length === 1 ? buying[0] : null);
-        if (pick) {
-            select.value = pick.value;
-            select.dispatchEvent(new Event('change', { bubbles: true }));
-            break;
-        }
-    }
-    const kept = form.querySelector('[data-carried-field]');
-    if (kept && !kept.value) kept.value = about;
-    if (id && !form.querySelector('input[name="search_record"]')) {
-        const hidden = doc.createElement('input');
-        hidden.type = 'hidden';
-        hidden.name = 'search_record';
-        hidden.value = id;
-        form.append(hidden);
-    }
-    const carried = doc.querySelector('[data-carried]');
-    const carriedList = doc.querySelector('[data-carried-list]');
-    if (carried && carriedList && !carriedList.children.length) {
-        const li = doc.createElement('li');
-        li.textContent = about;
-        carriedList.append(li);
-        carried.hidden = false;
-    }
-
-    return true;
 }
 
-export function boot(doc = document, win = window) {
-    if (!doc.getElementById('kit-search-base')) {
-        const style = doc.createElement('style');
-        style.id = 'kit-search-base';
-        style.textContent = BASE;
-        doc.head.prepend(style);
+const yielded = (win) => new Promise((resolve) => {
+    if (win.scheduler?.yield) win.scheduler.yield().then(resolve);
+    else win.setTimeout(resolve, 0);
+});
+
+/**
+ * A collection's index, whole. A big catalogue is published in parts (`parts`, each a file beside the first, named
+ * by its fingerprint): fetched together, and each read in a task of its own, so no single task holds the page.
+ */
+export async function loadIndex(address, { win = window, base = win.document?.baseURI } = {}) {
+    const read = (url) => win.fetch(url, { credentials: 'same-origin' })
+        .then((response) => (response.ok ? response.json() : Promise.reject(new Error(`${response.status}`))));
+    const first = await read(address);
+    const records = recordsOf(first);
+    const parts = Array.isArray(first.parts) ? first.parts.filter((part) => typeof part === 'string') : [];
+    if (parts.length) {
+        const from = new URL(address, base);
+        const pending = parts.map((part) => read(new URL(part, from).href));
+        for (const part of pending) {
+            const data = await part;
+            await yielded(win);
+            for (const record of recordsOf({ keys: first.keys, ...data })) records.push(record);
+        }
+    }
+    const { rows, keys, parts: _parts, ...rest } = first;
+
+    return { ...rest, records };
+}
+
+/**
+ * When a search reads its index: at once when the address already asks for something (a record, a search
+ * someone shared) or in the editor; otherwise as it comes near the screen (a screen and a half ahead), or the
+ * moment a visitor reaches for it, whichever is first. A page whose search is far below costs nothing until then.
+ */
+export function whenWanted(section, go, { win = window } = {}) {
+    let done = false;
+    let watcher = null;
+    const once = () => {
+        if (done) return;
+        done = true;
+        watcher?.disconnect();
+        for (const name of ['focusin', 'pointerover', 'touchstart']) section.removeEventListener(name, once);
+        go();
+    };
+    const asked = [...new URLSearchParams(win.location.search).keys()].length > 0;
+    if (asked || section.ownerDocument.body.classList.contains('editing') || typeof win.IntersectionObserver !== 'function') {
+        once();
+        return;
+    }
+    for (const name of ['focusin', 'pointerover', 'touchstart']) section.addEventListener(name, once, { passive: true });
+    watcher = new win.IntersectionObserver((entries) => { if (entries.some((entry) => entry.isIntersecting)) once(); }, { rootMargin: '150% 0px' });
+    watcher.observe(section);
+}
+
+// Where this file was loaded from, for its stylesheet beside it (read while the file runs: after, it is gone).
+const OWN_ADDRESS = typeof document !== 'undefined' ? document.currentScript?.src ?? '' : '';
+
+export function boot(doc = document, win = window, from = OWN_ADDRESS) {
+    /*
+     * The base look (kit-search-base.js) is in the page's head as the host publishes it (<style
+     * data-kit-search-base>), so the section is in its final shape at first paint and this file carries no CSS. A
+     * page without it (an older host) gets the stylesheet published beside this file (kit-search.css).
+     */
+    if (!doc.querySelector('style[data-kit-search-base], link[data-kit-search-base], #kit-search-base') && /\.js(\?|$)/.test(from)) {
+        const link = doc.createElement('link');
+        link.rel = 'stylesheet';
+        link.href = from.replace(/\.js(\?.*)?$/, '.css');
+        link.setAttribute('data-kit-search-base', '');
+        doc.head.prepend(link);
     }
     for (const section of doc.querySelectorAll('[data-search][data-search-index]')) {
         if (section.__kitSearch) continue;
         section.__kitSearch = true;
         const words = section.querySelector('[data-search-words]');
         if (words && !words.hasAttribute('data-said')) words.setAttribute('data-said', 'Words visitors see in the results. Click one to change it.');
-        win.fetch(section.getAttribute('data-search-index'), { credentials: 'same-origin' })
-            .then((response) => (response.ok ? response.json() : Promise.reject(new Error(`${response.status}`))))
+        whenWanted(section, () => loadIndex(section.getAttribute('data-search-index'), { win, base: doc.baseURI })
             .then((data) => { section.__kitSearchMounted = mount(section, data, { win }); section.setAttribute('data-search-ready', ''); })
-            .catch(() => { section.setAttribute('data-search-failed', ''); });
+            .catch(() => { section.setAttribute('data-search-failed', ''); }), { win });
     }
     carry(doc, win);
 }
