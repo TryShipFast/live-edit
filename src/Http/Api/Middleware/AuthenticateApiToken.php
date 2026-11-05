@@ -23,12 +23,17 @@ class AuthenticateApiToken
 {
     public function __construct(private readonly TokenAuthenticator $authenticator) {}
 
-    public function handle(Request $request, Closure $next, ?string $ability = null): Response
+    public function handle(Request $request, Closure $next, ?string $ability = null, ?string $mode = null): Response
     {
+        // "remembered": a polled read (who is editing what), answered from a
+        // key cached for a few seconds rather than a lookup on every poll.
+        $remembered = $mode === 'remembered';
+
         $result = $this->authenticator->authenticate(
             $this->presentedKey($request),
             $request->headers->get('Origin'),
             $ability !== null ? Ability::from($ability) : null,
+            $remembered,
         );
 
         // A key is valid for ITS site and no other. Without this, every
@@ -64,9 +69,14 @@ class AuthenticateApiToken
         }
 
         ApiContext::set($request, $result->token, $result->site);
-        $result->token->touchUsage();
-        // Somebody who is working should not be thrown out for working.
-        $result->token->renewIfActive();
+
+        // A poll is not use, and must not write: the saves around it renew
+        // the session and record its use.
+        if (! $remembered) {
+            $result->token->touchUsage();
+            // Somebody who is working should not be thrown out for working.
+            $result->token->renewIfActive();
+        }
 
         return $next($request);
     }

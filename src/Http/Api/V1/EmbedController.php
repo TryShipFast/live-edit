@@ -50,6 +50,7 @@ class EmbedController
         'brand.js' => 'brand.js',
         'upload.js' => 'upload.js',
         'seo.js' => 'seo.js',
+        'team.js' => 'team.js',
         'pages.js' => 'pages.js',
         'pages-list.js' => 'pages-list.js',
         'unsaved.js' => 'unsaved.js',

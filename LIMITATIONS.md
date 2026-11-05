@@ -16,6 +16,37 @@ Toy pages agree with whatever the code already does.
 
 ## Open
 
+### Open: team editing (one person per section) covers sites whose content we hold
+
+**What happens.** Section locks, own-only publish and per-person History are
+built into the content API (hosted and static sites, and anything that edits
+through it). A site that keeps its own content (the self-hosted Laravel
+fallback with `DraftStore`, and WordPress) has no locks: two people editing it
+still last-save-wins, as before 0.18.0. Records edited through the Laravel
+record endpoints are immediate writes and are not locked either.
+
+**Smaller edges.**
+
+- The Brand, Shop and SEO panels are claimed by the first save made in them,
+  not by opening them.
+- A change outside any section on a site that has sections (rare on a Kit
+  site) is locked per element (`key:<key>`).
+- Restoring a whole version (API only, owner or admin) is still all or nothing
+  for what is live: it says whose published work it takes back, but it does
+  take it back. **Undo these changes** on one version is the team-safe way.
+- Roles: somebody whose grant has no `role` and whose session was not started
+  with one is an editor. The host must say who the owner is (README, "What the
+  host passes"); the engine does not make the first person the owner by itself.
+- Who is editing what can show an old role for up to a minute if the host
+  changes a grant without going through Eloquent (a raw SQL update). The
+  powers themselves are always checked fresh.
+
+**What closing it would take.** For WordPress and the Laravel fallback, the
+same locks table and checks in their own save routes (`LiveEditController`
+and the plugin's REST routes); the editor side (`team.js`) already steps aside
+cleanly when `/team` answers 404 and would light up unchanged.
+
+
 ### Partly open: a card's page is edited in place, copied whole, and deleted with its card
 
 **Before.** **Edit all details** read the card's page and built a form from its

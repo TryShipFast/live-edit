@@ -25,14 +25,20 @@ final class EditorSession
     /**
      * @return array{token: string, editor: Editor, expires_at: string}
      */
-    public static function begin(Site $site, Editor $editor): array
+    /**
+     * @param  string|null  $role  "owner", "admin" or "editor", written to this
+     *                             person's grant on this site, which is where the role
+     *                             lives (so a later promotion or demotion is one change
+     *                             to the grant). Null leaves the grant's role as it is.
+     */
+    public static function begin(Site $site, Editor $editor, ?string $role = null): array
     {
         $editor->forceFill(['last_seen_at' => now()])->save();
         $editor->sawOn($site);
 
         $expiresAt = now()->addSeconds(max(60, (int) config('live-edit.api.session_ttl', 1800)));
 
-        [, $plain] = $site->issueToken(
+        [$token, $plain] = $site->issueToken(
             TokenType::Session,
             $editor->name ?: $editor->email,
             // From the grant on this site, never from the person. Trusting
@@ -42,6 +48,10 @@ final class EditorSession
             $expiresAt,
             $editor->id,
         );
+
+        if (in_array($role, \ShipFast\LiveEdit\Domain\Team\Person::ROLES, true)) {
+            $editor->sites()->updateExistingPivot($site->id, ['role' => $role]);
+        }
 
         return [
             'token' => $plain,

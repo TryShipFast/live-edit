@@ -294,6 +294,14 @@ export const apiRequestFor = (url, options = {}, api) => {
         '/live-edit/photos': `${base}/${api?.site}/photos`,
         '/live-edit/photos/used': `${base}/${api?.site}/photos/used`,
         '/live-edit/imagine': `${base}/${api?.site}/imagine`,
+        // Team editing: one person per section (team.js).
+        '/live-edit/team': `${base}/${api?.site}/team`,
+        '/live-edit/team/claim': `${base}/${api?.site}/team/claim`,
+        '/live-edit/team/heartbeat': `${base}/${api?.site}/team/heartbeat`,
+        '/live-edit/team/release': `${base}/${api?.site}/team/release`,
+        '/live-edit/team/take-over': `${base}/${api?.site}/team/take-over`,
+        '/live-edit/team/discard-left': `${base}/${api?.site}/team/discard-left`,
+        '/live-edit/team/discard': `${base}/${api?.site}/team/discard`,
     };
 
     /*
@@ -315,6 +323,7 @@ export const apiRequestFor = (url, options = {}, api) => {
      * Same origin, so the host's own session says who this is.
      */
     const generationMatch = path.match(/^\/live-edit\/imagine\/([0-9a-f-]{36})$/i);
+    const undoMatch = path.match(/^\/live-edit\/versions\/(\d+)\/undo$/);
     const claimed = api?.routes?.[path] ?? (path === '/live-edit/publish' ? api?.publishUrl : null);
 
     if (claimed) {
@@ -328,7 +337,9 @@ export const apiRequestFor = (url, options = {}, api) => {
         };
     }
 
-    const target = routes[path] ?? (generationMatch ? `${base}/${api?.site}/imagine/${generationMatch[1]}` : null);
+    const target = routes[path]
+        ?? (generationMatch ? `${base}/${api?.site}/imagine/${generationMatch[1]}` : null)
+        ?? (undoMatch ? `${base}/${api?.site}/versions/${undoMatch[1]}/undo` : null);
 
     if (!base || !api?.site || !api?.token) {
         throw new Error('The content API is not configured on this page.');

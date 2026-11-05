@@ -143,6 +143,172 @@ jobs:
 - `data-live-lock` means "this *is* the site, and it is not the client's". You
   still edit it. They do not.
 
+## Team editing: one person per section
+
+When a website has a team (editors invited on Pro and Agency), two people can
+have the editor open at once. Before 0.18.0 they silently overwrote each
+other: a change was one shared draft per key, the last save won, and whoever
+pressed Publish put everybody's half-finished work live. Now each part of the
+site belongs to one person while they work on it.
+
+**What people see**
+
+- The first thing you change in a section (or the first section you open)
+  becomes yours until you publish, discard, or leave it alone for 30 minutes.
+- A section a teammate is working on has a quiet dashed outline and a label,
+  "Ada is editing this section". Pressing anything in it says so in plain words
+  instead of opening it. An editor is told to ask an admin to take over; the
+  owner and admins get a **Take over** button.
+- The **Publish** button counts only your own changes, which is what pressing
+  it puts live.
+- **Publish** puts live only your own sections, then lets go of them. A
+  teammate's unfinished section stays a draft, still theirs and still locked,
+  until they publish it. The publish window lists "Your changes (these go live
+  when you publish)" and "Others' changes (not included)", by name.
+- **Changes** shows the same split. Only the author, or an admin, can put back
+  somebody's change.
+- A section left alone for 30 minutes opens up. Its changes stay saved and
+  still belong to their author. The next person to open it is told "Ada left
+  unpublished changes here" and can **Continue from them** (they become theirs)
+  or, for an admin, **Discard them**.
+- **Take over** (owner and admins) takes the section and the holder's
+  unpublished changes in it. The holder is told "Olu took over Hero" on their
+  next look.
+- **History** says who did what, newest first: "Ada published 2 changes",
+  then each change under its section, "Ada changed the headline in Hero". Each
+  version has **Undo these changes**, which puts back only what that publish
+  changed and leaves anything somebody changed again since (it says so).
+  Putting the whole website back to an earlier version is not in History: it
+  is `POST /restore` only, for the owner and admins (403 for an editor). It
+  says whose published work it takes back, and it no longer throws away a
+  teammate's unpublished drafts.
+
+**Roles.** The first person on the site is the owner. The owner can make
+anybody an admin, and an admin is promoted or demoted the same way. The owner
+and admins may take over a section, throw away changes somebody left, put back
+a teammate's change and restore a whole version; an editor may not. A role
+change counts on the person's next request: every action that needs the power
+reads the role fresh, and the cached "who is editing" answer forgets a person
+the moment their grant changes.
+
+A site with one person editing works exactly as before: everything is theirs
+and Publish publishes everything. So does any session that does not say who it
+is (the site's own keys, and every session minted before 0.18.0).
+
+**Lock units.** One person holds one unit at a time:
+
+| Unit | What it covers |
+| --- | --- |
+| `section:<instance>` | a Kit section on a page (`data-edit-section`, `data-instance`) |
+| `site/<instance>` | a band every page shares, such as `site/header`, `site/footer` |
+| `panel:brand`, `panel:shop`, `panel:seo:<page>` | the Brand tab, the Shop tab, one page's search and sharing settings |
+| `collection:<id>` | one search collection, with all of its pages of records |
+| `form:<key>` | one form the owner shapes |
+| `arrangement:<page>` | one page's arrangement (sections added, moved, hidden) |
+| `pages` | the list of pages (adding, renaming, removing a page) |
+| `area:<id>`, `key:<key>` | on a site with no sections: a part with an id, else the element itself |
+
+Keys whose shape says what they are (`form:`, `collection:`, `structure:page:`,
+`structure:pages`) are filed under their unit by the server whatever the
+browser says. Everything else uses the unit the editor declares
+(`X-Live-Edit-Unit`), and a draft remembers its unit, so a stale browser that
+declares a different one still meets the lock.
+
+**How it is built.** `live_edit_section_locks` holds one row per (site, unit):
+holder, name, role, `claimed_at`, `last_active_at`, and `taken_from` after a
+take-over. Drafts gained `author`, `author_name`, `unit` and `unit_label`;
+versions gained `published_by_id`, `summary` (who changed what, with before and
+after) and `undoes`. `Domain\Team\SectionLocks` is the authority; the editor
+(`resources/js/team.js`) only shows what it says.
+
+| Endpoint | |
+| --- | --- |
+| `GET /team` | who holds what on this site, and who you are. Cached; `If-None-Match` gets a 304 |
+| `POST /team/claim` `{unit, label, continue}` | take a section (409 with who holds it) |
+| `POST /team/heartbeat` | still here (renews at most once a minute) |
+| `POST /team/release` `{units?}` | let go |
+| `POST /team/take-over` `{unit}` | owner or admin |
+| `POST /team/discard-left` `{unit}` | owner or admin: throw away what somebody left |
+| `POST /team/discard` | throw away my own unpublished changes and let go |
+| `POST /versions/{n}/undo` | undo one published version (publish key) |
+| `POST /restore` `{version}` | the whole site back to a version: owner or admin only |
+| `POST /sessions/role` `{id, role}` | secret key: promote or demote a person the host named |
+
+Any save into a section somebody else holds is refused with **409** and a
+sentence ("Ada is editing Hero right now. Ask an admin to take over if it
+cannot wait."), even from a stale page. Two first edits at the same moment are
+decided by the unique index: one gets the section, the other is told who.
+
+**What the host passes.** Who the person is, when it starts the session:
+
+- somebody we know (signed in with us, or `EditorSession::begin($site,
+  $editor, $role)`): their name, and their role on their grant
+  (`live_edit_editor_site.role`: `owner`, `admin` or `editor`; `begin` writes
+  the role it is given there). Promote or demote by changing the grant
+  (`$editor->sites()->updateExistingPivot($site->id, ['role' => 'admin'])`);
+- minted by the host (`POST /sessions`): `editor: {id, name, role}`, where `id`
+  is the host's own id for its user and `role` is `owner`, `admin` or
+  `editor`; promote or demote with `POST /sessions/role {id, role}` and every
+  session of theirs changes on its next request.
+
+Settings: `live-edit.team.idle_minutes` (30), `poll_active_seconds` (5),
+`poll_idle_seconds` (30). `live-edit:prune-locks` runs every ten minutes on the
+schedule to clear lapsed rows; nothing depends on it.
+
+## Caching and load
+
+Many open editors must not load the server, and a busy published site must not
+cost a query per visitor.
+
+**Who is editing what** (`GET /team`) is the one request every open editor
+repeats. It is built to cost nothing when nothing changed:
+
+- the answer is one object per site in the application cache (Redis if the host
+  has it, else whatever `cache.default` is), keyed by a per-site revision that
+  moves only when a lock or a draft's owner changes;
+- the browser sends the `ETag` it was given and gets **304** with no body;
+- the key check is remembered for 30 seconds (`TokenAuthenticator`, remembered
+  mode), and forgotten at once when the key changes or is revoked; the CORS
+  check's allowed addresses are remembered for a minute and forgotten when the
+  site is saved;
+- result: **0 database queries** for an unchanged poll (`TeamEditingTest` checks
+  it; the load test measures it);
+- a lock lapsing is noticed lazily: the cached answer knows when its soonest
+  lock lapses and is rebuilt then (two queries), once.
+
+The editor asks every 5 seconds while somebody is working, every 30 seconds
+after two idle minutes, never while the tab is hidden, and spreads the polls by
+up to a fifth either way so a room of editors does not ask in step.
+
+**Writes.** Claiming is one `INSERT ... ON CONFLICT DO NOTHING` (insertOrIgnore)
+and, only if needed, one conditional `UPDATE` that succeeds for the holder or
+when the lock has lapsed. Activity renews `last_active_at` at most once a
+minute per person, in one statement over all their locks. Indexes:
+`(site_id, unit)` unique, `(site_id, holder)`, `(site_id, taken_from)`,
+`last_active_at`; drafts `(site_id, author)` and `(site_id, unit)`.
+
+**What else is cached** (audit, 0.18.0):
+
+| Path | Before | Now |
+| --- | --- | --- |
+| Visitor content read (`GET /content`, `/content/version` with the public key) | snapshot file plus 5 queries on every request | remembered per site and language for `min(10, pointer_seconds)` seconds, forgotten on save, publish, restore, undo and discard: auth only (2 queries, 1 more once a minute to note the key was used) |
+| CORS on every API request | one `sites` query | remembered a minute, forgotten when the site is saved |
+| Who is editing what | (new) | 0 queries when unchanged, see above |
+| Editor's own content read (with drafts) | 7 to 8 queries | unchanged on purpose: it is one person's unfinished work and is never cached |
+| Published files (snapshots) | written on publish, served as files, `Cache-Control` public with stale-while-revalidate | unchanged |
+| Tagging a page (`/tag`) | cached by markup hash | unchanged |
+| Licence answer | cached | unchanged |
+
+Still a query on every request, and why: the key check on every route except
+`GET /team` (a remembered key everywhere would delay a revocation everywhere);
+`hasLiveLicence()` on every write (two queries; a candidate for a short cache);
+a save is about 15 queries (policy, developer locks, meter, revision log, team
+lock), which is fine at human typing speed.
+
+The load test (`tests/load/team-locks.mjs`) runs 50 editors on one site and one
+editor on each of 200 other sites against the real API and reports polls per
+second, 304s, database queries per poll and latency.
+
 ## The three values a site is given
 
 ```env

@@ -5,6 +5,8 @@ namespace ShipFast\LiveEdit\Application\Api;
 use ShipFast\LiveEdit\Domain\Content\Companions;
 use ShipFast\LiveEdit\Domain\Content\SiteStore;
 use ShipFast\LiveEdit\Domain\Site\Site;
+use ShipFast\LiveEdit\Domain\Team\LockUnit;
+use ShipFast\LiveEdit\Domain\Team\Person;
 use ShipFast\LiveEdit\Models\Draft;
 
 /**
@@ -24,10 +26,12 @@ class ListChanges
     /**
      * @return array{changes: array<int, array<string, mixed>>, count: int}
      */
-    public function __invoke(Site $site): array
+    public function __invoke(Site $site, ?Person $viewer = null): array
     {
+        $viewer ??= Person::theWebsite();
         $store = new SiteStore($site);
         $published = $store->published();
+        $mineIds = $store->ownedBy($viewer, Draft::query()->where('site_id', $site->id)->get())->pluck('id')->flip();
 
         $changes = Draft::query()
             ->where('site_id', $site->id)
@@ -44,7 +48,7 @@ class ListChanges
              * purpose or would know how to revert.
              */
             ->reject(fn (Draft $draft) => $draft->kind === 'setting' && $this->belongsToAPicture($site, $draft->subject))
-            ->map(function (Draft $draft) use ($published) {
+            ->map(function (Draft $draft) use ($published, $mineIds) {
                 $payload = (array) $draft->payload;
 
                 return [
@@ -58,12 +62,22 @@ class ListChanges
                         ? $this->readably($payload['value'] ?? '', $published[$draft->subject] ?? null)
                         : $this->describeStyle($payload),
                     'at' => $draft->updated_at?->toIso8601String(),
+                    // Team editing: whose change this is, where, and whether
+                    // it goes live when the person looking presses Publish.
+                    'author' => $draft->author,
+                    'author_name' => $draft->author_name,
+                    'unit' => $draft->unit,
+                    'unit_label' => $draft->unit_label ?: ($draft->unit ? LockUnit::fallbackLabel($draft->unit) : null),
+                    'what' => $payload['what'] ?? null,
+                    'mine' => $mineIds->has($draft->id),
                 ];
             })
             ->values()
             ->all();
 
-        return ['changes' => $changes, 'count' => count($changes)];
+        $mine = count(array_filter($changes, fn ($c) => $c['mine']));
+
+        return ['changes' => $changes, 'count' => count($changes), 'yours' => $mine, 'others' => count($changes) - $mine];
     }
 
     /**
@@ -105,6 +119,14 @@ class ListChanges
         }
 
         return $items === $had ? 'The list is unchanged' : 'The order changed';
+    }
+
+    /** A list change in words for History ("1 item added, leaving 3 items"), or null for anything that is not a list. */
+    public static function describeList(mixed $after, mixed $before): ?string
+    {
+        $self = new self;
+
+        return $self->asList($after) === null ? null : $self->readably($after, $before);
     }
 
     protected function many(int $count, string $noun): string

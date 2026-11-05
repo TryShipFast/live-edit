@@ -15,7 +15,7 @@ class Draft extends Model
     // assignment drops it without a word, the row is written with no
     // owner, and every scoped query then fails to find it. Nothing
     // errors — the draft simply ceases to exist for the site that made it.
-    protected $fillable = ['site_id', 'kind', 'subject', 'payload'];
+    protected $fillable = ['site_id', 'kind', 'subject', 'payload', 'author', 'author_name', 'unit', 'unit_label'];
 
     protected function casts(): array
     {

@@ -549,6 +549,21 @@ return [
         ])),
     ],
 
+    /*
+     * Team editing: one person per section (README, "Team editing").
+     *
+     * A section somebody is editing is theirs until they publish, discard or
+     * go quiet for idle_minutes; their unpublished changes stay saved either
+     * way. Open editors ask who holds what every poll_active_seconds while
+     * somebody is working and every poll_idle_seconds otherwise, and not at
+     * all while the tab is hidden.
+     */
+    'team' => [
+        'idle_minutes' => (int) env('LIVE_EDIT_TEAM_IDLE_MINUTES', 30),
+        'poll_active_seconds' => (int) env('LIVE_EDIT_TEAM_POLL_ACTIVE', 5),
+        'poll_idle_seconds' => (int) env('LIVE_EDIT_TEAM_POLL_IDLE', 30),
+    ],
+
     'api' => [
         'enabled' => env('LIVE_EDIT_API', false),
 

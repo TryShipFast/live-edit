@@ -12,6 +12,7 @@ use ShipFast\LiveEdit\Console\Commands\ImportTheme;
 use ShipFast\LiveEdit\Console\Commands\LastSaveFailure;
 use ShipFast\LiveEdit\Console\Commands\ManageApiSite;
 use ShipFast\LiveEdit\Console\Commands\PruneOrphanedUploads;
+use ShipFast\LiveEdit\Console\Commands\PruneSectionLocks;
 use ShipFast\LiveEdit\Console\Commands\ScanForEditables;
 use ShipFast\LiveEdit\Console\Commands\SendRenewalNotices;
 use ShipFast\LiveEdit\Console\Commands\Versions;
@@ -151,10 +152,16 @@ class LiveEditServiceProvider extends ServiceProvider
             $this->app->make(HttpKernel::class)->prependMiddleware(OpensTheEditorFromAnyPage::class);
         }
         $this->loadMigrationsFrom(__DIR__.'/../database/migrations');
+
+        // Lapsed section locks are ignored as soon as they lapse; this only
+        // keeps the table small, off the request path.
+        $this->callAfterResolving(\Illuminate\Console\Scheduling\Schedule::class, function ($schedule) {
+            $schedule->command('live-edit:prune-locks')->everyTenMinutes()->withoutOverlapping();
+        });
         $this->loadViewsFrom(__DIR__.'/../resources/views', 'live-edit');
 
         if ($this->app->runningInConsole()) {
-            $this->commands([CheckMediaStorage::class, Diagnose::class, ImportTheme::class, LastSaveFailure::class, ManageApiSite::class, PruneOrphanedUploads::class, ScanForEditables::class, SendRenewalNotices::class, Versions::class]);
+            $this->commands([CheckMediaStorage::class, Diagnose::class, ImportTheme::class, LastSaveFailure::class, ManageApiSite::class, PruneOrphanedUploads::class, PruneSectionLocks::class, ScanForEditables::class, SendRenewalNotices::class, Versions::class]);
 
             $this->publishes([
                 __DIR__.'/../config/live-edit.php' => config_path('live-edit.php'),
