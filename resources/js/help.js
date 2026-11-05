@@ -232,6 +232,7 @@ export const shopQuestions = () => [
     { q: 'How do I change a product’s sizes or colours?', a: 'Click the product card and press Edit all details. On its page, click the sizes: add one, rename one, delete one, and set each one’s price.' },
     { q: 'How do I change a price?', a: 'Click the price on the product card or its page and type the new one, with its currency sign. The bag and checkout use that amount.' },
     { q: 'How do I take a product away?', a: 'Click its card and press Delete this item. It offers to delete the product’s page too, so nothing is left behind.' },
+    { q: 'How do I keep count of my stock?', a: 'In your dashboard, open the website’s Orders page and find Stock. Type how many you have of each product and size, then press Save stock. Leave a box empty to not count it. At 0 your website says Sold out; at 3 or fewer it says how many are left. Each paid order takes its quantities off by itself.' },
     { q: 'How do customers pay, and where do orders go?', a: 'Open the Shop tab to choose how customers pay (online, or by WhatsApp) and to set delivery prices, offers and your WhatsApp number. Orders paid online are listed in your dashboard under Orders; WhatsApp orders arrive in WhatsApp as a message.' },
 ];
 
@@ -239,7 +240,14 @@ export const commonQuestions = ({ hasPublish = true, hasPages = false, hasBrand 
     ...(hasPublish ? [{ q: 'I changed something, but the live site has not changed.', a: 'What you save is a draft only you can see. Press Publish when you are happy, and visitors see it.' }] : []),
     { q: 'How do I undo a mistake?', a: 'Press Undo in the bar to take back your latest change. The Changes tab lists everything you have saved, and each can be undone.' },
     { q: 'Can I break the design?', a: 'No. You change words, pictures, links and colours; the layout keeps its shape and works on phones as it did.' },
-    ...(hasPages ? [{ q: 'How do I add a page?', a: 'Press New page in the bar, start from a page your site already has, give it a name, and it opens ready to edit.' }] : []),
+    ...(hasPages ? [{ q: 'How do I add a page?', a: 'Press Pages in the bar, then + Add page. Start from a page your site already has, give it a name, and it opens ready to edit.' }] : []),
+    ...(hasPages ? [{ q: 'How do I add a section?', a: 'Point between two sections and press + Add a section on the line that appears (or + Section in the bar). Point at one in the list to see it, then press Add this section. It arrives with sample words and pictures to replace.' }] : []),
+    ...(hasPages ? [{ q: 'How do I move, hide or remove a section?', a: 'Click the section. Its panel has Move up, Move down, Duplicate section and Remove this section, and a Hide this section box.' }] : []),
+    ...(hasPages ? [{ q: 'How do I add a new form?', a: 'Press + Add a section and scroll to Forms. Choose Form: contact, Form: ask for a quote, or Form: start blank, then press Add this section. Click the new form to choose its questions.' }] : []),
+    ...(hasPages ? [{ q: 'How do I change a form’s questions?', a: 'Click any box on the form. In the window that opens, pick the kind of answer and press + Add a question, then type the question. Tick Must be filled in where you need an answer. Use the arrows to change the order, then press Save the form. Questions marked Your website uses this field can be renamed and moved but stay on the form.' }] : []),
+    ...(hasPages ? [{ q: 'Where do the answers to my forms go?', a: 'In your dashboard, under Enquiries. Each form’s answers can be downloaded as a spreadsheet.' }] : []),
+    ...(hasPages ? [{ q: 'How do I add a chart or a table?', a: 'Press + Add a section and scroll to Charts and tables. Pick the kind you want and press Add this section. Click it to change the figures one by one, or paste rows from a spreadsheet. It is drawn in your website’s own colours.' }] : []),
+    ...(hasPublish ? [{ q: 'Can my team edit with me?', a: 'Yes. In your dashboard, open the website’s Team page and press Invite. While someone edits a section, it is theirs until they publish or leave it for 30 minutes, so nobody overwrites anyone. Publish puts live only your own changes.' }] : []),
     ...(hasBrand ? [{ q: 'How do I change the colours or fonts?', a: 'Open the Brand tab. Choose your colours and two fonts, and the whole site follows.' }] : []),
     { q: 'Where do pictures come from?', a: 'Click a picture and choose one of your own, a free photo, or ask for a new one to be made. Making a picture uses credits; the others are free.' },
     { q: 'Something I want to change cannot be clicked.', a: 'Some parts are fixed by the design, such as the layout itself. If it is words or a picture you need to change, contact whoever set up your website.' },

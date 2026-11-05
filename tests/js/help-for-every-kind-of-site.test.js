@@ -47,6 +47,12 @@ describe('help for every kind of site', () => {
         const all = commonQuestions({ hasPublish: true, hasPages: true, hasBrand: true }).map((q) => q.q);
         expect(all).toContain('How do I add a page?');
         expect(all).toContain('How do I change the colours or fonts?');
+        // Sections, forms and charts come with the page builder; the team with publishing.
+        for (const q of ['How do I add a section?', 'How do I add a new form?', 'How do I change a form’s questions?', 'How do I add a chart or a table?']) {
+            expect(all).toContain(q);
+            expect(without).not.toContain(q);
+        }
+        expect(all.join(' ')).not.toMatch(/New page in the bar/);
     });
 
     it('makes a guide for each list the site has, named by the list', () => {

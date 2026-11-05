@@ -1,5 +1,9 @@
 # ShipFast Live Edit for WordPress
 
+## 0.19.2
+
+- Help answers what owners now ask: how to add a section; move, hide or remove one; add a new form (contact, quote or start blank); change a form's questions; where form answers go; add a chart or a table; whether the team can edit together; and, on a shop, how to keep count of stock. The answer on adding a page names the bar's Pages button (0.19.0 renamed New page). Sections, forms and charts are answered where the website has the page builder, the team where it publishes.
+
 ## 0.19.1
 
 - Fixed: in 0.19.0 every save answered "Content service answered 500" in a Laravel app that uses immutable dates (`Date::use(CarbonImmutable::class)`, as many do). The section-lock check expected a mutable date. It now takes either, and a test runs team editing with immutable dates. The whole suite also passes with immutable dates switched on everywhere.
