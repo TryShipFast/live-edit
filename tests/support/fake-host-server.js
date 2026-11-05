@@ -28,7 +28,7 @@ const RUNTIME = fileURLToPath(new URL('../../resources/dist/live-edit.js', impor
  */
 const TEAM_ROUTES = /^(content|styles|session|team(\/[a-z-]+)?|changes|publish|versions(\/\d+\/undo)?|restore)$/;
 
-export async function serveFakeHost({ removable = false, library = false, outside = false, data = false, search = false, forms = null, team = null, port = 0 } = {}) {
+export async function serveFakeHost({ removable = false, library = false, outside = false, data = false, search = false, forms = null, team = null, port: listenOn = 0 } = {}) {
     const window = new Window();
     const host = createHost({ makeDocument: (html) => new window.DOMParser().parseFromString(html, 'text/html'), removable, library, outside, data, search, forms });
 
@@ -180,7 +180,7 @@ export async function serveFakeHost({ removable = false, library = false, outsid
         }
     });
 
-    await new Promise((resolve) => server.listen(port, '127.0.0.1', resolve));
+    await new Promise((resolve) => server.listen(listenOn, '127.0.0.1', resolve));
     const { port } = server.address();
 
     return {
