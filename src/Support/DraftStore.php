@@ -24,8 +24,6 @@ class DraftStore
     /** The session flag a preview link sets. */
     public const PREVIEW_SESSION_KEY = 'live-edit.preview';
 
-    private static bool $tableSeen = false;
-
     public static function enabled(): bool
     {
         if (! config('live-edit.publishing', false)) {
@@ -35,14 +33,7 @@ class DraftStore
         // Turned on before the migration has run, holding an edit back would
         // mean writing to a table that is not there. Behaving as though
         // publishing were off is the safe reading.
-        //
-        // Asked once per process once the answer is yes: a table does not
-        // disappear between requests, and this was a query on every read.
-        if (self::$tableSeen) {
-            return true;
-        }
-
-        return self::$tableSeen = Schema::hasTable((new Draft)->getTable());
+        return Schema::hasTable((new Draft)->getTable());
     }
 
     /**
