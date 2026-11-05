@@ -11,3 +11,6 @@ vendor/orchestra/testbench-core/laravel/storage/app/
 # Built artefacts. The zip is made from the source on demand and should not
 # be committed: a stale one in the repo is the version somebody installs.
 /dist/
+
+# A worktree may link node_modules to a shared copy; never commit that link.
+/node_modules
