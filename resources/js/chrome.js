@@ -673,15 +673,25 @@ a.le-mark:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
     display: grid;
     place-items: center;
     font-size: 19px;
-    color: var(--le-ink);
-    background: linear-gradient(135deg, #fff 0 50%, #334155 50% 100%);
-    border: 1px solid var(--le-field);
-    border-radius: 8px;
+    color: var(--le-muted);
+    background: #eef1f4;
+    border: 1px solid transparent;
+    border-radius: 10px;
     cursor: pointer;
-    transition: border-color .12s, background .12s;
+    transition: background .15s ease, border-color .15s ease, color .15s ease, transform .15s ease, box-shadow .15s ease;
 }
-.le-icon-choice:hover { border-color: var(--le-accent); background: var(--le-soft); }
-.le-icon-choice.is-current { border-color: var(--le-accent); box-shadow: inset 0 0 0 1px var(--le-accent); }
+/* At rest every icon is quiet and grey; the one under the pointer (or the keyboard) comes alive. */
+.le-icon-choice > svg, .le-icon-choice > img { filter: grayscale(1); opacity: .75; transition: filter .15s ease, opacity .15s ease; }
+.le-icon-choice:hover, .le-icon-choice:focus-visible {
+    color: var(--le-ink); background: #fff; border-color: var(--le-accent);
+    box-shadow: 0 2px 8px rgba(15, 23, 42, .08); transform: translateY(-1px);
+}
+.le-icon-choice:hover > svg, .le-icon-choice:focus-visible > svg, .le-icon-choice:hover > img, .le-icon-choice:focus-visible > img,
+.le-icon-choice.is-current > svg, .le-icon-choice.is-current > img { filter: none; opacity: 1; }
+.le-icon-choice.is-current { color: var(--le-ink); background: #fff; border-color: var(--le-accent); box-shadow: inset 0 0 0 1px var(--le-accent); }
+/* A drawing made to sit on a dark band (white lines) keeps a dark tile, so it can be seen at all. */
+.le-icon-choice.is-light, .le-icon-choice.is-light:hover, .le-icon-choice.is-light:focus-visible, .le-icon-choice.is-light.is-current { background: #475569; color: #fff; }
+@media (prefers-reduced-motion: reduce) { .le-icon-choice, .le-icon-choice > svg { transition: none; } .le-icon-choice:hover { transform: none; } }
 /* The glyph is drawn with the page's icon font, set inline per element. */
 .le-icon-choice { line-height: 1; }
 /* The publish button inside the panel. Same blue as the one on the bar,
@@ -838,8 +848,8 @@ a.le-chip-btn { display: inline-flex; align-items: center; justify-content: cent
 .le-tool.is-bold { font-weight: 700; }
 .le-tool.is-italic { font-style: italic; }
 .le-icons { display: grid; grid-template-columns: repeat(6, 1fr); gap: 6px; }
-.le-icon { display: flex; height: 40px; cursor: pointer; align-items: center; justify-content: center; border: 1px solid var(--le-field); border-radius: 10px; background: #fff; color: var(--le-body); transition: background .15s ease, border-color .15s ease; }
-.le-icon:hover { background: var(--le-soft); border-color: var(--le-accent); }
+.le-icon { display: flex; height: 40px; cursor: pointer; align-items: center; justify-content: center; border: 1px solid transparent; border-radius: 10px; background: #eef1f4; color: var(--le-muted); transition: background .15s ease, border-color .15s ease, color .15s ease; }
+.le-icon:hover, .le-icon:focus-visible { background: #fff; border-color: var(--le-accent); color: var(--le-ink); }
 .le-icon.is-active { border-color: var(--le-accent); background: var(--le-accent); color: #fff; }
 .le-icon svg { width: 20px; height: 20px; }
 .le-preview { display: flex; height: 190px; align-items: center; justify-content: center; overflow: hidden; border-radius: 14px; background: var(--le-soft); border: 1px solid var(--le-line); font-size: 13px; font-weight: 400; letter-spacing: normal; text-transform: none; color: var(--le-muted); }

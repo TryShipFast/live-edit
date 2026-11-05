@@ -1,5 +1,9 @@
 # ShipFast Live Edit for WordPress
 
+## 0.19.4
+
+- The icon library is calm until you point at an icon (owner, 5 Nov 2026: "It should be grey and maybe come alive on mouse hover"). Every icon tile is a soft grey with the drawing in grey; the one under the pointer or the keyboard comes alive (white tile, the drawing in its own colours, a blue edge, a small lift), and the chosen one stays so. The white-and-dark diagonal behind every tile is gone; a drawing with white lines keeps a dark tile so it can be seen. Reduced motion: no lift.
+
 ## 0.19.3
 
 - Fixed: a drawing whose classes look like an icon font's (`<svg class="icon icon-arrow">`, as Car Wash and seven other templates draw their arrows) was read as an icon font once the page came back from the server, so pressing it opened "Icon name: this theme loads its icons from somewhere this page cannot read" instead of the drawing library. An `<svg>`, or anything already offered as a drawing, is never an icon font now. Present since 0.17.

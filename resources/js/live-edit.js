@@ -5598,6 +5598,7 @@ const bootLiveEdit = () => {
                     drawn.setAttribute('height', '20');
                 }
                 choice.classList.toggle('is-current', markup === was);
+                choice.classList.toggle('is-light', /(?:fill|stroke|color)\s*[=:]\s*["']?\s*(?:#fff\b|#ffffff\b|white\b)/i.test(markup) && !/(?:fill|stroke)\s*=\s*["']?\s*(?:#0|#1|#2|#3|black|currentColor)/i.test(markup));
                 choice.addEventListener('click', () => {
                     chooseDrawing(markup, choice);
                 });
