@@ -55,6 +55,7 @@ class EmbedController
         'pages-list.js' => 'pages-list.js',
         'unsaved.js' => 'unsaved.js',
         'toolbar-icons.js' => 'toolbar-icons.js',
+        'kit-carry.js' => 'kit-carry.js',
         'dropdown-trigger.js' => 'dropdown-trigger.js',
         'linked-detail-scope.js' => 'linked-detail-scope.js',
         'card-page.js' => 'card-page.js',
