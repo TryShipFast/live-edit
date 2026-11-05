@@ -454,6 +454,23 @@ like, holding `data-edit`) stay hidden while editing, whatever the design's styl
 `body.editing`: a ", home" beside the logo read as a mistake on the page. They are offered in the
 panel of what holds them, under **Read aloud by screen readers**.
 
+## Somebody who may not publish
+
+An editor whose grant does not include **Can publish** is not offered a Publish the server would
+refuse. Their bar says **Ask to publish** with the count (**Review** where the bar is folded on a
+phone; its name is "Ask to publish, 2 changes saved"), and pressing it says, in one dialog, **Ask an
+admin to publish**: the changes are saved, and visitors see them once someone who can publish puts
+them live. No publish is sent. This is WordPress's Contributor ("Submit for review") and Google Docs'
+suggesting, on the same bar.
+
+The editor knows from either of:
+
+- the session (`GET …/{site}/session`): `may_publish` is `true` or `false` for somebody who signed in
+  with us (their grant), and `null` for a session a host minted (that host publishes its own way);
+- the host: `window.liveEditPublishing = { pending: 3, mayPublish: false }`.
+
+Unknown means allowed, as before; the API refuses a publish without the `publish` ability regardless.
+
 ## Help (the ? button)
 
 Help is written for somebody who has never edited a website. It opens on what this kind of site is
