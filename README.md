@@ -159,8 +159,14 @@ site belongs to one person while they work on it.
   "Ada is editing this section". Pressing anything in it says so in plain words
   instead of opening it. An editor is told to ask an admin to take over; the
   owner and admins get a **Take over** button.
-- The **Publish** button counts only your own changes, which is what pressing
-  it puts live.
+- The **Publish** button (or **Ask to publish**, for somebody who may not
+  publish) counts only your own changes, which is what pressing it puts live
+  (or asks to).
+- **Pages** is one part of the site: while a teammate is adding, renaming,
+  moving or deleting pages, the list says "Ada is changing your pages right
+  now"; every page still opens, and the rest waits until Ada publishes. A
+  page's sections (adding one, taking one off) are that page's layout, and the
+  same applies: "+ Add a section" says who has it.
 - **Publish** puts live only your own sections, then lets go of them. A
   teammate's unfinished section stays a draft, still theirs and still locked,
   until they publish it. The publish window lists "Your changes (these go live

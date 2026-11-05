@@ -11,6 +11,7 @@
 - An editor without "Can publish" sees **Ask to publish** (Review on a folded phone bar) instead of Publish; pressing it explains that the changes are saved and an admin puts them live, and sends no publish, where before the server's refusal read "Could not publish… try again in a moment". The session payload says `may_publish` (true or false for somebody who signed in with us, null for a host-minted session); a host can also say `liveEditPublishing.mayPublish: false`.
 - Words only a screen reader hears (", home" beside a logo) no longer show on the page while editing, whatever the design's stylesheet does; they are in the logo's panel under "Read aloud by screen readers".
 - The toolbar is compact and fits every screen (owner, 5 Nov 2026: "dashboard can change to icon to create less space same as ads and tracking"; "they are not responsive on mobile"). A host link may name an `icon` (`dashboard`, `tracking`, `settings`, `help`, `external` or `logout`) and is then a round 44px icon button, its label its accessible name and a tooltip shown on hover and on focus; a link without one keeps its words. Log out is an icon. When the bar would not fit on one line (always on a phone, at 760px and under; on a tablet or a narrow desktop as needed) it folds: Edit or Done, Undo, Publish with its count and a More button stay, and the rest (Redo, New page, Sections, Brand, Search, Changes, Help, Preview, the language, the host's links, Log out) are offered in a More sheet as labelled icons with 44px targets. The sheet closes on a tap outside it, Escape or Back, keeps the keyboard inside it while open and returns it to More; the bar and the sheet keep clear of the iPhone's home bar. New: `resources/js/toolbar-icons.js`.
+- The editor's files include `toolbar-icons.js` on the embed endpoint (the folded bar's icons were not served to a site loading the editor from us).
 
 ### Team editing: one person per section
 
@@ -33,6 +34,7 @@ eachother works".
   them, or (owner) discard them.
 - The owner or an admin can take over any section, with its unpublished
   changes; the holder is told "Olu took over Hero".
+- The Pages list and a page's sections respect the same locks: while a teammate changes the list of pages, the others can open pages but not change the list ("Ada is changing your pages right now"); "+ Add a section" and "Remove this section" say who holds that page's layout.
 - Changes and the publish window are split into "Your changes (these go live
   when you publish)" and "Others' changes (not included)", by name.
 - History says who published each version and lists its changes by section and
