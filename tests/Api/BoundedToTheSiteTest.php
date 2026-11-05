@@ -126,7 +126,9 @@ class BoundedToTheSiteTest extends TestCase
 
     protected function path(string $uri, Site $site): string
     {
-        return '/'.str_replace(['{site:slug}', '{site}'], $site->slug, $uri);
+        // A version number is a route parameter like the site: filled in, so
+        // the route is reached and its key check is what answers.
+        return '/'.str_replace(['{site:slug}', '{site}', '{number}'], [$site->slug, $site->slug, '1'], $uri);
     }
 
     /* ------------------------------------------------------------------ */

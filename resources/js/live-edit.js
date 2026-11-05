@@ -1,4 +1,5 @@
 import { createChrome } from './chrome.js';
+import { createTeam, groupLines, sentenceFor, splitChanges, TEAM_CSS, versionHeadline } from './team.js';
 import { keepClearOfTheBar } from './clear-of-the-bar.js';
 import { openDialogsInPlace } from './dialogs-in-place.js';
 import { renderBrandPanel } from './brand.js';
@@ -27,6 +28,8 @@ import { renderShopPanel } from './shop.js';
 import { renderCsvImport, renderNewCollection, renderSearchPanel, renderTableEditor } from './collections-panel.js';
 import { renderImport, undoTheLastImport, UNDO_KEY } from './catalogue.js';
 import { addedWith, describeStructure, hrefTo, newAddedId, orderWith, pageBase, pageOfLink, renderCategoryProducts, renderNewCategory, renderNewPage, renderSectionBrowser } from './pages.js';
+import { menuOrder, renderPagesList, startsOffered } from './pages-list.js';
+import { LEAVE_QUESTION, guardLeaving } from './unsaved.js';
 import { insertionNear, sectionName, sectionUnder, shownSectionLists, shownSections } from './section-inserter.js';
 import { DETAIL_MODE, copiedItemSettings, copiedStyles, copyPageForCard, deletablePage, deletePage, detailAddress, keyMap, linksTo, linksWarning, showOnlyTheDetail } from './card-page.js';
 import { renderChoice } from './choice.js';
@@ -40,7 +43,7 @@ import { addressFromTheRoot } from './site-address.js';
 import { biggestThatFits, howMuchSurvives, inSourcePixels, movedWithin, whatIsThereNow } from './fitting.js';
 import { attrsWorthSending, creditWorthSending } from './only-what-changed.js';
 import { confirm as confirmChange, expectChange, takeExpected } from './verify.js';
-import { apiRequestFor, attributeOf, backgroundImageOf, classListWith, declaredStyleProps, displayedValue, iconNamesIn, isJsonResponse, looksLikeAPicture, orderedIcons, ownTextOf, parseEditKey, requestInit, stylePropsFor, interactiveTarget, nameOfControl, givesUpAfter, ranOutOfTime, WAITS_AT_MOST, wordsEditedElsewhere, PUTS_BACK, worthReverting, shownWords } from './support.js';
+import { apiRequestFor, attributeOf, backgroundImageOf, classListWith, declaredStyleProps, displayedValue, iconNamesIn, isJsonResponse, looksLikeAPicture, orderedIcons, ownTextOf, parseEditKey, requestInit, stylePropsFor, interactiveTarget, nameOfControl, givesUpAfter, ranOutOfTime, WAITS_AT_MOST, wordsEditedElsewhere, PUTS_BACK, worthReverting, shownWords, heardNotSeen } from './support.js';
 
 /**
  * "Keep all of it", as distinct from "no choice was made".
@@ -89,12 +92,24 @@ const bootLiveEdit = () => {
     // change they cannot save. Host-authenticated adapters already decide who
     // may edit, and have no remote session token to ask about.
     let mayEditLocked = true;
+    /*
+     * Whether this person may publish: false only when somebody says so (the session's
+     * `may_publish`, from their grant's "Can publish", or the host's
+     * `liveEditPublishing.mayPublish`). Unknown is allowed, as before; the server decides anyway.
+     */
+    let mayPublish = window.liveEditPublishing?.mayPublish === false ? false : null;
+    const publishRightKnown = new Set();
+    const learnedPublishRight = (value) => {
+        if (value === false) mayPublish = false;
+        publishRightKnown.forEach((tell) => tell());
+    };
     if (api?.base && api?.site && api?.token) {
         mayEditLocked = null;
         fetch(`${String(api.base).replace(/\/$/, '')}/${api.site}/session`, {
             headers: { Accept: 'application/json', Authorization: `Bearer ${api.token}` },
         }).then((response) => response.ok ? response.json() : null).then((payload) => {
             mayEditLocked = payload?.session?.valid ? payload.session.may_edit_locked === true : false;
+            if (payload?.session?.valid) learnedPublishRight(payload.session.may_publish);
         }).catch(() => { mayEditLocked = false; });
     }
 
@@ -171,6 +186,8 @@ const bootLiveEdit = () => {
         // The editor's UI is the package's own overlay in a shadow root, so the
         // host theme's CSS can neither style it nor be broken by it.
         const ui = createChrome();
+        // Team editing (team.js); set once the request helpers exist.
+        let team = null;
         // The site's own fixed things (a phone's Book bar, a cookie notice) lifted clear of the bar while editing.
         keepClearOfTheBar({
             bar: ui.toolbar,
@@ -1091,10 +1108,18 @@ const bootLiveEdit = () => {
          * Dismissing it any other way - the ×, the scrim, Escape - means keep
          * editing, because that is the answer that cannot lose work.
          */
-        const askBeforeLosingIt = () => new Promise((resolve) => {
+        const askBeforeLosingIt = () => askTo({
+            title: 'Discard what you typed?',
+            subtitle: 'Your changes to this element have not been saved.',
+            yes: 'Discard',
+            no: 'Keep editing',
+        });
+
+        /** One question, two answers, drawn in the editor (never a native dialog). Resolves true for `yes`. */
+        const askTo = ({ title, subtitle, yes, no, danger = true }) => new Promise((resolve) => {
             const sheet = ui.modal({
-                title: 'Discard what you typed?',
-                subtitle: 'Your changes to this element have not been saved.',
+                title,
+                subtitle,
                 size: 'is-narrow',
             });
 
@@ -1106,11 +1131,11 @@ const bootLiveEdit = () => {
                 resolve(discard);
             };
 
-            const keep = el('button', 'le-btn-outline', 'Keep editing');
+            const keep = el('button', 'le-btn-outline', no);
             keep.type = 'button';
             keep.addEventListener('click', () => answer(false));
 
-            const drop = el('button', 'le-btn-danger', 'Discard');
+            const drop = el('button', danger ? 'le-btn-danger' : 'le-btn', yes);
             drop.type = 'button';
             drop.addEventListener('click', () => answer(true));
 
@@ -1252,6 +1277,12 @@ const bootLiveEdit = () => {
                 sub.setAttribute('aria-selected', label === name ? 'true' : 'false');
             });
 
+            // A whole panel is one part of the site for team editing.
+            if (name === 'Brand') team?.setCurrent('panel:brand', 'Brand');
+            if (name === 'SEO') team?.setCurrent(`panel:seo:${window.location.pathname}`, 'Search and sharing');
+            if (name === 'Shop') team?.setCurrent('panel:shop', 'Shop');
+            if (name === 'Search') team?.setCurrent(null);
+
             if (name === 'Changes') void renderChanges();
             if (name === 'History') void renderHistory();
             if (name === 'Brand') renderBrand();
@@ -1272,6 +1303,8 @@ const bootLiveEdit = () => {
          * sections the design already has (pages.js). Only where the host
          * hands the editor a page builder (window.liveEditPages).
          */
+        // Set once the editor is drawn (guardLeaving, below); every way out of the page goes through it.
+        let leaving = { leave: (go) => { go(); return Promise.resolve(true); }, allow: () => {} };
         const saveSetting = async (key, value) => {
             await request('/live-edit/setting', {
                 method: 'POST',
@@ -1291,8 +1324,44 @@ const bootLiveEdit = () => {
                 save: saveSetting,
                 go: (href) => {
                     sessionStorage.setItem('tb_editing', '1');
+                    leaving.allow();
                     window.location.href = href;
                 },
+                notify,
+                // Never a checkout, a bag, a brand sheet, a notice or one product as a kind of page (pages-list.js).
+                offer: startsOffered,
+            });
+
+            return handle;
+        };
+
+        /*
+         * Pages (pages-list.js): every page in menu order, with Add page at the top, the way Wix's
+         * "Pages & Menu" lists them. Opening a page from it asks first when something is not saved.
+         */
+        const openPages = () => {
+            if (!window.liveEditPages) return null;
+            if (!document.body.classList.contains('editing')) setEditing(true);
+            const handle = ui.modal({ title: 'Pages', size: 'is-pages' });
+            const builder = window.liveEditPages;
+            // Team editing: the list of pages is one unit ("pages"); a teammate holding it is said once.
+            const held = team?.lockOn('pages');
+            const lockedBy = held && held.holder !== team.you?.id ? (held.name || 'Someone') : null;
+            team?.setCurrent('pages', 'Pages');
+            renderPagesList({
+                lockedBy,
+                ui: handle,
+                config: builder,
+                menu: menuOrder(document, builder.pages ?? [], pageBase(builder, window.location.href)),
+                save: saveSetting,
+                go: (href) => leaving.leave(() => {
+                    sessionStorage.setItem('tb_editing', '1');
+                    // Back on this page (a reload to see the menu), the list opens again.
+                    try { if (href === window.location.href) sessionStorage.setItem('le-open-pages', '1'); } catch { /* a convenience */ }
+                    window.location.href = href;
+                }),
+                addPage: () => { handle.close(); openNewPage(); },
+                ask: askTo,
                 notify,
             });
 
@@ -1893,9 +1962,9 @@ const bootLiveEdit = () => {
 
             drawerFields.replaceChildren();
 
-            changes.forEach((change) => {
+            const rowFor = (change) => {
                 const row = document.createElement('div');
-                row.className = 'le-change';
+                row.className = change.mine === false ? 'le-change is-others' : 'le-change';
 
                 const head = document.createElement('div');
                 head.className = 'le-row le-change-head';
@@ -1912,12 +1981,18 @@ const bootLiveEdit = () => {
                 head.append(label, revert);
                 row.append(head);
 
+                // Whose it is and where, once more than one person is working.
+                if (change.author_name && teamShown) {
+                    const who = document.createElement('p');
+                    who.className = 'le-change-who';
+                    who.textContent = [change.mine === false ? change.author_name : 'You', change.unit_label ? `in ${change.unit_label}` : ''].filter(Boolean).join(' ');
+                    row.append(who);
+                }
+
                 if (isAPictureChange(change)) {
                     row.append(picturesChanged(change));
 
-                    drawerFields.append(row);
-
-                    return;
+                    return row;
                 }
 
                 // The old words struck through, the new ones under them. A
@@ -1934,8 +2009,41 @@ const bootLiveEdit = () => {
                 after.textContent = arrangement(change)?.after ?? (readsOnThePageAs(change) || '(empty)');
                 row.append(after);
 
-                drawerFields.append(row);
-            });
+                return row;
+            };
+
+            /*
+             * Team editing: what goes live when this person publishes, and
+             * everybody else's, by name. One person alone sees the list as it
+             * always was.
+             */
+            const { yours, others } = splitChanges(changes);
+            const teamShown = others.size > 0;
+
+            if (!teamShown) {
+                changes.forEach((change) => drawerFields.append(rowFor(change)));
+
+                return;
+            }
+
+            const heading = (text, sub = null) => {
+                drawerFields.append(el('p', 'le-team-head', text));
+                if (sub) drawerFields.append(el('p', 'le-team-sub', sub));
+            };
+
+            heading('Your changes', yours.length ? 'These go live when you publish.' : 'You have no unpublished changes.');
+            yours.forEach((change) => drawerFields.append(rowFor(change)));
+
+            heading("Others' changes (not included)", 'They go live when each person publishes their own.');
+            for (const [name, theirs] of others) {
+                drawerFields.append(el('p', 'le-team-sub', `${name}: ${theirs.length} change${theirs.length === 1 ? '' : 's'}`));
+                theirs.forEach((change) => {
+                    const row = rowFor(change);
+                    // Putting back a teammate's change is theirs to do, or an admin's.
+                    if (!team?.mayManage()) row.querySelector('.le-chip-btn')?.remove();
+                    drawerFields.append(row);
+                });
+            }
         };
 
         const trim = (value) => {
@@ -2156,6 +2264,47 @@ const bootLiveEdit = () => {
 
         let historyPage = 1;
 
+        /*
+         * Taking back one published version, and only that one.
+         *
+         * Says whose work it undoes before it does it, and what it will leave
+         * because somebody changed it again since, so one person's rollback
+         * never quietly takes away another person's work.
+         */
+        const undoVersion = async (version, button) => {
+            const by = version.published_by ? `${version.published_by}'s` : 'the';
+            const sheet = ui.modal({ title: `Undo ${by} changes from version ${version.number}?`, subtitle: 'Only what that publish changed is put back. Anything somebody changed again since is left as it is.', size: 'is-narrow is-fit' });
+            const list = el('div', 'le-version-lines');
+            for (const group of groupLines(version.lines ?? [])) {
+                list.append(el('p', 'le-version-group', group.label));
+                group.lines.forEach((line) => list.append(el('p', 'le-version-line', sentenceFor(line, team?.you?.id ?? null))));
+            }
+            sheet.body.append(list);
+            sheet.foot.hidden = false;
+            const keep = el('button', 'le-btn-outline', 'Keep them');
+            keep.type = 'button';
+            keep.addEventListener('click', () => sheet.close());
+            const go = el('button', 'le-btn-publish', 'Undo and publish');
+            go.type = 'button';
+            go.addEventListener('click', async () => {
+                go.disabled = true;
+                go.textContent = 'Undoing\u2026';
+                try {
+                    const response = await request(`/live-edit/versions/${version.number}/undo`, { method: 'POST' });
+                    const result = await response.json();
+                    sheet.close();
+                    const kept = (result.kept ?? []).length;
+                    reloadWithToast(kept ? `Undone. ${kept} change${kept === 1 ? ' was' : 's were'} kept because someone changed ${kept === 1 ? 'it' : 'them'} again later.` : 'Undone \u2713');
+                } catch (error) {
+                    go.disabled = false;
+                    go.textContent = 'Try again';
+                    sheet.body.replaceChildren(note(plainly(error, 'undo that')));
+                }
+            });
+            sheet.foot.append(keep, go);
+            button.blur();
+        };
+
         const renderHistory = async () => {
             drawerFields.replaceChildren(note('Loading…'));
 
@@ -2196,15 +2345,41 @@ const bootLiveEdit = () => {
                 const text = document.createElement('div');
                 const what = document.createElement('p');
                 what.className = 'le-change-after';
-                what.textContent = version.restored_from
-                    ? `Restored version ${version.restored_from}`
-                    : `Published ${version.changes ?? 0} change${version.changes === 1 ? '' : 's'}`;
+                // Who, and what: "Ada published 2 changes", newest first.
+                what.textContent = versionHeadline(version, team?.you?.id ?? null);
 
                 const when = document.createElement('p');
                 when.className = 'le-change-when';
                 when.textContent = ago(version.published_at);
 
                 text.append(what, when);
+
+                /*
+                 * Each change under the section it was in, with who made it:
+                 * "Ada changed the headline in Hero". A version recorded
+                 * before team editing has no lines and reads as it always did.
+                 */
+                if ((version.lines ?? []).length > 0) {
+                    const lines = document.createElement('div');
+                    lines.className = 'le-version-lines';
+                    for (const group of groupLines(version.lines)) {
+                        lines.append(el('p', 'le-version-group', group.label));
+                        group.lines.forEach((line) => lines.append(el('p', 'le-version-line', sentenceFor(line, team?.you?.id ?? null))));
+                    }
+                    text.append(lines);
+
+                    // Undo this one publish, and nobody else's work since.
+                    const undoneBy = versions.find((later) => later.undoes === version.number);
+                    if (undoneBy) {
+                        text.append(el('p', 'le-change-who', `Undone in version ${undoneBy.number}${undoneBy.published_by ? ` by ${undoneBy.published_by}` : ''}`));
+                    } else if (!version.undoes && !version.restored_from && version.changes > 0) {
+                        const undo = el('button', 'le-chip-btn le-version-undo', 'Undo these changes');
+                        undo.type = 'button';
+                        undo.addEventListener('click', () => void undoVersion(version, undo));
+                        text.append(undo);
+                    }
+                }
+
                 row.append(dot, text);
                 drawerFields.append(row);
             });
@@ -2577,7 +2752,13 @@ const bootLiveEdit = () => {
             window.location.reload();
         };
 
-        const request = async (url, options) => {
+        const request = async (url, rawOptions) => {
+            // Team editing: a change says which part of the page it is in, so
+            // the server can keep one person per section (team.js).
+            const writes = rawOptions?.method && rawOptions.method !== 'GET';
+            const options = writes && team?.available
+                ? { ...rawOptions, headers: { ...team.headers(), ...(rawOptions.headers ?? {}) } }
+                : rawOptions;
             // Same-origin with a session cookie on a Laravel page; the content
             // API with a bearer key when the editor is running inside a site
             // this application does not serve.
@@ -2630,6 +2811,14 @@ const bootLiveEdit = () => {
                 // page copied, key by key), which waits out a "too many" rather than stopping halfway.
                 refused.status = response.status;
                 refused.retryAfter = Number(data.error?.retry_after ?? response.headers?.get?.('Retry-After')) || null;
+                // Somebody else is working on this part of the page: show who,
+                // rather than "Could not save".
+                if (response.status === 409 && data.error?.type === 'section_locked') {
+                    refused.lock = data.error.lock ?? null;
+                    refused.reason = data.error.reason ?? 'locked';
+                    refused.sectionLocked = true;
+                    team?.refused(refused);
+                }
                 throw refused;
             }
             if (!isJsonResponse(response)) {
@@ -2638,6 +2827,32 @@ const bootLiveEdit = () => {
 
             return response;
         };
+
+        /*
+         * Team editing: one person per section (team.js). Only over the
+         * content API, where the server keeps the locks; a site keeping its
+         * own content answers 404 and the layer stays out of the way.
+         */
+        const teamSend = async (path, options = {}) => {
+            const api = window.liveEditApi;
+            const mapped = apiRequestFor(path, options, api);
+
+            return fetch(mapped.url, { ...mapped.init, signal: givesUpAfter(15000) });
+        };
+        team = window.liveEditApi?.token
+            ? createTeam({
+                send: teamSend,
+                ui,
+                isEditing: () => document.body.classList.contains('editing'),
+                onChanged: ({ reload } = {}) => { if (reload) reloadWithToast('Done \u2713'); },
+            })
+            : null;
+        if (team) {
+            const teamStyle = document.createElement('style');
+            teamStyle.textContent = TEAM_CSS;
+            ui.shadow?.append(teamStyle);
+            void team.start();
+        }
 
         /**
          * What the page should show once this save has been applied.
@@ -4229,9 +4444,30 @@ const bootLiveEdit = () => {
          * The same on every page: a page the design came with takes sections
          * just as a page the owner made does.
          */
+        /*
+         * Team editing: a page's arrangement (its sections added, moved, taken off) is one unit,
+         * "arrangement:<page>". When a teammate holds it, say who before anything is chosen,
+         * rather than letting the save be refused afterwards. Returns true when it is free.
+         */
+        const arrangementIsFree = () => {
+            const key = window.liveEditPages?.structureKey ?? '';
+            if (!team || !key.startsWith('structure:page:')) return true;
+            const unit = `arrangement:${key.slice('structure:page:'.length)}`;
+            team.setCurrent(unit, 'Page layout');
+            const held = team.lockOn(unit);
+            if (held && held.holder !== team.you?.id) {
+                team.explain(held);
+
+                return false;
+            }
+
+            return true;
+        };
+
         const openSectionPicker = ({ list, after = null }) => {
             const builder = window.liveEditPages;
             if (!canAddSections() || !list?.dataset?.editList) return null;
+            if (!arrangementIsFree()) return null;
             const below = after ? [...list.children].find((child) => child.dataset.editItem === after) : null;
             const where = below ? `below “${sectionName(below)}”` : shownSections(list).length ? 'at the end of this page' : 'on this page';
             const handle = ui.modal({ title: 'Add a section', subtitle: `It goes ${where}. Point at one to see it.`, size: 'is-wide' });
@@ -4405,6 +4641,7 @@ const bootLiveEdit = () => {
                     remove.className = 'le-btn-danger';
                     remove.textContent = 'Remove this section';
                     remove.addEventListener('click', async () => {
+                        if (!arrangementIsFree()) return;
                         if (!window.confirm('Remove this section and what you wrote in it?')) return;
                         try {
                             await saveSetting(builder.structureKey, addedWith(builder.added, addedId, null));
@@ -4679,6 +4916,7 @@ const bootLiveEdit = () => {
                 addStyleFields(key, props, styleOn);
             }
 
+            appendHeardNotSeen(element);
             // A page's sections list is the whole page: its sections are listed instead (appendListControls).
             if (element.dataset?.editListKind !== 'sections') appendContents(element);
             if (inTable) appendTableControls(element);
@@ -4699,6 +4937,30 @@ const bootLiveEdit = () => {
          * it calls the thing: the name it gives a screen reader, then the
          * brand in its own icon class.
          */
+        /*
+         * Words a screen reader says for this (", home" on a logo link), which the page keeps hidden while
+         * editing: offered here, named for what they are, each opening its own field.
+         */
+        const appendHeardNotSeen = (element) => {
+            const spoken = [...element.querySelectorAll('[data-edit]')].filter((node) => heardNotSeen(node) && node.textContent.trim() !== '');
+            if (!spoken.length || heardNotSeen(element)) return;
+            const heading = document.createElement('div');
+            heading.className = 'le-section-heading';
+            heading.textContent = 'Read aloud by screen readers';
+            const row = document.createElement('div');
+            row.className = 'le-row';
+            spoken.slice(0, 6).forEach((node) => {
+                const button = document.createElement('button');
+                button.type = 'button';
+                button.className = 'le-chip-btn';
+                button.textContent = `“${node.textContent.replace(/\s+/g, ' ').trim().slice(0, 40)}”`;
+                button.setAttribute('aria-label', `Change what screen readers say: ${node.textContent.trim()}`);
+                button.addEventListener('click', () => switchToNode(node));
+                row.append(button);
+            });
+            drawerFields.append(heading, row);
+        };
+
         const nameInside = (node) => {
             const words = (ownTextOf(node) || node.textContent || '').replace(/\s+/g, ' ').trim();
 
@@ -6145,6 +6407,10 @@ const bootLiveEdit = () => {
         } catch { /* nothing to open again */ }
 
         const openTarget = ({ element, kind, field = null }) => {
+            // A section a teammate is working on does not open; it says who.
+            if (team && !team.beforeEdit(element, { onRefused: () => closeDrawer(true) })) return;
+            // What the change is called in History; never a reason not to open the panel.
+            try { team?.setWhat(describeElement(element)); } catch { /* named later, or not at all */ }
             if (kind === 'form') {
                 openFormBuilder(element, field);
 
@@ -6593,8 +6859,35 @@ const bootLiveEdit = () => {
             }
         });
 
+        /*
+         * Unsaved changes (unsaved.js, CONVENTIONS.md change 4): the panel's words not saved, or a Brand
+         * or SEO panel whose Save is waiting. Closing the tab or reloading gets the browser's own
+         * question; leaving from inside the editor gets ours, "You have unsaved changes. Leave without
+         * saving?", Leave or Stay. Nothing is asked when nothing is unsaved.
+         */
+        function anythingUnsaved() {
+            if (current?.dirty) return true;
+
+            return [...ui.shadow.querySelectorAll('.le-drawer.is-open :is(.le-brand-actions, .le-seo-actions) .le-btn:not(:disabled)')]
+                .some((button) => button.getClientRects().length > 0);
+        }
+        function askLeaving() {
+            return askTo({ title: LEAVE_QUESTION.title, subtitle: LEAVE_QUESTION.subtitle, yes: LEAVE_QUESTION.leave, no: LEAVE_QUESTION.stay });
+        }
+        leaving = guardLeaving({ win: window, isUnsaved: anythingUnsaved, ask: askLeaving, roots: [document, ui.shadow] });
+
         toggleButton?.addEventListener('click', () => {
             const enteringEditMode = !document.body.classList.contains('editing');
+            // Closing the editor with a panel not saved: asked, as leaving is (unsaved.js).
+            if (!enteringEditMode && anythingUnsaved()) {
+                askLeaving().then((yes) => {
+                    if (!yes) return;
+                    closeDrawer(true);
+                    setEditing(false);
+                });
+
+                return;
+            }
             setEditing(enteringEditMode);
             if (enteringEditMode) startWalkthrough();
         });
@@ -6612,7 +6905,19 @@ const bootLiveEdit = () => {
             openDrawer();
         });
 
-        ui.pagesButton?.addEventListener('click', () => { openNewPage(); });
+        // Pages first, as Wix and Squarespace have it; a page with something unsaved in the panel asks before it goes.
+        ui.pagesButton?.addEventListener('click', () => {
+            if (!current?.dirty) {
+                openPages();
+
+                return;
+            }
+            askLeaving().then((yes) => {
+                if (!yes) return;
+                closeDrawer(true);
+                openPages();
+            });
+        });
 
         ui.changesButton?.addEventListener('click', () => {
             // Somebody asking what they have changed is asking about editing,
@@ -6756,7 +7061,7 @@ const bootLiveEdit = () => {
                     publishStep,
                 ],
                 pages: [
-                    { point: () => inBar('pagesButton'), title: 'Add a page', copy: 'Press New page, start from a page your design already has, give it a name, and it opens ready to edit.' },
+                    { point: () => inBar('pagesButton'), title: 'Add a page', copy: 'Press Pages to see every page in menu order. Add page starts one from a page your design already has: give it a name, and it opens ready to edit.' },
                 ],
                 languages: [
                     { point: () => (ui.languagePicker && !ui.languagePicker.hidden ? ui.languagePicker : null), title: 'Choose a language', copy: 'Pick the language you are editing. Each language keeps its own words.' },
@@ -7075,7 +7380,23 @@ const bootLiveEdit = () => {
                 ui.publishButton.title = pending > 0
                     ? `Put ${pending} change${pending === 1 ? '' : 's'} live`
                     : 'Nothing is waiting to be published';
+                /*
+                 * Somebody whose grant does not include "Can publish": the familiar "submit for
+                 * review" (WordPress's Contributor, Google Docs' suggesting) instead of a Publish
+                 * that the server refuses with "Could not publish… try again in a moment".
+                 */
+                ui.publishButton.classList.toggle('is-for-review', mayPublish === false);
+                ui.publishButton.removeAttribute('aria-label');
+                if (mayPublish === false && pending > 0) {
+                    // "Ask to publish", or "Review" where the bar is folded on a phone; one name for both.
+                    const long = el('span', 'le-review-long', 'Ask to publish');
+                    const short = el('span', 'le-review-short', 'Review');
+                    ui.publishLabel.replaceChildren(long, short);
+                    ui.publishButton.setAttribute('aria-label', `Ask to publish, ${pending} change${pending === 1 ? '' : 's'} saved`);
+                    ui.publishButton.title = `${pending} change${pending === 1 ? ' is' : 's are'} saved. Someone who can publish puts them live.`;
+                }
             };
+            publishRightKnown.add(showPending);
             document.addEventListener('live-edit:pending', (event) => {
                 if (typeof event.detail?.pending !== 'number') return;
                 pending = event.detail.pending;
@@ -7162,10 +7483,11 @@ const bootLiveEdit = () => {
                     const response = await request('/live-edit/changes', { method: 'GET' });
                     const payload = await response.json();
                     const changes = payload?.changes ?? [];
+                    // Team editing: only your own go live; others' wait for them.
+                    const { yours, others } = splitChanges(changes);
 
                     const list = el('div', 'le-review');
-
-                    changes.forEach((change) => {
+                    const reviewRow = (change) => {
                         const row = el('div', 'le-review-row');
                         row.append(
                             // The same words the Changes tab uses, so the list
@@ -7174,18 +7496,55 @@ const bootLiveEdit = () => {
                             el('div', 'le-review-what', labelForChange(change)),
                             el('div', 'le-review-to', readsOnThePageAs(change) || '(empty)'),
                         );
-                        list.append(row);
-                    });
 
-                    sheet.body.replaceChildren(changes.length > 0 ? list : note('Nothing is waiting.'));
+                        return row;
+                    };
+
+                    if (others.size === 0) {
+                        changes.forEach((change) => list.append(reviewRow(change)));
+                        sheet.body.replaceChildren(changes.length > 0 ? list : note('Nothing is waiting.'));
+                    } else {
+                        const mine = yours.length;
+                        sheet.title(`Publish your ${mine} change${mine === 1 ? '' : 's'}`);
+                        list.append(el('p', 'le-team-head', 'Your changes (these go live when you publish)'));
+                        yours.forEach((change) => list.append(reviewRow(change)));
+                        if (mine === 0) list.append(note('You have no unpublished changes.'));
+                        list.append(el('p', 'le-team-head', "Others' changes (not included)"));
+                        for (const [name, theirs] of others) {
+                            list.append(el('p', 'le-team-sub', `${name}: ${theirs.length} change${theirs.length === 1 ? '' : 's'}${theirs[0]?.unit_label ? ` in ${[...new Set(theirs.map((c) => c.unit_label).filter(Boolean))].join(', ')}` : ''}. They go live when ${name} publishes.`));
+                        }
+                        sheet.body.replaceChildren(list);
+                        go.disabled = mine === 0;
+                    }
                 } catch (error) {
                     sheet.body.replaceChildren(note(plainly(error, 'list what is waiting')));
                 }
 
             };
 
+            /* What publishing means for somebody who may not: saved, and an admin puts it live. */
+            const explainReview = () => {
+                const sheet = ui.modal({
+                    title: 'Ask an admin to publish',
+                    subtitle: `Your ${pending === 1 ? 'change is' : `${pending} changes are`} saved. Your account can edit this website but not publish it, so visitors see ${pending === 1 ? 'it' : 'them'} once someone who can publish puts ${pending === 1 ? 'it' : 'them'} live.`,
+                    size: 'is-narrow',
+                });
+                const ok = el('button', 'le-btn', 'OK');
+                ok.type = 'button';
+                ok.addEventListener('click', () => sheet.close());
+                sheet.foot.hidden = false;
+                sheet.foot.append(ok);
+                ok.focus();
+            };
+
             ui.publishButton.addEventListener('click', () => {
                 if (pending === 0) return;
+                if (mayPublish === false) {
+                    document.activeElement?.blur?.();
+                    explainReview();
+
+                    return;
+                }
 
                 // Whatever is being typed right now counts as a change, and
                 // it is not saved until the box loses focus.
@@ -7782,6 +8141,10 @@ const bootLiveEdit = () => {
             let back = null;
             try { back = sessionStorage.getItem('le-open-tab'); sessionStorage.removeItem('le-open-tab'); } catch { /* a convenience */ }
             if (back === 'Search' && drawerTabs.Search) { showTab('Search'); openDrawer(); }
+            // Back from "Reload to see it" in Pages: the list, where the owner was.
+            let pagesAgain = false;
+            try { pagesAgain = sessionStorage.getItem('le-open-pages') === '1'; sessionStorage.removeItem('le-open-pages'); } catch { /* a convenience */ }
+            if (pagesAgain && window.liveEditPages) openPages();
         }
         if (!detailMode && !directPanelOpen && document.body.classList.contains('editing')) startWalkthrough();
     }

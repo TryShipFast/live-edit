@@ -27,6 +27,10 @@ use ShipFast\LiveEdit\Domain\Credits\Credits;
 use ShipFast\LiveEdit\Domain\Site\Ability;
 use ShipFast\LiveEdit\Domain\Site\Meter;
 use ShipFast\LiveEdit\Domain\Site\OverLimit;
+use ShipFast\LiveEdit\Domain\Team\LockRefused;
+use ShipFast\LiveEdit\Domain\Team\Person;
+use ShipFast\LiveEdit\Domain\Team\SectionLocks;
+use ShipFast\LiveEdit\Domain\Team\TeamWrite;
 use ShipFast\LiveEdit\Http\Api\ApiContext;
 use ShipFast\LiveEdit\Models\Draft;
 use ShipFast\LiveEdit\Models\Version;
@@ -48,6 +52,9 @@ class ContentController
         $payload = $read($site, $locale, $editing);
 
         if ($editing) {
+            // What pressing Publish will put live: this person's own changes.
+            $payload['pending'] = $this->yours($request, $payload['pending'] ?? 0);
+
             // Never cached, by anything. This is one person's unfinished work,
             // and a cache that kept it would serve a half-typed sentence to
             // the next visitor.
@@ -81,7 +88,7 @@ class ContentController
             'locale' => $payload['locale'],
             // So an editor can be offered a way to release held work rather
             // than being left to wonder where it went.
-            'pending' => $payload['pending'] ?? 0,
+            'pending' => $editing ? $this->yours($request, $payload['pending'] ?? 0) : ($payload['pending'] ?? 0),
             // What a consumer should key a cache on. A version alone is not
             // enough: a site with publishing off changes its words without
             // moving one.
@@ -108,7 +115,10 @@ class ContentController
                 ApiContext::token($request),
                 $validated['key'],
                 $validated['props'],
+                TeamWrite::fromRequest($request, ApiContext::token($request)),
             );
+        } catch (LockRefused $refused) {
+            return response()->json($refused->toArray(), 409);
         } catch (ValidationException $e) {
             return response()->json([
                 'error' => [
@@ -140,7 +150,12 @@ class ContentController
                 $validated['key'],
                 $validated['value'] ?? '',
                 $validated['locale'] ?? null,
+                TeamWrite::fromRequest($request, ApiContext::token($request)),
             );
+        } catch (LockRefused $refused) {
+            // Somebody else is working on this part of the site. Plain words,
+            // and who, so the editor can say "Ada is editing this section".
+            return response()->json($refused->toArray(), 409);
         } catch (ValidationException $e) {
             return response()->json([
                 'error' => [
@@ -196,7 +211,7 @@ class ContentController
     public function publish(Request $request, PublishSite $publish): JsonResponse
     {
         try {
-            return response()->json($publish(ApiContext::site($request)));
+            return response()->json($publish(ApiContext::site($request), Person::fromToken(ApiContext::token($request))));
         } catch (OverLimit $e) {
             return self::overLimit($e);
         }
@@ -265,7 +280,23 @@ class ContentController
                     'number' => $v->number,
                     'changes' => $v->changes,
                     'restored_from' => $v->restored_from,
+                    'undoes' => $v->undoes,
                     'published_at' => $v->created_at?->toIso8601String(),
+                    // Who pressed Publish, and what each change was and who
+                    // made it, for History ("Ada changed the headline in Hero").
+                    'published_by' => $v->published_by,
+                    'published_by_id' => $v->published_by_id,
+                    'lines' => collect((array) $v->summary)->map(fn (array $entry) => [
+                        'key' => $entry['key'] ?? null,
+                        'kind' => $entry['kind'] ?? 'setting',
+                        'unit' => $entry['unit'] ?? null,
+                        'label' => $entry['label'] ?? null,
+                        'author' => $entry['author'] ?? null,
+                        'author_name' => $entry['author_name'] ?? null,
+                        'what' => $entry['what'] ?? null,
+                        'undid' => (bool) ($entry['undid'] ?? false),
+                        'list' => ListChanges::describeList($entry['after'] ?? null, $entry['before'] ?? null),
+                    ])->values()->all(),
                     'url' => $snapshot->url($v->number),
                 ])->all(),
         ]);
@@ -280,7 +311,24 @@ class ContentController
     {
         $validated = $request->validate(['version' => ['required', 'integer', 'min:1']]);
 
-        $changed = (new SiteStore(ApiContext::site($request)))->restore((int) $validated['version']);
+        $site = ApiContext::site($request);
+        $person = Person::fresh(ApiContext::token($request));
+
+        // Putting the whole site back takes back everybody's published work,
+        // so it is for an admin or the owner, and only through the API: History
+        // offers "Undo these changes" on one version instead.
+        if (! $person->mayManage()) {
+            return response()->json(['error' => [
+                'type' => 'forbidden',
+                'message' => 'Only an admin can put the whole website back to an earlier version.',
+            ]], 403);
+        }
+
+        // Whose published work going back undoes, said before it is gone.
+        $undoes = Version::query()->where('site_id', $site->id)->where('number', '>', (int) $validated['version'])
+            ->whereNotNull('published_by')->distinct()->pluck('published_by')->values()->all();
+
+        $changed = (new SiteStore($site))->restore((int) $validated['version'], $person);
 
         if ($changed === null) {
             return response()->json([
@@ -288,7 +336,28 @@ class ContentController
             ], 404);
         }
 
-        return response()->json(['restored_from' => (int) $validated['version'], 'changed' => $changed]);
+        return response()->json(['restored_from' => (int) $validated['version'], 'changed' => $changed, 'undoes_work_of' => $undoes]);
+    }
+
+    /**
+     * Take back what one version changed, and nothing else.
+     *
+     * A restore puts the whole site back as it was; this undoes one person's
+     * publish and leaves everybody else's, which is what a team needs. Keys
+     * somebody changed again later are left alone and listed, so nothing is
+     * silently thrown away.
+     */
+    public function undo(Request $request, string $site, int $number): JsonResponse
+    {
+        $result = (new SiteStore(ApiContext::site($request)))->undoVersion($number, Person::fromToken(ApiContext::token($request)));
+
+        if ($result === null) {
+            return response()->json([
+                'error' => ['type' => 'not_found', 'message' => 'There is no such version for this site.'],
+            ], 404);
+        }
+
+        return response()->json($result)->withHeaders(['Cache-Control' => 'no-store']);
     }
 
     /**
@@ -529,7 +598,7 @@ class ContentController
      */
     public function changes(Request $request, ListChanges $changes): JsonResponse
     {
-        return response()->json($changes(ApiContext::site($request)))
+        return response()->json($changes(ApiContext::site($request), Person::fromToken(ApiContext::token($request))))
             // One person's unfinished work. Nothing may hold it, anywhere.
             ->withHeaders(['Cache-Control' => 'no-store, private']);
     }
@@ -550,12 +619,33 @@ class ContentController
         ]);
 
         $site = ApiContext::site($request);
+        $person = Person::fresh(ApiContext::token($request));
 
-        $removed = Draft::query()
+        $drafts = Draft::query()
             ->where('site_id', $site->id)
             ->where('subject', $validated['key'])
             ->when($validated['kind'] ?? null, fn ($query, $kind) => $query->where('kind', $kind))
-            ->delete();
+            ->get();
+
+        // Only your own changes; an admin (or the owner) may put back anybody's.
+        $mine = (new SiteStore($site))->ownedBy($person, $drafts);
+
+        if ($mine->count() < $drafts->count() && ! $person->mayManage()) {
+            $other = $drafts->first(fn (Draft $d) => ! $mine->contains('id', $d->id));
+
+            return response()->json(['error' => [
+                'type' => 'section_locked',
+                'message' => ($other?->author_name ?: 'A teammate').' made that change. Only they, or an admin, can put it back.',
+            ]], 409);
+        }
+
+        $removed = $person->mayManage()
+            ? Draft::query()->whereIn('id', $drafts->pluck('id'))->delete()
+            : Draft::query()->whereIn('id', $mine->pluck('id'))->delete();
+
+        if ($removed > 0) {
+            (new SectionLocks($site))->moved();
+        }
 
         return response()->json(['reverted' => $removed > 0])
             ->withHeaders(['Cache-Control' => 'no-store, private']);
@@ -677,6 +767,24 @@ class ContentController
         $result = $export(ApiContext::site($request), $validated['html'], $validated['page'] ?? '');
 
         return response()->json($result)->withHeaders(['Cache-Control' => 'no-store, private']);
+    }
+
+    /**
+     * How many unpublished changes are this person's (team editing): the
+     * Publish button's count. Everything, for the website itself, which is
+     * the count it always was.
+     */
+    private function yours(Request $request, int $all): int
+    {
+        $person = Person::fromToken(ApiContext::token($request));
+
+        if (! $person->isSomeone() || $all === 0) {
+            return $all;
+        }
+
+        $site = ApiContext::site($request);
+
+        return (new SiteStore($site))->ownedBy($person, Draft::query()->where('site_id', $site->id)->get())->count();
     }
 
     private function locale(Request $request): ?string

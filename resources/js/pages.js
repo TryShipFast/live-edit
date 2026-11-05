@@ -258,6 +258,18 @@ export function describeStructure(key, before, after, { library = [], pages = []
         };
     }
 
+    // The design's own pages the owner deleted (the Pages list's Delete): named, not printed as addresses.
+    if (key === 'structure:removed') {
+        const named = (value) => (Array.isArray(parsed(value, [])) ? parsed(value, []) : []).map((id) => (pages.find((page) => page.id === id) ?? {}).title ?? `/${id}`);
+        const was = named(before);
+        const now = named(after);
+        const gone = now.filter((title) => !was.includes(title));
+        const back = was.filter((title) => !now.includes(title));
+        const said = [gone.length ? `Deleted the page ${listed(gone)}` : '', back.length ? `Brought back ${listed(back)}` : ''].filter(Boolean).join('. ');
+
+        return { label: 'Deleted pages', before: was.length ? listed(was) : 'None', after: said || (now.length ? listed(now) : 'None') };
+    }
+
     if (!String(key ?? '').startsWith('structure:page:')) return null;
 
     const id = key.slice('structure:page:'.length);
@@ -500,10 +512,11 @@ function thumbnail(href, title, names = []) {
  * `ui` is the editor's modal handle (chrome.js `modal()`); `save(key, value)`
  * saves one setting; `go(href)` opens the page just made.
  */
-export function renderNewPage({ ui, config, save, go, notify }) {
+export function renderNewPage({ ui, config, save, go, notify, offer = startingPoints }) {
     const library = config.library ?? [];
     const taken = config.taken ?? [];
-    const kinds = startingPoints(config);
+    // `offer` narrows the kinds (pages-list.js startsOffered: never a checkout, a brand sheet or one product).
+    const kinds = offer(config);
     // A page's own copy of a section (shop-headphones.intro) is named as the library names it (Page heading).
     const likeOf = new Map(kinds.flatMap((kind) => kind.own.map((own, i) => [own, kind.sections[i]])));
     const nameOf = (from) => labelOf(library, likeOf.get(from) ?? from);

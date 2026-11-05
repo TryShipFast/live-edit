@@ -41,7 +41,7 @@ test('typed words show on the page, the footer says they are unsaved, and Cancel
     await ui(page).locator('.le-drawer textarea').first().fill('Neroli, cedar and rain');
     await expect(notes).toHaveText('Neroli, cedar and rain');
     await expect(ui(page).locator('.le-foot-status')).toHaveText('Unsaved changes');
-    await ui(page).getByRole('button', { name: 'Cancel' }).click();
+    await ui(page).getByRole('button', { name: 'Discard' }).click();
     const discard = ui(page).locator('.le-modal').getByRole('button').filter({ hasText: /discard|leave|close/i }).first();
     if (await discard.isVisible().catch(() => false)) await discard.click();
     await expect(notes).toHaveText('Neroli and cedar');

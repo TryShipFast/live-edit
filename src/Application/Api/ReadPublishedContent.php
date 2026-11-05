@@ -2,6 +2,8 @@
 
 namespace ShipFast\LiveEdit\Application\Api;
 
+use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Str;
 use ShipFast\LiveEdit\Domain\Content\SiteSnapshot;
 use ShipFast\LiveEdit\Domain\Content\SiteStore;
 use ShipFast\LiveEdit\Domain\Site\Site;
@@ -29,6 +31,49 @@ class ReadPublishedContent
     public function __invoke(Site $site, ?string $locale = null, bool $includeDrafts = false): array
     {
         $locale ??= (string) config('live-edit.default_locale', 'en');
+
+        /*
+         * What visitors read, remembered for a few seconds.
+         *
+         * Every page view of a site we host asks for this with the public key,
+         * and it was five queries and a file read each time, the same answer
+         * for everybody. It is held no longer than the pointer is already
+         * allowed to be cached by a browser or CDN (pointer_seconds, at most
+         * ten), so nothing is promised that was not promised before, and a
+         * publish, restore or undo forgets it at once (forget()). The editor's
+         * own read, with drafts, is never remembered.
+         */
+        if (! $includeDrafts) {
+            $seconds = min(10, max(0, (int) config('live-edit.api.cache.pointer_seconds', 30)));
+
+            if ($seconds > 0) {
+                return Cache::remember(
+                    'live-edit.read.'.$site->id.'.'.$locale.'.'.self::generation($site),
+                    $seconds,
+                    fn () => $this->read($site, $locale, false),
+                );
+            }
+        }
+
+        return $this->read($site, $locale, $includeDrafts);
+    }
+
+    /** Forget what visitors were being served, so the next read is fresh. Called whenever what is live changes. */
+    public static function forget(Site $site): void
+    {
+        Cache::forever('live-edit.read.gen.'.$site->id, Str::random(10));
+    }
+
+    private static function generation(Site $site): string
+    {
+        return (string) Cache::rememberForever('live-edit.read.gen.'.$site->id, fn () => Str::random(10));
+    }
+
+    /**
+     * @return array{version: int|null, locale: string, pending: int, settings: array<string, string>, styles: array<string, mixed>}
+     */
+    private function read(Site $site, string $locale, bool $includeDrafts): array
+    {
         $store = new SiteStore($site);
 
         // The published state is read from the last snapshot rather than from

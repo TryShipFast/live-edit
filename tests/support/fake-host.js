@@ -131,6 +131,27 @@ export const DESIGN = {
     'journal/salt-air': { title: 'Salt air', html: page('Salt air', post('salt-air', 'Salt air')) },
 };
 
+/**
+ * More of a real site, for the Pages list (pagesList): an About page the menu links, and the pages a
+ * site needs but nobody puts in a menu (its checkout, its brand sheet, its privacy notice).
+ */
+export const MORE_PAGES = {
+    about: { title: 'About', html: page('About', `
+<main>
+  <section data-instance="about.story" data-component="core.story" data-label="Our story">
+    <h1 data-edit="text">About us</h1>
+    <p data-edit="text">Small batches, since 2019.</p>
+  </section>
+</main>`, '../') },
+    checkout: { title: 'Checkout', html: page('Checkout', '<main><section data-instance="checkout.form" data-component="shop.checkout" data-label="Checkout"><h1 data-edit="text">Checkout</h1></section></main>', '../') },
+    brand: { title: 'brand', html: page('brand', '<main><section data-instance="brand.sheet" data-component="core.brand" data-label="Brand"><h1 data-edit="text">Brand</h1></section></main>', '../') },
+    privacy: { title: 'Privacy', html: page('Privacy', '<main><section data-instance="privacy.notice" data-component="core.legal" data-label="Privacy"><h1 data-edit="text">Privacy</h1></section></main>', '../') },
+};
+
+/** What a template does with words only a screen reader hears (car-wash-auto): shown small while editing. */
+const SCREEN_READER_CSS = '<style>.visually-hidden{position:absolute;width:1px;height:1px;margin:-1px;padding:0;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;border:0}'
+    + 'body.editing .visually-hidden[data-edit]{position:static;width:auto;height:auto;margin:0;clip:auto;white-space:normal;font-size:12px;opacity:.75}</style>';
+
 /** A contact page with a form an owner shapes (Forms the owner shapes), drawn only for a host that hands the builder over. */
 export const FORM_PAGE = {
     title: 'Contact',
@@ -328,7 +349,10 @@ const nameListsAndSections = (doc, page) => {
  * `outside` hands over no page builder at all: an outside site (the plugin or
  * another adapter), which gets in-place editing only.
  */
-export function createHost({ makeDocument, serialise = (doc) => `<!doctype html>${doc.documentElement.outerHTML}`, removable = false, library = false, outside = false, data = false, search = false, forms = null } = {}) {
+export function createHost({ makeDocument, serialise = (doc) => `<!doctype html>${doc.documentElement.outerHTML}`, removable = false, library = false, outside = false, data = false, search = false, forms = null, pagesList = false } = {}) {
+    // With pagesList: the About, checkout, brand and privacy pages too, the menu linking About, a logo with
+    // words only a screen reader hears, and the owner's pages put in the menu as the host does (putThemInTheMenus).
+    const DESIGN_HERE = pagesList ? { ...DESIGN, ...MORE_PAGES } : DESIGN;
     const settings = {};
     const styles = {};
     const saves = [];
@@ -337,7 +361,7 @@ export function createHost({ makeDocument, serialise = (doc) => `<!doctype html>
         try {
             const listed = JSON.parse(settings['structure:pages'] ?? '[]');
 
-            return Array.isArray(listed) ? listed.filter((entry) => entry?.id && !DESIGN[entry.id]) : [];
+            return Array.isArray(listed) ? listed.filter((entry) => entry?.id && !DESIGN_HERE[entry.id]) : [];
         } catch {
             return [];
         }
@@ -350,7 +374,7 @@ export function createHost({ makeDocument, serialise = (doc) => `<!doctype html>
     };
     // The collections kept, as the host reads them (TheCollectionsASiteKeeps), and handed to the editor.
     const collections = () => collectionsIn(settings);
-    const fileOf = (instance) => Object.keys(DESIGN).find((id) => DESIGN[id].html.includes(`data-instance="${instance}"`)) ?? null;
+    const fileOf = (instance) => Object.keys(DESIGN_HERE).find((id) => DESIGN_HERE[id].html.includes(`data-instance="${instance}"`)) ?? null;
 
     /** One design section, keyed as a copy named `added:<page>/<id>` and renamed for its new page (keysOnly, cut). */
     const sectionAdded = (doc, page, id, from) => {
@@ -365,13 +389,38 @@ export function createHost({ makeDocument, serialise = (doc) => `<!doctype html>
         }
         const file = fileOf(from);
         if (!file || from.startsWith('site.')) return null;
-        const source = makeDocument(DESIGN[file].html);
+        const source = makeDocument(DESIGN_HERE[file].html);
         keyMarkers(source, `added:${page === '' ? 'home' : page}/${id}`, false);
         const section = source.querySelector(`[data-instance="${from}"]`);
         if (!section) return null;
         section.setAttribute('data-instance', `${page === '' ? 'home' : page}.${id}`);
 
         return doc.importNode ? doc.importNode(section, true) : section.cloneNode(true);
+    };
+
+    /** The site's own extras, written into a design page's markup before it is keyed (pagesList). */
+    const asThisSite = (html, id) => {
+        if (!pagesList) return html;
+        const root = rootOf(id);
+
+        return html
+            .replace('</head>', `${SCREEN_READER_CSS}</head>`)
+            .replace('>Vellum</a>', '>Vellum<span class="visually-hidden" data-edit="text">, home</span></a>')
+            .replace('</nav>', ` <a href="${root}about/" data-key="nav.about" data-edit="link" data-link-page="about">About</a></nav>`);
+    };
+
+    /** The owner's pages in the menu, in the order they listed them, after the menu's own links (putThemInTheMenus). */
+    const putThemInTheMenu = (doc, here) => {
+        const nav = doc.querySelector('header nav');
+        if (!nav) return;
+        for (const mine of made().filter((entry) => entry.menu)) {
+            const link = doc.createElement('a');
+            link.setAttribute('href', `${rootOf(here)}${mine.id}/`);
+            link.setAttribute('data-link-page', mine.id);
+            link.textContent = mine.title;
+            if (mine.id === here) link.setAttribute('aria-current', 'page');
+            nav.append(doc.createTextNode(' '), link);
+        }
     };
 
     /** The page at an address, keyed, arranged and with the owner's words over it, or null. */
@@ -404,14 +453,14 @@ export function createHost({ makeDocument, serialise = (doc) => `<!doctype html>
                     form.insertBefore(label, button);
                 }
             }
-        } else if (DESIGN[id]) {
-            doc = makeDocument(DESIGN[id].html);
+        } else if (DESIGN_HERE[id]) {
+            doc = makeDocument(asThisSite(DESIGN_HERE[id].html, id));
             keyMarkers(doc, id);
         } else {
             const mine = made().find((entry) => entry.id === id);
             if (!mine) return null;
             // The shell: one of the design's pages with its own sections taken out.
-            doc = makeDocument(DESIGN.shop.html);
+            doc = makeDocument(asThisSite(DESIGN_HERE.shop.html, id));
             keyMarkers(doc, id);
             const main = doc.querySelector('main');
             main.replaceChildren();
@@ -422,6 +471,7 @@ export function createHost({ makeDocument, serialise = (doc) => `<!doctype html>
             const section = sectionAdded(doc, id, added, from);
             if (section) main.append(section);
         }
+        if (pagesList) putThemInTheMenu(doc, id);
         nameListsAndSections(doc, id);
         applyContent(doc, settings);
         applyStyles(doc, styles);
@@ -430,7 +480,7 @@ export function createHost({ makeDocument, serialise = (doc) => `<!doctype html>
     };
 
     const pages = (editorBase) => [
-        ...Object.entries(DESIGN).filter(([id]) => !removed().includes(id)).map(([id, page]) => ({ id, title: page.title, href: `${editorBase}${id}` })),
+        ...Object.entries(DESIGN_HERE).filter(([id]) => !removed().includes(id)).map(([id, page]) => ({ id, title: page.title, href: `${editorBase}${id}` })),
         ...made().map((entry) => ({ id: entry.id, title: entry.title, href: `${editorBase}${entry.id}`, made: true })),
     ];
 
@@ -446,10 +496,18 @@ export function createHost({ makeDocument, serialise = (doc) => `<!doctype html>
         taken: pages(editorBase).map((entry) => entry.id),
         library: [
             ...(library ? LIBRARY.map(({ file, ...section }) => ({ ...section, at: `${editorBase}${file}` })) : []),
+            ...(pagesList ? Object.entries(DESIGN_HERE).flatMap(([file, { title, html }]) => [...html.matchAll(/data-instance="([^"]+)"[^>]*data-label="([^"]+)"/g)]
+                .filter((m) => !m[1].startsWith('site.') && !(library && LIBRARY.some((section) => section.from === m[1])))
+                .map((m) => ({ from: m[1], label: m[2], page: title, at: `${editorBase}${file}` }))) : []),
             ...(data ? DATA_COMPONENTS.map(({ markup, ...offered }) => ({ ...offered, at: null })) : []),
             ...(search && collections().some((c) => c.id === 'parts') ? [{ from: SEARCH_COMPONENT.from, label: SEARCH_COMPONENT.label, page: SEARCH_COMPONENT.page, kind: 'search', at: null }] : []),
         ],
-        starts: [],
+        // The design's pages as a new page starts from them (TheKit::startingPoints), for a site with the Pages list.
+        starts: pagesList ? Object.entries(DESIGN_HERE).map(([page, { title, html }]) => {
+            const sections = [...html.matchAll(/data-instance="([^"]+)"/g)].map((m) => m[1]).filter((from) => !from.startsWith('site.'));
+
+            return { id: page, title, sections, own: sections };
+        }) : [],
         ...(removable ? { removedKey: 'structure:removed', removed: removed() } : {}),
     });
 
@@ -463,18 +521,20 @@ export function createHost({ makeDocument, serialise = (doc) => `<!doctype html>
         made,
         removed,
         /** The editor's page, as markup, with what the editor is handed. */
-        editorPage(id, { editorBase, api, runtime }) {
+        editorPage(id, { editorBase, api, runtime, token = 'kbs_demo', visitor = false, pending = 0 }) {
             const doc = draw(id);
             if (!doc) return null;
+            // What a visitor gets: the page with the published words and no editor.
+            if (visitor) return serialise(doc);
             doc.body.setAttribute('data-admin', '');
             const script = (text) => {
                 const tag = doc.createElement('script');
                 tag.textContent = text;
                 doc.body.append(tag);
             };
-            script(`window.liveEditApi=${JSON.stringify({ base: api, site: 'demo', token: 'kbs_demo' })};`
-                + `window.liveEditContent=${JSON.stringify({ base: api, site: 'demo', key: 'kbs_demo' })};`
-                + 'window.liveEditPublishing={pending:0};');
+            script(`window.liveEditApi=${JSON.stringify({ base: api, site: 'demo', token })};`
+                + `window.liveEditContent=${JSON.stringify({ base: api, site: 'demo', key: token })};`
+                + `window.liveEditPublishing={pending:${Number(pending) || 0}};`);
             if (!outside) script(`window.liveEditPages=${JSON.stringify(builderFor(id, editorBase))};`);
             // Only a hosted template that gets search is handed its collections; an outside site never.
             if (search && !outside) script(`window.liveEditCollections=${JSON.stringify({ collections: collections(), missed: { href: '/dashboard#search', count: 0 } })};`);

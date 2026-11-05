@@ -15,6 +15,7 @@ use ShipFast\LiveEdit\Http\Api\V1\PluginController;
 use ShipFast\LiveEdit\Http\Api\V1\SessionController;
 use ShipFast\LiveEdit\Http\Api\V1\SignInController;
 use ShipFast\LiveEdit\Http\Api\V1\SiteController;
+use ShipFast\LiveEdit\Http\Api\V1\TeamController;
 use ShipFast\LiveEdit\Http\Middleware\RecoversAnExpiredSignIn;
 
 /*
@@ -166,6 +167,33 @@ Route::prefix(config('live-edit.api.prefix', 'api/live-edit/v1').'/{site}')
                 ->whereUuid('generation')->name('live-edit.api.imagine.status');
         });
 
+        /*
+         * Team editing: one person per section.
+         *
+         * Who holds what is polled by every open editor, so it is the one read
+         * built to cost nothing when nothing changed: the key is remembered
+         * for a few seconds, the answer is one cached object per site, and an
+         * unchanged answer is a 304 (TeamController::show).
+         */
+        Route::middleware([
+            ThrottleApi::class.':read',
+            AuthenticateApiToken::class.':read,remembered',
+            ThrottleApi::class.':read',
+        ])->get('/team', [TeamController::class, 'show'])->name('live-edit.api.team');
+
+        Route::middleware([
+            ThrottleApi::class.':write',
+            AuthenticateApiToken::class.':write',
+            ThrottleApi::class.':write',
+        ])->group(function () {
+            Route::post('/team/claim', [TeamController::class, 'claim'])->name('live-edit.api.team.claim');
+            Route::post('/team/heartbeat', [TeamController::class, 'heartbeat'])->name('live-edit.api.team.heartbeat');
+            Route::post('/team/release', [TeamController::class, 'release'])->name('live-edit.api.team.release');
+            Route::post('/team/take-over', [TeamController::class, 'takeOver'])->name('live-edit.api.team.take-over');
+            Route::post('/team/discard-left', [TeamController::class, 'discardLeft'])->name('live-edit.api.team.discard-left');
+            Route::post('/team/discard', [TeamController::class, 'discard'])->name('live-edit.api.team.discard');
+        });
+
         // How a section looks. The same key and the same cost as a word: the
         // reading half of this was always here, so only the write was missing
         // and a static site could be edited in every way but this one.
@@ -191,6 +219,13 @@ Route::prefix(config('live-edit.api.prefix', 'api/live-edit/v1').'/{site}')
             ThrottleApi::class.':session',
         ])->post('/sessions', [SessionController::class, 'store'])->name('live-edit.api.sessions');
 
+        // Promoting or demoting a person the host named (team editing roles).
+        Route::middleware([
+            ThrottleApi::class.':session',
+            AuthenticateApiToken::class.':mint',
+            ThrottleApi::class.':session',
+        ])->post('/sessions/role', [SessionController::class, 'role'])->name('live-edit.api.sessions.role');
+
         Route::middleware([
             ThrottleApi::class.':publish',
             AuthenticateApiToken::class.':publish',
@@ -204,6 +239,15 @@ Route::prefix(config('live-edit.api.prefix', 'api/live-edit/v1').'/{site}')
             AuthenticateApiToken::class.':publish',
             ThrottleApi::class.':publish',
         ])->post('/restore', [ContentController::class, 'restore'])->name('live-edit.api.restore');
+
+        // Undoing one published version and nothing else (team editing):
+        // the same kind of decision as rolling back.
+        Route::middleware([
+            ThrottleApi::class.':publish',
+            AuthenticateApiToken::class.':publish',
+            ThrottleApi::class.':publish',
+        ])->post('/versions/{number}/undo', [ContentController::class, 'undo'])
+            ->whereNumber('number')->name('live-edit.api.versions.undo');
 
         // Taking their content away with them. An owner's decision, so it asks
         // for an owner's key.

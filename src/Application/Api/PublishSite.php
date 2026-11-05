@@ -6,6 +6,7 @@ use ShipFast\LiveEdit\Domain\Content\SiteStore;
 use ShipFast\LiveEdit\Domain\Site\Meter;
 use ShipFast\LiveEdit\Domain\Site\OverLimit;
 use ShipFast\LiveEdit\Domain\Site\Site;
+use ShipFast\LiveEdit\Domain\Team\Person;
 
 /**
  * Puts one site's held changes live.
@@ -21,15 +22,18 @@ use ShipFast\LiveEdit\Domain\Site\Site;
 class PublishSite
 {
     /**
-     * @return array{published: int, version: int}
+     * Team editing: only $by's own changes go live, then their sections are
+     * released (SiteStore::publish). Without a person, everything, as before.
+     *
+     * @return array{published: int, version: int, left: int}
      */
-    public function __invoke(Site $site): array
+    public function __invoke(Site $site, ?Person $by = null): array
     {
         if (! Meter::allows($site, Meter::PUBLISH)) {
             throw new OverLimit('This site has reached its limit of publishes for this month.');
         }
 
-        $result = (new SiteStore($site))->publish();
+        $result = (new SiteStore($site))->publish($by);
 
         Meter::record($site, Meter::PUBLISH);
 

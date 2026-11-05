@@ -175,7 +175,7 @@ test('an outside site (no page builder handed over) never shows an add-section c
     await page.mouse.move(product.x + 20, product.y + product.height - 10);
     await expect(ui(page).locator('.le-insert.is-visible')).toHaveCount(0);
     await expect(ui(page).getByRole('button', { name: '+ Section' })).toBeHidden();
-    await expect(ui(page).getByRole('button', { name: '+ New page' })).toBeHidden();
+    await expect(ui(page).getByRole('button', { name: 'Pages', exact: true })).toBeHidden();
 
     // A section's own panel offers moving it, but no adding from a library.
     await page.locator('[data-edit-item="s-story"] h2').click();

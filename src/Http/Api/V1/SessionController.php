@@ -5,6 +5,7 @@ namespace ShipFast\LiveEdit\Http\Api\V1;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use ShipFast\LiveEdit\Application\Api\IssueEditSession;
+use ShipFast\LiveEdit\Domain\Site\Ability;
 use ShipFast\LiveEdit\Domain\Site\TokenType;
 use ShipFast\LiveEdit\Http\Api\ApiContext;
 
@@ -29,13 +30,25 @@ class SessionController
              * new service.
              */
             'may_edit_locked' => ['nullable', 'boolean'],
+            /*
+             * Who this is, for team editing (one person per section). The
+             * host's own id for its user, the name teammates will see ("Ada
+             * is editing this section"), and their role: owner, admin or editor.
+             * Absent means the session is the website itself, which edits as
+             * it always did: everything is its own.
+             */
+            'editor' => ['nullable', 'array'],
+            'editor.id' => ['required_with:editor', 'string', 'max:100'],
+            'editor.name' => ['nullable', 'string', 'max:120'],
+            'editor.role' => ['nullable', 'string', 'in:owner,admin,editor'],
         ]);
 
         $session = $issue(
             ApiContext::site($request),
             $validated['label'] ?? null,
             null,
-            (bool) ($validated['may_edit_locked'] ?? true)
+            (bool) ($validated['may_edit_locked'] ?? true),
+            $validated['editor'] ?? null,
         );
 
         // Never cached, anywhere, by anyone. This response is a credential.
@@ -92,7 +105,44 @@ class SessionController
                 // that the API will refuse at save time. Keep the API as the
                 // authority; this only controls editor affordances.
                 'may_edit_locked' => $usable ? $token->mayEditLocked() : false,
+                /*
+                 * Whether this person may put changes live (their grant's "Can publish").
+                 * Only said for somebody who signed in with us: a session a host minted
+                 * has nobody behind it, and that host publishes in its own way, so null
+                 * (not known here) leaves Publish as it was. The API refuses a publish
+                 * regardless; this only spares an editor a button that cannot work.
+                 */
+                'may_publish' => ! $usable ? false : ($token->editor_id === null ? null : $token->can(Ability::Publish)),
             ],
         ])->withHeaders(['Cache-Control' => 'no-store, private']);
+    }
+
+    /**
+     * Promote or demote somebody the host named when it minted their session.
+     *
+     * A secret-key act, like minting. Every session of theirs on this site
+     * takes the new role on its next request, so a demoted admin does not keep
+     * the power for the rest of a session. (Somebody we know as an editor has
+     * their role on their grant instead, EditorGrant.)
+     */
+    public function role(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'id' => ['required', 'string', 'max:100'],
+            'role' => ['required', 'string', 'in:owner,admin,editor'],
+        ]);
+
+        $changed = 0;
+        \ShipFast\LiveEdit\Domain\Site\ApiToken::query()
+            ->where('site_id', ApiContext::site($request)->id)
+            ->where('holder_ref', $validated['id'])
+            ->get()
+            ->each(function ($token) use ($validated, &$changed) {
+                // Saved one by one so each remembered key is forgotten (ApiToken::booted).
+                $token->forceFill(['holder_role' => $validated['role']])->save();
+                $changed++;
+            });
+
+        return response()->json(['sessions' => $changed, 'role' => $validated['role']])->withHeaders(['Cache-Control' => 'no-store']);
     }
 }

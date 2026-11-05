@@ -1,5 +1,92 @@
 # ShipFast Live Edit for WordPress
 
+## 0.19.0
+
+0.18.0 was tagged by mistake on the 0.17.0 code; it is identical to 0.17.0.
+
+### The editor the familiar way
+
+- Unsaved changes are asked about before they are lost, as Shopify and Google Docs ask (CONVENTIONS.md, change 4). Closing the tab or reloading with the panel's words not saved (or a Brand or SEO panel waiting to be saved) brings up the browser's own question; leaving from inside the editor (a link in the bar, Open in Pages) or pressing Done editing asks "You have unsaved changes. Leave without saving?" with Leave and Stay. Nothing is asked when nothing is unsaved. The panel's Cancel is now Discard (beside Save changes, Save brand, Save SEO). New: `resources/js/unsaved.js`.
+- Pages (CONVENTIONS.md, change 5; Wix's "Pages & Menu"): the bar's + New page is now **Pages**, a list of every page in the order the menu shows them, with + Add page at the top. Each page opens from it; the owner's own pages are renamed, put in or out of the menu, moved up and down (buttons, or drag) among their other pages in the menu, duplicated and deleted; the design's own are duplicated, and deleted where the host keeps deletions (`removedKey`). A checkout, a bag, search results, a brand sheet, a 404, privacy and terms, and a product's or post's own page are listed apart as "Not in menu", and New page no longer offers them as a kind of page to start from. Saved as `structure:pages` and `structure:removed` as before; a deleted design page is named under Changes. New: `resources/js/pages-list.js`.
+- An editor without "Can publish" sees **Ask to publish** (Review on a folded phone bar) instead of Publish; pressing it explains that the changes are saved and an admin puts them live, and sends no publish, where before the server's refusal read "Could not publish… try again in a moment". The session payload says `may_publish` (true or false for somebody who signed in with us, null for a host-minted session); a host can also say `liveEditPublishing.mayPublish: false`.
+- Words only a screen reader hears (", home" beside a logo) no longer show on the page while editing, whatever the design's stylesheet does; they are in the logo's panel under "Read aloud by screen readers".
+- The toolbar is compact and fits every screen (owner, 5 Nov 2026: "dashboard can change to icon to create less space same as ads and tracking"; "they are not responsive on mobile"). A host link may name an `icon` (`dashboard`, `tracking`, `settings`, `help`, `external` or `logout`) and is then a round 44px icon button, its label its accessible name and a tooltip shown on hover and on focus; a link without one keeps its words. Log out is an icon. When the bar would not fit on one line (always on a phone, at 760px and under; on a tablet or a narrow desktop as needed) it folds: Edit or Done, Undo, Publish with its count and a More button stay, and the rest (Redo, New page, Sections, Brand, Search, Changes, Help, Preview, the language, the host's links, Log out) are offered in a More sheet as labelled icons with 44px targets. The sheet closes on a tap outside it, Escape or Back, keeps the keyboard inside it while open and returns it to More; the bar and the sheet keep clear of the iPhone's home bar. New: `resources/js/toolbar-icons.js`.
+- The editor's files include `toolbar-icons.js` on the embed endpoint (the folded bar's icons were not served to a site loading the editor from us).
+
+### Team editing: one person per section
+
+Owner, 5 Nov 2026: "if we allow for collaboration, we should lock a section a
+team member is working on and publish releases it, otherwise, they override
+eachother works".
+
+- A section somebody is editing is theirs until they publish, discard, or leave
+  it alone for 30 minutes. Teammates see a dashed outline and "Ada is editing
+  this section", and pressing it says so instead of opening it.
+- The server refuses (409, in plain words) any save into a section somebody
+  else holds, even from a stale page. Two first edits at once: one wins, the
+  other is told who.
+- Publish puts live only the publisher's own sections, then releases them. A
+  teammate's unfinished section stays a draft and stays theirs.
+- Discard (`POST /team/discard`) throws away only your own changes and releases
+  your sections. Putting back one change is for its author or the owner.
+- A lapsed section keeps its changes, still attributed to their author; the
+  next person is told "Ada left unpublished changes here" and can continue from
+  them, or (owner) discard them.
+- The owner or an admin can take over any section, with its unpublished
+  changes; the holder is told "Olu took over Hero".
+- The Pages list and a page's sections respect the same locks: while a teammate changes the list of pages, the others can open pages but not change the list ("Ada is changing your pages right now"); "+ Add a section" and "Remove this section" say who holds that page's layout.
+- Changes and the publish window are split into "Your changes (these go live
+  when you publish)" and "Others' changes (not included)", by name.
+- History says who published each version and lists its changes by section and
+  author ("Ada changed the headline in Hero"). **Undo these changes** takes back
+  one version only and leaves later work alone. Restoring a whole version says
+  whose published work it undoes and keeps a teammate's drafts.
+- Sessions can say who the person is: `EditorSession::begin($site, $editor,
+  'owner')`, or `editor: {id, name, role}` on `POST /sessions`. A session that
+  says nothing is the website itself and behaves exactly as before.
+- New: `GET /team`, `POST /team/claim|heartbeat|release|take-over|discard-left|discard`,
+  `POST /versions/{n}/undo`, `live-edit:prune-locks` (scheduled every ten
+  minutes), config `live-edit.team.*`, migration
+  `2026_11_05_120000_one_person_per_section`.
+
+### Roles: owner, admin, editor
+
+Owner, 5 Nov 2026: "the first person to open is the admin, but can also add
+other team member as admin or someone can be promoted to admin".
+
+- `admin` is accepted wherever a role is read (the grant's `role`,
+  `editor.role` on `POST /sessions`, `EditorSession::begin`). The owner and
+  admins may take over, throw away left changes, put back a teammate's change
+  and restore a whole version; an editor may not ("Ask an admin to take over").
+- A role change counts on the next request: powers are checked fresh, the
+  cached who-is-editing answer forgets a person when their grant changes, and
+  `POST /sessions/role` changes a host-named person's sessions at once.
+- The Publish button (`pending` on `/content` and `/content/version` for an
+  editor) counts only your own changes, what pressing it will publish.
+- Restoring a whole version stays out of History, API only, and is refused
+  (403) for an editor.
+
+### Caching and load
+
+- `GET /team` costs no database query when nothing changed: a cached answer per
+  site and revision, a 304 for the ETag the browser holds, and a key check
+  remembered for 30 seconds (forgotten when the key changes).
+- What visitors read (`GET /content` and `/content/version` with the public
+  key) is remembered for up to 10 seconds per site and language and forgotten
+  on every save, publish, restore, undo and discard: 5 fewer queries per page
+  view.
+- The CORS check remembers a site's allowed addresses for a minute instead of a
+  query on every API request; forgotten when the site is saved.
+- `tests/load/team-locks.mjs`: 50 editors on one site and 200 other sites
+  polling the real API.
+
+### Search, charts and forms cost a page nothing until wanted
+
+- A search costs a published page nothing until it is wanted (the owner, 5 Nov 2026: charts, search and forms must add no Lighthouse issue). `kit-search.js` reads its index only when the search comes within a screen and a half of view, or a visitor reaches for it (focus, pointer, touch), or the address already asks for a record or a search; words typed while it loads are kept as the search. An index may be columns and rows (`v: 2`, `keys` and `rows`: half the bytes of one object per record) and come in `parts` beside it, each read in a task of its own, so a big catalogue makes no long task; v1 (`records`) is still read. The search's look is no longer inside the script: it is `resources/dist/kit-search.css` (from `kit-search-base.js`), which a host writes into the page's head (`<style data-kit-search-base>`); a page without it gets the stylesheet linked from beside the script. Its results keep room while the index is on its way. The script is 8 KB gzipped (was 9.6).
+- `resources/dist/kit-carry.js` (1 KB): carrying a record into the quote form (`carry()`, now `kit-carry.js`) on its own, for the form's page, which no longer needs the whole search.
+- Search filters: a filter's name sits 6px above its control whatever a template does to labels (before, "Sort by" touched its select, since the rule meant for it matched nothing); filter groups 16px apart and wrapping whole rather than squeezing; From and To 8px from their boxes; every chip, select, box, toggle and Clear 44px tall, above a template's own field heights; on a phone, each filter on a row of its own at the row's width.
+- `npm run build:kits` builds `kit-search.js`, `kit-carry.js` and `kit-search.css`.
+
 ## 0.17.0
 
 - Search over a collection, for a host that hands the editor its collections (`window.liveEditCollections`; a hosted template whose plan includes it, never a plugin website). A **Search** button and tab keep each collection: open it as a table (a box of the right kind per cell, add, delete, find, Fields to add, rename, retype, reorder and remove fields), add from a spreadsheet (columns matched to fields by their headings, every refused row said with its row number), download as CSV, or make a new one from a spreadsheet. A collection is saved as settings in pages of rows, so it is a draft until published. A search section from the library (`kind: "search"`) opens its own panel: the filters visitors see and cards or rows. `resources/dist/kit-search.js` is the visitor's search (part numbers found with or without dashes, filters from the data's shape, a record's own page, a quote request carried into the form, searches that found nothing told to the host). `EditPolicy::longestValue()` lets a host allow longer values under keys of its own. A search's buttons take the design's own button classes (`data-search-buttons`) and stack on a card; a quote request also sets the form's purpose when one option plainly means buying (or one is marked `data-search-purpose`).
