@@ -705,12 +705,32 @@
         }
     };
 
+    var nearby = typeof IntersectionObserver === 'function'
+        ? new IntersectionObserver(function (entries) {
+            entries.forEach(function (entry) {
+                if (!entry.isIntersecting) return;
+                nearby.unobserve(entry.target);
+                later(entry.target);
+            });
+        }, { rootMargin: '150% 0px' })
+        : null;
+    var far = function (chart) {
+        if (!nearby || document.body.classList.contains('editing')) return false;
+        var top = chart.getBoundingClientRect().top;
+        var screen = window.innerHeight || 800;
+        return top > screen * 2.5 || chart.getBoundingClientRect().bottom < -screen * 1.5;
+    };
+    var whenNear = function (chart) { nearby.observe(chart); };
+
     var draw = function (root) {
         var scope = root || document;
         if (scope.ownerDocument || scope === document) baseIn(scope.ownerDocument || document);
         var started = clock();
         [].slice.call(scope.querySelectorAll('[data-chart]')).forEach(function (chart) {
             var first = !(watched && watched.has(chart));
+            // A chart far down the page is drawn as it comes within a screen and a half of view: the page's load
+            // is not spent on it, and it is drawn (and its room settled) well before anyone sees it.
+            if (first && far(chart)) { chart.__kitFirst = true; whenNear(chart); watch(chart); return; }
             // The first charts at once, so what is on the screen is drawn before it is seen; the rest a frame later.
             if (clock() - started < 12) drawChart(chart, first);
             else { chart.__kitFirst = first; later(chart); }
