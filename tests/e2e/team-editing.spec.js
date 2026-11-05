@@ -227,33 +227,40 @@ test('two people edit two sections at once, and each publish puts live only its 
     for (const one of [ada, tunde, olu, phone]) await one.context.close();
 });
 
-test('two first edits of the same section: one wins, the other is told who', async ({ browser }) => {
+test('two people open the same section at the same moment: one gets it, the other is told who', async ({ browser }) => {
     const ada = await member(browser, 'ada');
     const tunde = await member(browser, 'tunde');
 
-    // Both open the product name before either has saved: neither sees a lock yet.
-    for (const one of [ada, tunde]) {
-        await one.page.locator(PRODUCT).first().click({ force: true });
-        await expect(one.page.getByRole('button', { name: 'Save changes' })).toBeVisible();
-        await one.page.locator('.le-drawer textarea').first().fill(`${one === ada ? 'Ada' : 'Tunde'} named it`);
-    }
-
-    // Both press Save at the same moment.
-    await Promise.all([ada, tunde].map((one) => one.page.getByRole('button', { name: 'Save changes' }).click()));
+    // Neither sees a lock yet, and both press the product name at once.
+    await Promise.all([ada, tunde].map((one) => one.page.locator(PRODUCT).first().click({ force: true })));
     await settle(ada.page);
     await settle(tunde.page);
 
     const locks = (await team('olu')).locks;
     expect(locks).toHaveLength(1);
     const winner = locks[0].name;
-    const loser = winner === 'Ada' ? tunde : ada;
-    const drafts = (await changesFor('olu')).changes;
-    expect(drafts.map((c) => c.author_name)).toEqual([winner]);
-    expect(drafts[0].after).toBe(`${winner} named it`);
+    const [won, lost] = winner === 'Ada' ? [ada, tunde] : [tunde, ada];
+    const loserKey = winner === 'Ada' ? 'tunde' : 'ada';
 
-    // The other is told, by name.
-    await expect(ui(loser.page).locator('.le-modal')).toContainText(`${winner} is editing this section`, { timeout: 10000 });
-    await shot(loser.page, '10-same-section-race-loser-is-told-1440');
+    // The other is told, by name, and their panel does not stay open.
+    await expect(ui(lost.page).locator('.le-modal')).toContainText(`${winner} is editing this section`, { timeout: 10000 });
+    await shot(lost.page, '10-same-section-race-other-is-told-1440');
+
+    // The one who got it saves; a save from the other's stale page is refused by the server.
+    await won.page.locator('.le-drawer textarea').first().fill(`${winner} named it`);
+    await won.page.getByRole('button', { name: 'Save changes' }).click();
+    await settle(won.page);
+    const key = await won.page.locator(PRODUCT).first().getAttribute('data-edit');
+    const stale = await fetch(`${site.url}/api/demo/content`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${tokens[loserKey]}`, 'Content-Type': 'application/json', Accept: 'application/json', 'X-Live-Edit-Unit': 'section:aster-veil.detail' },
+        body: JSON.stringify({ key: key.replace(/^setting:/, ''), value: 'Overwritten?' }),
+    });
+    expect(stale.status).toBe(409);
+    expect((await stale.json()).error.message).toBe(`${winner} is editing Product right now. Ask the owner to take over if it cannot wait.`);
+
+    const drafts = (await changesFor('olu')).changes;
+    expect(drafts.map((c) => [c.author_name, c.after])).toEqual([[winner, `${winner} named it`]]);
 
     for (const one of [ada, tunde]) await one.context.close();
 });
@@ -323,13 +330,11 @@ test('the owner takes over a section, and the person who had it is told', async 
     await visitor.context.close();
     expect((await team('olu')).locks.map((l) => [l.label, l.name])).toEqual([['Story', 'Tunde']]);
 
-    // And Ada's next save there is refused in plain words.
+    // Publishing released the owner's sections: Product is free again, and Ada may pick it up.
     await ada.page.reload();
     await ada.page.locator(PRODUCT).first().click({ force: true });
-    await expect(ui(ada.page).locator('.le-modal')).toContainText('Olu is editing this section', { timeout: 10000 }).catch(async () => {
-        // The lock went with the owner's publish; then the section is free again, which is also right.
-        expect((await team('ada')).locks.find((l) => l.label === 'Product')).toBeUndefined();
-    });
+    await expect(ada.page.getByRole('button', { name: 'Save changes' })).toBeVisible();
+    await expect.poll(async () => (await team('ada')).locks.find((l) => l.label === 'Product')?.name).toBe('Ada');
 
     for (const one of [ada, tunde, olu]) await one.context.close();
 });

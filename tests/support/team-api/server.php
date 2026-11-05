@@ -9,8 +9,11 @@ $app = require __DIR__.'/boot.php';
 
 // How many queries this request asked, for the load test (DB queries per poll).
 $queries = 0;
-DB::listen(function () use (&$queries) {
+DB::listen(function ($query) use (&$queries) {
     $queries++;
+    if (getenv('LIVE_EDIT_LOG_SQL')) {
+        error_log($_SERVER['REQUEST_URI'].' :: '.$query->sql);
+    }
 });
 
 $kernel = $app->make(Kernel::class);

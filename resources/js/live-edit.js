@@ -2309,7 +2309,10 @@ const bootLiveEdit = () => {
                     text.append(lines);
 
                     // Undo this one publish, and nobody else's work since.
-                    if (!version.undoes && !version.restored_from && version.changes > 0) {
+                    const undoneBy = versions.find((later) => later.undoes === version.number);
+                    if (undoneBy) {
+                        text.append(el('p', 'le-change-who', `Undone in version ${undoneBy.number}${undoneBy.published_by ? ` by ${undoneBy.published_by}` : ''}`));
+                    } else if (!version.undoes && !version.restored_from && version.changes > 0) {
                         const undo = el('button', 'le-chip-btn le-version-undo', 'Undo these changes');
                         undo.type = 'button';
                         undo.addEventListener('click', () => void undoVersion(version, undo));

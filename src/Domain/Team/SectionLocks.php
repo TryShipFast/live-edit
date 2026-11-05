@@ -55,7 +55,7 @@ class SectionLocks
      *
      * @return array{lock: array<string, mixed>, left: array<int, array{author: string, name: string, changes: int}>}
      */
-    public function claim(Person $person, string $unit, ?string $label = null, bool $continue = false): array
+    public function claim(Person $person, string $unit, ?string $label = null, bool $continue = false, bool $describe = true): array
     {
         if (! $person->isSomeone()) {
             return ['lock' => [], 'left' => []];
@@ -120,6 +120,10 @@ class SectionLocks
             $this->moved();
         }
 
+        if (! $describe) {
+            return ['lock' => [], 'left' => $left];
+        }
+
         $lock = $this->locks()->where('unit', $unit)->first();
 
         return ['lock' => $lock ? $this->describe($lock) : [], 'left' => $left];
@@ -148,7 +152,7 @@ class SectionLocks
         }
 
         if ($unit !== null) {
-            $this->claim($person, $unit, $label, true);
+            $this->claim($person, $unit, $label, true, false);
         }
     }
 

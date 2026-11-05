@@ -2,6 +2,7 @@
 
 namespace ShipFast\LiveEdit\Domain\Content;
 
+use ShipFast\LiveEdit\Application\Api\ReadPublishedContent;
 use ShipFast\LiveEdit\Domain\Site\Site;
 use ShipFast\LiveEdit\Domain\Team\LockUnit;
 use ShipFast\LiveEdit\Domain\Team\Person;
@@ -148,6 +149,9 @@ class SiteStore
             return;
         }
 
+        // What visitors are served (and the pending count) is about to change.
+        ReadPublishedContent::forget($this->site);
+
         if ($hold) {
             Draft::query()->updateOrCreate(
                 ['site_id' => $this->site->id, 'kind' => 'setting', 'subject' => $key],
@@ -222,6 +226,8 @@ class SiteStore
             return;
         }
 
+        ReadPublishedContent::forget($this->site);
+
         if ($hold) {
             Draft::query()->updateOrCreate(
                 ['site_id' => $this->site->id, 'kind' => 'style', 'subject' => $key],
@@ -286,6 +292,7 @@ class SiteStore
         $this->drafts()->whereIn('id', $drafts->pluck('id'))->delete();
 
         $version = $this->recordVersion($count, null, $by, $summary);
+        ReadPublishedContent::forget($this->site);
 
         // Written after the drafts are applied, so the file holds what is now
         // live rather than what was about to be.
@@ -402,6 +409,7 @@ class SiteStore
         }
 
         $version = $this->recordVersion($undone, null, $by, $summary, $number);
+        ReadPublishedContent::forget($this->site);
         (new SiteSnapshot($this))->write($version->number);
 
         return ['undone' => $undone, 'kept' => $kept, 'version' => $version->number];
@@ -525,6 +533,7 @@ class SiteStore
         $this->drafts()->whereIn('id', $this->ownedBy($by, $this->drafts()->get())->pluck('id'))->delete();
 
         $version = $this->recordVersion($changed, $number, $by);
+        ReadPublishedContent::forget($this->site);
         (new SiteSnapshot($this))->write($version->number);
 
         return $changed;
@@ -536,6 +545,7 @@ class SiteStore
         $by ??= Person::theWebsite();
         $mine = $this->ownedBy($by, $this->drafts()->get());
         $this->drafts()->whereIn('id', $mine->pluck('id'))->delete();
+        ReadPublishedContent::forget($this->site);
 
         $locks = new SectionLocks($this->site);
         $locks->release($by);

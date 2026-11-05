@@ -544,7 +544,7 @@ export const TEAM_CSS = `
   background: #b45309; color: #fff; font: 600 12px/1 system-ui, sans-serif; padding: 6px 10px; border-radius: 6px; white-space: nowrap; }
 .le-lock.is-flipped .le-lock-label { top: 6px; left: 6px; }
 .le-lock-words { margin: 0 0 10px; font-size: 14px; line-height: 1.5; color: #1f2937; }
-.le-team-head { margin: 14px 0 6px; font-size: 12px; font-weight: 700; letter-spacing: .02em; text-transform: uppercase; color: #374151; }
+.le-team-head { margin: 14px 0 6px; font-size: 13px; font-weight: 700; color: #111827; }
 .le-team-head:first-child { margin-top: 0; }
 .le-team-sub { margin: -2px 0 8px; font-size: 12px; color: #6b7280; }
 .le-change.is-others { opacity: .85; }
