@@ -734,3 +734,13 @@ export const stylePropsFor = (element, declared) => {
 
     return declared.filter((name) => allowed.includes(name.trim()));
 };
+
+/**
+ * Words only a screen reader hears (", home" beside a logo, "(opens in a new tab)"): the usual
+ * hiding classes, or drawn clipped to a pixel. While editing they stay hidden from the page, where a
+ * stray ", home" under the logo read as a mistake on the website (CONVENTIONS.md, "Found on the way"),
+ * and are offered in the panel of what they belong to instead.
+ */
+export const SCREEN_READER_ONLY = '.visually-hidden, .visuallyhidden, .sr-only, .screen-reader-text, .screen-reader-only, .u-hidden-visually';
+
+export const heardNotSeen = (element) => Boolean(element?.matches?.(SCREEN_READER_ONLY));

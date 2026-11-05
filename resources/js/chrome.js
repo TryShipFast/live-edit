@@ -295,6 +295,34 @@ a.le-mark:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
 .le-start-own:focus-visible { outline: none; border-color: var(--le-accent); box-shadow: 0 0 0 3px var(--le-accent-soft); }
 .le-start-own-plus { display: grid; place-items: center; width: 34px; height: 34px; margin-bottom: auto; border-radius: 50%; background: var(--le-soft); color: var(--le-ink); font-size: 20px; line-height: 1; }
 .le-starts-none { grid-column: 1 / -1; }
+.le-modal.is-pages { max-width: 720px; }
+/* Pages (pages-list.js): one row a page, in menu order; its buttons wrap under its name on a phone. */
+.le-pages-top { display: flex; justify-content: flex-start; margin-bottom: 6px; }
+.le-pages-said { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 12px; min-height: 22px; margin-bottom: 8px; }
+.le-pages-said .le-hint { margin: 0; }
+.le-pages-group + .le-pages-group, .le-pages-needed { margin-top: 18px; }
+.le-pages-group > .le-section-heading { margin: 0 0 6px; font-size: 12px; }
+.le-page-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.le-page-row { display: grid; gap: 8px; padding: 10px 12px; border: 1px solid var(--le-line); border-radius: 12px; background: #fff; }
+.le-page-row.is-here { border-color: var(--le-ink); }
+.le-page-row.is-dragging { opacity: .5; }
+.le-page-row[draggable="true"] { cursor: grab; }
+.le-page-line { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.le-page-handle { flex: none; color: var(--le-muted); font-size: 18px; line-height: 1; }
+.le-page-name { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; flex: 1; min-width: 0; }
+.le-page-title { color: var(--le-ink); font-size: 15px; font-weight: 650; overflow-wrap: anywhere; }
+.le-page-badge { padding: 2px 8px; border-radius: 999px; background: var(--le-soft); color: var(--le-ink); font-size: 11.5px; font-weight: 600; }
+.le-page-badge.is-quiet { color: #5B5F68; }
+.le-page-rename { flex: 1 1 180px; min-width: 0; }
+.le-page-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; }
+.le-page-actions .le-switch { margin-left: 4px; font-size: 13px; }
+.le-page-why { flex-basis: 100%; margin: 0; font-size: 12px; }
+.le-pages-needed > summary { cursor: pointer; padding: 8px 0; color: var(--le-ink); font-size: 13px; font-weight: 650; }
+.le-pages-needed > .le-hint { margin: 0 0 8px; }
+@media (max-width: 760px) {
+  .le-page-row .le-chip-btn, .le-pages-add, .le-pages-needed > summary, .le-pages-reload { min-height: 44px; min-width: 44px; }
+  .le-page-actions .le-switch { min-height: 44px; }
+}
 .le-modal.is-fit { height: auto; }
 .le-name-look .le-start-thumb.is-outline { padding: 28px 40px 0; }
 .le-name-look .le-outline { gap: 8px; padding: 14px; }
@@ -1404,6 +1432,14 @@ body.editing [data-live-edit-tour-focus] {
   html:has(#live-edit-ui) { scroll-padding-bottom: 112px; }
   html:has(#live-edit-ui) > body { padding-bottom: 112px; }
 }
+/* Words only a screen reader hears stay hidden while editing, whatever the design's own stylesheet
+   reveals (", home" showed under the logo on every page): they are offered in the panel of the link
+   they belong to instead ("Read aloud by screen readers"). support.js SCREEN_READER_ONLY. */
+body.editing :is(.visually-hidden, .visuallyhidden, .sr-only, .screen-reader-text, .screen-reader-only, .u-hidden-visually)[data-edit]:not(:focus) {
+  position: absolute !important; width: 1px !important; height: 1px !important; margin: -1px !important;
+  padding: 0 !important; overflow: hidden !important; clip: rect(0 0 0 0) !important; clip-path: inset(50%) !important;
+  white-space: nowrap !important; border: 0 !important; outline: 0 !important;
+}
 body.editing [data-edit],
 body.editing [data-edit-href]:not([data-edit]),
 /* The picture itself is marked the same way the words are. */
@@ -1646,9 +1682,11 @@ export function createChrome() {
     /* One way to add a page, named for what it does. There were two buttons
        here ("Pages" and "Create page") opening the same form, and the second
        was never wired up, so half the ways in did nothing. */
-    const pagesButton = el('button', 'le-bar-btn le-when-roomy', '+ New page');
+    /* Pages, as Wix ("Pages & Menu") and Squarespace name it: every page of the website, in menu order,
+       with Add page at the top of the list (pages-list.js). */
+    const pagesButton = el('button', 'le-bar-btn le-when-roomy', 'Pages');
     pagesButton.type = 'button';
-    pagesButton.title = 'Add a page to your website';
+    pagesButton.title = 'Your website\'s pages: open, rename, order the menu, add a page';
     pagesButton.hidden = !window.liveEditPages;
 
     /* Adding a section to the page being looked at, beside adding a page: a page
@@ -1844,7 +1882,7 @@ export function createChrome() {
 
     const sheetTools = () => sheetEntries([
         { control: redoButton, label: 'Redo', icon: 'redo' },
-        { control: pagesButton, label: 'New page', icon: 'page' },
+        { control: pagesButton, label: 'Pages', icon: 'page' },
         { control: sectionsButton, label: 'Sections', icon: 'section' },
         { control: brandButton, label: 'Brand', icon: 'brand' },
         { control: searchButton, label: 'Search', icon: 'search' },
@@ -2087,7 +2125,8 @@ export function createChrome() {
     const foot = el('div', 'le-foot');
     const drawerDelete = el('button', 'le-btn-danger le-start le-hidden', 'Delete');
     drawerDelete.type = 'button';
-    const cancelButton = el('button', 'le-btn-outline', 'Cancel');
+    // "Discard" beside Save, as Shopify's save bar says it: "Cancel" read like "close the panel".
+    const cancelButton = el('button', 'le-btn-outline', 'Discard');
     cancelButton.type = 'button';
     const saveButton = el('button', 'le-btn', 'Save changes');
     saveButton.type = 'button';

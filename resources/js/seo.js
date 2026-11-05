@@ -78,7 +78,7 @@ export const renderSeoPanel = ({ container, config, save, done, notify, pickImag
     });
     ownImage.addEventListener('click', () => { pending.image = ''; update(); });
     const actions = el('div', 'le-row le-seo-actions');
-    const cancel = el('button', 'le-btn-outline', 'Cancel');
+    const cancel = el('button', 'le-btn-outline', 'Discard');
     cancel.type = 'button';
     const saveButton = el('button', 'le-btn', 'Save SEO');
     saveButton.type = 'button';

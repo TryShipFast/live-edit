@@ -539,7 +539,7 @@ export const renderBrandPanel = ({ container, config, save, upload, done, notify
     dock.append(warning);
 
     const actions = el('div', 'le-row le-brand-actions');
-    const cancel = el('button', 'le-btn-outline', 'Cancel');
+    const cancel = el('button', 'le-btn-outline', 'Discard');
     cancel.type = 'button';
     const apply = el('button', 'le-btn', 'Save brand');
     apply.type = 'button';

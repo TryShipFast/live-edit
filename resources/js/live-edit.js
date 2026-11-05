@@ -27,6 +27,8 @@ import { renderShopPanel } from './shop.js';
 import { renderCsvImport, renderNewCollection, renderSearchPanel, renderTableEditor } from './collections-panel.js';
 import { renderImport, undoTheLastImport, UNDO_KEY } from './catalogue.js';
 import { addedWith, describeStructure, hrefTo, newAddedId, orderWith, pageBase, pageOfLink, renderCategoryProducts, renderNewCategory, renderNewPage, renderSectionBrowser } from './pages.js';
+import { menuOrder, renderPagesList, startsOffered } from './pages-list.js';
+import { LEAVE_QUESTION, guardLeaving } from './unsaved.js';
 import { insertionNear, sectionName, sectionUnder, shownSectionLists, shownSections } from './section-inserter.js';
 import { DETAIL_MODE, copiedItemSettings, copiedStyles, copyPageForCard, deletablePage, deletePage, detailAddress, keyMap, linksTo, linksWarning, showOnlyTheDetail } from './card-page.js';
 import { renderChoice } from './choice.js';
@@ -40,7 +42,7 @@ import { addressFromTheRoot } from './site-address.js';
 import { biggestThatFits, howMuchSurvives, inSourcePixels, movedWithin, whatIsThereNow } from './fitting.js';
 import { attrsWorthSending, creditWorthSending } from './only-what-changed.js';
 import { confirm as confirmChange, expectChange, takeExpected } from './verify.js';
-import { apiRequestFor, attributeOf, backgroundImageOf, classListWith, declaredStyleProps, displayedValue, iconNamesIn, isJsonResponse, looksLikeAPicture, orderedIcons, ownTextOf, parseEditKey, requestInit, stylePropsFor, interactiveTarget, nameOfControl, givesUpAfter, ranOutOfTime, WAITS_AT_MOST, wordsEditedElsewhere, PUTS_BACK, worthReverting, shownWords } from './support.js';
+import { apiRequestFor, attributeOf, backgroundImageOf, classListWith, declaredStyleProps, displayedValue, iconNamesIn, isJsonResponse, looksLikeAPicture, orderedIcons, ownTextOf, parseEditKey, requestInit, stylePropsFor, interactiveTarget, nameOfControl, givesUpAfter, ranOutOfTime, WAITS_AT_MOST, wordsEditedElsewhere, PUTS_BACK, worthReverting, shownWords, heardNotSeen } from './support.js';
 
 /**
  * "Keep all of it", as distinct from "no choice was made".
@@ -1091,10 +1093,18 @@ const bootLiveEdit = () => {
          * Dismissing it any other way - the ×, the scrim, Escape - means keep
          * editing, because that is the answer that cannot lose work.
          */
-        const askBeforeLosingIt = () => new Promise((resolve) => {
+        const askBeforeLosingIt = () => askTo({
+            title: 'Discard what you typed?',
+            subtitle: 'Your changes to this element have not been saved.',
+            yes: 'Discard',
+            no: 'Keep editing',
+        });
+
+        /** One question, two answers, drawn in the editor (never a native dialog). Resolves true for `yes`. */
+        const askTo = ({ title, subtitle, yes, no, danger = true }) => new Promise((resolve) => {
             const sheet = ui.modal({
-                title: 'Discard what you typed?',
-                subtitle: 'Your changes to this element have not been saved.',
+                title,
+                subtitle,
                 size: 'is-narrow',
             });
 
@@ -1106,11 +1116,11 @@ const bootLiveEdit = () => {
                 resolve(discard);
             };
 
-            const keep = el('button', 'le-btn-outline', 'Keep editing');
+            const keep = el('button', 'le-btn-outline', no);
             keep.type = 'button';
             keep.addEventListener('click', () => answer(false));
 
-            const drop = el('button', 'le-btn-danger', 'Discard');
+            const drop = el('button', danger ? 'le-btn-danger' : 'le-btn', yes);
             drop.type = 'button';
             drop.addEventListener('click', () => answer(true));
 
@@ -1272,6 +1282,8 @@ const bootLiveEdit = () => {
          * sections the design already has (pages.js). Only where the host
          * hands the editor a page builder (window.liveEditPages).
          */
+        // Set once the editor is drawn (guardLeaving, below); every way out of the page goes through it.
+        let leaving = { leave: (go) => { go(); return Promise.resolve(true); }, allow: () => {} };
         const saveSetting = async (key, value) => {
             await request('/live-edit/setting', {
                 method: 'POST',
@@ -1291,8 +1303,39 @@ const bootLiveEdit = () => {
                 save: saveSetting,
                 go: (href) => {
                     sessionStorage.setItem('tb_editing', '1');
+                    leaving.allow();
                     window.location.href = href;
                 },
+                notify,
+                // Never a checkout, a bag, a brand sheet, a notice or one product as a kind of page (pages-list.js).
+                offer: startsOffered,
+            });
+
+            return handle;
+        };
+
+        /*
+         * Pages (pages-list.js): every page in menu order, with Add page at the top, the way Wix's
+         * "Pages & Menu" lists them. Opening a page from it asks first when something is not saved.
+         */
+        const openPages = () => {
+            if (!window.liveEditPages) return null;
+            if (!document.body.classList.contains('editing')) setEditing(true);
+            const handle = ui.modal({ title: 'Pages', size: 'is-pages' });
+            const builder = window.liveEditPages;
+            renderPagesList({
+                ui: handle,
+                config: builder,
+                menu: menuOrder(document, builder.pages ?? [], pageBase(builder, window.location.href)),
+                save: saveSetting,
+                go: (href) => leaving.leave(() => {
+                    sessionStorage.setItem('tb_editing', '1');
+                    // Back on this page (a reload to see the menu), the list opens again.
+                    try { if (href === window.location.href) sessionStorage.setItem('le-open-pages', '1'); } catch { /* a convenience */ }
+                    window.location.href = href;
+                }),
+                addPage: () => { handle.close(); openNewPage(); },
+                ask: askTo,
                 notify,
             });
 
@@ -4679,6 +4722,7 @@ const bootLiveEdit = () => {
                 addStyleFields(key, props, styleOn);
             }
 
+            appendHeardNotSeen(element);
             // A page's sections list is the whole page: its sections are listed instead (appendListControls).
             if (element.dataset?.editListKind !== 'sections') appendContents(element);
             if (inTable) appendTableControls(element);
@@ -4699,6 +4743,30 @@ const bootLiveEdit = () => {
          * it calls the thing: the name it gives a screen reader, then the
          * brand in its own icon class.
          */
+        /*
+         * Words a screen reader says for this (", home" on a logo link), which the page keeps hidden while
+         * editing: offered here, named for what they are, each opening its own field.
+         */
+        const appendHeardNotSeen = (element) => {
+            const spoken = [...element.querySelectorAll('[data-edit]')].filter((node) => heardNotSeen(node) && node.textContent.trim() !== '');
+            if (!spoken.length || heardNotSeen(element)) return;
+            const heading = document.createElement('div');
+            heading.className = 'le-section-heading';
+            heading.textContent = 'Read aloud by screen readers';
+            const row = document.createElement('div');
+            row.className = 'le-row';
+            spoken.slice(0, 6).forEach((node) => {
+                const button = document.createElement('button');
+                button.type = 'button';
+                button.className = 'le-chip-btn';
+                button.textContent = `“${node.textContent.replace(/\s+/g, ' ').trim().slice(0, 40)}”`;
+                button.setAttribute('aria-label', `Change what screen readers say: ${node.textContent.trim()}`);
+                button.addEventListener('click', () => switchToNode(node));
+                row.append(button);
+            });
+            drawerFields.append(heading, row);
+        };
+
         const nameInside = (node) => {
             const words = (ownTextOf(node) || node.textContent || '').replace(/\s+/g, ' ').trim();
 
@@ -6593,8 +6661,35 @@ const bootLiveEdit = () => {
             }
         });
 
+        /*
+         * Unsaved changes (unsaved.js, CONVENTIONS.md change 4): the panel's words not saved, or a Brand
+         * or SEO panel whose Save is waiting. Closing the tab or reloading gets the browser's own
+         * question; leaving from inside the editor gets ours, "You have unsaved changes. Leave without
+         * saving?", Leave or Stay. Nothing is asked when nothing is unsaved.
+         */
+        function anythingUnsaved() {
+            if (current?.dirty) return true;
+
+            return [...ui.shadow.querySelectorAll('.le-drawer.is-open :is(.le-brand-actions, .le-seo-actions) .le-btn:not(:disabled)')]
+                .some((button) => button.getClientRects().length > 0);
+        }
+        function askLeaving() {
+            return askTo({ title: LEAVE_QUESTION.title, subtitle: LEAVE_QUESTION.subtitle, yes: LEAVE_QUESTION.leave, no: LEAVE_QUESTION.stay });
+        }
+        leaving = guardLeaving({ win: window, isUnsaved: anythingUnsaved, ask: askLeaving, roots: [document, ui.shadow] });
+
         toggleButton?.addEventListener('click', () => {
             const enteringEditMode = !document.body.classList.contains('editing');
+            // Closing the editor with a panel not saved: asked, as leaving is (unsaved.js).
+            if (!enteringEditMode && anythingUnsaved()) {
+                askLeaving().then((yes) => {
+                    if (!yes) return;
+                    closeDrawer(true);
+                    setEditing(false);
+                });
+
+                return;
+            }
             setEditing(enteringEditMode);
             if (enteringEditMode) startWalkthrough();
         });
@@ -6612,7 +6707,19 @@ const bootLiveEdit = () => {
             openDrawer();
         });
 
-        ui.pagesButton?.addEventListener('click', () => { openNewPage(); });
+        // Pages first, as Wix and Squarespace have it; a page with something unsaved in the panel asks before it goes.
+        ui.pagesButton?.addEventListener('click', () => {
+            if (!current?.dirty) {
+                openPages();
+
+                return;
+            }
+            askLeaving().then((yes) => {
+                if (!yes) return;
+                closeDrawer(true);
+                openPages();
+            });
+        });
 
         ui.changesButton?.addEventListener('click', () => {
             // Somebody asking what they have changed is asking about editing,
@@ -6756,7 +6863,7 @@ const bootLiveEdit = () => {
                     publishStep,
                 ],
                 pages: [
-                    { point: () => inBar('pagesButton'), title: 'Add a page', copy: 'Press New page, start from a page your design already has, give it a name, and it opens ready to edit.' },
+                    { point: () => inBar('pagesButton'), title: 'Add a page', copy: 'Press Pages to see every page in menu order. Add page starts one from a page your design already has: give it a name, and it opens ready to edit.' },
                 ],
                 languages: [
                     { point: () => (ui.languagePicker && !ui.languagePicker.hidden ? ui.languagePicker : null), title: 'Choose a language', copy: 'Pick the language you are editing. Each language keeps its own words.' },
@@ -7782,6 +7889,10 @@ const bootLiveEdit = () => {
             let back = null;
             try { back = sessionStorage.getItem('le-open-tab'); sessionStorage.removeItem('le-open-tab'); } catch { /* a convenience */ }
             if (back === 'Search' && drawerTabs.Search) { showTab('Search'); openDrawer(); }
+            // Back from "Reload to see it" in Pages: the list, where the owner was.
+            let pagesAgain = false;
+            try { pagesAgain = sessionStorage.getItem('le-open-pages') === '1'; sessionStorage.removeItem('le-open-pages'); } catch { /* a convenience */ }
+            if (pagesAgain && window.liveEditPages) openPages();
         }
         if (!detailMode && !directPanelOpen && document.body.classList.contains('editing')) startWalkthrough();
     }
