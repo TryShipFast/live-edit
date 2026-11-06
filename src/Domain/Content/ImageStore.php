@@ -31,8 +31,19 @@ class ImageStore
     /** What a browser may send, and what the fitter can actually read. */
     public const ALLOWED = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'avif', 'svg'];
 
-    /** Stop tiny compressed files from expanding into a multi-hundred-megabyte GD bitmap. */
+    /** Stored as it comes, then shrunk by the usual pass below. */
     private const MAX_INPUT_PIXELS = 13_000_000;
+
+    /**
+     * Shrunk first, with room to do it, the way WordPress raises its memory for image work: a camera's 6000x4000
+     * photograph, or an Openverse original chosen in Free photos (owner, 2 Nov 2026), is made the size a page needs
+     * instead of being turned away. Beyond this a tiny compressed file could still expand into a bitmap of hundreds of
+     * megabytes, so it is refused as before.
+     */
+    private const MAX_SHRINKABLE_PIXELS = 24_000_000;
+
+    /** What GD needs for a picture of MAX_SHRINKABLE_PIXELS (4 bytes a pixel) and its smaller copy, with headroom. */
+    private const IMAGE_MEMORY = '256M';
 
     /**
      * @return string the stored path or key — never a URL
@@ -72,10 +83,24 @@ class ImageStore
         if ($dimensions === false && $extension !== 'avif') {
             throw ValidationException::withMessages(['file' => 'That image could not be read. Choose a valid image and try again.']);
         }
-        if ($dimensions !== false && ((int) $dimensions[0] * (int) $dimensions[1]) > self::MAX_INPUT_PIXELS) {
+        $pixels = $dimensions === false ? 0 : (int) $dimensions[0] * (int) $dimensions[1];
+
+        if ($pixels > self::MAX_SHRINKABLE_PIXELS) {
             throw ValidationException::withMessages([
-                'file' => 'That image has too many pixels to process safely. Resize it to 13 megapixels or less and try again.',
+                'file' => 'That image has too many pixels to process safely. Resize it to 24 megapixels or less and try again.',
             ]);
+        }
+
+        if ($pixels > self::MAX_INPUT_PIXELS) {
+            self::withRoomForImages(fn () => ImageFitter::shrink($file->getRealPath(), (int) config('live-edit.max_image_edge', 2400)));
+            clearstatcache(true, $file->getRealPath());
+            $dimensions = @getimagesize($file->getRealPath());
+
+            if ($dimensions === false || (int) $dimensions[0] * (int) $dimensions[1] > self::MAX_INPUT_PIXELS) {
+                throw ValidationException::withMessages([
+                    'file' => 'That image is too large to make smaller here. Resize it to 24 megapixels or less and try again.',
+                ]);
+            }
         }
 
         // Before storing, while there is still a real file to work on.
@@ -210,5 +235,35 @@ class ImageStore
     private function directory(): string
     {
         return trim((string) config('live-edit.directory', 'live-edit'), '/');
+    }
+
+    /** Runs image work with at least IMAGE_MEMORY, then puts the limit back (an unlimited one is left alone). */
+    private static function withRoomForImages(callable $work): mixed
+    {
+        $was = (string) ini_get('memory_limit');
+        $bytes = static function (string $limit): int {
+            $limit = trim($limit);
+            $n = (int) $limit;
+
+            return match (strtolower(substr($limit, -1))) {
+                'g' => $n * 1024 ** 3,
+                'm' => $n * 1024 ** 2,
+                'k' => $n * 1024,
+                default => $n,
+            };
+        };
+        $raise = $was !== '-1' && $bytes($was) < $bytes(self::IMAGE_MEMORY);
+
+        if ($raise) {
+            @ini_set('memory_limit', self::IMAGE_MEMORY);
+        }
+
+        try {
+            return $work();
+        } finally {
+            if ($raise) {
+                @ini_set('memory_limit', $was);
+            }
+        }
     }
 }

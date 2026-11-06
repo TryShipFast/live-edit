@@ -1,5 +1,17 @@
 # ShipFast Live Edit for WordPress
 
+## 0.19.6
+
+- Fixed: since 0.19.5 a picture over 13 megapixels was refused ("That image has too many pixels to process safely"), so an Openverse original chosen in Free photos, often a large Flickr photograph, could not be used. A picture up to 24 megapixels (a 6000x4000 camera photograph) is now made the size a page needs first, with room to do it (PHP's memory raised to 256 MB for the work, then put back), and stored like any other. Beyond 24 megapixels it is refused as before, so a tiny compressed file still cannot expand into a bitmap of hundreds of megabytes.
+- The version the package reports (`LiveEdit::VERSION`) is right again: 0.19.5 still said 0.19.4.
+
+## 0.19.5
+
+- The toolbar's Live Edit mark stays on the narrowest phones (340px); the controls wrap before it goes.
+- Free photos, while it loads, shows plain grey boxes instead of a moving horizontal gradient.
+- The icon picker scrolls with its drawer.
+- Picture imports and resizing run on the queue (a worker must run where the queue is not `sync`), with throttling.
+
 ## 0.19.4
 
 - The icon library is calm until you point at an icon (owner, 5 Nov 2026: "It should be grey and maybe come alive on mouse hover"). Every icon tile is a soft grey with the drawing in grey; the one under the pointer or the keyboard comes alive (white tile, the drawing in its own colours, a blue edge, a small lift), and the chosen one stays so. The white-and-dark diagonal behind every tile is gone; a drawing with white lines keeps a dark tile so it can be seen. Reduced motion: no lift.

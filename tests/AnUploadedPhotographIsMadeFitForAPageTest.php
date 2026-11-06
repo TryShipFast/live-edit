@@ -117,6 +117,26 @@ class AnUploadedPhotographIsMadeFitForAPageTest extends TestCase
         $this->assertSame([2400, 1800], array_slice((array) getimagesizefromstring(Storage::disk('public')->get($stored)), 0, 2));
     }
 
+    /**
+     * 0.19.5 refused every picture over 13 megapixels, so an Openverse original chosen in Free photos (a 5000x3500
+     * Flickr photograph) was turned away with "too many pixels". Up to 24 megapixels it is shrunk first, with room to
+     * do it, and stored at the page's size; beyond that it is still refused.
+     */
+    public function test_a_picture_over_13_megapixels_is_made_smaller_and_one_over_24_is_still_refused(): void
+    {
+        Storage::fake('public');
+        config(['live-edit.disk' => 'public']);
+        $file = new UploadedFile($this->photograph(5000, 3500), 'original.jpg', 'image/jpeg', null, true);
+
+        $stored = (new ImageStore)->store($file);
+
+        $this->assertSame([2400, 1680], array_slice((array) getimagesizefromstring(Storage::disk('public')->get($stored)), 0, 2));
+
+        $huge = new UploadedFile($this->photograph(6200, 4000), 'huge.jpg', 'image/jpeg', null, true);
+        $this->expectException(\Illuminate\Validation\ValidationException::class);
+        (new ImageStore)->store($huge);
+    }
+
     public function test_a_logo_is_made_the_weight_of_a_logo(): void
     {
         if (! function_exists('imagewebp')) {
