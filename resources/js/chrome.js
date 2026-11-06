@@ -664,8 +664,6 @@ a.le-mark:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(52px, 1fr));
     gap: 6px;
-    max-height: 320px;
-    overflow-y: auto;
     padding: 4px 2px;
 }
 .le-icon-choice {

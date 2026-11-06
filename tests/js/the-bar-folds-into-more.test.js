@@ -65,6 +65,15 @@ describe('the links on the bar', () => {
         expect(css).not.toContain('@keyframes le-shimmer');
     });
 
+    it('lets the icon list use the drawer scroll instead of trapping it in a short nested box', () => {
+        const ui = chrome();
+        const css = ui.shadow.querySelector('style').textContent;
+        const iconGrid = css.match(/\.le-icon-grid\s*\{([^}]+)\}/)?.[1] ?? '';
+
+        expect(iconGrid).not.toMatch(/max-height|overflow-y/);
+        expect(css).toMatch(/\.le-fields\s*\{[^}]*overflow:\s*auto/);
+    });
+
     it('are icon buttons named by their label when they name an icon, and words when they do not', () => {
         const ui = chrome({
             links: [
