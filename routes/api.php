@@ -211,6 +211,13 @@ Route::prefix(config('live-edit.api.prefix', 'api/live-edit/v1').'/{site}')
             ThrottleApi::class.':upload',
         ])->post('/media', [MediaController::class, 'store'])->name('live-edit.api.media');
 
+        Route::middleware([
+            ThrottleApi::class.':read',
+            AuthenticateApiToken::class.':write',
+            ThrottleApi::class.':read',
+        ])->get('/media/{import}', [MediaController::class, 'status'])
+            ->whereUuid('import')->name('live-edit.api.media.status');
+
         // Minting a session and publishing are both secret-key acts: decisions
         // about who may edit, and about what the public sees.
         Route::middleware([

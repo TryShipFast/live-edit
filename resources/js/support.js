@@ -323,6 +323,7 @@ export const apiRequestFor = (url, options = {}, api) => {
      * Same origin, so the host's own session says who this is.
      */
     const generationMatch = path.match(/^\/live-edit\/imagine\/([0-9a-f-]{36})$/i);
+    const mediaOperation = path.match(/^\/live-edit\/media\/([0-9a-f-]{36})$/i);
     const undoMatch = path.match(/^\/live-edit\/versions\/(\d+)\/undo$/);
     const claimed = api?.routes?.[path] ?? (path === '/live-edit/publish' ? api?.publishUrl : null);
 
@@ -339,6 +340,7 @@ export const apiRequestFor = (url, options = {}, api) => {
 
     const target = routes[path]
         ?? (generationMatch ? `${base}/${api?.site}/imagine/${generationMatch[1]}` : null)
+        ?? (mediaOperation ? `${base}/${api?.site}/media/${mediaOperation[1]}` : null)
         ?? (undoMatch ? `${base}/${api?.site}/versions/${undoMatch[1]}/undo` : null);
 
     if (!base || !api?.site || !api?.token) {

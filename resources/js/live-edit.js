@@ -2752,6 +2752,27 @@ const bootLiveEdit = () => {
             window.location.reload();
         };
 
+        const waitForMediaImport = async (response) => {
+            const accepted = await response.clone().json().catch(() => ({}));
+            const operation = accepted.operation_id;
+
+            if (!operation) throw new Error('The image was accepted, but its processing status could not be read.');
+
+            const deadline = Date.now() + 300000;
+            while (Date.now() < deadline) {
+                await new Promise((resolve) => window.setTimeout(resolve, 1500));
+                const result = await request(`/live-edit/media/${operation}`, { method: 'GET' });
+                const state = await result.json().catch(() => ({}));
+
+                if (state.status === 'completed') return state;
+                if (state.status === 'failed') {
+                    throw new Error('The image could not be processed. Your current image is still in place; try saving again.');
+                }
+            }
+
+            throw new Error('The image is still processing. Leave this page open and check again shortly.');
+        };
+
         const request = async (url, rawOptions) => {
             // Team editing: a change says which part of the page it is in, so
             // the server can keep one person per section (team.js).
@@ -2823,6 +2844,14 @@ const bootLiveEdit = () => {
             }
             if (!isJsonResponse(response)) {
                 throw new Error('That did not save. Reload the page and try again.');
+            }
+
+            if (response.status === 202 && (url === '/live-edit/image' || url === '/live-edit/upload')) {
+                const completed = await waitForMediaImport(response);
+                response = new Response(JSON.stringify(completed), {
+                    status: 200,
+                    headers: { 'Content-Type': 'application/json' },
+                });
             }
 
             return response;

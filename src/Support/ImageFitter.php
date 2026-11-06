@@ -17,6 +17,9 @@ class ImageFitter
     /** Guard against absurd targets; a page box is never this large. */
     protected const MAX_EDGE = 4000;
 
+    /** Bound GD's second full bitmap while it resamples a source image. */
+    protected const MAX_OUTPUT_PIXELS = 8_000_000;
+
     /**
      * How many image pixels to keep per CSS pixel of the box.
      *
@@ -93,6 +96,13 @@ class ImageFitter
 
         $width = (int) min(round($width * $density), self::MAX_EDGE);
         $height = (int) min(round($height * $density), self::MAX_EDGE);
+
+        $pixels = $width * $height;
+        if ($pixels > self::MAX_OUTPUT_PIXELS) {
+            $scale = sqrt(self::MAX_OUTPUT_PIXELS / $pixels);
+            $width = max(1, (int) floor($width * $scale));
+            $height = max(1, (int) floor($height * $scale));
+        }
 
         $source = self::read($path, $info[2]);
         if ($source === null) {

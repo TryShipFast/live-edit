@@ -31,6 +31,9 @@ class ImageStore
     /** What a browser may send, and what the fitter can actually read. */
     public const ALLOWED = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'avif', 'svg'];
 
+    /** Stop tiny compressed files from expanding into a multi-hundred-megabyte GD bitmap. */
+    private const MAX_INPUT_PIXELS = 13_000_000;
+
     /**
      * @return string the stored path or key — never a URL
      *
@@ -61,6 +64,18 @@ class ImageStore
 
         if ($extension === 'svg') {
             return $this->storeSvg($file, $directory);
+        }
+
+        $dimensions = @getimagesize($file->getRealPath());
+        // Some PHP/GD builds can store AVIF but cannot inspect or decode it;
+        // keep the existing pass-through behavior on those hosts.
+        if ($dimensions === false && $extension !== 'avif') {
+            throw ValidationException::withMessages(['file' => 'That image could not be read. Choose a valid image and try again.']);
+        }
+        if ($dimensions !== false && ((int) $dimensions[0] * (int) $dimensions[1]) > self::MAX_INPUT_PIXELS) {
+            throw ValidationException::withMessages([
+                'file' => 'That image has too many pixels to process safely. Resize it to 13 megapixels or less and try again.',
+            ]);
         }
 
         // Before storing, while there is still a real file to work on.

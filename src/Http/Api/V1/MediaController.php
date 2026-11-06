@@ -6,12 +6,20 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use ShipFast\LiveEdit\Application\Api\ApplyEdit;
+use ShipFast\LiveEdit\Application\Api\FindPhotos;
 use ShipFast\LiveEdit\Application\Api\StoreMedia;
 use ShipFast\LiveEdit\Domain\Content\Companions;
+use ShipFast\LiveEdit\Domain\Content\ImageStore;
+use ShipFast\LiveEdit\Domain\Site\ApiToken;
 use ShipFast\LiveEdit\Domain\Site\OverLimit;
+use ShipFast\LiveEdit\Domain\Site\Site;
 use ShipFast\LiveEdit\Http\Api\ApiContext;
+use ShipFast\LiveEdit\Jobs\ProcessMediaImport;
+use ShipFast\LiveEdit\Models\MediaImport;
 
 /**
  * Changing a picture on a site that is not this application.
@@ -114,6 +122,11 @@ class MediaController
             $site = ApiContext::site($request);
             $token = ApiContext::token($request);
             $key = $this->settingKey($validated['target'] ?? null);
+
+            $remotePhoto = trim((string) ($validated['url'] ?? ''));
+            if ($request->hasFile('file') || ($remotePhoto !== '' && FindPhotos::offered($remotePhoto))) {
+                return $this->enqueueImage($request, $site, $token, $key, $validated);
+            }
 
             $uploaded = $request->hasFile('file')
                 ? $store(
@@ -302,6 +315,128 @@ class MediaController
         }
     }
 
+    /** Queue fetching and decoding so a web worker only accepts the image and creates the job. */
+    private function enqueueImage(Request $request, Site $site, ApiToken $token, ?string $key, array $validated): JsonResponse
+    {
+        if (config('queue.default') === 'sync') {
+            return $this->fresh(['error' => [
+                'type' => 'queue_unavailable',
+                'message' => 'Image processing is not available right now. Try again in a moment.',
+            ]], 503);
+        }
+
+        $file = $request->file('file');
+        $disk = (string) config('live-edit.disk', 'public');
+        $uuid = (string) Str::uuid();
+        $sourcePath = null;
+        $sourceUrl = trim((string) ($validated['url'] ?? '')) ?: null;
+        $import = null;
+
+        try {
+            if ($file !== null) {
+                $extension = strtolower($file->getClientOriginalExtension() ?: $file->guessExtension() ?: '');
+                $maxKilobytes = (int) config('live-edit.max_upload_kb', 8192);
+
+                if (! in_array($extension, ImageStore::ALLOWED, true)) {
+                    throw ValidationException::withMessages(['file' => 'That file type is not accepted.']);
+                }
+                if ($file->getSize() > $maxKilobytes * 1024) {
+                    throw ValidationException::withMessages(['file' => 'That image is too large. The limit is '.round($maxKilobytes / 1024, 1).'MB.']);
+                }
+
+                $sourcePath = Storage::disk($disk)->putFileAs('live-edit-pending/'.$site->id, $file, $uuid.'.'.$extension);
+                if (! $sourcePath) {
+                    throw new \RuntimeException('The original image could not be staged for processing.');
+                }
+            }
+
+            $metadata = [];
+            foreach (['alt', 'imgTitle', 'credit', 'creditBy', 'creditUrl', 'creditSource', 'creditSourceUrl', 'locale'] as $field) {
+                if ($request->has($field)) {
+                    $metadata[$field] = $validated[$field] ?? '';
+                }
+            }
+
+            $options = [
+                ...$metadata,
+                'fitWidth' => $validated['fitWidth'] ?? null,
+                'fitHeight' => $validated['fitHeight'] ?? null,
+                'fitExact' => (bool) ($validated['fitExact'] ?? false),
+                'logo' => ($validated['role'] ?? null) === 'logo',
+            ];
+            if (isset($validated['cropWidth'], $validated['cropHeight'])) {
+                $options['crop'] = [
+                    'x' => (int) ($validated['cropX'] ?? 0),
+                    'y' => (int) ($validated['cropY'] ?? 0),
+                    'width' => (int) $validated['cropWidth'],
+                    'height' => (int) $validated['cropHeight'],
+                ];
+            }
+
+            // Commit the operation row before dispatch, so a fast worker can
+            // always see it. A failed dispatch is marked below and the staged
+            // source is removed instead of leaving a forever-queued record.
+            $import = MediaImport::query()->create([
+                'uuid' => $uuid,
+                'site_id' => $site->id,
+                'token_public_id' => $token->public_id,
+                'target' => $key,
+                'source_disk' => $sourcePath !== null ? $disk : null,
+                'source_path' => $sourcePath,
+                'source_url' => $sourceUrl,
+                'options' => $options,
+                'status' => 'queued',
+            ]);
+
+            ProcessMediaImport::dispatch($import->id);
+
+            return response()->json([
+                'operation_id' => $import->uuid,
+                'status' => 'queued',
+            ], 202)->withHeaders(['Cache-Control' => 'no-store, private']);
+        } catch (ValidationException $exception) {
+            if ($sourcePath !== null) {
+                Storage::disk($disk)->delete($sourcePath);
+            }
+
+            throw $exception;
+        } catch (\Throwable $exception) {
+            if ($import instanceof MediaImport) {
+                $import->forceFill(['status' => 'failed', 'reason' => 'queue_unavailable'])->save();
+            }
+            if ($sourcePath !== null) {
+                Storage::disk($disk)->delete($sourcePath);
+            }
+
+            report($exception);
+
+            return $this->fresh(['error' => [
+                'type' => 'queue_unavailable',
+                'message' => 'Image processing could not be queued. Nothing on the page has changed. Try again shortly.',
+            ]], 503);
+        }
+    }
+
+    /** A site may poll only its own queued image operations. */
+    public function status(Request $request, string $site, string $import): JsonResponse
+    {
+        $operation = MediaImport::query()->useWritePdo()
+            ->where('site_id', ApiContext::site($request)->id)
+            ->where('uuid', $import)
+            ->first();
+
+        if (! $operation) {
+            return $this->fresh(['message' => 'Image operation not found.'], 404);
+        }
+
+        return $this->fresh([
+            'operation_id' => $operation->uuid,
+            'status' => $operation->status,
+            'url' => $operation->url,
+            'reason' => $operation->reason,
+        ], in_array($operation->status, ['queued', 'processing'], true) ? 202 : 200);
+    }
+
     /**
      * The setting a target names, or null when the caller only wants an
      * address back.
@@ -330,8 +465,8 @@ class MediaController
      * An upload is a one-off: nothing should cache the response that announces
      * it, though the file it points at may be cached forever.
      */
-    private function fresh(array $payload): JsonResponse
+    private function fresh(array $payload, int $status = 200): JsonResponse
     {
-        return response()->json($payload)->withHeaders(['Cache-Control' => 'no-store']);
+        return response()->json($payload, $status)->withHeaders(['Cache-Control' => 'no-store, private']);
     }
 }

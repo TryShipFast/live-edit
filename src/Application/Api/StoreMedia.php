@@ -4,6 +4,7 @@ namespace ShipFast\LiveEdit\Application\Api;
 
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Validation\ValidationException;
 use ShipFast\LiveEdit\Domain\Content\ImageStore;
 use ShipFast\LiveEdit\Domain\Content\SiteStore;
 use ShipFast\LiveEdit\Domain\Site\Meter;
@@ -20,6 +21,8 @@ use ShipFast\LiveEdit\Domain\Site\Site;
  */
 class StoreMedia
 {
+    private const MAX_REMOTE_IMAGE_BYTES = 12 * 1048576;
+
     public function __construct(private readonly ImageStore $images) {}
 
     /**
@@ -60,25 +63,54 @@ class StoreMedia
             return null;
         }
 
-        try {
-            $response = Http::timeout(30)->get($address);
-        } catch (\Throwable) {
+        $local = tempnam(sys_get_temp_dir(), 'photo-');
+
+        if ($local === false) {
             return null;
         }
 
-        $type = strtolower(explode(';', (string) $response->header('Content-Type'))[0]);
-        $extension = ['image/jpeg' => 'jpg', 'image/png' => 'png', 'image/webp' => 'webp'][$type] ?? null;
-        $bytes = (string) $response->body();
-
-        if (! $response->successful() || $extension === null || $bytes === '' || strlen($bytes) > 40 * 1048576) {
-            return null;
-        }
-
-        $local = tempnam(sys_get_temp_dir(), 'photo').'.'.$extension;
-        file_put_contents($local, $bytes);
+        $tooLarge = false;
+        $maxBytes = min(self::MAX_REMOTE_IMAGE_BYTES, (int) config('live-edit.max_upload_kb', 8192) * 1024);
 
         try {
+            $response = Http::connectTimeout(5)
+                ->timeout(30)
+                ->withOptions([
+                    'sink' => $local,
+                    // Do not buffer a camera original in PHP memory. Abort
+                    // it once it reaches the configured upload-size limit.
+                    'progress' => static function ($downloadTotal, $downloaded) use (&$tooLarge, $maxBytes): void {
+                        if ($downloaded > $maxBytes) {
+                            $tooLarge = true;
+                            throw new \RuntimeException('The remote image exceeds the configured processing limit.');
+                        }
+                    },
+                ])
+                ->get($address);
+
+            $type = strtolower(explode(';', (string) $response->header('Content-Type'))[0]);
+            $extension = ['image/jpeg' => 'jpg', 'image/png' => 'png', 'image/webp' => 'webp'][$type] ?? null;
+
+            if (! $response->successful() || $extension === null || ! is_file($local) || filesize($local) < 1) {
+                return null;
+            }
+            if (filesize($local) > $maxBytes) {
+                throw ValidationException::withMessages([
+                    'file' => 'That photograph is larger than this site accepts. Choose a smaller image and try again.',
+                ]);
+            }
+
             return $this($site, new UploadedFile($local, 'photo.'.$extension, $type, null, true), $fitWidth, $fitHeight, $fitExact);
+        } catch (ValidationException $exception) {
+            throw $exception;
+        } catch (\Throwable) {
+            if ($tooLarge) {
+                throw ValidationException::withMessages([
+                    'file' => 'That photograph is larger than this site accepts. Choose a smaller image and try again.',
+                ]);
+            }
+
+            return null;
         } finally {
             @unlink($local);
         }
