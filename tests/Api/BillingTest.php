@@ -4,10 +4,16 @@ namespace ShipFast\LiveEdit\Tests\Api;
 
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\Queue;
+use Illuminate\Testing\TestResponse;
+use ShipFast\LiveEdit\Application\Api\ApplyEdit;
+use ShipFast\LiveEdit\Application\Api\StoreMedia;
 use ShipFast\LiveEdit\Domain\Site\Ability;
 use ShipFast\LiveEdit\Domain\Site\Meter;
 use ShipFast\LiveEdit\Domain\Site\Site;
 use ShipFast\LiveEdit\Domain\Site\TokenType;
+use ShipFast\LiveEdit\Jobs\ProcessMediaImport;
+use ShipFast\LiveEdit\Models\MediaImport;
 use ShipFast\LiveEdit\Tests\TestCase;
 
 /**
@@ -50,6 +56,7 @@ class BillingTest extends TestCase
         $app['config']->set('live-edit.settings', ['heroTitle']);
         $app['config']->set('live-edit.publishing', false);
         $app['config']->set('live-edit.disk', 's3');
+        $app['config']->set('queue.default', 'database');
         $app['config']->set('cors.paths', []);
     }
 
@@ -57,6 +64,7 @@ class BillingTest extends TestCase
     {
         parent::setUp();
         Storage::fake('s3');
+        Queue::fake();
 
         $this->site = Site::query()->create(['slug' => 'acme', 'name' => 'Acme', 'allowed_origins' => ['https://acme.test']]);
         [, $this->session] = $this->site->issueToken(TokenType::Session, 'Edit', [Ability::Read, Ability::Write], now()->addHour());
@@ -76,6 +84,17 @@ class BillingTest extends TestCase
     private function save(string $value): void
     {
         $this->postJson($this->url(), ['key' => 'heroTitle', 'value' => $value], $this->editor())->assertOk();
+    }
+
+    private function upload(string $filename): TestResponse
+    {
+        $response = $this->post($this->url('/media'), ['file' => UploadedFile::fake()->image($filename)], $this->editor())
+            ->assertStatus(202);
+        $operation = MediaImport::query()->where('uuid', $response->json('operation_id'))->firstOrFail();
+        (new ProcessMediaImport($operation->id))->handle(app(StoreMedia::class), app(ApplyEdit::class));
+        $this->assertSame('completed', $operation->fresh()->status);
+
+        return $response;
     }
 
     public function test_saves_are_counted(): void
@@ -101,7 +120,7 @@ class BillingTest extends TestCase
     public function test_publishing_and_uploading_are_counted_separately(): void
     {
         $this->postJson($this->url('/publish'), [], ['Authorization' => 'Bearer '.$this->secret])->assertOk();
-        $this->post($this->url('/media'), ['file' => UploadedFile::fake()->image('a.jpg')], $this->editor())->assertOk();
+        $this->upload('a.jpg');
 
         $usage = Meter::current($this->site);
 
@@ -113,12 +132,12 @@ class BillingTest extends TestCase
     public function test_stored_bytes_accumulate_across_months_while_counts_do_not(): void
     {
         // Storage is what a customer pays to keep, whenever they uploaded it.
-        $this->post($this->url('/media'), ['file' => UploadedFile::fake()->image('a.jpg')], $this->editor())->assertOk();
+        $this->upload('a.jpg');
 
         $first = $this->site->fresh()->bytes_stored;
         $this->assertGreaterThan(0, $first);
 
-        $this->post($this->url('/media'), ['file' => UploadedFile::fake()->image('b.jpg')], $this->editor())->assertOk();
+        $this->upload('b.jpg');
 
         $this->assertGreaterThan($first, $this->site->fresh()->bytes_stored);
     }

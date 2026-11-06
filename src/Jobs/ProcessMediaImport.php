@@ -110,7 +110,7 @@ class ProcessMediaImport implements ShouldQueue
                 throw new \RuntimeException('The image source could not be processed.');
             }
 
-            DB::transaction(function () use ($import, $site, $token, $apply, $options, $url): void {
+            DB::transaction(function () use ($import, $site, $token, $apply, $options, $url, $stored): void {
                 $key = $import->target;
 
                 if ($key !== null) {
@@ -136,7 +136,7 @@ class ProcessMediaImport implements ShouldQueue
                 }
 
                 MediaImport::query()->useWritePdo()->whereKey($import->id)->update([
-                    'status' => 'completed', 'url' => $url, 'reason' => null,
+                    'status' => 'completed', 'url' => $url, 'stored_path' => $stored['path'] ?? null, 'reason' => null,
                 ]);
             });
         } catch (\Throwable $exception) {

@@ -25,9 +25,9 @@ class AChosenFreePhotoIsStoredAsTheSitesOwnTest extends TestCase
         config(['live-edit.disk' => 'public']);
         $site = Site::query()->create(['slug' => 'client', 'name' => 'Client', 'allowed_origins' => ['https://client.test']]);
 
-        $image = imagecreatetruecolor(5000, 3500);
+        $image = imagecreatetruecolor(5000, 2500);
         for ($i = 0; $i < 80000; $i++) {
-            imagesetpixel($image, random_int(0, 4999), random_int(0, 3499), random_int(0, 0xFFFFFF));
+            imagesetpixel($image, random_int(0, 4999), random_int(0, 2499), random_int(0, 0xFFFFFF));
         }
         ob_start();
         imagejpeg($image, null, 95);
@@ -44,7 +44,7 @@ class AChosenFreePhotoIsStoredAsTheSitesOwnTest extends TestCase
         $stored = app(StoreMedia::class)->fromAddress($site, $offered);
 
         $this->assertNotNull($stored);
-        $this->assertSame([2400, 1680], array_slice((array) getimagesizefromstring(Storage::disk('public')->get($stored['path'])), 0, 2));
+        $this->assertSame([2400, 1200], array_slice((array) getimagesizefromstring(Storage::disk('public')->get($stored['path'])), 0, 2));
         $this->assertLessThan(strlen($original) / 3, Storage::disk('public')->size($stored['path']));
     }
 }

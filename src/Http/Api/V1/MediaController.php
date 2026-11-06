@@ -15,6 +15,7 @@ use ShipFast\LiveEdit\Application\Api\StoreMedia;
 use ShipFast\LiveEdit\Domain\Content\Companions;
 use ShipFast\LiveEdit\Domain\Content\ImageStore;
 use ShipFast\LiveEdit\Domain\Site\ApiToken;
+use ShipFast\LiveEdit\Domain\Site\Meter;
 use ShipFast\LiveEdit\Domain\Site\OverLimit;
 use ShipFast\LiveEdit\Domain\Site\Site;
 use ShipFast\LiveEdit\Http\Api\ApiContext;
@@ -318,6 +319,11 @@ class MediaController
     /** Queue fetching and decoding so a web worker only accepts the image and creates the job. */
     private function enqueueImage(Request $request, Site $site, ApiToken $token, ?string $key, array $validated): JsonResponse
     {
+        $file = $request->file('file');
+        if ($file !== null && ! Meter::allows($site, Meter::UPLOAD, (int) $file->getSize())) {
+            return ContentController::overLimit(new OverLimit('This site has reached its storage limit.'));
+        }
+
         if (config('queue.default') === 'sync') {
             return $this->fresh(['error' => [
                 'type' => 'queue_unavailable',
@@ -325,7 +331,6 @@ class MediaController
             ]], 503);
         }
 
-        $file = $request->file('file');
         $disk = (string) config('live-edit.disk', 'public');
         $uuid = (string) Str::uuid();
         $sourcePath = null;
@@ -408,6 +413,29 @@ class MediaController
                 Storage::disk($disk)->delete($sourcePath);
             }
 
+            cache()->put('live-edit.last-save-failure', [
+                'at' => now()->toIso8601String(),
+                'site' => $site->slug,
+                'key' => $key,
+                'disk' => $disk,
+                'thrown' => $exception::class,
+                'reason' => $exception->getMessage(),
+                'where' => collect($exception->getTrace())
+                    ->pluck('file')
+                    ->filter(fn ($file) => $file !== null && ! str_contains((string) $file, '/vendor/laravel/'))
+                    ->take(3)
+                    ->values()
+                    ->all(),
+            ], now()->addDay());
+
+            Log::error('[live-edit] an image could not be queued', [
+                'site' => $site->slug,
+                'key' => $key,
+                'disk' => $disk,
+                'reason' => $exception->getMessage(),
+                'thrown' => $exception::class,
+            ]);
+
             report($exception);
 
             return $this->fresh(['error' => [
@@ -433,6 +461,7 @@ class MediaController
             'operation_id' => $operation->uuid,
             'status' => $operation->status,
             'url' => $operation->url,
+            'path' => $operation->stored_path,
             'reason' => $operation->reason,
         ], in_array($operation->status, ['queued', 'processing'], true) ? 202 : 200);
     }

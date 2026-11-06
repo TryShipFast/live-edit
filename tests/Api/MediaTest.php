@@ -3,13 +3,20 @@
 namespace ShipFast\LiveEdit\Tests\Api;
 
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Cache;
+use Illuminate\Testing\TestResponse;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\Queue;
+use ShipFast\LiveEdit\Application\Api\ApplyEdit;
+use ShipFast\LiveEdit\Application\Api\StoreMedia;
 use ShipFast\LiveEdit\Domain\Content\ImageStore;
 use ShipFast\LiveEdit\Domain\Content\SiteStore;
 use ShipFast\LiveEdit\Domain\Site\Ability;
 use ShipFast\LiveEdit\Domain\Site\Site;
 use ShipFast\LiveEdit\Domain\Site\TokenType;
+use ShipFast\LiveEdit\Jobs\ProcessMediaImport;
 use ShipFast\LiveEdit\Mapper\MarkupScanner;
+use ShipFast\LiveEdit\Models\MediaImport;
 use ShipFast\LiveEdit\Tests\Fixtures\RefusesEveryWrite;
 use ShipFast\LiveEdit\Tests\Fixtures\RemoteLikeDisk;
 use ShipFast\LiveEdit\Tests\TestCase;
@@ -46,6 +53,7 @@ class MediaTest extends TestCase
         $app['config']->set('live-edit.directory', 'live-edit');
         $app['config']->set('live-edit.max_upload_kb', 8192);
         $app['config']->set('live-edit.settings', ['heroImage', 'heroImageAlt', 'heroImageTitle']);
+        $app['config']->set('queue.default', 'database');
     }
 
     protected function setUp(): void
@@ -58,6 +66,7 @@ class MediaTest extends TestCase
         // fake is a local directory and the bug being guarded against here
         // cannot show itself.
         Storage::set('s3', new RemoteLikeDisk(Storage::disk('s3')));
+        Queue::fake();
 
         $this->site = Site::query()->create([
             'slug' => 'client',
@@ -85,11 +94,31 @@ class MediaTest extends TestCase
         ];
     }
 
+    /** Run a queued image operation as a worker and return its terminal state. */
+    protected function completeImport(TestResponse $accepted): MediaImport
+    {
+        $accepted->assertStatus(202)->assertJsonPath('status', 'queued');
+        $operation = MediaImport::query()->where('uuid', $accepted->json('operation_id'))->firstOrFail();
+        Queue::assertPushed(ProcessMediaImport::class, fn (ProcessMediaImport $job): bool => $job->importId === $operation->id);
+
+        (new ProcessMediaImport($operation->id))->handle(app(StoreMedia::class), app(ApplyEdit::class));
+
+        $finished = $operation->fresh();
+        $this->assertSame('completed', $finished->status);
+
+        return $finished;
+    }
+
+    protected function pollImport(MediaImport $operation): TestResponse
+    {
+        return $this->get($this->url().'/'.$operation->uuid, $this->as($this->session));
+    }
+
     public function test_an_image_is_stored_on_the_bucket_and_answered_with_a_url(): void
     {
-        $response = $this->post($this->url(), ['file' => UploadedFile::fake()->image('hero.jpg', 800, 600)], $this->as($this->session));
-
-        $response->assertOk()->assertJsonStructure(['url', 'path']);
+        $accepted = $this->post($this->url(), ['file' => UploadedFile::fake()->image('hero.jpg', 800, 600)], $this->as($this->session));
+        $operation = $this->completeImport($accepted);
+        $response = $this->pollImport($operation)->assertOk()->assertJsonStructure(['url', 'path']);
 
         $path = $response->json('path');
         Storage::disk('s3')->assertExists($path);
@@ -98,6 +127,76 @@ class MediaTest extends TestCase
         // A URL is what a page fetches; a key is what the disk is asked for.
         // The stored value must be the key.
         $this->assertStringNotContainsString('http', $path);
+    }
+
+    public function test_the_request_stages_the_original_and_returns_before_image_processing(): void
+    {
+        $accepted = $this->post($this->url(), [
+            'target' => 'setting:heroImage',
+            'file' => UploadedFile::fake()->image('pending.jpg', 800, 600),
+        ], $this->as($this->session))->assertStatus(202);
+
+        $operation = MediaImport::query()->where('uuid', $accepted->json('operation_id'))->firstOrFail();
+
+        $this->assertSame('queued', $operation->status);
+        $this->assertArrayNotHasKey('heroImage', $this->settings());
+        Storage::disk('s3')->assertExists($operation->source_path);
+        $this->assertStringStartsWith('live-edit-pending/', $operation->source_path);
+        Queue::assertPushed(ProcessMediaImport::class, fn (ProcessMediaImport $job): bool => $job->importId === $operation->id);
+    }
+
+    public function test_a_free_photo_is_fetched_only_after_the_import_job_runs(): void
+    {
+        $address = 'https://images.unsplash.com/photo-123';
+        Cache::put('live-edit:photo-offered:'.sha1($address), true, now()->addHour());
+
+        $accepted = $this->post($this->url(), [
+            'target' => 'setting:heroImage',
+            'url' => $address,
+        ], $this->as($this->session))->assertStatus(202);
+
+        $operation = MediaImport::query()->where('uuid', $accepted->json('operation_id'))->firstOrFail();
+        $this->assertSame('queued', $operation->status);
+        $this->assertSame($address, $operation->source_url);
+        $this->assertArrayNotHasKey('heroImage', $this->settings());
+        \Illuminate\Support\Facades\Http::assertNothingSent();
+    }
+
+    public function test_a_sync_queue_is_refused_without_processing_in_the_request(): void
+    {
+        config()->set('queue.default', 'sync');
+
+        $this->post($this->url(), [
+            'target' => 'setting:heroImage',
+            'file' => UploadedFile::fake()->image('photo.jpg'),
+        ], $this->as($this->session))
+            ->assertStatus(503)
+            ->assertJsonPath('error.type', 'queue_unavailable');
+
+        $this->assertSame([], Storage::disk('s3')->allFiles());
+        $this->assertSame(0, MediaImport::query()->count());
+    }
+
+    public function test_a_failed_image_job_keeps_the_old_picture_and_cleans_its_staged_source(): void
+    {
+        $this->post($this->url(), [
+            'target' => 'setting:heroImage',
+            'url' => 'https://images.example.com/old.jpg',
+        ], $this->as($this->session))->assertOk();
+
+        $accepted = $this->post($this->url(), [
+            'target' => 'setting:heroImage',
+            'file' => UploadedFile::fake()->createWithContent('broken.jpg', 'not an image'),
+        ], $this->as($this->session))->assertStatus(202);
+        $operation = MediaImport::query()->where('uuid', $accepted->json('operation_id'))->firstOrFail();
+        $sourcePath = $operation->source_path;
+
+        (new ProcessMediaImport($operation->id))->handle(app(StoreMedia::class), app(ApplyEdit::class));
+
+        $this->assertSame('failed', $operation->fresh()->status);
+        $this->assertSame('https://images.example.com/old.jpg', $this->settings()['heroImage']);
+        Storage::disk('s3')->assertMissing($sourcePath);
+        $this->pollImport($operation)->assertOk()->assertJsonPath('status', 'failed');
     }
 
     public function test_an_image_is_fitted_before_it_reaches_the_bucket(): void
@@ -109,13 +208,14 @@ class MediaTest extends TestCase
             $this->markTestSkipped('GD is not available.');
         }
 
-        $response = $this->post($this->url(), [
+        $accepted = $this->post($this->url(), [
             'file' => UploadedFile::fake()->image('wide.jpg', 1600, 400),
             'fitWidth' => 400,
             'fitHeight' => 400,
         ], $this->as($this->session));
 
-        $response->assertOk();
+        $operation = $this->completeImport($accepted);
+        $response = $this->pollImport($operation)->assertOk();
 
         $stored = Storage::disk('s3')->get($response->json('path'));
         $size = getimagesizefromstring($stored);
@@ -133,13 +233,14 @@ class MediaTest extends TestCase
             $this->markTestSkipped('GD is not available.');
         }
 
-        $response = $this->post($this->url(), [
+        $accepted = $this->post($this->url(), [
             'file' => UploadedFile::fake()->image('photo.jpg', 2400, 1600),
             'fitWidth' => 400,
             'fitHeight' => 300,
         ], $this->as($this->session));
 
-        $response->assertOk();
+        $operation = $this->completeImport($accepted);
+        $response = $this->pollImport($operation)->assertOk();
 
         $size = getimagesizefromstring(Storage::disk('s3')->get($response->json('path')));
 
@@ -155,13 +256,14 @@ class MediaTest extends TestCase
             $this->markTestSkipped('GD is not available.');
         }
 
-        $response = $this->post($this->url(), [
+        $accepted = $this->post($this->url(), [
             'file' => UploadedFile::fake()->image('small.jpg', 500, 500),
             'fitWidth' => 400,
             'fitHeight' => 300,
         ], $this->as($this->session));
 
-        $response->assertOk();
+        $operation = $this->completeImport($accepted);
+        $response = $this->pollImport($operation)->assertOk();
 
         $size = getimagesizefromstring(Storage::disk('s3')->get($response->json('path')));
 
@@ -185,6 +287,22 @@ class MediaTest extends TestCase
         ])->assertStatus(403);
 
         $this->assertSame([], Storage::disk('s3')->allFiles());
+    }
+
+    public function test_a_session_for_another_site_cannot_impersonate_this_site_on_media(): void
+    {
+        $other = Site::query()->create(['slug' => 'other', 'name' => 'Other', 'allowed_origins' => ['https://other.test']]);
+        [, $otherSession] = $other->issueToken(TokenType::Session, 'Edit', [Ability::Read, Ability::Write], now()->addHour());
+
+        $this->post($this->url(), ['target' => 'setting:heroImage', 'file' => UploadedFile::fake()->image('spoof.jpg')], [
+            'Authorization' => 'Bearer '.$otherSession,
+            'Origin' => 'https://client.test',
+            'Accept' => 'application/json',
+        ])->assertForbidden();
+
+        Queue::assertNothingPushed();
+        $this->assertSame([], Storage::disk('s3')->allFiles());
+        $this->assertSame(0, MediaImport::query()->count());
     }
 
     public function test_a_disguised_file_is_refused(): void
@@ -220,11 +338,12 @@ class MediaTest extends TestCase
         </svg>
         SVG;
 
-        $response = $this->post($this->url(), [
+        $accepted = $this->post($this->url(), [
             'file' => UploadedFile::fake()->createWithContent('logo.svg', $hostile),
         ], $this->as($this->session));
 
-        $response->assertOk();
+        $operation = $this->completeImport($accepted);
+        $response = $this->pollImport($operation)->assertOk();
 
         $stored = Storage::disk('s3')->get($response->json('path'));
 
@@ -238,11 +357,27 @@ class MediaTest extends TestCase
     public function test_uploads_are_throttled_harder_than_text(): void
     {
         for ($i = 0; $i < 3; $i++) {
-            $this->post($this->url(), ['file' => UploadedFile::fake()->image("a{$i}.jpg")], $this->as($this->session))->assertOk();
+            $this->post($this->url(), ['file' => UploadedFile::fake()->image("a{$i}.jpg")], $this->as($this->session))->assertStatus(202);
         }
 
         $this->post($this->url(), ['file' => UploadedFile::fake()->image('b.jpg')], $this->as($this->session))
             ->assertStatus(429);
+
+        // A burst can fill only the configured three-job allowance. Requests
+        // stage their input and return; no image work runs on the web worker.
+        Queue::assertPushed(ProcessMediaImport::class, 3);
+        $operations = MediaImport::query()->where('status', 'queued')->get();
+        $this->assertCount(3, $operations);
+        $this->assertCount(3, Storage::disk('s3')->allFiles());
+
+        foreach ($operations as $operation) {
+            (new ProcessMediaImport($operation->id))->handle(app(StoreMedia::class), app(ApplyEdit::class));
+            $this->assertSame('completed', $operation->fresh()->status);
+        }
+
+        $files = Storage::disk('s3')->allFiles();
+        $this->assertCount(3, array_filter($files, fn (string $path): bool => str_contains($path, '/sites/client/')));
+        $this->assertSame([], array_filter($files, fn (string $path): bool => str_contains($path, 'live-edit-pending/')));
     }
 
     public function test_two_sites_keep_their_pictures_apart(): void
@@ -250,12 +385,13 @@ class MediaTest extends TestCase
         $other = Site::query()->create(['slug' => 'other', 'name' => 'Other', 'allowed_origins' => ['https://other.test']]);
         [, $theirSession] = $other->issueToken(TokenType::Session, 'Edit', [Ability::Read, Ability::Write], now()->addHour());
 
-        $ours = $this->post($this->url(), ['file' => UploadedFile::fake()->image('a.jpg')], $this->as($this->session))
-            ->assertOk()->json('path');
+        $oursOperation = $this->completeImport($this->post($this->url(), ['file' => UploadedFile::fake()->image('a.jpg')], $this->as($this->session)));
+        $ours = $oursOperation->stored_path;
 
-        $theirs = $this->post('/api/live-edit/v1/other/media', ['file' => UploadedFile::fake()->image('b.jpg')],
-            ['Authorization' => 'Bearer '.$theirSession, 'Origin' => 'https://other.test'])
-            ->assertOk()->json('path');
+        $theirsAccepted = $this->post('/api/live-edit/v1/other/media', ['file' => UploadedFile::fake()->image('b.jpg')],
+            ['Authorization' => 'Bearer '.$theirSession, 'Origin' => 'https://other.test']);
+        $theirsOperation = $this->completeImport($theirsAccepted);
+        $theirs = $theirsOperation->stored_path;
 
         $this->assertStringContainsString('/sites/client/', $ours);
         $this->assertStringContainsString('/sites/other/', $theirs);
@@ -267,7 +403,9 @@ class MediaTest extends TestCase
         // never from this application.
         config()->set('live-edit.media_url', 'https://cdn.client.test');
 
-        $response = $this->post($this->url(), ['file' => UploadedFile::fake()->image('hero.jpg')], $this->as($this->session));
+        $accepted = $this->post($this->url(), ['file' => UploadedFile::fake()->image('hero.jpg')], $this->as($this->session));
+        $operation = $this->completeImport($accepted);
+        $response = $this->pollImport($operation)->assertOk();
 
         $this->assertSame(
             'https://cdn.client.test/'.$response->json('path'),
@@ -307,12 +445,13 @@ class MediaTest extends TestCase
      */
     public function test_an_uploaded_picture_becomes_the_one_the_page_shows(): void
     {
-        $response = $this->post($this->url(), [
+        $accepted = $this->post($this->url(), [
             'target' => 'setting:heroImage',
             'file' => UploadedFile::fake()->image('new.jpg', 800, 600),
-        ], $this->as($this->session))->assertOk();
+        ], $this->as($this->session));
+        $operation = $this->completeImport($accepted);
 
-        $this->assertSame($response->json('url'), $this->settings()['heroImage'] ?? null);
+        $this->assertSame($operation->url, $this->settings()['heroImage'] ?? null);
     }
 
     public function test_a_pasted_url_becomes_the_picture(): void
@@ -368,16 +507,10 @@ class MediaTest extends TestCase
             'file' => UploadedFile::fake()->image('beach.jpg', 800, 600),
         ], $this->as($this->session));
 
-        $response->assertStatus(500);
-        $this->assertSame('save_failed', $response->json('error.type'));
-        $this->assertStringContainsString('could not be saved', (string) $response->json('error.message'));
-        // The exception, to the editor who is already trusted to change this
-        // site's content. Without it every occurrence is a hunt through a log
-        // shared by every customer.
-        $this->assertNotEmpty((string) $response->json('error.detail'));
-        // And it says the page is untouched, because the first thing somebody
-        // wonders is whether they have half-broken their own site.
+        $response->assertStatus(503);
+        $this->assertSame('queue_unavailable', $response->json('error.type'));
         $this->assertStringContainsString('Nothing on the page has changed', (string) $response->json('error.message'));
+        $this->assertArrayNotHasKey('heroImage', $this->settings());
     }
 
     public function test_a_disk_that_fails_quietly_is_not_reported_as_saved(): void
@@ -402,8 +535,12 @@ class MediaTest extends TestCase
             'file' => UploadedFile::fake()->image('beach.jpg', 800, 600),
         ], $this->as($this->session));
 
-        $response->assertStatus(500);
-        $this->assertSame('save_failed', $response->json('error.type'));
+        $response->assertStatus(202)->assertJsonPath('status', 'queued');
+        $operation = MediaImport::query()->where('uuid', $response->json('operation_id'))->firstOrFail();
+        (new ProcessMediaImport($operation->id))->handle(app(StoreMedia::class), app(ApplyEdit::class));
+
+        $this->assertSame('failed', $operation->fresh()->status);
+        $this->assertSame('processing_failed', $operation->fresh()->reason);
         $this->assertArrayNotHasKey('heroImage', $this->settings(), 'a picture that was never stored was recorded as stored');
     }
 
@@ -422,7 +559,7 @@ class MediaTest extends TestCase
         $this->post($this->url(), [
             'target' => 'setting:heroImage',
             'file' => UploadedFile::fake()->image('beach.jpg', 800, 600),
-        ], $this->as($this->session))->assertStatus(500);
+        ], $this->as($this->session))->assertStatus(503);
 
         $this->artisan('live-edit:last-failure')
             ->expectsOutputToContain('heroImage')
@@ -626,9 +763,8 @@ class MediaTest extends TestCase
         // A style field uploading a section background writes the address into
         // the style itself, so it names no setting. That path must keep
         // working exactly as it did.
-        $this->post($this->url(), ['file' => UploadedFile::fake()->image('bg.jpg')], $this->as($this->session))
-            ->assertOk()
-            ->assertJsonStructure(['url', 'path']);
+        $operation = $this->completeImport($this->post($this->url(), ['file' => UploadedFile::fake()->image('bg.jpg')], $this->as($this->session)));
+        $this->pollImport($operation)->assertOk()->assertJsonStructure(['url', 'path']);
     }
 
     /**

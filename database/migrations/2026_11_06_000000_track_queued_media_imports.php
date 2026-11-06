@@ -20,6 +20,7 @@ return new class extends Migration
             $table->json('options');
             $table->string('status', 20)->index();
             $table->text('url')->nullable();
+            $table->string('stored_path', 500)->nullable();
             $table->string('reason', 80)->nullable();
             $table->timestamps();
             $table->index(['site_id', 'uuid']);

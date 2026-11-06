@@ -5,9 +5,14 @@ namespace ShipFast\LiveEdit\Tests\Api;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\Queue;
+use ShipFast\LiveEdit\Application\Api\ApplyEdit;
+use ShipFast\LiveEdit\Application\Api\StoreMedia;
 use ShipFast\LiveEdit\Domain\Site\Ability;
 use ShipFast\LiveEdit\Domain\Site\Site;
 use ShipFast\LiveEdit\Domain\Site\TokenType;
+use ShipFast\LiveEdit\Jobs\ProcessMediaImport;
+use ShipFast\LiveEdit\Models\MediaImport;
 use ShipFast\LiveEdit\Tests\TestCase;
 
 /**
@@ -57,12 +62,14 @@ class BoundedToTheSiteTest extends TestCase
         $app['config']->set('cors.paths', []);
         $app['config']->set('live-edit.auto_keys', true);
         $app['config']->set('live-edit.settings', ['heroImage']);
+        $app['config']->set('queue.default', 'database');
     }
 
     protected function setUp(): void
     {
         parent::setUp();
         Storage::fake('local');
+        Queue::fake();
 
         $this->mine = Site::query()->create([
             'slug' => 'mine', 'name' => 'Mine', 'allowed_origins' => ['https://mine.test'],
@@ -312,10 +319,13 @@ class BoundedToTheSiteTest extends TestCase
         )->status();
 
         // Sent as multipart, which postJson cannot do.
-        $stored = $this->post('/api/live-edit/v1/mine/media',
+        $accepted = $this->post('/api/live-edit/v1/mine/media',
             ['file' => UploadedFile::fake()->image('x.jpg')],
             ['Authorization' => 'Bearer '.$this->mySession, 'Origin' => 'https://mine.test', 'Accept' => 'application/json'],
-        )->assertOk()->json('path');
+        )->assertStatus(202);
+        $operation = MediaImport::query()->where('uuid', $accepted->json('operation_id'))->firstOrFail();
+        (new ProcessMediaImport($operation->id))->handle(app(StoreMedia::class), app(ApplyEdit::class));
+        $stored = $operation->fresh()->stored_path;
 
         $this->assertStringContainsString('/mine/', $stored);
         $this->assertStringNotContainsString('/theirs/', $stored);
