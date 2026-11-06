@@ -1081,12 +1081,9 @@ select.le-input {
 .le-pick-by { display: block; font-size: 11px; color: var(--le-muted); margin-top: 6px; }
 .le-shimmer {
   width: 100%; aspect-ratio: 4 / 3; border-radius: 10px;
-  background: linear-gradient(100deg, #EEEFF1 30%, #F7F8F9 50%, #EEEFF1 70%);
-  background-size: 200% 100%; animation: le-shimmer 1.2s linear infinite;
+  background: #EEEFF1;
 }
 .le-grid.is-square .le-shimmer { aspect-ratio: 1 / 1; }
-@keyframes le-shimmer { to { background-position: -200% 0; } }
-@media (prefers-reduced-motion: reduce) { .le-shimmer { animation: none; } }
 
 /* The prompt the page writes for itself. Somebody who cannot describe the
    picture they want can press one button and get a usable one. */
@@ -1324,9 +1321,8 @@ select.le-input {
   .le-sheet-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
   @keyframes le-sheet-rise { from { opacity: 0; transform: translateY(24px); } to { opacity: 1; transform: none; } }
 }
-/* The narrowest phones: the mark gives its room to the controls (the dashboard is in More, where the host links it). */
+/* Keep the mark visible on the narrowest phones too; controls wrap before it disappears. */
 @media (max-width: 359px) {
-  .le-toolbar.is-folded .le-mark { display: none; }
   .le-toolbar { left: 6px; right: 6px; max-width: calc(100vw - 12px); gap: 2px; padding: 4px; }
   .le-toolbar .le-publish { gap: 6px; }
 }

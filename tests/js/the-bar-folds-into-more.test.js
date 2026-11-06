@@ -46,6 +46,25 @@ describe('which icon a host link gets', () => {
 });
 
 describe('the links on the bar', () => {
+    it('keeps the product mark visible at every responsive width', () => {
+        const ui = chrome();
+        const mark = ui.toolbar.querySelector('.le-mark');
+        const css = ui.shadow.querySelector('style').textContent;
+
+        expect(mark.querySelector('svg')).not.toBeNull();
+        expect(css).not.toMatch(/\.le-toolbar\.is-folded \.le-mark\s*\{[^}]*display:\s*none/);
+    });
+
+    it('uses a solid image-loading placeholder without a horizontal gradient', () => {
+        const ui = chrome();
+        const css = ui.shadow.querySelector('style').textContent;
+        const shimmer = css.match(/\.le-shimmer\s*\{([^}]+)\}/)?.[1] ?? '';
+
+        expect(shimmer).toContain('background: #EEEFF1');
+        expect(shimmer).not.toContain('gradient');
+        expect(css).not.toContain('@keyframes le-shimmer');
+    });
+
     it('are icon buttons named by their label when they name an icon, and words when they do not', () => {
         const ui = chrome({
             links: [
