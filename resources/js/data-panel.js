@@ -9,8 +9,8 @@
  * kept in step with the columns.
  */
 import {
-    KINDS, cellContext, cellsOf, cellPlace, chartData, chartOf, columnsOf, fieldNames, itemContext, kindOf, mostFor,
-    movedColumn, pastePlan, rowsOf, tablePastePlan, tryEdit, tryOrder, freshIds,
+    KINDS, cellContext, cellsOf, cellPlace, chartData, chartOf, chartPlan, columnsOf, fieldNames, figure, itemContext, kindOf, mostFor,
+    movedColumn, parsePasted, pastePlan, rowsOf, tableOf, tablePastePlan, tablePlan, tryEdit, tryOrder, freshIds,
 } from './data-kit.js';
 
 const el = (tag, className, text) => {
@@ -171,23 +171,42 @@ export const renderChartRow = ({ row, save, saveOrder, refresh, notify }) => {
  * The chart as a whole: its kind, its settings (the ones its kind offers), its rows to open, and
  * "Paste rows" to fill it from a spreadsheet.
  */
-export const renderChartPanel = ({ chart, save, saveOrder, refresh, notify, renderChoice, applyOrder, openRow }) => {
+export const renderChartPanel = ({ chart, save, saveOrder, refresh, notify, renderChoice, applyOrder, focusRow = null }) => {
     const kind = kindOf(chart);
     const spec = KINDS[kind];
     const wrap = el('div', 'le-data');
     const { list, rows } = chartData(chart);
-    wrap.append(el('p', 'le-hint', `A ${kind === 'bar' ? 'bar chart' : kind === 'line' ? 'line chart' : kind === 'progress' ? 'chart of progress to targets' : kind}, drawn from its ${spec.many} in your site’s own colours. Click a ${spec.one.toLowerCase()} to change it.`));
+    wrap.append(el('p', 'le-hint', `A ${kind === 'bar' ? 'bar chart' : kind === 'line' ? 'line chart' : kind === 'progress' ? 'chart of progress to targets' : kind}, drawn from its ${spec.many} in your site’s own colours. Type in the grid below, then Save changes.`));
 
+    wrap.append(el('div', 'le-section-heading', `Its ${spec.many}`));
+    const headCells = chartData(chart).table?.querySelector('thead tr') ? cellsOf(chartData(chart).table.querySelector('thead tr')) : [];
+    const width = 1 + spec.fields.length;
+    wrap.append(renderDataGrid({
+        heads: Array.from({ length: width }, (_, i) => String(headCells[i]?.textContent ?? [spec.label, ...spec.fields][i] ?? '').trim()),
+        rows: rows.map((tr) => cellWords(tr).slice(0, width)),
+        fixedColumns: true,
+        mostRows: mostFor(chart),
+        figures: [false, ...spec.fields.map(() => true)],
+        rowNoun: spec.one.toLowerCase(),
+        focus: focusRow && rows.includes(focusRow) ? { row: rows.indexOf(focusRow), col: 1 } : null,
+        onSave: async ({ heads, rows: grid }) => {
+            const plan = chartPlan(chart, grid, heads);
+            if (plan.refused.length) return plan.refused;
+            await fillRows({ list, plan: plan.order, values: plan.grid, heads: plan.heads, headCells: headCells.length ? headCells : null, save, saveOrder, applyOrder });
+            await refresh(`Chart saved ✓ ${plan.grid.length} ${plan.grid.length === 1 ? spec.one.toLowerCase() : spec.many}.${plan.notes.length ? ` ${plan.notes[0]}` : ''}`);
+
+            return [];
+        },
+    }));
+
+    // How it is drawn comes after its figures: the figures are what an owner opens a chart to change.
     const settings = chart.querySelector('[data-edit-choice]');
     const choices = settings ? renderChoice({ item: settings, list: chart, save, notify, hint: 'How this chart is drawn. The figures stay as they are.' }) : null;
     if (choices) wrap.append(el('div', 'le-section-heading', 'How it is drawn'), choices);
 
-    wrap.append(el('div', 'le-section-heading', `${spec.many[0].toUpperCase()}${spec.many.slice(1)} (${rows.length} of at most ${mostFor(chart)})`));
-    const listed = el('div', 'le-row');
-    rows.forEach((tr, i) => listed.append(button(`${i + 1}. ${cellsOf(tr)[0]?.textContent.trim().slice(0, 28) ?? ''}`, 'le-chip-btn', () => openRow(tr))));
-    wrap.append(listed);
-
-    wrap.append(el('div', 'le-section-heading', 'Paste rows'));
+    const more = el('details', 'le-figures-more');
+    more.append(el('summary', null, 'Paste many rows at once'));
+    wrap.append(more);
     const names = [spec.label, ...spec.fields];
     const area = el('textarea', 'le-input le-textarea');
     area.rows = 5;
@@ -209,7 +228,7 @@ export const renderChartPanel = ({ chart, save, saveOrder, refresh, notify, rend
             notify(error.message);
         }
     });
-    wrap.append(el('p', 'le-hint', `From a spreadsheet, or typed: one ${spec.one.toLowerCase()} per line, ${names.length} columns (${names.join(', ')}), separated by tabs or commas. A first line of column names is used for the headings.`), area, fill, why);
+    more.append(el('p', 'le-hint', `From a spreadsheet, or typed: one ${spec.one.toLowerCase()} per line, ${names.length} columns (${names.join(', ')}), separated by tabs or commas. A first line of column names is used for the headings.`), area, fill, why);
 
     return wrap;
 };
@@ -347,6 +366,245 @@ export const renderTableControls = ({ element, save, saveOrder, refresh, notify,
         el('p', 'le-hint', 'From a spreadsheet, or typed: one row per line, cells separated by tabs or commas. A first line of names becomes the headings. The table takes as many columns as the rows have.'),
         area, fill, why,
     );
+
+    return wrap;
+};
+
+/*
+ * The data grid (owner, 7 Nov 2026: "It should be easy to update the components. Table, charts, etc. They are being
+ * used by novice"). A chart's figures and a table's cells as the small spreadsheet people already know from Canva,
+ * Google Slides and PowerPoint's "Edit data": type in any cell, + Add a row, + Add a column, ✕ to remove one, paste
+ * straight from Excel or Google Sheets into any cell, then Save changes. Saving runs the same rules as pasting
+ * (chartPlan, tablePlan), so a donut still takes six slices at most and a figure must be a figure.
+ */
+export const renderDataGrid = ({ heads = [], rows = [], fixedColumns = false, mostRows = 40, mostColumns = 8, figures = [], rowNoun = 'row', focus = null, onSave }) => {
+    const state = {
+        heads: [...heads],
+        rows: rows.map((cells) => [...cells]),
+    };
+    const width = () => Math.max(state.heads.length, ...state.rows.map((cells) => cells.length), 1);
+    const wrap = el('div', 'le-figures-wrap');
+    const scroll = el('div', 'le-figures-scroll');
+    const table = el('table', 'le-figures');
+    scroll.append(table);
+    const tools = el('div', 'le-figures-tools');
+    const count = el('span', 'le-figures-count');
+    const why = el('div', 'le-data-why');
+    const foot = el('div', 'le-figures-foot');
+    const saveButton = button('Save changes', 'le-btn le-btn-primary', () => void saveNow());
+    const undo = button('Undo changes', 'le-chip-btn', () => {
+        state.heads = [...heads];
+        state.rows = rows.map((cells) => [...cells]);
+        dirty(false);
+        draw();
+    });
+    let changed = false;
+    const dirty = (on = true) => {
+        changed = on;
+        saveButton.disabled = !on;
+        undo.hidden = !on;
+        if (on) why.replaceChildren();
+    };
+    const plural = (n, one) => `${n} ${one}${n === 1 ? '' : 's'}`;
+
+    const input = (value, label, r, c) => {
+        const box = el('input', 'le-figures-cell');
+        box.type = 'text';
+        box.value = value ?? '';
+        box.setAttribute('aria-label', label);
+        box.dataset.row = String(r);
+        box.dataset.col = String(c);
+        if (r >= 0 && figures[c]) box.inputMode = 'decimal';
+        box.addEventListener('input', () => {
+            if (r < 0) state.heads[c] = box.value;
+            else state.rows[r][c] = box.value;
+            dirty();
+        });
+        // Enter goes down a row, as in a spreadsheet.
+        box.addEventListener('keydown', (event) => {
+            if (event.key !== 'Enter') return;
+            event.preventDefault();
+            table.querySelector(`input[data-row="${r + 1}"][data-col="${c}"]`)?.focus();
+        });
+        // Rows copied from a spreadsheet fill the grid from this cell, as many rows and columns as there are room for.
+        box.addEventListener('paste', (event) => {
+            const text = event.clipboardData?.getData('text/plain') ?? '';
+            if (!/[\t\n]/.test(text.trim())) return;
+            event.preventDefault();
+            const pasted = parsePasted(text);
+            pasted.forEach((cells, i) => {
+                const at = r + i;
+                if (at < 0) {
+                    cells.forEach((cell, j) => { if (!fixedColumns || c + j < width()) state.heads[c + j] = cell; });
+
+                    return;
+                }
+                while (state.rows.length <= at && state.rows.length < mostRows) state.rows.push(Array(width()).fill(''));
+                if (!state.rows[at]) return;
+                cells.forEach((cell, j) => {
+                    const col = c + j;
+                    if (col >= (fixedColumns ? width() : mostColumns)) return;
+                    state.rows[at][col] = cell;
+                });
+            });
+            dirty();
+            draw({ row: r, col: c });
+        });
+
+        return box;
+    };
+
+    const draw = (focusOn = null) => {
+        const w = width();
+        state.rows = state.rows.map((cells) => Array.from({ length: w }, (_, i) => cells[i] ?? ''));
+        state.heads = Array.from({ length: w }, (_, i) => state.heads[i] ?? '');
+        const head = el('tr');
+        head.append(el('th', 'le-figures-corner'));
+        state.heads.forEach((name, c) => {
+            const th = el('th');
+            th.append(input(name, `Column ${c + 1} name`, -1, c));
+            if (!fixedColumns && w > 1) {
+                th.append(button('✕', 'le-figures-x', () => {
+                    state.heads.splice(c, 1);
+                    state.rows.forEach((cells) => cells.splice(c, 1));
+                    dirty();
+                    draw();
+                }));
+                th.lastChild.setAttribute('aria-label', `Delete column ${c + 1}${name ? ` “${name}”` : ''}`);
+                th.lastChild.title = 'Delete this column';
+            }
+            head.append(th);
+        });
+        head.append(el('th', 'le-figures-corner'));
+        const body = el('tbody');
+        state.rows.forEach((cells, r) => {
+            const tr = el('tr');
+            tr.append(el('th', 'le-figures-n', String(r + 1)));
+            cells.forEach((value, c) => {
+                const td = el('td');
+                td.append(input(value, `Row ${r + 1}, ${state.heads[c] || `column ${c + 1}`}`, r, c));
+                tr.append(td);
+            });
+            const x = el('td');
+            if (state.rows.length > 1) {
+                const del = button('✕', 'le-figures-x', () => {
+                    state.rows.splice(r, 1);
+                    dirty();
+                    draw();
+                });
+                del.setAttribute('aria-label', `Delete row ${r + 1}`);
+                del.title = `Delete this ${rowNoun}`;
+                x.append(del);
+            }
+            tr.append(x);
+            body.append(tr);
+        });
+        const thead = el('thead');
+        thead.append(head);
+        table.replaceChildren(thead, body);
+
+        const addRow = button(`+ Add a ${rowNoun}`, 'le-chip-btn', () => {
+            state.rows.push(Array(width()).fill(''));
+            dirty();
+            draw({ row: state.rows.length - 1, col: 0 });
+        }, state.rows.length >= mostRows);
+        const parts = [addRow];
+        if (!fixedColumns) {
+            parts.push(button('+ Add a column', 'le-chip-btn', () => {
+                state.heads.push('');
+                state.rows.forEach((cells) => cells.push(''));
+                dirty();
+                draw({ row: -1, col: width() - 1 });
+            }, w >= mostColumns));
+        }
+        count.textContent = `${plural(state.rows.length, rowNoun)} of at most ${mostRows}${fixedColumns ? '' : ` · ${plural(w, 'column')} of at most ${mostColumns}`}`;
+        tools.replaceChildren(...parts, count);
+        if (focusOn) table.querySelector(`input[data-row="${focusOn.row}"][data-col="${focusOn.col}"]`)?.focus();
+    };
+    // The cell pressed on the page is the one ready to type in, once the drawer has opened and settled its own focus.
+    if (focus) setTimeout(() => {
+        const box = table.querySelector(`input[data-row="${focus.row}"][data-col="${focus.col}"]`);
+        if (box && box.isConnected) { box.focus(); box.select?.(); box.scrollIntoView?.({ block: 'nearest' }); }
+    }, 120);
+
+    const saveNow = async () => {
+        if (!changed) return;
+        saveButton.disabled = true;
+        saveButton.textContent = 'Saving…';
+        try {
+            const refused = await onSave({ heads: [...state.heads], rows: state.rows.map((cells) => [...cells]) });
+            if (refused?.length) {
+                why.replaceChildren(said(refused.map((message) => ({ refuse: true, message }))));
+                saveButton.disabled = false;
+            } else {
+                changed = false;
+            }
+        } catch (error) {
+            why.replaceChildren(said([{ refuse: true, message: error.message || 'It could not be saved. Try again.' }]));
+            saveButton.disabled = false;
+        } finally {
+            saveButton.textContent = 'Save changes';
+        }
+    };
+
+    foot.append(saveButton, undo);
+    wrap.append(scroll, tools, why, foot);
+    dirty(false);
+    draw(focus);
+
+    return wrap;
+};
+
+/** A row's cells as words, for the grid. */
+const cellWords = (tr) => cellsOf(tr).map((cell) => String(wordsIn(cell)?.textContent ?? cell.textContent ?? '').replace(/\s+/g, ' ').trim());
+
+/** Save a table from a plan: its columns, its rows, then every cell and heading. */
+const fillTable = async ({ info, plan, save, saveOrder, applyOrder }) => {
+    // Columns first, so every row (the new ones too) has them; then the rows; then every cell.
+    await saveOrder(info.head, plan.columns);
+    await applyOrder(info.head, plan.columns);
+    await saveOrder(info.rowsList, plan.rows);
+    await applyOrder(info.rowsList, plan.rows);
+    const rows = rowsOf(info);
+    const cells = [...(plan.heads ? [[info.head, plan.heads]] : []), ...rows.map((tr, i) => [tr, plan.grid[i]])];
+    for (const [tr, values] of cells) {
+        for (const [c, cell] of [...tr.children].filter((n) => n.dataset?.editItem).entries()) {
+            const target = wordsIn(cell);
+            const key = keyOf(target);
+            if (key && values?.[c] !== undefined && target.textContent.trim() !== values[c]) {
+                await save(key, values[c]);
+                target.textContent = values[c];
+            }
+        }
+    }
+};
+
+/**
+ * A table: the whole of it as a grid, opened on the cell that was clicked; pasting many rows at once below it.
+ */
+export const renderTablePanel = ({ element, save, saveOrder, refresh, applyOrder }) => {
+    const info = tableOf(element);
+    if (!info) return null;
+    const columns = columnsOf(info);
+    const rows = rowsOf(info);
+    const place = cellPlace(element);
+    const wrap = el('div', 'le-data');
+    wrap.append(el('p', 'le-hint', 'Type in any cell. Add or delete rows and columns, or paste rows from Excel or Google Sheets into a cell. Then Save changes.'));
+    wrap.append(renderDataGrid({
+        heads: columns.map((c) => c.name),
+        rows: rows.map((tr) => cellWords(tr).slice(0, columns.length)),
+        mostRows: parseInt(info.rowsList?.dataset?.editListMax ?? '', 10) || 40,
+        mostColumns: parseInt(info.head?.dataset?.editListMax ?? '', 10) || 8,
+        focus: place ? { row: place.rowIndex, col: Math.max(0, place.columnIndex) } : { row: 0, col: 0 },
+        onSave: async ({ heads, rows: grid }) => {
+            const plan = tablePlan(info, grid, heads);
+            if (plan.refused.length) return plan.refused;
+            await fillTable({ info, plan, save, saveOrder, applyOrder });
+            await refresh(`Table saved ✓ ${plan.grid.length} rows, ${plan.columns.length} columns.`);
+
+            return [];
+        },
+    }));
 
     return wrap;
 };

@@ -104,7 +104,8 @@ class EditPolicy
          * slugs. No ":" - keys are split on that to separate a locale, and
          * letting one through here would be letting a locale through.
          */
-        return preg_replace('/@[A-Za-z0-9_.~-]{1,64}$/', '', $key) ?? $key;
+        // Two at most: a table's cell in an added row and an added column carries both ("…@<column>@<row>").
+        return preg_replace('/(?:@[A-Za-z0-9_.~-]{1,64}){1,2}$/', '', $key) ?? $key;
     }
 
     /**

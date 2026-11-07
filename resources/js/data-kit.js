@@ -272,6 +272,21 @@ export const pastePlan = (chart, text, now = Date.now()) => {
     if (short !== -1) {
         return { refused: [`Line ${short + 1 + (heads ? 1 : 0)} has ${grid[short].length} column${grid[short].length === 1 ? '' : 's'}; a ${kind} needs ${width}: ${[spec.label, ...spec.fields].join(', ')}.`] };
     }
+
+    return chartPlan(chart, grid, heads, now);
+};
+
+/**
+ * How a grid of rows fills a chart (the data grid's Save, and pasting): the same rules, the same order to save.
+ * Rows with nothing in them are left out.
+ */
+export const chartPlan = (chart, rows, heads = null, now = Date.now()) => {
+    const kind = kindOf(chart);
+    const spec = KINDS[kind];
+    const width = 1 + spec.fields.length;
+    let grid = rows.map((cells) => Array.from({ length: width }, (_, i) => String(cells[i] ?? '').trim()))
+        .filter((cells) => cells.some((cell) => cell !== ''));
+    if (!grid.length) return { refused: [`A ${kind === 'bar' ? 'bar chart' : kind === 'line' ? 'line chart' : 'chart'} needs at least one ${spec.one.toLowerCase()}.`] };
     grid = grid.map((cells) => cells.slice(0, width));
     const found = problems(kind, grid, { unit: unitOf(chart), total: totalOf(chart), most: mostFor(chart) });
     const refused = found.filter((p) => p.refuse).map((p) => p.message);
@@ -354,14 +369,24 @@ export const movedColumn = (ids, id, delta) => {
 export const tablePastePlan = (tableInfo, text, { most = { columns: 8, rows: 40 } } = {}, now = Date.now()) => {
     let grid = parsePasted(text);
     if (!grid.length) return { refused: ['Nothing to fill it with: paste one row per line.'] };
-    const width = Math.max(...grid.map((cells) => cells.length));
-    const columnRoom = parseInt(tableInfo.head?.dataset?.editListMax ?? '', 10) || most.columns;
-    const rowRoom = parseInt(tableInfo.rowsList?.dataset?.editListMax ?? '', 10) || most.rows;
     // A table's first line is its headings unless every cell of it is a figure.
     const heads = grid.length > 1 && grid[0].some((cell) => figure(cell) === null) ? grid[0] : null;
     if (heads) grid = grid.slice(1);
-    if (width > columnRoom) return { refused: [`This table holds ${columnRoom} columns at most; the rows pasted have ${width}.`] };
-    if (grid.length > rowRoom) return { refused: [`This table holds ${rowRoom} rows at most; ${grid.length} were pasted.`] };
+
+    return tablePlan(tableInfo, grid, heads, { most }, now);
+};
+
+/** How a grid fills a table (the data grid's Save, and pasting): its columns, its rows, every cell. */
+export const tablePlan = (tableInfo, given, heads = null, { most = { columns: 8, rows: 40 } } = {}, now = Date.now()) => {
+    let grid = given.map((cells) => cells.map((cell) => String(cell ?? '').trim()));
+    const width = Math.max(heads?.length ?? 0, ...grid.map((cells) => cells.length), 0);
+    grid = grid.filter((cells) => cells.some((cell) => cell !== ''));
+    if (!width) return { refused: ['A table needs at least one column.'] };
+    if (!grid.length) return { refused: ['A table needs at least one row with something in it.'] };
+    const columnRoom = parseInt(tableInfo.head?.dataset?.editListMax ?? '', 10) || most.columns;
+    const rowRoom = parseInt(tableInfo.rowsList?.dataset?.editListMax ?? '', 10) || most.rows;
+    if (width > columnRoom) return { refused: [`This table holds ${columnRoom} columns at most; this has ${width}.`] };
+    if (grid.length > rowRoom) return { refused: [`This table holds ${rowRoom} rows at most; this has ${grid.length}.`] };
     grid = grid.map((cells) => Array.from({ length: width }, (_, i) => cells[i] ?? ''));
     const columns = columnsOf(tableInfo).map((c) => c.id);
     const rows = rowsOf(tableInfo).map((tr) => tr.dataset.editItem);

@@ -35,8 +35,8 @@ import { DETAIL_MODE, copiedItemSettings, copiedStyles, copyPageForCard, deletab
 import { renderChoice } from './choice.js';
 import { TYPES as FORM_TYPES, seedForm } from './forms.js';
 import { renderFormBuilder } from './form-builder.js';
-import { chartRowOf, renderChartPanel, renderChartRow, renderTableControls } from './data-panel.js';
-import { KINDS as CHART_KINDS, chartData, chartOf, itemContext as chartItemContext, kindOf as chartKindOf } from './data-kit.js';
+import { chartRowOf, renderChartPanel, renderChartRow, renderTableControls, renderTablePanel } from './data-panel.js';
+import { KINDS as CHART_KINDS, chartData, chartOf, itemContext as chartItemContext, kindOf as chartKindOf, tableOf as kitTableOf } from './data-kit.js';
 import { commonQuestions, listGuides, profileFor, shopQuestions } from './help.js';
 import { dropdownTriggerFrom } from './dropdown-trigger.js';
 import { addressFromTheRoot } from './site-address.js';
@@ -1073,7 +1073,8 @@ const bootLiveEdit = () => {
             // arrives after it was built. See redrawPanel().
             lastOpened = node;
 
-            if (node.matches?.('tr') && chartRowOf(node) === node) editChartRow(node);
+            if (node.matches?.('tr') && chartRowOf(node) === node) editChart(chartOf(node), node);
+            else if (node.closest?.('td, th') && gridTableOf(node)) editTable(node.closest('td, th'));
             else if (node.hasAttribute('data-edit-list') && chartKindOf(chartOf(node)) && chartData(chartOf(node)).list === node) editChart(chartOf(node));
             else if (node.hasAttribute('data-edit-list')) editList(node);
             else if (node.dataset.editImg !== undefined) editImage(node);
@@ -5424,13 +5425,13 @@ const bootLiveEdit = () => {
             openDrawer();
         };
 
-        /** A chart: its settings, its rows, and pasting rows into it. */
-        const editChart = (chart) => {
+        /** A chart: its settings and its figures as a grid (the bar, point or slice pressed, ready to type in). */
+        const editChart = (chart, focusRow = null) => {
             current = { kind: 'chart' };
             lastOpened = chart;
             drawerTitle.textContent = chart.querySelector('.kit-data__title, h2, h3')?.textContent.trim() || 'Chart';
             drawerDelete.classList.add('le-hidden');
-            drawerFields.replaceChildren(renderChartPanel({ chart, ...dataDeps(), openRow: (row) => switchToNode(row) }));
+            drawerFields.replaceChildren(renderChartPanel({ chart, ...dataDeps(), focusRow }));
             const section = chart.closest('[data-edit-item]');
             if (section) {
                 const open = document.createElement('button');
@@ -5443,6 +5444,39 @@ const bootLiveEdit = () => {
             setTrail(chart);
             showTab('Edit');
             // Each field saves as it is changed (data-panel.js): no Save button to press.
+            ui.drawerFoot.classList.add('le-hidden');
+            openDrawer();
+        };
+
+        /** A table whose columns and rows are lists: edited as a grid. Null for any other table. */
+        const gridTableOf = (node) => {
+            if (node.closest?.('[data-chart-table]')) return null;
+            const info = kitTableOf(node);
+
+            return info?.head?.dataset?.editList && info.rowsList?.dataset?.editList ? info : null;
+        };
+
+        /** A table: the whole of it as a grid, opened on the cell that was pressed. */
+        const editTable = (cell) => {
+            const info = gridTableOf(cell);
+            if (!info) return;
+            current = { kind: 'table' };
+            lastOpened = cell;
+            drawerTitle.textContent = info.block.querySelector('.kit-data__title, h2, h3')?.textContent.trim() || 'Table';
+            drawerDelete.classList.add('le-hidden');
+            drawerFields.replaceChildren(renderTablePanel({ element: cell, ...dataDeps() }));
+            const section = info.block.closest('[data-edit-item]');
+            if (section) {
+                const open = document.createElement('button');
+                open.type = 'button';
+                open.className = 'le-chip-btn';
+                open.textContent = 'Move, hide or remove this section';
+                open.addEventListener('click', () => editStyle(section));
+                drawerFields.append(open);
+            }
+            setTrail(info.block);
+            showTab('Edit');
+            // The grid has its own Save changes.
             ui.drawerFoot.classList.add('le-hidden');
             openDrawer();
         };
@@ -6470,6 +6504,11 @@ const bootLiveEdit = () => {
              * and nothing to type in (owner, 7 Nov 2026: "it's difficult to edit table").
              */
             const cell = node.closest?.('td, th');
+            /*
+             * A table the owner can grow (its columns and rows are lists): pressing any cell opens the whole table as
+             * a grid, on that cell (owner, 7 Nov 2026: "It should be easy to update the components... used by novice").
+             */
+            if (cell && gridTableOf(cell)) return { element: cell, kind: 'table', box: gridTableOf(cell).table, label: 'Table: press to edit it as a grid' };
             if (cell && !node.closest('[data-edit]')) {
                 const words = cell.querySelectorAll('[data-edit^="setting:"]');
                 if (words.length === 1) return { element: words[0], kind: 'text' };
@@ -6644,8 +6683,9 @@ const bootLiveEdit = () => {
                 return;
             }
             if (kind === 'search') editSearch(element);
-            else if (kind === 'chart-row') editChartRow(element);
+            else if (kind === 'chart-row') editChart(chartOf(element), element);
             else if (kind === 'chart') editChart(element);
+            else if (kind === 'table') editTable(element);
             else if (kind === 'image') { const list = galleryOf(element); if (list) editGalleryPhoto(element, list); else editImage(element); }
             else if (kind === 'icon') void editIcon(element);
             else if (kind === 'svg') editDrawing(element);

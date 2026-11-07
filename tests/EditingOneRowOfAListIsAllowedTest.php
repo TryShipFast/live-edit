@@ -49,6 +49,14 @@ class EditingOneRowOfAListIsAllowedTest extends TestCase
         $this->assertTrue($this->policy()->permitsKey('auto:6c246fb8f7e4@nm2x8p1q'));
     }
 
+    /** A table's cell in an added row and an added column carries both (owner, 7 Nov 2026: tables "used by novice"). */
+    public function test_a_cell_in_an_added_row_and_an_added_column_may_be_written(): void
+    {
+        $this->assertTrue($this->policy()->permitsKey('auto:6c246fb8f7e4@nmw6v9lmv_c4@nmw6v9men_r3'));
+        $this->assertFalse($this->policy()->permitsKey('not_declared@c4@r3'));
+        $this->assertFalse($this->policy()->permitsKey('auto:6c246fb8f7e4@a@b@c'));
+    }
+
     public function test_a_declared_key_carries_its_item_the_same_way(): void
     {
         // Declared keys are the shape a developer writes by hand, and an

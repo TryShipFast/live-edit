@@ -60,7 +60,21 @@ const path = (page) => new URL(page.url()).pathname.replace(/^\/edit\//, '').rep
 const rowsDrawn = (page_, id) => [...site.host.draw(page_).querySelectorAll(`[data-instance="${page_}.${id}"] tbody tr`)]
     .map((tr) => [...tr.children].map((cell) => cell.textContent.trim()));
 
-test('a donut, chosen by its kind, is added and edited slice by slice with its rules kept', async ({ page }) => {
+/*
+ * Charts and tables are edited as a grid (owner, 7 Nov 2026: "It should be easy to update the components. Table,
+ * charts, etc. They are being used by novice"): a press anywhere on one opens its figures or cells as a small
+ * spreadsheet, on what was pressed; typed in, rows and columns added and removed, pasted into; one Save changes.
+ */
+const sheet = (page) => drawer(page).locator('.le-figures');
+const box = (page, r, c) => sheet(page).locator(`input[data-row="${r}"][data-col="${c}"]`);
+const saveSheet = (page) => drawer(page).locator('.le-figures-foot').getByRole('button', { name: 'Save changes' }).click();
+const pasteInto = (locator, text) => locator.evaluate((input, rows) => {
+    const data = new DataTransfer();
+    data.setData('text/plain', rows);
+    input.dispatchEvent(new ClipboardEvent('paste', { clipboardData: data, bubbles: true, cancelable: true }));
+}, text);
+
+test('a donut, chosen by its kind, is added and edited in its grid with its rules kept', async ({ page }) => {
     await openAsEditor(page, 'shop');
     await page.mouse.move(400, 300);
     await ui(page).locator('.le-insert-end.is-visible .le-insert-btn').click();
@@ -77,58 +91,55 @@ test('a donut, chosen by its kind, is added and edited slice by slice with its r
     const chart = page.locator(`[data-instance="shop.${id}"]`);
     await expect(chart.locator('[data-chart-plot] svg .kit-chart__mark')).toHaveCount(4);
 
-    // A slice, clicked on the drawing, opens as a slice with the donut's own fields.
+    // A slice pressed on the drawing opens the donut's grid, that slice's share ready to type in.
     await chart.locator('[data-chart-plot] .kit-chart__mark').first().dispatchEvent('click');
-    await expect(drawer(page).getByText('Slice 1 of 4 · Recommended by a friend')).toBeVisible();
-    await expect(drawer(page).locator('.le-data-fields .le-label')).toHaveText(['Source', 'Share']);
-    await expect(drawer(page).getByRole('button', { name: '+ Add a slice after' })).toBeVisible();
+    await expect(sheet(page).locator('tbody tr')).toHaveCount(4);
+    await expect(sheet(page).locator('thead input')).toHaveCount(2);
+    await expect(box(page, 0, 1)).toBeFocused();
 
     // A share that stops the whole adding up is saved, and said.
-    const share = drawer(page).locator('input[data-data-column="1"]');
-    await share.fill('46');
-    await share.press('Enter');
+    await box(page, 0, 1).fill('46');
+    await saveSheet(page);
     const shareKey = keyOf(site.host.draw('shop'), `[data-instance="shop.${id}"] tbody tr td`);
     await expect.poll(() => site.host.settings[shareKey]).toBe('46');
-    await expect(drawer(page).getByText(/Shares now add to 104%, not 100%\. Take 4 off one of them/)).toBeVisible();
+    await expect(page.locator('#live-edit-ui')).toContainText(/Shares now add to 104%, not 100%/);
     await expect.poll(() => chart.locator('svg[role="img"]').getAttribute('aria-label')).toContain('46%');
 
-    // A word where a figure goes is refused, and nothing is saved.
-    await share.fill('lots');
-    await share.press('Enter');
+    // A word where a figure goes is refused, said in the panel, and nothing is saved.
+    await chart.locator('[data-chart-plot] .kit-chart__mark').first().dispatchEvent('click');
+    await box(page, 0, 1).fill('lots');
+    await saveSheet(page);
     await expect(drawer(page).getByRole('alert')).toContainText('“lots” is not a figure');
     expect(site.host.settings[shareKey]).toBe('46');
 
-    // Two more slices make six; a seventh is not offered, and the panel says why.
-    for (const _ of [1, 2]) {
-        await chart.locator('[data-chart-plot] .kit-chart__mark').first().dispatchEvent('click');
-        await drawer(page).getByRole('button', { name: '+ Add a slice after' }).click();
-        await expect(page.locator('.le-toast, #live-edit-ui').first()).toBeAttached();
-        await expect.poll(() => rowsDrawn('shop', id).length).toBe(4 + _);
+    // Two more slices make six; a seventh is not offered.
+    await box(page, 0, 1).fill('40');
+    for (const [r, name] of [[4, 'Podcasts'], [5, 'Events']]) {
+        await drawer(page).getByRole('button', { name: '+ Add a slice' }).click();
+        await box(page, r, 0).fill(name);
+        await box(page, r, 1).fill('2');
     }
-    await chart.locator('[data-chart-plot] .kit-chart__mark').first().dispatchEvent('click');
-    await expect(drawer(page).getByRole('button', { name: '+ Add a slice after' })).toBeDisabled();
-    await expect(drawer(page).getByText(/A donut reads at 6 slices at most/)).toBeVisible();
+    await expect(drawer(page).getByRole('button', { name: '+ Add a slice' })).toBeDisabled();
+    await expect(drawer(page).locator('.le-figures-count')).toHaveText('6 slices of at most 6');
+    await saveSheet(page);
+    await expect.poll(() => rowsDrawn('shop', id).length).toBe(6);
+    await expect.poll(() => rowsDrawn('shop', id).at(-1)).toEqual(['Events', '2']);
 });
 
-test('a funnel refuses a stage larger than the one before it, and a move that would make one', async ({ page }) => {
+test('a funnel refuses a stage larger than the one before it, said in its grid', async ({ page }) => {
     await openAsEditor(page, 'shop');
     const id = await addAtTheEnd(page, 'Chart: a funnel of stages');
     const chart = page.locator(`[data-instance="shop.${id}"]`);
     await chart.locator('[data-chart-plot] .kit-chart__mark').nth(2).dispatchEvent('click');
-    await expect(drawer(page).getByText('Stage 3 of 4 · Added to the bag')).toBeVisible();
+    await expect(box(page, 2, 1)).toBeFocused();
 
-    const count = drawer(page).locator('input[data-data-column="1"]');
-    await count.fill('2,500');
-    await count.press('Enter');
+    await box(page, 2, 1).fill('2,500');
+    await saveSheet(page);
     await expect(drawer(page).getByRole('alert')).toContainText('can’t be more than the stage before it, “Viewed a product” (2,100)');
     expect(rowsDrawn('shop', id)[2][1]).toBe('640');
 
-    await drawer(page).getByRole('button', { name: '↑ Move up' }).click();
-    await expect(drawer(page).getByRole('alert').first()).toContainText('can’t be more than the stage before it');
-    expect(rowsDrawn('shop', id).map((r) => r[0])).toEqual(['Visited the site', 'Viewed a product', 'Added to the bag', 'Ordered']);
-
-    await count.fill('900');
-    await count.press('Enter');
+    await box(page, 2, 1).fill('900');
+    await saveSheet(page);
     await expect.poll(() => rowsDrawn('shop', id)[2][1]).toBe('900');
 });
 
@@ -137,13 +148,15 @@ test('a bar chart is filled from pasted rows, and drawn across instead of up', a
     const id = await addAtTheEnd(page, 'Chart: bars or columns');
     const chart = page.locator(`[data-instance="shop.${id}"]`);
 
-    // The drawing itself, away from any bar, is the chart: its settings, its bars, pasting.
+    // The drawing itself, away from any bar, is the chart: its grid, its settings.
     await chart.locator('[data-chart-plot]').scrollIntoViewIfNeeded();
     const plot = await chart.locator('[data-chart-plot]').boundingBox();
     await page.mouse.click(plot.x + 4, plot.y + 4);
     await expect(drawer(page).getByText('How it is drawn', { exact: true })).toBeVisible();
-    await drawer(page).locator('textarea').fill('Month\tSales\nJul\t210\nAug\t190\nSep\t230\nOct\t260\nNov\t300\nDec\t340\nJan\t280');
-    await drawer(page).getByRole('button', { name: 'Fill the chart' }).click();
+    // Rows copied from a spreadsheet, pasted into the grid's first cell: the headings and seven bars.
+    await pasteInto(box(page, -1, 0), 'Month\tSales\nJul\t210\nAug\t190\nSep\t230\nOct\t260\nNov\t300\nDec\t340\nJan\t280');
+    await expect(sheet(page).locator('tbody tr')).toHaveCount(7);
+    await saveSheet(page);
     await expect.poll(() => rowsDrawn('shop', id)).toEqual([['Jul', '210'], ['Aug', '190'], ['Sep', '230'], ['Oct', '260'], ['Nov', '300'], ['Dec', '340'], ['Jan', '280']]);
     expect(site.host.draw('shop').querySelector(`[data-instance="shop.${id}"] thead th:nth-child(2)`).textContent.trim()).toBe('Sales');
     await page.reload();
@@ -162,54 +175,53 @@ test('a bar chart is filled from pasted rows, and drawn across instead of up', a
     await expect.poll(() => page.locator(`[data-instance="shop.${id}"] [data-chart-settings]`).getAttribute('data-chart-variant')).toBe('bars');
 });
 
-test('a table takes columns added, moved and deleted in every row, and rows with every column', async ({ page }) => {
+test('a table takes columns and rows added and deleted in its grid, every row kept in step', async ({ page }) => {
     await openAsEditor(page, 'shop');
     const id = await addAtTheEnd(page, 'Table');
     const table = page.locator(`[data-instance="shop.${id}"] table`);
     const shape = () => rowsDrawn('shop', id).map((r) => r.length);
     const heads = () => [...site.host.draw('shop').querySelectorAll(`[data-instance="shop.${id}"] thead th`)].map((th) => th.textContent.trim());
+    const openTable = async () => {
+        await page.keyboard.press('Escape');
+        await table.locator('tbody tr').first().locator('td').first().evaluate((el) => el.scrollIntoView({ block: 'center' }));
+        await table.locator('tbody tr').first().locator('td').first().click();
+        await expect(sheet(page)).toBeVisible();
+    };
 
-    await table.locator('tbody tr').first().locator('td').first().locator('span').click();
-    await expect(drawer(page).getByText('Row 1 of 3 · Starter · Column 2 of 4 · Price a month')).toBeVisible();
-    await drawer(page).getByRole('button', { name: '+ Add a column after' }).click();
-    await expect.poll(shape).toEqual([5, 5, 5]);
-    expect(heads()).toEqual(['Plan', 'Price a month', 'Price a month', 'People included', 'Support']);
-
-    // Name it in the heading, a field of its own.
-    await page.locator(`[data-instance="shop.${id}"] thead th`).nth(2).locator('span').click();
-    await expect(drawer(page).getByText('Heading · Column 3 of 5')).toBeVisible();
-    await drawer(page).locator('textarea').first().fill('Storage');
-    await ui(page).getByRole('button', { name: 'Save changes' }).click();
-    await expect.poll(heads).toEqual(['Plan', 'Price a month', 'Storage', 'People included', 'Support']);
-    expect(heads()[1]).toBe('Price a month');
-
-    // A row added has every column, the new one included, each cell with its own key.
-    await table.locator('tbody tr').nth(2).locator('th span').click();
-    await drawer(page).getByRole('button', { name: '+ Add a row after' }).click();
+    await openTable();
+    await expect(sheet(page).locator('thead input')).toHaveCount(4);
+    // A column added and named, filled in every row.
+    await drawer(page).getByRole('button', { name: '+ Add a column' }).click();
+    await box(page, -1, 4).fill('Storage');
+    for (const r of [0, 1, 2]) await box(page, r, 4).fill(`${r + 1} GB`);
+    // A row added, with every column, the new one included.
+    await drawer(page).getByRole('button', { name: '+ Add a row' }).click();
+    for (const [c, value] of ['Agency', '$99', '50', 'A named contact', '1 TB'].entries()) await box(page, 3, c).fill(value);
+    await saveSheet(page);
+    await expect.poll(heads).toEqual(['Plan', 'Price a month', 'People included', 'Support', 'Storage']);
     await expect.poll(shape).toEqual([5, 5, 5, 5]);
+    await expect.poll(() => rowsDrawn('shop', id)[3]).toEqual(['Agency', '$99', '50', 'A named contact', '1 TB']);
     await page.reload();
     const keys = [...site.host.draw('shop').querySelectorAll(`[data-instance="shop.${id}"] table [data-edit^="setting:"]`)].map((n) => n.getAttribute('data-edit'));
     expect(keys).toHaveLength(25);
     expect(new Set(keys).size).toBe(25);
 
-    // Moved left, then deleted, in every row at once.
-    await page.locator(`[data-instance="shop.${id}"] thead th`).nth(2).locator('span').click();
-    await drawer(page).getByRole('button', { name: '← Move left' }).click();
-    await expect.poll(heads).toEqual(['Plan', 'Storage', 'Price a month', 'People included', 'Support']);
-    await page.locator(`[data-instance="shop.${id}"] thead th`).nth(1).locator('span').click();
-    await drawer(page).getByRole('button', { name: 'Delete this column' }).click();
-    await expect.poll(heads).toEqual(['Plan', 'Price a month', 'People included', 'Support']);
-    expect(shape()).toEqual([4, 4, 4, 4]);
+    // A column and a row deleted, in every row at once.
+    await openTable();
+    await drawer(page).getByRole('button', { name: 'Delete column 2 “Price a month”' }).click();
+    await drawer(page).getByRole('button', { name: 'Delete row 4' }).click();
+    await saveSheet(page);
+    await expect.poll(heads).toEqual(['Plan', 'People included', 'Support', 'Storage']);
+    await expect.poll(shape).toEqual([4, 4, 4]);
 
-    // Filled from pasted rows: as many columns as the rows have.
-    await page.locator(`[data-instance="shop.${id}"] tbody tr`).first().locator('th span').click();
-    await drawer(page).getByLabel('Rows to paste into the table').fill('Size,Price,Weight\nSmall,$40,1 kg\nLarge,$70,2 kg');
-    await drawer(page).getByRole('button', { name: 'Fill the table' }).click();
-    await expect.poll(heads).toEqual(['Size', 'Price', 'Weight']);
-    await expect.poll(() => rowsDrawn('shop', id)).toEqual([['Small', '$40', '1 kg'], ['Large', '$70', '2 kg']]);
+    // Rows copied from a spreadsheet, pasted into a cell, fill from there.
+    await openTable();
+    await pasteInto(box(page, 0, 0), 'Small\t1\tEmail\t1 GB\nLarge\t9\tPhone\t9 GB');
+    await saveSheet(page);
+    await expect.poll(() => rowsDrawn('shop', id).slice(0, 2)).toEqual([['Small', '1', 'Email', '1 GB'], ['Large', '9', 'Phone', '9 GB']]);
 });
 
-test('a press anywhere in a table cell opens its words first, ready to type (owner, 7 Nov 2026)', async ({ page }) => {
+test('a press anywhere in a table cell opens its grid on that cell, ready to type (owner, 7 Nov 2026)', async ({ page }) => {
     await openAsEditor(page, 'shop');
     const id = await addAtTheEnd(page, 'Table');
     const cell = page.locator(`[data-instance="shop.${id}"] tbody tr`).first().locator('td').first();
@@ -219,16 +231,12 @@ test('a press anywhere in a table cell opens its words first, ready to type (own
     await cell.evaluate((el) => el.scrollIntoView({ block: 'center' }));
     await page.waitForTimeout(300);
     // beside its words, not on them: the left edge of the cell, where a right-aligned price leaves empty space
-    const box = await cell.boundingBox();
-    await page.mouse.click(box.x + 6, box.y + box.height / 2);
-    const words = drawer(page).locator('textarea[name="value"]').first();
-    await expect(words).toBeFocused();
-    await expect(words).toHaveValue(await cell.locator('span').innerText());
-    await expect(drawer(page).locator('.le-trail')).not.toContainText('Card');
-    // the row and column controls follow the words
-    await expect(drawer(page).getByRole('button', { name: '+ Add a column after' })).toBeVisible();
-    await words.fill('₦25,000');
-    await drawer(page).getByRole('button', { name: 'Save changes' }).click();
+    const at = await cell.boundingBox();
+    await page.mouse.click(at.x + 6, at.y + at.height / 2);
+    await expect(box(page, 0, 1)).toBeFocused();
+    await expect(box(page, 0, 1)).toHaveValue(await cell.locator('span').innerText());
+    await box(page, 0, 1).fill('₦25,000');
+    await saveSheet(page);
     await expect.poll(() => rowsDrawn('shop', id)[0][1]).toBe('₦25,000');
 });
 

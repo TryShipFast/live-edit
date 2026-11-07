@@ -1,5 +1,19 @@
 # ShipFast Live Edit for WordPress
 
+## 0.20.5
+
+- Charts and tables are edited as a grid (owner, 7 Nov 2026: "It should be easy to update the components. Table,
+  charts, etc. They are being used by novice"). A press anywhere on a chart or a table opens its figures or cells as a
+  small spreadsheet, the way Canva, Google Slides and PowerPoint's "Edit data" show them, with what was pressed ready
+  to type in: type in any cell (Enter goes down), + Add a row / + Add a column, ✕ on a row or column to delete it,
+  rows copied from Excel or Google Sheets pasted into any cell fill from there, then one Save changes (Undo changes
+  puts it back). It replaces a panel per bar, slice or cell with their own move/add/delete buttons. Saving keeps
+  every rule of the kind (`chartPlan` and `tablePlan`, shared with pasting): a donut still takes six slices at most,
+  a word where a figure goes is refused, and the reason is said in the panel. A chart's figures come before how it is
+  drawn; "Paste many rows at once" stays, folded under the grid.
+- A cell in an added row and an added column could not be saved ("Unknown setting"): its key carries both
+  (`…@<column>@<row>`) and only one was allowed. `EditPolicy` now takes two.
+
 ## 0.20.4
 
 - Adding a chart, table or form with none left on the plan says so (owner, 7 Nov 2026: "Then I add to section for chart

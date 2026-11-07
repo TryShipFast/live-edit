@@ -395,6 +395,30 @@ a.le-mark:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
 .le-browser-frame { position: absolute; top: 0; left: 0; height: 600px; border: 0; transform-origin: 0 0; pointer-events: none; background: #fff; }
 /* Under the picture: where it goes, then the button that adds it. */
 .le-browser-foot { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 10px 14px; }
+/* The data grid: a chart's figures or a table's cells, as a small spreadsheet (data-panel.js renderDataGrid). */
+.le-figures-wrap { display: flex; flex-direction: column; gap: 10px; margin: 4px 0 14px; }
+.le-figures-scroll { overflow-x: auto; border: 1px solid #e3e5ea; border-radius: 10px; background: #fff; }
+.le-figures { border-collapse: collapse; width: 100%; font-size: 14px; }
+.le-figures th, .le-figures td { border-bottom: 1px solid #eef0f3; padding: 0; vertical-align: middle; }
+.le-figures thead th { background: #f6f7f9; position: relative; }
+.le-figures thead th:not(.le-figures-corner) { min-width: 104px; }
+.le-figures thead .le-figures-cell { font-weight: 600; padding-right: 26px; text-overflow: ellipsis; }
+.le-figures tbody tr:last-child th, .le-figures tbody tr:last-child td { border-bottom: 0; }
+.le-figures-corner { width: 28px; min-width: 28px; }
+.le-figures-n { width: 28px; color: #8a8f98; font-size: 12px; font-weight: 500; text-align: center; background: #fafbfc; }
+:host .le-figures-cell { width: 100%; min-width: 96px; box-sizing: border-box; border: 0; border-left: 1px solid #eef0f3; border-radius: 0; padding: 9px 10px; font: inherit; background: transparent; color: #0b0c0f; outline: none; }
+:host .le-figures-cell:focus { background: #f2f6ff; box-shadow: inset 0 0 0 2px #2f6fed; border-color: #eef0f3; outline: none; }
+.le-figures-cell[inputmode="decimal"] { text-align: right; font-variant-numeric: tabular-nums; }
+.le-figures-x { border: 0; background: transparent; color: #8a8f98; cursor: pointer; width: 28px; height: 32px; font-size: 13px; border-radius: 6px; }
+.le-figures-x:hover, .le-figures-x:focus-visible { color: #b42318; background: #fdecea; outline: none; }
+.le-figures thead .le-figures-x { position: absolute; top: 50%; right: 2px; transform: translateY(-50%); width: 22px; height: 22px; font-size: 11px; }
+.le-figures-tools { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.le-figures-count { color: #8a8f98; font-size: 12px; margin-left: auto; }
+.le-figures-foot { display: flex; gap: 8px; align-items: center; }
+.le-figures-foot .le-btn-primary { background: var(--le-accent); color: #fff; border-color: var(--le-accent); }
+.le-figures-foot .le-btn-primary:disabled { opacity: .45; cursor: default; }
+.le-figures-more { margin: 8px 0 12px; }
+.le-figures-more > summary { cursor: pointer; font-weight: 600; font-size: 13px; padding: 6px 0; }
 .le-browser-note { margin: 0 0 10px; padding: 10px 12px; border-radius: 10px; background: #fff7e6; color: #7a4b00; font-size: 14px; line-height: 1.45; }
 .le-browser-note[hidden] { display: none; }
 .le-browser-where { display: flex; align-items: center; gap: 8px; flex: 1 1 260px; min-width: 0; font-size: 13px; font-weight: 600; color: var(--le-ink); }
