@@ -76,7 +76,8 @@ test('between two sections of a page the design came with, a section is added wh
 
     await page.mouse.move(pill.x + pill.width / 2, pill.y + pill.height / 2);
     await insert.click();
-    await expect(ui(page).locator('.le-modal-sub')).toHaveText(/below “Product”/);
+    // Where it goes starts where they pointed, said in the window's "Put it".
+    await expect(ui(page).locator('.le-browser-where-pick option:checked')).toHaveText(/Below “Product”/);
     await addFromLibrary(page, 'More posts');
 
     const added = Object.keys(site.host.builderFor('products/aster-veil', '').added);
@@ -104,7 +105,8 @@ test('the end of a page the design came with offers a section, and it goes last'
     expect(Math.abs(pill.y + pill.height / 2 - (last.y + last.height))).toBeLessThan(30);
 
     await end.click();
-    await expect(ui(page).locator('.le-modal-sub')).toHaveText(/at the end of this page/);
+    // Where it goes is said, and chosen, in the window: the end, from the line after the last section.
+    await expect(ui(page).locator('.le-browser-where-pick option:checked')).toHaveText(/^At the end, below/);
     await addFromLibrary(page, 'Story');
 
     const [id] = Object.keys(site.host.builderFor('shop', '').added);
@@ -181,4 +183,38 @@ test('an outside site (no page builder handed over) never shows an add-section c
     await page.locator('[data-edit-item="s-story"] h2').click();
     await expect(ui(page).locator('.le-drawer')).toBeVisible();
     await expect(ui(page).getByRole('button', { name: /Add a section/ })).toHaveCount(0);
+});
+
+/*
+ * Owner, 7 Nov 2026: "Adding the form is confusing, and where to add it is not specified." + Add a form is beside
+ * + Add a section on the line and in the page's sections panel; it opens on the forms alone, shows the form itself,
+ * and the form goes where "Put it" says, here the top of the page.
+ */
+test('+ Add a form opens on the forms, shows the form, and puts it where the owner chose', async ({ page }) => {
+    await site.close();
+    site = await serveFakeHost({ library: true, libraryForms: true });
+    await openAsEditor(page, 'shop');
+    await page.mouse.move(400, 300);
+    const end = ui(page).locator('.le-insert-end.is-visible');
+    await expect(end.locator('.le-insert-btn')).toHaveText('+ Add a section');
+    await end.locator('.le-insert-form').click();
+
+    const window_ = ui(page).locator('.le-modal');
+    await expect(window_.locator('.le-modal-title, h2').first()).toHaveText('Add a form');
+    await expect(window_.locator('.le-library-item')).toHaveText(['Form: contact']);
+    await expect(window_.locator('.le-library-kinds .le-subtab.is-on')).toHaveText('Forms');
+    // The form itself, as it will look.
+    await expect.poll(() => window_.locator('.le-browser-frame').evaluate((frame) => frame.srcdoc)).toContain('Get in touch');
+    // Put it at the top of the page.
+    await window_.locator('.le-browser-where-pick').selectOption({ label: 'At the top of the page' });
+    await Promise.all([page.waitForNavigation(), window_.getByRole('button', { name: 'Add this form' }).click()]);
+    await expect.poll(() => page.evaluate(() => document.body.classList.contains('editing'))).toBe(true);
+
+    const [id] = Object.keys(site.host.builderFor('shop', '').added);
+    expect(site.host.builderFor('shop', '').added[id]).toBe('kit.form.contact');
+    expect(sectionsOf('shop')[0]).toMatch(new RegExp(`^s-${id}=`));
+
+    // The page's sections panel offers it too.
+    await ui(page).getByRole('button', { name: /^\+ Section$|^Sections$/ }).first().click();
+    await expect(ui(page).locator('.le-drawer').getByRole('button', { name: '+ Add a form' })).toBeVisible();
 });

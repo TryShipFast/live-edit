@@ -46,7 +46,7 @@ const addAtTheEnd = async (page, label) => {
     await page.mouse.move(400, 300);
     await ui(page).locator('.le-insert-end.is-visible .le-insert-btn').click();
     const window_ = ui(page).locator('.le-modal');
-    await expect(window_.getByText('Charts and tables')).toBeVisible();
+    await expect(window_.locator('.le-library-page', { hasText: 'Charts and tables' })).toBeVisible();
     await window_.getByRole('button', { name: label, exact: true }).click();
     await Promise.all([page.waitForNavigation(), window_.getByRole('button', { name: 'Add this section' }).click()]);
     await expect.poll(() => page.evaluate(() => document.body.classList.contains('editing'))).toBe(true);

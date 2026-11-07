@@ -28,10 +28,10 @@ const RUNTIME = fileURLToPath(new URL('../../resources/dist/live-edit.js', impor
  */
 const TEAM_ROUTES = /^(content|styles|session|team(\/[a-z-]+)?|changes|publish|versions(\/\d+\/undo)?|restore)$/;
 
-export async function serveFakeHost({ removable = false, library = false, outside = false, data = false, search = false, forms = null, pagesList = false, mayPublish, team = null, port: listenOn = 0 } = {}) {
+export async function serveFakeHost({ removable = false, library = false, outside = false, data = false, search = false, forms = null, pagesList = false, libraryForms = false, mayPublish, team = null, port: listenOn = 0 } = {}) {
     const window = new Window();
     let publishAsked = 0;
-    const host = createHost({ makeDocument: (html) => new window.DOMParser().parseFromString(html, 'text/html'), removable, library, outside, data, search, forms, pagesList });
+    const host = createHost({ makeDocument: (html) => new window.DOMParser().parseFromString(html, 'text/html'), removable, library, outside, data, search, forms, pagesList, libraryForms });
 
     const json = (response, status, body) => {
         response.writeHead(status, { 'Content-Type': 'application/json' });

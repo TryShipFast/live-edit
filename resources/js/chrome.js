@@ -976,18 +976,19 @@ select.le-input {
 .le-insert.is-visible { display: block; }
 .le-insert-line { position: absolute; left: 0; right: 0; top: -1px; border-top: 2px dashed var(--le-ink); opacity: .55; }
 .le-insert-end .le-insert-line { opacity: 0; transition: opacity .15s ease; }
-.le-insert-end:has(.le-insert-btn:hover) .le-insert-line, .le-insert-end:has(.le-insert-btn:focus-visible) .le-insert-line { opacity: .55; }
-.le-insert-btn {
+.le-insert-end:has(.le-insert-btn:hover) .le-insert-line, .le-insert-end:has(.le-insert-btn:focus-visible) .le-insert-line,
+.le-insert-end:has(.le-insert-form:hover) .le-insert-line, .le-insert-end:has(.le-insert-form:focus-visible) .le-insert-line { opacity: .55; }
+.le-insert-btn, .le-insert-form {
   position: absolute; left: 50%; top: 0; transform: translate(-50%, -50%); pointer-events: auto;
   cursor: pointer; border: 0; border-radius: 999px; padding: 7px 14px; white-space: nowrap;
   font-family: inherit; font-size: 12px; font-weight: 600; line-height: 1.2; letter-spacing: .01em; background: #0b1220; color: #fff;
   box-shadow: 0 8px 20px -6px rgba(11,18,32,.7), 0 0 0 3px #fff;
 }
-.le-insert-btn:hover { background: #2A2C31; }
+.le-insert-btn:hover, .le-insert-form:hover { background: #2A2C31; }
 /* The two buttons on the line, side by side, centred on it. */
 .le-insert-btns { position: absolute; left: 50%; top: 0; transform: translate(-50%, -50%); display: flex; gap: 8px; pointer-events: auto; }
-.le-insert-btns .le-insert-btn { position: static; transform: none; }
-.le-insert-btn[hidden] { display: none; }
+.le-insert-btns .le-insert-btn, .le-insert-btns .le-insert-form { position: static; transform: none; }
+.le-insert-form[hidden] { display: none; }
 
 /* ---- toast ---- */
 .le-toast {
@@ -2185,7 +2186,7 @@ export function createChrome() {
         const line = el('div', `le-insert ${extra}`.trim());
         const button = el('button', 'le-insert-btn', '+ Add a section');
         button.type = 'button';
-        const form = el('button', 'le-insert-btn le-insert-form', '+ Add a form');
+        const form = el('button', 'le-insert-form', '+ Add a form');
         form.type = 'button';
         form.hidden = true;
         const buttons = el('div', 'le-insert-btns');

@@ -268,6 +268,18 @@ const keyMarkers = (doc, name, bandsAreShared = true) => {
 // From the repository root (vitest's root): under happy-dom import.meta.url is not a file: URL, which readFileSync refuses.
 export const DATA_COMPONENTS = JSON.parse(readFileSync(join(process.cwd(), 'tests/support/data-components.json'), 'utf8'));
 
+/**
+ * A form the owner adds from the library (the host's TheFormsAnOwnerAdds): the entry the host hands the editor, with
+ * the form drawn as it would be added (`preview`), and the markup the host draws once it is added.
+ */
+export const LIBRARY_FORM = {
+    from: 'kit.form.contact', label: 'Form: contact', page: 'Forms', kind: 'form',
+    says: ['A contact form: name, email, phone and a message.'],
+    preview: '<section><h2>Get in touch</h2><form><label>Your name<input name="fname"></label><label>Email<input name="femail" type="email"></label></form></section>',
+    markup: '<section data-component="form.contact" data-instance="__INSTANCE__" data-label="Get in touch" data-kit-form-preset="contact"><h2>Get in touch</h2>'
+        + '<form action="https://formspree.io/f/x" method="POST"><label>Your name<input name="fname"></label><label>Email<input name="femail" type="email"></label><button type="submit">Send</button></form></section>',
+};
+
 /** A search over a collection (the host's TheSearchComponent), written out by it into search-component.json. */
 export const SEARCH_COMPONENT = JSON.parse(readFileSync(join(process.cwd(), 'tests/support/search-component.json'), 'utf8'));
 
@@ -349,7 +361,7 @@ const nameListsAndSections = (doc, page) => {
  * `outside` hands over no page builder at all: an outside site (the plugin or
  * another adapter), which gets in-place editing only.
  */
-export function createHost({ makeDocument, serialise = (doc) => `<!doctype html>${doc.documentElement.outerHTML}`, removable = false, library = false, outside = false, data = false, search = false, forms = null, pagesList = false } = {}) {
+export function createHost({ makeDocument, serialise = (doc) => `<!doctype html>${doc.documentElement.outerHTML}`, removable = false, library = false, outside = false, data = false, search = false, forms = null, pagesList = false, libraryForms = false } = {}) {
     // With pagesList: the About, checkout, brand and privacy pages too, the menu linking About, a logo with
     // words only a screen reader hears, and the owner's pages put in the menu as the host does (putThemInTheMenus).
     const DESIGN_HERE = pagesList ? { ...DESIGN, ...MORE_PAGES } : DESIGN;
@@ -378,7 +390,8 @@ export function createHost({ makeDocument, serialise = (doc) => `<!doctype html>
 
     /** One design section, keyed as a copy named `added:<page>/<id>` and renamed for its new page (keysOnly, cut). */
     const sectionAdded = (doc, page, id, from) => {
-        const offered = data ? DATA_COMPONENTS.find((entry) => entry.from === from) : (search && from === SEARCH_COMPONENT.from && collections().some((c) => c.id === 'parts') ? SEARCH_COMPONENT : null);
+        const offered = (libraryForms && from === LIBRARY_FORM.from ? LIBRARY_FORM : null)
+            ?? (data ? DATA_COMPONENTS.find((entry) => entry.from === from) : (search && from === SEARCH_COMPONENT.from && collections().some((c) => c.id === 'parts') ? SEARCH_COMPONENT : null));
         if (offered) {
             const owner = page === '' ? 'home' : page;
             const source = makeDocument(`<!doctype html><html><body>${offered.markup.replace('__INSTANCE__', `${owner}.${id}`)}</body></html>`);
@@ -500,6 +513,7 @@ export function createHost({ makeDocument, serialise = (doc) => `<!doctype html>
                 .filter((m) => !m[1].startsWith('site.') && !(library && LIBRARY.some((section) => section.from === m[1])))
                 .map((m) => ({ from: m[1], label: m[2], page: title, at: `${editorBase}${file}` }))) : []),
             ...(data ? DATA_COMPONENTS.map(({ markup, ...offered }) => ({ ...offered, at: null })) : []),
+            ...(libraryForms ? [(({ markup, ...offered }) => ({ ...offered, at: null }))(LIBRARY_FORM)] : []),
             ...(search && collections().some((c) => c.id === 'parts') ? [{ from: SEARCH_COMPONENT.from, label: SEARCH_COMPONENT.label, page: SEARCH_COMPONENT.page, kind: 'search', at: null }] : []),
         ],
         // The design's pages as a new page starts from them (TheKit::startingPoints), for a site with the Pages list.
