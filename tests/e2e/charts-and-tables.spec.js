@@ -242,3 +242,32 @@ test('an outside site is offered no chart and no table', async ({ page }) => {
     await expect(ui(page).getByRole('button', { name: '+ Section' })).toBeHidden();
     await expect(ui(page).getByText('Charts and tables')).toHaveCount(0);
 });
+
+/*
+ * "The charts and other others only have above and below. But no left of or right of" (owner, 7 Nov 2026): a table
+ * put on the right of a chart added before is saved beside it and placed just after it; the choice is not offered
+ * for a section that is not a chart or a table.
+ */
+test('a table can be put on the right of a chart added before', async ({ page }) => {
+    await openAsEditor(page, 'shop');
+    const chart = await addAtTheEnd(page, 'Chart: bars or columns');
+
+    // The page is longer with the chart on it: the end's "+ Add a section" is pressed where it is.
+    await page.mouse.move(400, 300);
+    await ui(page).locator('.le-insert-end.is-visible .le-insert-btn').evaluate((button) => button.click());
+    const window_ = ui(page).locator('.le-modal');
+    const where = window_.locator('.le-browser-where-pick');
+    const right = where.locator(`option[value="beside:right:s-${chart}"]`);
+    await window_.getByRole('button', { name: 'Table', exact: true }).click();
+    await expect(right).toBeEnabled();
+    await expect(right).toHaveText(/^On the right of “/);
+    await where.selectOption(`beside:right:s-${chart}`);
+    await Promise.all([page.waitForNavigation(), window_.getByRole('button', { name: 'Add this section' }).click()]);
+
+    const saved = JSON.parse(site.host.settings['structure:page:shop']);
+    const [table] = Object.keys(saved.added).filter((id) => id !== chart);
+    expect(saved.beside).toEqual({ [table]: { of: chart, side: 'right' } });
+    const order = JSON.parse(Object.entries(site.host.settings).find(([key, value]) => key !== 'structure:page:shop' && String(value).includes(`s-${chart}`))[1]);
+    expect(order.indexOf(`s-${table}`)).toBe(order.indexOf(`s-${chart}`) + 1);
+});
+

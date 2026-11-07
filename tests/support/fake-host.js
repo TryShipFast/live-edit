@@ -384,6 +384,10 @@ export function createHost({ makeDocument, serialise = (doc) => `<!doctype html>
     const addedTo = (id) => {
         try { return JSON.parse(settings[`structure:page:${id === '' ? 'home' : id}`] ?? '{}').added ?? {}; } catch { return {}; }
     };
+    // Charts and tables set beside another (WhatTheOwnerArranged::besideOn).
+    const besideOn = (id) => {
+        try { return JSON.parse(settings[`structure:page:${id === '' ? 'home' : id}`] ?? '{}').beside ?? {}; } catch { return {}; }
+    };
     // The collections kept, as the host reads them (TheCollectionsASiteKeeps), and handed to the editor.
     const collections = () => collectionsIn(settings);
     const fileOf = (instance) => Object.keys(DESIGN_HERE).find((id) => DESIGN_HERE[id].html.includes(`data-instance="${instance}"`)) ?? null;
@@ -504,6 +508,7 @@ export function createHost({ makeDocument, serialise = (doc) => `<!doctype html>
         made: made(),
         structureKey: `structure:page:${id === '' ? 'home' : id}`,
         added: addedTo(id),
+        beside: besideOn(id),
         editorBase,
         pages: pages(editorBase),
         taken: pages(editorBase).map((entry) => entry.id),

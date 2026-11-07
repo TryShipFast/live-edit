@@ -116,12 +116,30 @@ export function newAddedId(random = Math.random) {
 }
 
 /** The saved value for a page's additions, with one more (or one fewer). */
-export function addedWith(added, id, from) {
+export function addedWith(added, id, from, beside = {}, place = null) {
     const next = { ...(added ?? {}) };
     if (from) next[id] = from;
     else delete next[id];
+    /*
+     * Charts and tables set beside another (owner, 7 Nov 2026: "only have above and below. But no left of or right
+     * of"): kept while both are still on the page, and the one just added takes its place beside its partner.
+     */
+    const pairs = Object.fromEntries(Object.entries(beside ?? {}).filter(([one, at]) => one !== id && one in next && at?.of in next && at.of !== id));
+    if (from && place?.of in next && (place.side === 'left' || place.side === 'right')) pairs[id] = { of: place.of, side: place.side };
 
-    return JSON.stringify({ added: next });
+    return JSON.stringify(Object.keys(pairs).length ? { added: next, beside: pairs } : { added: next });
+}
+
+/** A chart or a table from the library: the only things that can be set beside another. */
+export function aChartOrTable(section) {
+    return Boolean(section && (KINDS[section.kind] || section.kind === 'table'));
+}
+
+/** Where the add window's "On the left of" / "On the right of" choices are said: `beside:left:s-add-…`. */
+export function besidePlace(value) {
+    const found = /^beside:(left|right):(s-(add-[a-z0-9]+))$/.exec(String(value ?? ''));
+
+    return found ? { side: found[1], item: found[2], of: found[3] } : null;
 }
 
 /** A page's section order with an added section placed after another (or last). */
@@ -292,7 +310,16 @@ export function describeStructure(key, before, after, { library = [], pages = []
     const now = sectionsIn(after);
     const added = now.filter((name) => !was.includes(name));
     const removed = was.filter((name) => !now.includes(name));
-    const said = [added.length ? `Added ${listed(added)}` : '', removed.length ? `Removed ${listed(removed)}` : '']
+    // A chart or table set beside another: said as where it now sits ("Table on the right of Chart: bars").
+    const pairsIn = (value) => {
+        const { added: sections = {}, beside = {} } = parsed(value, { added: {} }) ?? {};
+
+        return Object.entries(beside ?? {}).filter(([one, at]) => sections[one] && sections[at?.of])
+            .map(([one, at]) => `${named(sections[one])} on the ${at.side === 'left' ? 'left' : 'right'} of ${named(sections[at.of])}`);
+    };
+    const wasBeside = pairsIn(before);
+    const set = pairsIn(after).filter((pair) => !wasBeside.includes(pair));
+    const said = [added.length ? `Added ${listed(added)}` : '', set.length ? `Set ${listed(set)}` : '', removed.length ? `Removed ${listed(removed)}` : '']
         .filter(Boolean).join('. ');
 
     return {
@@ -915,6 +942,11 @@ export function renderSectionBrowser({ container, library, add, multiple = false
         for (const option of places) {
             const o = el('option', null, option.label);
             o.value = option.value === null ? '' : option.value;
+            // Beside another chart or table: offered only while a chart or a table is the one being looked at.
+            if (option.chartsAndTables) {
+                o.dataset.chartsAndTables = '';
+                o.hidden = o.disabled = true;
+            }
             whereTo.append(o);
         }
         whereTo.value = place === null ? '' : place;
@@ -963,6 +995,11 @@ export function renderSectionBrowser({ container, library, add, multiple = false
 
     const show = async (section) => {
         looking = section;
+        if (whereTo) {
+            const beside = aChartOrTable(section);
+            whereTo.querySelectorAll('option[data-charts-and-tables]').forEach((o) => { o.hidden = o.disabled = !beside; });
+            if (whereTo.selectedOptions[0]?.disabled) whereTo.value = place === null ? '' : place;
+        }
         stageName.textContent = section.label;
         stageFrom.textContent = section.kind ? 'Drawn in your site’s own colours and type' : section.page ? `From your ${section.page} page` : '';
         paintAction();

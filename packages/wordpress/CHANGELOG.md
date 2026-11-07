@@ -1,5 +1,15 @@
 # ShipFast Live Edit for WordPress
 
+## 0.20.4
+
+- A chart or table can go on the left or right of another (owner, 7 Nov 2026: "The charts and other others only have
+  above and below. But no left of or right of"). When a chart or table is chosen in Add a section and the page already
+  has one the owner added, Put it also offers "On the left of “X”" and "On the right of “X”". The pair is saved in the
+  page's arrangement (`"beside": {"add-…": {"of": "add-…", "side": "left"}}`, kept when sections are added and
+  dropped when either is removed), placed next to each other in the section order, and said in words on the publish
+  review ("Set Table on the right of Chart: bars"). The host lays the two side by side on wider screens and stacks
+  them on a phone. Charts and tables only, one partner each.
+
 ## 0.20.3
 
 - The AI assist in a text panel is compact (owner, 7 Nov 2026: "the AI credit space was also too big"). It was a

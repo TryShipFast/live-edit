@@ -27,7 +27,7 @@ import { renderSeoPanel } from './seo.js';
 import { renderShopPanel } from './shop.js';
 import { renderCsvImport, renderNewCollection, renderSearchPanel, renderTableEditor } from './collections-panel.js';
 import { renderImport, undoTheLastImport, UNDO_KEY } from './catalogue.js';
-import { AT_THE_TOP, addedWith, describeStructure, hrefTo, newAddedId, orderWith, pageBase, pageOfLink, renderCategoryProducts, renderNewCategory, renderNewPage, renderSectionBrowser } from './pages.js';
+import { AT_THE_TOP, aChartOrTable, addedWith, besidePlace, describeStructure, hrefTo, newAddedId, orderWith, pageBase, pageOfLink, renderCategoryProducts, renderNewCategory, renderNewPage, renderSectionBrowser } from './pages.js';
 import { menuOrder, renderPagesList, startsOffered } from './pages-list.js';
 import { LEAVE_QUESTION, guardLeaving } from './unsaved.js';
 import { insertionNear, sectionName, sectionUnder, shownSectionLists, shownSections } from './section-inserter.js';
@@ -4584,6 +4584,19 @@ const bootLiveEdit = () => {
                     label: index === shown.length - 1 ? `At the end, below “${sectionName(section)}”` : `Below “${sectionName(section)}”`,
                 })),
             ];
+            /*
+             * Beside a chart or table they added before (owner, 7 Nov 2026: "only have above and below. But no left
+             * of or right of"): on its left or right, offered while a chart or table is chosen. One partner each.
+             */
+            const paired = new Set(Object.entries(builder.beside ?? {}).flatMap(([one, at]) => [one, at?.of]));
+            for (const section of shown) {
+                const id = section.dataset.editItem.replace(/^s-/, '');
+                const from = (builder.added ?? {})[id];
+                if (!from || paired.has(id) || !aChartOrTable((builder.library ?? []).find((entry) => entry.from === from))) continue;
+                for (const side of ['left', 'right']) {
+                    places.push({ value: `beside:${side}:s-${id}`, label: `On the ${side} of “${sectionName(section)}”`, chartsAndTables: true });
+                }
+            }
             const startAt = after ?? shown.at(-1)?.dataset.editItem ?? AT_THE_TOP;
             const aForm = only !== null && only === formsGroup();
             const handle = ui.modal({
@@ -4602,10 +4615,18 @@ const bootLiveEdit = () => {
                 add: async (section, chosen) => {
                     if (chosen !== undefined) after = chosen;
                     const id = newAddedId();
+                    const order = [...list.children].filter((child) => child.dataset.editItem).map((child) => child.dataset.editItem);
+                    // On the left: just before its partner; on the right: just after it.
+                    const beside = aChartOrTable(section) ? besidePlace(after) : null;
+                    if (beside) {
+                        const at = order.indexOf(beside.item);
+                        after = beside.side === 'right' ? beside.item : (at > 0 ? order[at - 1] : AT_THE_TOP);
+                    } else if (besidePlace(after)) {
+                        after = null;
+                    }
                     handle.allowDismiss(false);
                     try {
-                        await saveSetting(builder.structureKey, addedWith(builder.added, id, section.from));
-                        const order = [...list.children].filter((child) => child.dataset.editItem).map((child) => child.dataset.editItem);
+                        await saveSetting(builder.structureKey, addedWith(builder.added, id, section.from, builder.beside, beside));
                         await saveListOrder(list, orderWith(order, `s-${id}`, after));
                         handle.close();
                         reloadWithToast(`${section.label.replace(/ · \d+ left$/, '')} added ✓`);
@@ -4794,7 +4815,7 @@ const bootLiveEdit = () => {
                         if (!arrangementIsFree()) return;
                         if (!window.confirm('Remove this section and what you wrote in it?')) return;
                         try {
-                            await saveSetting(builder.structureKey, addedWith(builder.added, addedId, null));
+                            await saveSetting(builder.structureKey, addedWith(builder.added, addedId, null, builder.beside));
                             await saveOrder(currentOrder().filter((id) => id !== item.dataset.editItem), 'Section removed ✓');
                         } catch (error) {
                             notify(error.message);
