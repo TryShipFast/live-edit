@@ -10,6 +10,12 @@
 - A section with a background photo can be hidden. Its panel is the photo's, and ticking **Hide this section** then
   Save was refused with "Choose a file from your computer or paste an image URL first", because no new picture was
   chosen. A picture's panel holding only a style change now saves the style (19 pages of The Photographer, 7 Nov 2026).
+- An arrow at the end of a short link opens the icon picker. The link's pencil sat on the link's corner, over the
+  arrow, so pressing the arrow opened the link (The Architect's "View Projects"). On a link holding an icon the pencil
+  now sits just above it, clear of it, as it does for a menu's label.
+- A section that is itself a list (a case study's gallery, a row of columns that is the whole section) can be moved,
+  copied and hidden. Its panel showed only its list's controls, as if the section were one of its own photos; it now
+  shows both, the section's (Move up, Move down, Duplicate section, Hide) and the list's (+ Add a photo).
 
 ## 0.20.0
 

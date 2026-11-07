@@ -4556,10 +4556,24 @@ const bootLiveEdit = () => {
          * Add / remove for a repeated block (FAQs, cards, list rows). The order of
          * item ids is the stored value; the server rebuilds the list from it.
          */
+        /*
+         * A section that is itself a list (a gallery or a row of columns that is the whole section, which the Kit
+         * allows) is two things: an item of the page's sections and a list of its own. Its item was found with
+         * closest(), which is the section itself, so its own list's controls were drawn for it as if it were one of
+         * its photos, and Move up, Move down and Hide never showed: The Photographer's case-study galleries could not
+         * be moved (7 Nov 2026). It gets both: its list's controls, and its own as a section.
+         */
         const appendListControls = (element) => {
-            const item = element.closest?.('[data-edit-item]');
+            const both = element.matches?.('[data-edit-list]') && element.dataset?.editItem !== undefined
+                && Boolean(element.parentElement?.dataset?.editList);
+            listControlsFor(element, both ? 'list' : null);
+            if (both) listControlsFor(element, 'item');
+        };
+
+        const listControlsFor = (element, as = null) => {
+            const item = as === 'list' ? null : as === 'item' ? element : element.closest?.('[data-edit-item]');
             // Either an item was clicked, or the list itself was.
-            const list = element.matches?.('[data-edit-list]')
+            const list = as === 'item' ? element.parentElement : element.matches?.('[data-edit-list]')
                 ? element
                 : item?.parentElement?.dataset?.editList ? item.parentElement : element.closest?.('[data-edit-list]');
             if (!list?.dataset?.editList) return;
@@ -6245,8 +6259,12 @@ const bootLiveEdit = () => {
                 linkHandle.style.left = `${box.left + box.width / 2 - 13}px`;
             } else {
                 const rect = anchor.getBoundingClientRect();
-                linkHandle.style.top = `${Math.max(2, rect.top - 10)}px`;
-                linkHandle.style.left = `${rect.right - 10}px`;
+                // A link ending in an icon (an arrow): on its corner the handle covered the icon on a short link,
+                // so pressing the arrow opened the link, never the icon picker (The Architect's "View Projects",
+                // 7 Nov 2026). Above the link, clear of it, as for a menu's label.
+                const holdsADrawing = Boolean(anchor.querySelector('[data-edit-svg], [data-edit-icon]'));
+                linkHandle.style.top = `${Math.max(2, rect.top - (holdsADrawing ? 28 : 10))}px`;
+                linkHandle.style.left = `${rect.right - (holdsADrawing ? 26 : 10)}px`;
             }
             linkHandle.classList.add('is-visible');
         };
