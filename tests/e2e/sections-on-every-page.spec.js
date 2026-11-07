@@ -218,3 +218,29 @@ test('+ Add a form opens on the forms, shows the form, and puts it where the own
     await ui(page).getByRole('button', { name: /^\+ Section$|^Sections$/ }).first().click();
     await expect(ui(page).locator('.le-drawer').getByRole('button', { name: '+ Add a form' })).toBeVisible();
 });
+
+test('a section the design came with can be deleted too, and is gone from the page (owner, 7 Nov 2026)', async ({ page }) => {
+    await openAsEditor(page, 'journal/salt-air');
+    await ui(page).getByRole('button', { name: '+ Section' }).click();
+    const drawer = ui(page).locator('.le-drawer');
+    await drawer.getByRole('button', { name: '2. More posts' }).click();
+    await expect(drawer.getByText('This section', { exact: true })).toBeVisible();
+    // the design's own section offers Delete as well as Hide; an added one says "Remove this section"
+    await expect(drawer.getByRole('button', { name: 'Remove this section' })).toHaveCount(0);
+    await drawer.getByRole('button', { name: 'Delete this section' }).click();
+    await expect.poll(() => sectionsOf('journal/salt-air')).toEqual(['s-article=Post']);
+});
+
+test('the last section of a page cannot be deleted', async ({ page }) => {
+    await openAsEditor(page, 'journal/salt-air');
+    await ui(page).getByRole('button', { name: '+ Section' }).click();
+    const drawer = ui(page).locator('.le-drawer');
+    await drawer.getByRole('button', { name: '2. More posts' }).click();
+    await drawer.getByRole('button', { name: 'Delete this section' }).click();
+    await expect.poll(() => sectionsOf('journal/salt-air')).toEqual(['s-article=Post']);
+    await page.reload();
+    await expect.poll(() => page.evaluate(() => document.body.classList.contains('editing'))).toBe(true);
+    await ui(page).getByRole('button', { name: '+ Section' }).click();
+    await drawer.getByRole('button', { name: '1. Post' }).click();
+    await expect(drawer.getByRole('button', { name: 'Delete this section' })).toBeDisabled();
+});

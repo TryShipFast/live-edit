@@ -4733,6 +4733,25 @@ const bootLiveEdit = () => {
                         }
                     });
                     row.append(remove);
+                } else if (sections) {
+                    /*
+                     * The design's own sections can be deleted too (owner, 7 Nov 2026: "there is no way to delete a
+                     * section"). Every site builder people know offers Delete on any section (Wix, Squarespace,
+                     * Shopify); Hide stays for "not now". Deleting takes it out of the page's arrangement, as deleting
+                     * an item takes it out of its list, and "+ Add a section" offers the design's sections again later
+                     * (Undo covers it only while it is unpublished). A page keeps at least one section.
+                     */
+                    const remove = document.createElement('button');
+                    remove.type = 'button';
+                    remove.className = 'le-btn-danger';
+                    remove.textContent = 'Delete this section';
+                    remove.disabled = lowest;
+                    remove.addEventListener('click', async () => {
+                        if (!arrangementIsFree()) return;
+                        if (!window.confirm('Delete this section from the page? You can add it back later from + Add a section.')) return;
+                        await saveOrder(currentOrder().filter((id) => id !== item.dataset.editItem), 'Section deleted ✓');
+                    });
+                    row.append(remove);
                 }
 
                 if (!sections) {
