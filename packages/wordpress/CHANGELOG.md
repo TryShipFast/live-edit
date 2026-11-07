@@ -1,5 +1,13 @@
 # ShipFast Live Edit for WordPress
 
+## 0.20.0
+
+- Adding a form is easy to find (owner, 7 Nov 2026: "Adding the form is confusing, and where to add it is not specified"). **+ Add a form** sits beside **+ Add a section** on the line that appears between two sections, after the last section, and in the page's sections panel (+ Section in the bar, or Sections under More on a phone). It opens **Add a form** on the forms alone.
+- The add window lists forms first, with tabs over its list (All, Forms, Charts and tables, Search) so each kind is one press, and the search finds "form".
+- Where it goes is chosen in the window: **Put it** at the top of the page, below any of its sections, or at the end, starting where you pointed. It used to go at the end, said only in the window's subtitle.
+- A form is shown as it will look, in the site's own style and with its own questions, where the host sends a `preview`; before, it was three lines of text.
+- On a phone the add window fits the screen: its search, "Put it" and the add button are no longer cut off at the right.
+
 ## 0.19.6
 
 - Fixed: since 0.19.5 a picture over 13 megapixels was refused ("That image has too many pixels to process safely"), so an Openverse original chosen in Free photos, often a large Flickr photograph, could not be used. A picture up to 24 megapixels (a 6000x4000 camera photograph) is now made the size a page needs first, with room to do it (PHP's memory raised to 256 MB for the work, then put back), and stored like any other. Beyond 24 megapixels it is refused as before, so a tiny compressed file still cannot expand into a bitmap of hundreds of megabytes.

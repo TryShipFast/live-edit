@@ -372,12 +372,25 @@ a.le-mark:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
 .le-browser-shot { position: relative; margin: 0 auto; overflow: hidden; border-radius: 8px; background: #fff; box-shadow: 0 1px 3px rgba(11,12,15,.12); }
 .le-browser-shot.is-phone { border: 6px solid var(--le-ink); border-radius: 22px; }
 .le-browser-frame { position: absolute; top: 0; left: 0; height: 600px; border: 0; transform-origin: 0 0; pointer-events: none; background: #fff; }
+/* Under the picture: where it goes, then the button that adds it. */
+.le-browser-foot { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 10px 14px; }
+.le-browser-where { display: flex; align-items: center; gap: 8px; flex: 1 1 260px; min-width: 0; font-size: 13px; font-weight: 600; color: var(--le-ink); }
+.le-browser-where .le-input { flex: 1; min-width: 0; min-height: 40px; }
+/* The kinds of thing to add, as tabs over the list: All, Forms, Charts and tables. */
+.le-library-kinds { display: flex; flex-wrap: wrap; gap: 4px; padding: 3px; border-radius: 10px; background: var(--le-soft, #f1f2f4); }
+.le-library-kinds .le-subtab { flex: 0 1 auto; }
 .le-browser-add { align-self: flex-end; }
 .le-browser-add.is-added { background: #fff; color: var(--le-ink); box-shadow: inset 0 0 0 1px var(--le-line); }
 @media (max-width: 760px) {
   .le-name-layout, .le-browser { grid-template-columns: 1fr; }
   .le-name-look { display: none; }
   .le-browser-list .le-library-list { max-height: 30vh; }
+  /* On a phone the window is one column the width of the screen: nothing in it may be wider. */
+  .le-browser > *, .le-browser-head > * { min-width: 0; }
+  .le-browser-head { flex-wrap: wrap; }
+  .le-browser-foot { flex-direction: column; align-items: stretch; }
+  .le-browser-where { flex: none; }
+  .le-browser-add { align-self: stretch; }
 }
 .le-item-actions { display: flex; flex-direction: column; gap: 8px; padding: 12px; margin: 0 0 6px; border-radius: 12px; background: var(--le-soft); }
 .le-item-actions .le-section-heading { margin: 0; border-top: 0; padding-top: 0; }
@@ -971,6 +984,10 @@ select.le-input {
   box-shadow: 0 8px 20px -6px rgba(11,18,32,.7), 0 0 0 3px #fff;
 }
 .le-insert-btn:hover { background: #2A2C31; }
+/* The two buttons on the line, side by side, centred on it. */
+.le-insert-btns { position: absolute; left: 50%; top: 0; transform: translate(-50%, -50%); display: flex; gap: 8px; pointer-events: auto; }
+.le-insert-btns .le-insert-btn { position: static; transform: none; }
+.le-insert-btn[hidden] { display: none; }
 
 /* ---- toast ---- */
 .le-toast {
@@ -2163,13 +2180,19 @@ export function createChrome() {
     hoverBox.append(hoverLabel);
 
     // "+ Add a section": one between sections, one after the last (section-inserter.js).
+    // "+ Add a form" beside it (owner, 7 Nov 2026: a form was hard to find); shown where the website has forms to add.
     const inserter = (extra) => {
         const line = el('div', `le-insert ${extra}`.trim());
         const button = el('button', 'le-insert-btn', '+ Add a section');
         button.type = 'button';
-        line.append(el('div', 'le-insert-line'), button);
+        const form = el('button', 'le-insert-btn le-insert-form', '+ Add a form');
+        form.type = 'button';
+        form.hidden = true;
+        const buttons = el('div', 'le-insert-btns');
+        buttons.append(button, form);
+        line.append(el('div', 'le-insert-line'), buttons);
 
-        return { line, button };
+        return { line, button, form };
     };
     const sectionInsert = inserter('');
     const sectionInsertEnd = inserter('le-insert-end');

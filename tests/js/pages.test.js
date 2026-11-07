@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 import { describe, expect, it } from 'vitest';
-import { addedWith, addressProblem, describeStructure, grouped, newAddedId, orderWith, previewDoc, renderLibrary, renderNewPage, renderSectionBrowser, sectionMarkup, slugFor, startingPoints, whyNotYet, withMenu } from '../../resources/js/pages.js';
+import { AT_THE_TOP, addedWith, addressProblem, describeStructure, grouped, newAddedId, orderWith, previewDoc, renderLibrary, renderNewPage, renderSectionBrowser, sectionMarkup, slugFor, startingPoints, whyNotYet, withMenu } from '../../resources/js/pages.js';
 
 describe('the page builder names and places things the way the host reads them', () => {
     it('suggests an address from a title', () => {
@@ -36,6 +36,18 @@ describe('the page builder names and places things the way the host reads them',
         expect(orderWith(['s-intro', 's-team', 's-faq'], 's-add-a', 's-intro')).toEqual(['s-intro', 's-add-a', 's-team', 's-faq']);
         expect(orderWith(['s-intro', 's-team'], 's-add-a')).toEqual(['s-intro', 's-team', 's-add-a']);
         expect(orderWith(['s-intro'], 's-add-a', 's-gone')).toEqual(['s-intro', 's-add-a']);
+        // At the top of the page, chosen in the window (owner, 7 Nov 2026: "where to add it is not specified").
+        expect(orderWith(['s-intro', 's-team'], 's-add-a', AT_THE_TOP)).toEqual(['s-add-a', 's-intro', 's-team']);
+    });
+
+    it('lists forms first, before the sections of every page and the charts', () => {
+        const library = [
+            { from: 'about.team', label: 'Leadership team', page: 'About' },
+            { from: 'kit.chart.bar', label: 'Chart: bars', page: 'Charts and tables', kind: 'bar' },
+            { from: 'kit.form.contact', label: 'Form: contact', page: 'Forms', kind: 'form' },
+        ];
+        expect(grouped(library).map((g) => g.page)).toEqual(['Forms', 'About', 'Charts and tables']);
+        expect(grouped(library, 'form').map((g) => g.page)).toEqual(['Forms']);
     });
 
     it('groups the library under the page each section comes from, and finds by any word', () => {
@@ -211,6 +223,36 @@ describe('the Pages tab', () => {
         expect(added).toEqual([]);
         container.querySelector('.le-browser-add').click();
         expect(added).toEqual(['visit.book']);
+    });
+
+    it('opens on the forms, shows the form itself, and adds it where the owner chose', async () => {
+        const container = document.createElement('div');
+        const added = [];
+        const library = [
+            ...config.library,
+            { from: 'kit.chart.bar', label: 'Chart: bars', page: 'Charts and tables', at: null, kind: 'bar' },
+            { from: 'kit.form.contact', label: 'Form: contact', page: 'Forms', at: null, kind: 'form', says: ['A contact form.'], preview: '<section><form><label>Your name<input name="name"></label></form></section>' },
+        ];
+        const places = [{ value: AT_THE_TOP, label: 'At the top of the page' }, { value: 's-intro', label: 'Below “Intro”' }, { value: 's-faq', label: 'At the end, below “Questions”' }];
+        renderSectionBrowser({ container, library, only: 'Forms', places, place: 's-faq', add: (section, after) => added.push([section.from, after]) });
+        // Tabs over the list: All, then each kind of thing (forms, charts), Forms chosen.
+        expect([...container.querySelectorAll('.le-library-kinds .le-subtab')].map((b) => [b.textContent, b.classList.contains('is-on')]))
+            .toEqual([['All', false], ['Forms', true], ['Charts and tables', false]]);
+        expect([...container.querySelectorAll('.le-library-item')].map((row) => row.dataset.from)).toEqual(['kit.form.contact']);
+        // The form itself, as it will look, not a description of it.
+        expect(container.querySelector('.le-browser-name').textContent).toBe('Form: contact');
+        expect(container.querySelector('.le-browser-frame').srcdoc).toContain('Your name');
+        expect(container.querySelector('.le-browser-view').textContent).toContain('A contact form.');
+        // Where it goes: starts where they pointed, and the choice is what is added.
+        const where = container.querySelector('.le-browser-where-pick');
+        expect(where.value).toBe('s-faq');
+        where.value = AT_THE_TOP;
+        container.querySelector('.le-browser-add').click();
+        expect(added).toEqual([['kit.form.contact', AT_THE_TOP]]);
+        // All shows everything again, forms first.
+        container.querySelector('.le-library-kinds .le-subtab').click();
+        expect(container.querySelectorAll('.le-library-item')[0].dataset.from).toBe('kit.form.contact');
+        expect(container.querySelectorAll('.le-library-item').length).toBe(library.length);
     });
 
     it('shows a section before it is chosen, and pressing See it does not choose it', async () => {

@@ -27,7 +27,7 @@ import { renderSeoPanel } from './seo.js';
 import { renderShopPanel } from './shop.js';
 import { renderCsvImport, renderNewCollection, renderSearchPanel, renderTableEditor } from './collections-panel.js';
 import { renderImport, undoTheLastImport, UNDO_KEY } from './catalogue.js';
-import { addedWith, describeStructure, hrefTo, newAddedId, orderWith, pageBase, pageOfLink, renderCategoryProducts, renderNewCategory, renderNewPage, renderSectionBrowser } from './pages.js';
+import { AT_THE_TOP, addedWith, describeStructure, hrefTo, newAddedId, orderWith, pageBase, pageOfLink, renderCategoryProducts, renderNewCategory, renderNewPage, renderSectionBrowser } from './pages.js';
 import { menuOrder, renderPagesList, startsOffered } from './pages-list.js';
 import { LEAVE_QUESTION, guardLeaving } from './unsaved.js';
 import { insertionNear, sectionName, sectionUnder, shownSectionLists, shownSections } from './section-inserter.js';
@@ -4493,17 +4493,41 @@ const bootLiveEdit = () => {
             return true;
         };
 
-        const openSectionPicker = ({ list, after = null }) => {
+        /** The library's group of forms ("Forms"), where the website has forms to add, else null. */
+        const formsGroup = () => (window.liveEditPages?.library ?? []).find((section) => section.kind === 'form')?.page ?? null;
+
+        const openSectionPicker = ({ list, after = null, only = null }) => {
             const builder = window.liveEditPages;
             if (!canAddSections() || !list?.dataset?.editList) return null;
             if (!arrangementIsFree()) return null;
-            const below = after ? [...list.children].find((child) => child.dataset.editItem === after) : null;
-            const where = below ? `below “${sectionName(below)}”` : shownSections(list).length ? 'at the end of this page' : 'on this page';
-            const handle = ui.modal({ title: 'Add a section', subtitle: `It goes ${where}. Point at one to see it.`, size: 'is-wide' });
+            /*
+             * Where it goes, chosen in the window (owner, 7 Nov 2026: "where to add it is not specified"): the top
+             * of the page or below any section, starting where they pointed (the end, from the bar).
+             */
+            const shown = shownSections(list);
+            const places = [
+                { value: AT_THE_TOP, label: 'At the top of the page' },
+                ...shown.map((section, index) => ({
+                    value: section.dataset.editItem,
+                    label: index === shown.length - 1 ? `At the end, below “${sectionName(section)}”` : `Below “${sectionName(section)}”`,
+                })),
+            ];
+            const startAt = after ?? shown.at(-1)?.dataset.editItem ?? AT_THE_TOP;
+            const aForm = only !== null && only === formsGroup();
+            const handle = ui.modal({
+                title: aForm ? 'Add a form' : 'Add a section',
+                subtitle: aForm ? 'Choose a form and where it goes. You change its questions once it is on the page.' : 'Point at one to see it, and choose where it goes.',
+                size: 'is-wide',
+            });
             const picker = renderSectionBrowser({
                 container: handle.body,
                 library: builder.library,
-                add: async (section) => {
+                only,
+                places: shown.length ? places : [],
+                place: startAt,
+                actionLabel: aForm ? 'Add this form' : 'Add this section',
+                add: async (section, chosen) => {
+                    if (chosen !== undefined) after = chosen;
                     const id = newAddedId();
                     handle.allowDismiss(false);
                     try {
@@ -4511,7 +4535,7 @@ const bootLiveEdit = () => {
                         const order = [...list.children].filter((child) => child.dataset.editItem).map((child) => child.dataset.editItem);
                         await saveListOrder(list, orderWith(order, `s-${id}`, after));
                         handle.close();
-                        reloadWithToast(`${section.label} added ✓`);
+                        reloadWithToast(`${section.label.replace(/ · \d+ left$/, '')} added ✓`);
                     } catch (error) {
                         handle.allowDismiss(true);
                         notify(error.message);
@@ -4613,6 +4637,16 @@ const bootLiveEdit = () => {
                 // adding it, rather than a list squeezed into the panel.
                 addSection.addEventListener('click', () => openSectionPicker({ list, after: item?.dataset.editItem ?? null }));
                 row.append(addSection);
+                // A form, named where it is looked for rather than inside the section library (owner, 7 Nov 2026).
+                const forms = formsGroup();
+                if (forms) {
+                    const addForm = document.createElement('button');
+                    addForm.type = 'button';
+                    addForm.className = 'le-chip-btn';
+                    addForm.textContent = item ? '+ Add a form below' : '+ Add a form';
+                    addForm.addEventListener('click', () => openSectionPicker({ list, after: item?.dataset.editItem ?? null, only: forms }));
+                    row.append(addForm);
+                }
             }
 
             if (item) {
@@ -6537,6 +6571,7 @@ const bootLiveEdit = () => {
                 return;
             }
             Object.assign(handle.line.style, { top: `${at.top}px`, left: `${at.left}px`, width: `${at.width}px` });
+            if (handle.form) handle.form.hidden = !formsGroup();
             handle.line.classList.add('is-visible');
         };
         const endList = () => shownSectionLists().at(-1) ?? null;
@@ -6565,7 +6600,7 @@ const bootLiveEdit = () => {
             }
             const path = event.composedPath?.() ?? [];
             // On the button itself: it stays where it is, so it can be pressed.
-            if (path.includes(ui.sectionInsert?.button) || path.includes(ui.sectionInsertEnd?.button)) return;
+            if ([ui.sectionInsert?.button, ui.sectionInsertEnd?.button, ui.sectionInsert?.form, ui.sectionInsertEnd?.form].some((b) => b && path.includes(b))) return;
             if (event.target === ui.root || ui.root.contains(event.target)) {
                 insertHere = null;
                 drawInsert(ui.sectionInsert, null);
@@ -6602,6 +6637,19 @@ const bootLiveEdit = () => {
             const list = insertEnd?.list ?? endList();
             hideInserts();
             if (list) openSectionPicker({ list, after: null });
+        });
+        // "+ Add a form" beside it on the same line, where the website has forms to add.
+        ui.sectionInsert?.form?.addEventListener('click', (event) => {
+            event.stopPropagation();
+            const at = insertHere;
+            hideInserts();
+            if (at) openSectionPicker({ list: at.list, after: at.after, only: formsGroup() });
+        });
+        ui.sectionInsertEnd?.form?.addEventListener('click', (event) => {
+            event.stopPropagation();
+            const list = insertEnd?.list ?? endList();
+            hideInserts();
+            if (list) openSectionPicker({ list, after: null, only: formsGroup() });
         });
         // The bar's "+ Section": the page's sections panel, which adds one at the end and lists the rest.
         const refreshSectionsButton = () => {

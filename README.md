@@ -860,7 +860,10 @@ window.liveEditPages = {
   taken: ['', 'about', 'open-days'],      // addresses a new page may not have
   library: [                              // the sections the design has, named by its designer
     { from: 'about.leadership', label: 'Leadership team', page: 'About the school', at: '/sites/trial/edit/about' },
-  ],
+    { from: 'kit.form.contact', label: 'Form: contact', page: 'Forms', at: null, kind: 'form',   // a form the host adds:
+      says: ['A contact form: name, email, phone and a message.'],                          // listed first, offered as
+      preview: '<section>…the form drawn as it would be added…</section>' },                 // "+ Add a form", shown as
+  ],                                                                                        // `preview` (optional)
   starts: [                               // optional: the design's pages to start a new page from,
     { id: 'about', title: 'About the school', sections: ['about.head', 'about.leadership'],
       own: ['about.head', 'about.leadership'] },  // optional: the same sections as this page has them;

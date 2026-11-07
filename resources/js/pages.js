@@ -125,8 +125,16 @@ export function addedWith(added, id, from) {
 }
 
 /** A page's section order with an added section placed after another (or last). */
+/** Where "at the top of the page" is said to orderWith, since `null` already means the end. */
+export const AT_THE_TOP = '^top';
+
 export function orderWith(order, itemId, after = null) {
     const next = order.filter((id) => id !== itemId);
+    if (after === AT_THE_TOP) {
+        next.unshift(itemId);
+
+        return next;
+    }
     const at = after === null ? -1 : next.indexOf(after);
     next.splice(at === -1 ? next.length : at + 1, 0, itemId);
 
@@ -150,7 +158,12 @@ export function grouped(library, query = '') {
         groups.get(section.page).push(section);
     }
 
-    return [...groups.entries()].map(([page, sections]) => ({ page, sections }));
+    // Forms first (owner, 7 Nov 2026: adding a form was "confusing", found only by scrolling past every section and
+    // chart): the thing most owners come to add is at the top, as the builders they know list it.
+    const all = [...groups.entries()].map(([page, sections]) => ({ page, sections }));
+    const forms = all.filter((group) => group.sections.some((section) => section.kind === 'form'));
+
+    return [...forms, ...all.filter((group) => !forms.includes(group))];
 }
 
 const el = (tag, className, text) => {
@@ -784,7 +797,7 @@ export function renderNewPage({ ui, config, save, go, notify, offer = startingPo
  * button toggles and `chosen()` says which are on; `onChange(chosen)` follows.
  * The page each section is kept on is fetched once and kept.
  */
-export function renderSectionBrowser({ container, library, add, multiple = false, onChange = () => {}, fetchPage = (href) => fetch(href).then((r) => r.text()), actionLabel = 'Add this section' }) {
+export function renderSectionBrowser({ container, library, add, multiple = false, onChange = () => {}, fetchPage = (href) => fetch(href).then((r) => r.text()), actionLabel = 'Add this section', only = null, places = [], place = null }) {
     const wrap = el('div', 'le-browser');
     const side = el('div', 'le-browser-list');
     const search = el('input', 'le-input le-library-search');
@@ -792,7 +805,38 @@ export function renderSectionBrowser({ container, library, add, multiple = false
     search.placeholder = 'Find a section: team, prices, questions...';
     search.setAttribute('aria-label', 'Find a section');
     const list = el('div', 'le-library-list');
-    side.append(search, list);
+
+    /*
+     * The kinds of thing to add, one press each (owner, 7 Nov 2026: a form was found only by scrolling to the
+     * bottom). "All", then each group of things not taken from a page (Forms, Charts and tables, Search), as the
+     * builders owners know put their categories beside the list.
+     */
+    let showing = only;
+    const kindGroups = [...new Set((library ?? []).filter((section) => section.kind).map((section) => section.page))]
+        .sort((a, b) => Number((library ?? []).some((s) => s.page === b && s.kind === 'form')) - Number((library ?? []).some((s) => s.page === a && s.kind === 'form')));
+    const tabs = el('div', 'le-library-kinds');
+    tabs.setAttribute('role', 'group');
+    tabs.setAttribute('aria-label', 'Show');
+    const tabButtons = new Map();
+    for (const [value, label] of [[null, 'All'], ...kindGroups.map((group) => [group, group])]) {
+        const b = el('button', 'le-subtab', label);
+        b.type = 'button';
+        b.addEventListener('click', () => {
+            showing = value;
+            paintTabs();
+            draw();
+            const first = list.querySelector('.le-library-item');
+            if (first) first.click();
+        });
+        tabButtons.set(value, b);
+        tabs.append(b);
+    }
+    const paintTabs = () => tabButtons.forEach((b, value) => {
+        b.classList.toggle('is-on', value === showing);
+        b.setAttribute('aria-pressed', value === showing ? 'true' : 'false');
+    });
+    paintTabs();
+    side.append(search, ...(kindGroups.length ? [tabs] : []), list);
 
     const stage = el('div', 'le-browser-stage');
     const stageHead = el('div', 'le-browser-head');
@@ -815,7 +859,28 @@ export function renderSectionBrowser({ container, library, add, multiple = false
     const action = el('button', 'le-btn-publish le-browser-add', actionLabel);
     action.type = 'button';
     action.disabled = true;
-    stage.append(stageHead, view, action);
+
+    /*
+     * Where it goes, said and changeable before it is added (owner, 7 Nov 2026: "where to add it is not
+     * specified"): the top of the page, below any of its sections, or the end, starting where they pointed.
+     */
+    const foot = el('div', 'le-browser-foot');
+    let whereTo = null;
+    if (places.length) {
+        const where = el('label', 'le-browser-where');
+        where.append(el('span', null, 'Put it'));
+        whereTo = el('select', 'le-input le-browser-where-pick');
+        for (const option of places) {
+            const o = el('option', null, option.label);
+            o.value = option.value === null ? '' : option.value;
+            whereTo.append(o);
+        }
+        whereTo.value = place === null ? '' : place;
+        where.append(whereTo);
+        foot.append(where);
+    }
+    foot.append(action);
+    stage.append(stageHead, view, foot);
     wrap.append(side, stage);
     container.append(wrap);
 
@@ -839,6 +904,30 @@ export function renderSectionBrowser({ container, library, add, multiple = false
         stageFrom.textContent = section.kind ? 'Drawn in your site’s own colours and type' : section.page ? `From your ${section.page} page` : '';
         paintAction();
         list.querySelectorAll('.le-library-item').forEach((row) => row.classList.toggle('is-looking', row.dataset.from === section.from));
+        // A form (TheFormsAnOwnerAdds): the form itself as it will be added, then what it asks.
+        if (section.preview) {
+            const width = size === 'phone' ? 390 : 1280;
+            const room = Math.max(200, view.clientWidth - 2);
+            const scale = Math.min(1, room / width);
+            const frame = el('iframe', 'le-browser-frame');
+            frame.setAttribute('sandbox', 'allow-same-origin');
+            frame.setAttribute('scrolling', 'no');
+            frame.title = `${section.label}, as it will look on the site`;
+            frame.style.width = `${width}px`;
+            frame.style.transform = `scale(${scale})`;
+            frame.srcdoc = previewDoc({ styles: styleHrefs(), markup: section.preview });
+            const holder = el('div', `le-browser-shot is-${size}`);
+            holder.style.width = `${Math.round(width * scale)}px`;
+            holder.append(frame);
+            frame.addEventListener('load', () => {
+                const tall = frame.contentDocument?.body?.scrollHeight || 600;
+                frame.style.height = `${tall}px`;
+                holder.style.height = `${Math.round(tall * scale)}px`;
+            });
+            view.replaceChildren(holder, ...(section.kind ? kindSays(section.kind, section) : []).map((line) => el('p', 'le-hint', line)));
+
+            return;
+        }
         // A chart or a table (data-kit.js): what it holds and the rules it keeps, since it is not on any page yet.
         if (section.kind) {
             view.replaceChildren(...kindSays(section.kind, section).map((line) => el('p', 'le-hint', line)));
@@ -893,13 +982,13 @@ export function renderSectionBrowser({ container, library, add, multiple = false
             paintAction();
             onChange([...on]);
         } else {
-            add(looking);
+            add(looking, whereTo ? (whereTo.value === '' ? null : whereTo.value) : undefined);
         }
     });
 
     const draw = () => {
         list.replaceChildren();
-        const groups = grouped(library, search.value);
+        const groups = grouped(library, search.value).filter((group) => showing === null || group.page === showing);
         if (!groups.length) {
             list.append(el('p', 'le-hint', 'No section by that name. Try a word from its heading.'));
 
@@ -924,7 +1013,7 @@ export function renderSectionBrowser({ container, library, add, multiple = false
     };
     search.addEventListener('input', draw);
     draw();
-    const first = library?.[0];
+    const first = grouped(library).find((group) => showing === null || group.page === showing)?.sections[0];
     if (first) show(first);
 
     return { chosen: () => [...on], focus: () => search.focus() };
