@@ -66,6 +66,7 @@ class EmbedController
         'section-inserter.js' => 'section-inserter.js',
         'data-kit.js' => 'data-kit.js',
         'data-panel.js' => 'data-panel.js',
+        'changes-as-made.js' => 'changes-as-made.js',
         'forms.js' => 'forms.js',
         'form-builder.js' => 'form-builder.js',
         'clear-of-the-bar.js' => 'clear-of-the-bar.js',

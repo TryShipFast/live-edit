@@ -784,7 +784,9 @@ class ContentController
 
         $site = ApiContext::site($request);
 
-        return (new SiteStore($site))->ownedBy($person, Draft::query()->where('site_id', $site->id)->get())->count();
+        return \ShipFast\LiveEdit\Domain\Content\ChangesAsMade::count(
+            (new SiteStore($site))->ownedBy($person, Draft::query()->where('site_id', $site->id)->get())->pluck('subject')->all()
+        );
     }
 
     private function locale(Request $request): ?string

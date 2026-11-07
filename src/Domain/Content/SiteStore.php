@@ -85,7 +85,8 @@ class SiteStore
 
     public function pending(): int
     {
-        return $this->drafts()->count();
+        // As the owner made them: a palette's colours are one change (ChangesAsMade).
+        return ChangesAsMade::count($this->drafts()->pluck('subject')->all());
     }
 
     /**

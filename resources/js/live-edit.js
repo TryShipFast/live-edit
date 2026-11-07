@@ -2,7 +2,8 @@ import { createChrome } from './chrome.js';
 import { createTeam, groupLines, sentenceFor, splitChanges, TEAM_CSS, versionHeadline } from './team.js';
 import { keepClearOfTheBar } from './clear-of-the-bar.js';
 import { openDialogsInPlace } from './dialogs-in-place.js';
-import { renderBrandPanel } from './brand.js';
+import { PAIRINGS, PALETTES, renderBrandPanel } from './brand.js';
+import { BRAND_NAMES, COLOUR_KEYS, TYPE_KEYS, asMade, pairingNamed, paletteNamed } from './changes-as-made.js';
 
 /** The marks a template puts on the business's own facts, each with the Branding setting it shows. */
 const BRAND_FIELDS = [
@@ -2194,6 +2195,11 @@ const bootLiveEdit = () => {
             const said = arrangement(change);
 
             if (said) return said.label;
+
+            // The brand's own fields and colours, by the names the Brand panel gives them, never "Text".
+            if (BRAND_NAMES[change.key]) return BRAND_NAMES[change.key];
+            if (COLOUR_KEYS.includes(change.key)) return `Colour: ${{ ink: 'headings', accent: 'links and buttons', surface: 'page', raised: 'cards', body: 'text', muted: 'captions', line: 'borders' }[change.key.slice(6)] ?? 'colour'}`;
+            if (TYPE_KEYS.includes(change.key)) return change.key.endsWith('display') ? 'Font for headings' : 'Font for text';
 
             // A table's rows or columns, a card list: named for what it is and where, never "Text"
             // (owner, 7 Nov 2026: a table's changes read "Text: A list of 4 items" before publishing).
@@ -7768,27 +7774,71 @@ const bootLiveEdit = () => {
                     const { yours, others } = splitChanges(changes);
 
                     const list = el('div', 'le-review');
-                    const reviewRow = (change) => {
-                        const row = el('div', 'le-review-row');
-                        row.append(
-                            // The same words the Changes tab uses, so the list
-                            // somebody checked before pressing Publish and the
-                            // list they publish are recognisably the same one.
-                            el('div', 'le-review-what', labelForChange(change)),
-                            el('div', 'le-review-to', readsOnThePageAs(change) || '(empty)'),
-                        );
+                    const row = (what, to) => {
+                        const line = el('div', 'le-review-row');
+                        line.append(el('div', 'le-review-what', what), to);
 
-                        return row;
+                        return line;
                     };
+                    // Where a change sits, by its section's name: "Photo in “Hand washed from ₦8,000.”".
+                    const sectionOf = (change) => {
+                        const onPage = elementForChange(change);
+                        // Its heading as the page reads it now, so a section whose heading was just changed is
+                        // named by the new words; the design's own label when it has no heading.
+                        const named = onPage?.closest('section')?.querySelector('h1, h2, h3')?.textContent
+                            ?? onPage?.closest('[data-edit-section-label]')?.dataset.editSectionLabel;
+
+                        return String(named ?? '').replace(/\s+/g, ' ').trim().slice(0, 60);
+                    };
+                    const reviewRow = (change) => {
+                        // A picture is shown, not its address (first-time owner walk, 7 Nov 2026).
+                        if (isAPictureChange(change) && change.after) {
+                            const where = sectionOf(change);
+                            const picture = el('img', 'le-review-picture');
+                            picture.src = change.after;
+                            picture.alt = '';
+
+                            return row(where ? `Photo in “${where}”` : 'Photo', picture);
+                        }
+
+                        // The same words the Changes tab uses, so the list somebody checked before pressing Publish
+                        // and the list they publish are recognisably the same one.
+                        return row(labelForChange(change), el('div', 'le-review-to', readsOnThePageAs(change) || '(empty)'));
+                    };
+                    // A palette is one change, said by its name, its colours shown; a pairing of faces one.
+                    const reviewEntry = (entry) => {
+                        if (entry.kind === 'colours') {
+                            const to = el('div', 'le-review-to');
+                            const swatches = el('span', 'le-review-swatches');
+                            entry.changes.forEach((change) => {
+                                const dot = el('span', 'le-review-swatch');
+                                dot.style.background = String(change.after ?? '');
+                                swatches.append(dot);
+                            });
+                            to.append(swatches, document.createTextNode(paletteNamed(entry.changes, PALETTES) ?? (entry.changes.length === 1 ? labelForChange(entry.changes[0]).replace(/^Colour: /, 'The colour for ') : 'Your own colours')));
+
+                            return row('Colours', to);
+                        }
+                        if (entry.kind === 'type') {
+                            const named = pairingNamed(entry.changes, PAIRINGS) ?? entry.changes.map((change) => change.after).join(' and ');
+
+                            return row('Fonts', el('div', 'le-review-to', named));
+                        }
+
+                        return reviewRow(entry.change);
+                    };
+                    const many = (n) => `${n} change${n === 1 ? '' : 's'}`;
 
                     if (others.size === 0) {
-                        changes.forEach((change) => list.append(reviewRow(change)));
+                        const made = asMade(changes);
+                        sheet.title(`Publish ${many(made.length)}`);
+                        made.forEach((entry) => list.append(reviewEntry(entry)));
                         sheet.body.replaceChildren(changes.length > 0 ? list : note('Nothing is waiting.'));
                     } else {
-                        const mine = yours.length;
-                        sheet.title(`Publish your ${mine} change${mine === 1 ? '' : 's'}`);
+                        const mine = asMade(yours).length;
+                        sheet.title(`Publish your ${many(mine)}`);
                         list.append(el('p', 'le-team-head', 'Your changes (these go live when you publish)'));
-                        yours.forEach((change) => list.append(reviewRow(change)));
+                        asMade(yours).forEach((entry) => list.append(reviewEntry(entry)));
                         if (mine === 0) list.append(note('You have no unpublished changes.'));
                         list.append(el('p', 'le-team-head', "Others' changes (not included)"));
                         for (const [name, theirs] of others) {

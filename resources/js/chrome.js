@@ -1243,6 +1243,10 @@ select.le-input {
 .le-review-row:last-child { border-bottom: 0; }
 .le-review-what { font-size: 12px; color: var(--le-muted); }
 .le-review-to { font-size: 14px; font-weight: 500; color: var(--le-ink); margin-top: 2px; }
+.le-review-picture { display: block; width: 120px; height: 72px; object-fit: cover; border-radius: 8px; margin-top: 6px; border: 1px solid var(--le-line); }
+.le-review-swatches { display: inline-flex; margin-right: 8px; vertical-align: -3px; }
+.le-review-swatch { width: 16px; height: 16px; border-radius: 50%; border: 2px solid #fff; box-shadow: 0 0 0 1px rgba(0,0,0,.12); margin-left: -4px; }
+.le-review-swatch:first-child { margin-left: 0; }
 
 /* ---- the drawer's system (0.15.81) -------------------------------------------
    One hierarchy in every panel: header (where you are, what this is), the field

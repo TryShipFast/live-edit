@@ -86,7 +86,8 @@ class DraftStore
 
     public static function pending(): int
     {
-        return self::drafts()->count();
+        // As the owner made them: a palette's colours are one change (ChangesAsMade).
+        return \ShipFast\LiveEdit\Domain\Content\ChangesAsMade::count(self::drafts()->pluck('subject')->all());
     }
 
     /**

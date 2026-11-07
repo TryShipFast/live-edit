@@ -1,5 +1,14 @@
 # ShipFast Live Edit for WordPress
 
+## 0.20.6
+
+- The publish review says what was done, the way it was done (first-time owner walk, 7 Nov 2026: "Our promise to
+  people is easy of use"). It read "Publish 18 changes" for six things done: a palette chosen in Brand was seven rows
+  of "Text #0F2A43", a photo its web address. Now a palette is one row, "Colours: Rose", with its colours shown; a
+  pairing of fonts one, "Fonts: Classic"; a photo is shown as the picture, "Photo in “<its section>”"; the brand's
+  fields by their own names (Business name, Phone, ...) in the review and in Changes. The number on Publish and in
+  the window count the same way (`ChangesAsMade` on the server, `changes-as-made.js` in the editor).
+
 ## 0.20.5
 
 - Charts and tables are edited as a grid (owner, 7 Nov 2026: "It should be easy to update the components. Table,
