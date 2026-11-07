@@ -16,6 +16,9 @@
 - A section that is itself a list (a case study's gallery, a row of columns that is the whole section) can be moved,
   copied and hidden. Its panel showed only its list's controls, as if the section were one of its own photos; it now
   shows both, the section's (Move up, Move down, Duplicate section, Hide) and the list's (+ Add a photo).
+- Words only a screen reader hears are offered from more panels: the link or button they sit in (a logo's ", home"
+  beside the business name, which opens Branding) and a list's panel for the hidden heading beside it in its section
+  (a portfolio's "Selected work" over a list of the same name, whose section the trail could not reach).
 
 ## 0.20.0
 

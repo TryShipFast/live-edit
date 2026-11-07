@@ -5024,8 +5024,20 @@ const bootLiveEdit = () => {
          * editing: offered here, named for what they are, each opening its own field.
          */
         const appendHeardNotSeen = (element) => {
-            const spoken = [...element.querySelectorAll('[data-edit]')].filter((node) => heardNotSeen(node) && node.textContent.trim() !== '');
-            if (!spoken.length || heardNotSeen(element)) return;
+            if (heardNotSeen(element)) return;
+            /*
+             * Where they are kept: inside what was opened, and also beside it in two places an owner would look.
+             * The link or button it sits in (a logo's ", home" beside its name: pressing the name opened the name,
+             * and the link around it is no step in the trail); and, for a list, the hidden heading beside it in its
+             * section (a portfolio's "Selected work" over a list of the same name: the trail keeps one of two
+             * steps named alike, the list, so the section's panel was never reached). The Photographer, 7 Nov 2026.
+             */
+            const around = element.parentElement?.closest?.('a[href], button');
+            const beside = element.matches?.('[data-edit-list]') && element.parentElement
+                ? [...element.parentElement.children].filter((child) => child !== element) : [];
+            const spoken = [...new Set([element, around, ...beside].filter(Boolean).flatMap((scope) => [scope, ...scope.querySelectorAll('[data-edit]')]))]
+                .filter((node) => node !== element && node.matches?.('[data-edit]') && heardNotSeen(node) && node.textContent.trim() !== '');
+            if (!spoken.length) return;
             const heading = document.createElement('div');
             heading.className = 'le-section-heading';
             heading.textContent = 'Read aloud by screen readers';
