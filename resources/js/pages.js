@@ -816,6 +816,9 @@ const loadScript = (src) => {
 
     return loadedScripts.get(src);
 };
+/** The pages a section is shown from, fetched once in a visit to the editor (renderSectionBrowser). */
+const pagesFetched = new Map();
+
 export async function drawnOffScreen(markup, width, script) {
     if (!window.kitData && script) await loadScript(script);
     if (!window.kitData?.draw) return markup;
@@ -923,8 +926,28 @@ export function renderSectionBrowser({ container, library, add, multiple = false
     container.append(wrap);
 
     const on = new Set();
-    const pageHtml = new Map();
     const drawnCache = new Map();
+    /*
+     * Each section's page, fetched once and kept for the visit (owner, 7 Nov 2026: "sometimes you don't see the
+     * preview on the right when you scroll the bottom left"): a page of the editor takes a second or more to make,
+     * so the pages are fetched in the background as soon as the window opens, two at a time, in the list's order,
+     * and a row pointed at fetches its page first. Choosing one then shows it at once.
+     */
+    const pageOf = (href) => {
+        if (!pagesFetched.has(href)) pagesFetched.set(href, Promise.resolve(fetchPage(href)).catch(() => null));
+
+        return pagesFetched.get(href);
+    };
+    const toFetch = [...new Set(grouped(library).flatMap((group) => group.sections).map((section) => section.at).filter(Boolean))];
+    const fetchNext = async () => {
+        while (toFetch.length) {
+            const href = toFetch.shift();
+            if (!pagesFetched.has(href)) await pageOf(href);
+        }
+    };
+    setTimeout(() => { fetchNext(); fetchNext(); }, 0);
+    // A chart's drawing script, loaded now so the first chart chosen is drawn without waiting for it.
+    if (drawWith && (library ?? []).some((section) => KINDS[section.kind] || section.kind === 'table') && !window.kitData) loadScript(drawWith);
     let looking = null;
 
     const paintSize = () => Object.entries(sizeButtons).forEach(([key, b]) => b.classList.toggle('is-on', key === size));
@@ -988,9 +1011,9 @@ export function renderSectionBrowser({ container, library, add, multiple = false
         }
         view.replaceChildren(el('p', 'le-hint', 'Loading…'));
         try {
-            if (!pageHtml.has(section.at)) pageHtml.set(section.at, await fetchPage(section.at));
+            const html = await pageOf(section.at);
             if (looking !== section) return;
-            const markup = sectionMarkup(pageHtml.get(section.at), section.from);
+            const markup = html === null ? null : sectionMarkup(html, section.from);
             if (!markup) {
                 view.replaceChildren(el('p', 'le-hint', 'This section cannot be shown on its own. It can still be added.'));
 
@@ -1054,6 +1077,7 @@ export function renderSectionBrowser({ container, library, add, multiple = false
                 // The picture is of the row chosen (owner, 7 Nov 2026: "the right should preview what the left has
                 // selected"): pointing at a row only lights it, so scrolling the list past others never changes it.
                 row.addEventListener('focus', () => { if (looking !== section) show(section); });
+                row.addEventListener('mouseenter', () => { if (section.at) pageOf(section.at); });
                 row.addEventListener('click', () => show(section));
                 list.append(row);
             }

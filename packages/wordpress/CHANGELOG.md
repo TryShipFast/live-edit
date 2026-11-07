@@ -7,7 +7,8 @@
 - Where it goes is chosen in the window: **Put it** at the top of the page, below any of its sections, or at the end, starting where you pointed. It used to go at the end, said only in the window's subtitle.
 - A form is shown as it will look, in the site's own style and with its own questions, where the host sends a `preview`; before, it was three lines of text.
 - On a phone the add window fits the screen: its search, "Put it" and the add button are no longer cut off at the right.
-- The picture is of the section chosen in the list (owner, 7 Nov 2026: "the right should preview what the left has selected"). Pointing at a row only lights it, so scrolling the list past other rows no longer changes the picture; the chosen row is marked in blue. Only the list scrolls; the picture and its button stay where they are.
+- The picture is of the section chosen in the list (owner, 7 Nov 2026: "the right should preview what the left has selected"). Pointing at a row only lights it, so scrolling the list past other rows no longer changes the picture; the chosen row has an even outline, like the editor's other choices. Only the list scrolls; the picture and its button stay where they are.
+- The pages the pictures come from are fetched as soon as the window opens, two at a time, and kept for the visit, and a row pointed at fetches its page first, so a section chosen far down the list shows at once instead of after a second or more of "Loading…".
 - Charts, tables and search are shown as they will look (owner, 7 Nov 2026: "should have a preview beyond text"): a chart drawn by the site's own kit-data.js (named by the host as the builder's `kitData`), a table and a search box in the site's style, where the host sends a `preview`.
 
 ## 0.19.6
