@@ -1,5 +1,5 @@
 // @vitest-environment happy-dom
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { AT_THE_TOP, addedWith, addressProblem, describeStructure, grouped, newAddedId, orderWith, previewDoc, renderLibrary, renderNewPage, renderSectionBrowser, sectionMarkup, slugFor, startingPoints, whyNotYet, withMenu } from '../../resources/js/pages.js';
 
 describe('the page builder names and places things the way the host reads them', () => {
@@ -209,12 +209,16 @@ describe('the Pages tab', () => {
         expect(ui.body.querySelectorAll('.le-chip')).toHaveLength(1);
     });
 
-    it('shows the section being pointed at, and adds it from under the picture', async () => {
+    it('shows the section chosen in the list, not the one pointed at, and adds it from under the picture', async () => {
         const container = document.createElement('div');
         const added = [];
         renderSectionBrowser({ container, library: config.library, add: (section) => added.push(section.from), fetchPage: async () => '<section data-instance="visit.book"><h2>Book a visit</h2></section>' });
         const rows = [...container.querySelectorAll('.le-library-item')];
+        // Pointing at a row lights it but does not change the picture: the picture is of the row chosen.
         rows[1].dispatchEvent(new Event('mouseenter'));
+        await tick();
+        expect(container.querySelector('.le-browser-name').textContent).not.toBe('Book a visit');
+        rows[1].click();
         await tick();
         expect(container.querySelector('.le-browser-name').textContent).toBe('Book a visit');
         expect(container.querySelector('.le-browser-from').textContent).toContain('Visit');
@@ -253,6 +257,20 @@ describe('the Pages tab', () => {
         container.querySelector('.le-library-kinds .le-subtab').click();
         expect(container.querySelectorAll('.le-library-item')[0].dataset.from).toBe('kit.form.contact');
         expect(container.querySelectorAll('.le-library-item').length).toBe(library.length);
+    });
+
+    it('shows a chart drawn, not its figures, before it is chosen', async () => {
+        const container = document.createElement('div');
+        document.body.append(container);
+        // The site's own drawing script, as kit-data.js leaves it on window.
+        window.kitData = { draw: (root) => root.querySelectorAll('[data-chart]').forEach((chart) => chart.insertAdjacentHTML('beforeend', '<svg class="drawn"></svg>')) };
+        const library = [{ from: 'kit.chart.bar', label: 'Chart: bars', page: 'Charts and tables', at: null, kind: 'bar', preview: '<section data-chart="bar"><table><tr><td>Jan</td><td>120</td></tr></table></section>' }];
+        renderSectionBrowser({ container, library, add: () => {}, drawWith: '/kit-data.js' });
+        await vi.waitFor(() => expect(container.querySelector('.le-browser-frame')?.srcdoc ?? '').toContain('class="drawn"'), { timeout: 2000 });
+        // Drawn off the page and taken away again.
+        expect(document.querySelectorAll('[data-chart]').length).toBe(0);
+        delete window.kitData;
+        container.remove();
     });
 
     it('shows a section before it is chosen, and pressing See it does not choose it', async () => {

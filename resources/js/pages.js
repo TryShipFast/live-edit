@@ -797,7 +797,45 @@ export function renderNewPage({ ui, config, save, go, notify, offer = startingPo
  * button toggles and `chosen()` says which are on; `onChange(chosen)` follows.
  * The page each section is kept on is fetched once and kept.
  */
-export function renderSectionBrowser({ container, library, add, multiple = false, onChange = () => {}, fetchPage = (href) => fetch(href).then((r) => r.text()), actionLabel = 'Add this section', only = null, places = [], place = null }) {
+/**
+ * A chart or a table drawn before it is chosen (owner, 7 Nov 2026: "should have a preview beyond text"): its markup
+ * put off screen at the width it is shown at, drawn there by the site's own kit-data.js (loaded once from `script`),
+ * and read back as drawn, so the sandboxed picture, which runs nothing, shows the chart and not its figures.
+ */
+const loadedScripts = new Map();
+const loadScript = (src) => {
+    if (!loadedScripts.has(src)) {
+        loadedScripts.set(src, new Promise((resolve) => {
+            const tag = document.createElement('script');
+            tag.src = src;
+            tag.onload = () => resolve(true);
+            tag.onerror = () => resolve(false);
+            document.head.append(tag);
+        }));
+    }
+
+    return loadedScripts.get(src);
+};
+export async function drawnOffScreen(markup, width, script) {
+    if (!window.kitData && script) await loadScript(script);
+    if (!window.kitData?.draw) return markup;
+    const box = document.createElement('div');
+    box.setAttribute('aria-hidden', 'true');
+    Object.assign(box.style, { position: 'fixed', left: '-30000px', top: '0', width: `${width}px`, visibility: 'hidden', pointerEvents: 'none' });
+    box.innerHTML = markup;
+    document.body.append(box);
+    try {
+        window.kitData.draw(box);
+        for (let i = 0; i < 3; i++) await new Promise((resolve) => requestAnimationFrame(() => resolve()));
+        await new Promise((resolve) => setTimeout(resolve, 120));
+
+        return box.innerHTML;
+    } finally {
+        box.remove();
+    }
+}
+
+export function renderSectionBrowser({ container, library, add, multiple = false, onChange = () => {}, fetchPage = (href) => fetch(href).then((r) => r.text()), actionLabel = 'Add this section', only = null, places = [], place = null, drawWith = null }) {
     const wrap = el('div', 'le-browser');
     const side = el('div', 'le-browser-list');
     const search = el('input', 'le-input le-library-search');
@@ -840,7 +878,7 @@ export function renderSectionBrowser({ container, library, add, multiple = false
 
     const stage = el('div', 'le-browser-stage');
     const stageHead = el('div', 'le-browser-head');
-    const stageName = el('div', 'le-browser-name', 'Point at a section to see it');
+    const stageName = el('div', 'le-browser-name', 'Choose a section to see it');
     const stageFrom = el('div', 'le-browser-from');
     const sizes = el('div', 'le-browser-sizes');
     const sizeButtons = {};
@@ -886,6 +924,7 @@ export function renderSectionBrowser({ container, library, add, multiple = false
 
     const on = new Set();
     const pageHtml = new Map();
+    const drawnCache = new Map();
     let looking = null;
 
     const paintSize = () => Object.entries(sizeButtons).forEach(([key, b]) => b.classList.toggle('is-on', key === size));
@@ -904,9 +943,17 @@ export function renderSectionBrowser({ container, library, add, multiple = false
         stageFrom.textContent = section.kind ? 'Drawn in your site’s own colours and type' : section.page ? `From your ${section.page} page` : '';
         paintAction();
         list.querySelectorAll('.le-library-item').forEach((row) => row.classList.toggle('is-looking', row.dataset.from === section.from));
-        // A form (TheFormsAnOwnerAdds): the form itself as it will be added, then what it asks.
+        // A form (TheFormsAnOwnerAdds), a chart or a table: the thing itself as it will be added, then what it holds.
         if (section.preview) {
             const width = size === 'phone' ? 390 : 1280;
+            let markup = section.preview;
+            if ((KINDS[section.kind] || section.kind === 'table') && drawWith) {
+                view.replaceChildren(el('p', 'le-hint', 'Drawing…'));
+                const key = `${section.from}|${width}`;
+                if (!drawnCache.has(key)) drawnCache.set(key, drawnOffScreen(section.preview, width, drawWith));
+                markup = await drawnCache.get(key);
+                if (looking !== section) return;
+            }
             const room = Math.max(200, view.clientWidth - 2);
             const scale = Math.min(1, room / width);
             const frame = el('iframe', 'le-browser-frame');
@@ -915,7 +962,7 @@ export function renderSectionBrowser({ container, library, add, multiple = false
             frame.title = `${section.label}, as it will look on the site`;
             frame.style.width = `${width}px`;
             frame.style.transform = `scale(${scale})`;
-            frame.srcdoc = previewDoc({ styles: styleHrefs(), markup: section.preview });
+            frame.srcdoc = previewDoc({ styles: styleHrefs(), markup });
             const holder = el('div', `le-browser-shot is-${size}`);
             holder.style.width = `${Math.round(width * scale)}px`;
             holder.append(frame);
@@ -1004,7 +1051,8 @@ export function renderSectionBrowser({ container, library, add, multiple = false
                 row.append(el('span', 'le-library-name', section.label));
                 if (multiple && on.has(section.from)) row.append(el('span', 'le-library-mark', 'Added'));
                 row.setAttribute('aria-pressed', multiple && on.has(section.from) ? 'true' : 'false');
-                row.addEventListener('mouseenter', () => { if (looking !== section) show(section); });
+                // The picture is of the row chosen (owner, 7 Nov 2026: "the right should preview what the left has
+                // selected"): pointing at a row only lights it, so scrolling the list past others never changes it.
                 row.addEventListener('focus', () => { if (looking !== section) show(section); });
                 row.addEventListener('click', () => show(section));
                 list.append(row);

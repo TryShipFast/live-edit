@@ -376,6 +376,9 @@ a.le-mark:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
 .le-browser-list { display: flex; flex-direction: column; gap: 10px; min-height: 0; }
 .le-browser-list .le-library-list { flex: 1; max-height: none; }
 .le-library-item.is-looking { background: var(--le-soft); border-color: var(--le-line); }
+/* The row whose picture is shown is marked as chosen; a row pointed at is only lit. */
+.le-browser .le-library-item.is-looking { background: #EEF4FF; border-color: #1F6FEB; box-shadow: inset 3px 0 0 #1F6FEB; }
+.le-browser .le-library-item:hover:not(.is-looking) { background: var(--le-soft); }
 .le-browser-stage { display: flex; flex-direction: column; gap: 12px; min-height: 0; }
 .le-browser-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
 .le-browser-name { color: var(--le-ink); font-size: 15px; font-weight: 650; }

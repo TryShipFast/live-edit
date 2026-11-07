@@ -4516,12 +4516,13 @@ const bootLiveEdit = () => {
             const aForm = only !== null && only === formsGroup();
             const handle = ui.modal({
                 title: aForm ? 'Add a form' : 'Add a section',
-                subtitle: aForm ? 'Choose a form and where it goes. You change its questions once it is on the page.' : 'Point at one to see it, and choose where it goes.',
+                subtitle: aForm ? 'Choose a form and where it goes. You change its questions once it is on the page.' : 'Choose one to see it, and where it goes.',
                 size: 'is-wide',
             });
             const picker = renderSectionBrowser({
                 container: handle.body,
                 library: builder.library,
+                drawWith: builder.kitData ?? null,
                 only,
                 places: shown.length ? places : [],
                 place: startAt,
