@@ -866,7 +866,7 @@ export async function drawnOffScreen(markup, width, script) {
     }
 }
 
-export function renderSectionBrowser({ container, library, add, multiple = false, onChange = () => {}, fetchPage = (href) => fetch(href).then((r) => r.text()), actionLabel = 'Add this section', only = null, places = [], place = null, drawWith = null }) {
+export function renderSectionBrowser({ container, library, add, multiple = false, onChange = () => {}, fetchPage = (href) => fetch(href).then((r) => r.text()), actionLabel = 'Add this section', only = null, places = [], place = null, drawWith = null, upgrade = null }) {
     const wrap = el('div', 'le-browser');
     const side = el('div', 'le-browser-list');
     const search = el('input', 'le-input le-library-search');
@@ -953,8 +953,20 @@ export function renderSectionBrowser({ container, library, add, multiple = false
         where.append(whereTo);
         foot.append(where);
     }
+    /*
+     * Why it cannot be added, said where the button is (owner, 7 Nov 2026: "add to section for chart is not
+     * working"): with none left on the plan the save was refused and the message went to a toast behind this
+     * window, so the button looked dead. As builders do it, the limit is said and the button offers the upgrade.
+     */
+    const note = el('p', 'le-browser-note');
+    note.setAttribute('role', 'alert');
+    note.hidden = true;
+    const say = (message) => {
+        note.textContent = String(message ?? '').trim();
+        note.hidden = note.textContent === '';
+    };
     foot.append(action);
-    stage.append(stageHead, view, foot);
+    stage.append(stageHead, view, note, foot);
     wrap.append(side, stage);
     container.append(wrap);
 
@@ -986,11 +998,15 @@ export function renderSectionBrowser({ container, library, add, multiple = false
     const paintSize = () => Object.entries(sizeButtons).forEach(([key, b]) => b.classList.toggle('is-on', key === size));
     paintSize();
 
+    const lockedNow = () => Boolean(looking?.locked) && !(multiple && on.has(looking.from));
     const paintAction = () => {
         if (!looking) return;
-        action.disabled = false;
-        action.textContent = multiple ? (on.has(looking.from) ? 'Remove from the page' : 'Add to the page') : actionLabel;
+        const locked = lockedNow();
+        action.disabled = locked && !upgrade;
+        action.textContent = locked ? (upgrade ? 'Upgrade to add more' : 'None left on your plan')
+            : multiple ? (on.has(looking.from) ? 'Remove from the page' : 'Add to the page') : actionLabel;
         action.classList.toggle('is-added', multiple && on.has(looking.from));
+        say(locked ? (looking.locked_reason || 'Your plan has none of these left on this website.') : '');
     };
 
     const show = async (section) => {
@@ -1084,6 +1100,12 @@ export function renderSectionBrowser({ container, library, add, multiple = false
 
     action.addEventListener('click', () => {
         if (!looking) return;
+        if (lockedNow()) {
+            // The billing page opens beside the editor, so nothing on this page is lost while they upgrade.
+            if (upgrade) window.open(upgrade, '_blank', 'noopener');
+
+            return;
+        }
         if (multiple) {
             on.has(looking.from) ? on.delete(looking.from) : on.add(looking.from);
             draw();
@@ -1126,7 +1148,7 @@ export function renderSectionBrowser({ container, library, add, multiple = false
     const first = grouped(library).find((group) => showing === null || group.page === showing)?.sections[0];
     if (first) show(first);
 
-    return { chosen: () => [...on], focus: () => search.focus() };
+    return { chosen: () => [...on], focus: () => search.focus(), say };
 }
 
 /**

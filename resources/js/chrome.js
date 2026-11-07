@@ -395,6 +395,8 @@ a.le-mark:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
 .le-browser-frame { position: absolute; top: 0; left: 0; height: 600px; border: 0; transform-origin: 0 0; pointer-events: none; background: #fff; }
 /* Under the picture: where it goes, then the button that adds it. */
 .le-browser-foot { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 10px 14px; }
+.le-browser-note { margin: 0 0 10px; padding: 10px 12px; border-radius: 10px; background: #fff7e6; color: #7a4b00; font-size: 14px; line-height: 1.45; }
+.le-browser-note[hidden] { display: none; }
 .le-browser-where { display: flex; align-items: center; gap: 8px; flex: 1 1 260px; min-width: 0; font-size: 13px; font-weight: 600; color: var(--le-ink); }
 .le-browser-where .le-input { flex: 1; min-width: 0; min-height: 40px; }
 /* The kinds of thing to add, as tabs over the list: All, Forms, Charts and tables. */

@@ -2,6 +2,12 @@
 
 ## 0.20.4
 
+- Adding a chart, table or form with none left on the plan says so (owner, 7 Nov 2026: "Then I add to section for chart
+  is not working"). The save was refused ("Your plan includes 1 chart or table on this website. Upgrade to add more.")
+  but the message went to a toast behind the add window, so Add this section looked dead. The window now reads the
+  host's `locked` / `locked_reason`: it shows the sentence above the button, and the button becomes "Upgrade to add
+  more", opening the owner's billing page in a new tab (`window.liveEditEditor.billing`; disabled for a teammate, who
+  has no billing). Any other refused add is also said in the window.
 - A chart or table can go on the left or right of another (owner, 7 Nov 2026: "The charts and other others only have
   above and below. But no left of or right of"). When a chart or table is chosen in Add a section and the page already
   has one the owner added, Put it also offers "On the left of “X”" and "On the right of “X”". The pair is saved in the

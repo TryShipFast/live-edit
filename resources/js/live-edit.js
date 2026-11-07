@@ -4612,6 +4612,7 @@ const bootLiveEdit = () => {
                 places: shown.length ? places : [],
                 place: startAt,
                 actionLabel: aForm ? 'Add this form' : 'Add this section',
+                upgrade: window.liveEditEditor?.billing ?? null,
                 add: async (section, chosen) => {
                     if (chosen !== undefined) after = chosen;
                     const id = newAddedId();
@@ -4632,7 +4633,8 @@ const bootLiveEdit = () => {
                         reloadWithToast(`${section.label.replace(/ · \d+ left$/, '')} added ✓`);
                     } catch (error) {
                         handle.allowDismiss(true);
-                        notify(error.message);
+                        // Said in the window, where they are looking; a toast would sit behind it.
+                        picker.say(error.message || 'It could not be added. Try again.');
                     }
                 },
             });
