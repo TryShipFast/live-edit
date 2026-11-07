@@ -1228,6 +1228,28 @@ class MarkupScanner
             $nodes[] = $descendant;
         }
 
+        // A product sold where it stands (its own Add to bag, no page of its own) is a product of its own once
+        // copied: its data-kit-product takes the copy's id, so the copy's Add to bag puts the copy in the bag and
+        // the shop prices it by the copy's words (the Kit contract, LIVE-EDIT-STRUCTURE.md: "a copied product card keeps its own product
+        // association"). A card that opens a product's page (commerce.product) is still that product.
+        $sold = [];
+        foreach ($nodes as $node) {
+            if ($node instanceof DOMElement && preg_match('/(^|\s)commerce\.product(\s|$)/', $node->getAttribute('data-kit-action')) === 1) {
+                $sold = null;
+                break;
+            }
+            if ($node instanceof DOMElement && preg_match('/(^|\s)commerce\.add-to-bag(\s|$)/', $node->getAttribute('data-kit-action')) === 1) {
+                $sold[] = $node;
+            }
+        }
+        if ($sold !== null && $sold !== []) {
+            foreach ($nodes as $node) {
+                if ($node instanceof DOMElement && ($product = trim($node->getAttribute('data-kit-product'))) !== '') {
+                    $node->setAttribute('data-kit-product', $product.'--'.$newId);
+                }
+            }
+        }
+
         $idMap = [];
         foreach ($nodes as $node) {
             if (! $node instanceof DOMElement) {

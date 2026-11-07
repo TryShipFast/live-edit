@@ -1,5 +1,13 @@
 # ShipFast Live Edit for WordPress
 
+## 0.20.1
+
+- A copied product sold where it stands is a product of its own. On a page that sells each item in place (its own Add
+  to bag, no page of its own: The Photographer's prints), a copy the owner made kept the first item's
+  `data-kit-product`, so its Add to bag put the first item in the bag at the first item's price. A copy now takes
+  `<product>--<copy id>`, on the item and everything inside it. A card that opens a product's page
+  (`commerce.product`) is still that product, as before.
+
 ## 0.20.0
 
 - Adding a form is easy to find (owner, 7 Nov 2026: "Adding the form is confusing, and where to add it is not specified"). **+ Add a form** sits beside **+ Add a section** on the line that appears between two sections, after the last section, and in the page's sections panel (+ Section in the bar, or Sections under More on a phone). It opens **Add a form** on the forms alone.
