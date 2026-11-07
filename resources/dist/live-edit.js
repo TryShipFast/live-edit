@@ -342,6 +342,20 @@ a.le-mark:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
 .le-name-look .le-hint { margin-top: 10px; }
 .le-starts-own { height: 100%; }
 .le-browser { display: grid; grid-template-columns: 280px minmax(0, 1fr); gap: 20px; height: 100%; min-height: 0; }
+/*
+ * Two columns, each in its own place (owner, 7 Nov 2026: "the right side should be static since the left side is
+ * long"): only the list scrolls, and the picture and its button stay where they are. The window's body is a column
+ * the browser fills by flex, not by a percentage height, which Safari leaves as "as tall as its content" inside a
+ * flex item, so the whole window scrolled and the picture went up with the list. The picture also sticks to the top,
+ * in case anything still makes the body scroll.
+ */
+@media (min-width: 761px) {
+  .le-modal-body:has(> .le-browser) { display: flex; flex-direction: column; overflow: hidden; }
+  .le-modal-body > .le-browser { flex: 1 1 auto; height: auto; min-height: 0; grid-template-rows: minmax(0, 1fr); }
+  .le-browser-list, .le-browser-stage { min-height: 0; max-height: 100%; }
+  .le-browser-list .le-library-list { overflow-y: auto; overscroll-behavior: contain; }
+  .le-browser-stage { position: sticky; top: 0; align-self: start; height: 100%; }
+}
 .le-browser-list { display: flex; flex-direction: column; gap: 10px; min-height: 0; }
 .le-browser-list .le-library-list { flex: 1; max-height: none; }
 .le-library-item.is-looking { background: var(--le-soft); border-color: var(--le-line); }
