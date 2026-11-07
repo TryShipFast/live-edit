@@ -313,6 +313,15 @@ describe('the Pages tab', () => {
         expect(doc).not.toContain('<script');
     });
 
+    it('names an added section without the add window\'s "left" counter (owner, 7 Nov 2026)', () => {
+        const withCounts = { ...config, library: [{ from: 'kit.table.data', label: 'Table · None left' }, { from: 'kit.chart.bar', label: 'Chart: bars or columns · 1 left' }] };
+        const said = describeStructure('structure:page:open-days', JSON.stringify({ added: {} }),
+            JSON.stringify({ added: { 'add-1': 'kit.table.data', 'add-2': 'kit.chart.bar' } }), withCounts);
+        expect(said.after).toContain('Table');
+        expect(said.after).toContain('Chart: bars or columns');
+        expect(said.after).not.toMatch(/left/);
+    });
+
     it('says what was arranged in the owner words, never the stored json', () => {
         const said = describeStructure(
             'structure:page:open-days',

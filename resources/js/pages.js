@@ -238,7 +238,8 @@ const parsed = (value, fallback) => {
  * Returns null for any other key, which the caller describes as it always did.
  */
 export function describeStructure(key, before, after, { library = [], pages = [] } = {}) {
-    const named = (from) => (library.find((section) => section.from === from) ?? {}).label ?? from;
+    // The add window's own label carries how many are left ("Table · 1 left"); a change names the section only.
+    const named = (from) => String((library.find((section) => section.from === from) ?? {}).label ?? from).replace(/\s*·\s*(\d+|None) left$/i, '');
     const sectionsIn = (value) => Object.values(parsed(value, { added: {} }).added ?? {}).map(named);
     const titlesIn = (value) => (Array.isArray(parsed(value, [])) ? parsed(value, []) : []).map((page) => page.title ?? page.id);
 

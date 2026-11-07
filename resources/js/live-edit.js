@@ -2165,12 +2165,46 @@ const bootLiveEdit = () => {
         /** Arranging pages and sections, said in words; null for every other change. */
         const arrangement = (change) => describeStructure(change.key, change.before, change.after, window.liveEditPages ?? {});
 
+        /* A list's order is one change; the list it belongs to, on this page, when it is here. */
+        const listForChange = (change) => document.querySelector(`[data-edit-list="${CSS.escape(change.key)}"]`);
+
+        /* What a list holds, said the way its own label says it: "Rows" holds rows, "Columns" columns. */
+        const listNoun = (list, count) => {
+            const plural = String(list?.dataset.editListLabel ?? '').trim().toLowerCase() || 'items';
+            const one = plural.endsWith('s') ? plural.slice(0, -1) : plural;
+
+            return count === 1 ? one : plural;
+        };
+
         const labelForChange = (change) => {
             const said = arrangement(change);
 
             if (said) return said.label;
 
+            // A table's rows or columns, a card list: named for what it is and where, never "Text"
+            // (owner, 7 Nov 2026: a table's changes read "Text: A list of 4 items" before publishing).
+            const list = listForChange(change);
+            if (list) {
+                const where = list.closest('[data-edit-section-label]')?.dataset.editSectionLabel
+                    ?? list.closest('[data-label]')?.getAttribute('data-label');
+                const what = list.dataset.editListLabel || 'List';
+
+                return where && where !== what ? `${what} in “${where}”` : what;
+            }
+
             const onPage = elementForChange(change);
+
+            // A table's cell: which one, by its row and its column ("Price a month, Starter")
+            const cell = onPage?.closest('td, th');
+            const table = cell?.closest('table');
+            if (cell && table) {
+                const row = cell.closest('tr');
+                const index = [...row.children].indexOf(cell);
+                const column = table.querySelector('thead tr')?.children[index]?.textContent.trim();
+                const rowName = row.closest('thead') ? 'Heading' : row.querySelector('th')?.textContent.trim();
+                const named = [column, rowName].filter((part, i, all) => part && all.indexOf(part) === i).join(', ');
+                if (named) return `Table cell: ${named}`;
+            }
 
             if (onPage) return describeElement(onPage);
 
@@ -2205,6 +2239,21 @@ const bootLiveEdit = () => {
          * its children, the row shows the sentence a visitor will read.
          */
         const readsOnThePageAs = (change) => {
+            // Pages and sections arranged, said in words, as the Changes tab says them: the review before
+            // Publish printed the stored arrangement ({"added":{...}}) instead (owner, 7 Nov 2026).
+            const said = arrangement(change);
+            if (said) return said.after;
+
+            // A list's order, counted in what it holds ("4 rows", "1 row added, leaving 4 rows").
+            const list = listForChange(change);
+            if (list) {
+                const text = String(change.after ?? '');
+                const listed = text.match(/^A list of (\d+) items?$/);
+                if (listed) return `${listed[1]} ${listNoun(list, Number(listed[1]))}`;
+
+                return text.replace(/(\d+) items?\b/g, (_, n) => `${n} ${listNoun(list, Number(n))}`);
+            }
+
             const stored = trim(change.after);
             const onPage = elementForChange(change);
 

@@ -13,6 +13,11 @@
 - No more empty space in the panel (owner, 7 Nov 2026: "unnecessary spaces between the text and AI credits"). The
   collection editor's list of fields used the panel body's own class name, and its grid stretched every row of every
   panel to fill the drawer; it has a class of its own now.
+- The list before Publish says what changed in words (owner, 7 Nov 2026: "publish table shows json and not human
+  readable text"). An added section printed its stored arrangement (`{"added":{...}}`) in the Publish window, which
+  did not use the words the Changes tab already had; both use them now. A table's rows and columns read "Rows in
+  “Plans side by side”: 4 rows", a cell "Table cell: Price a month, Starter", and an added section is named without the
+  add window's "· 1 left".
 
 ## 0.20.1
 
