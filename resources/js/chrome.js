@@ -246,7 +246,11 @@ a.le-mark:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
 .le-seo-preview-description { color: #4d5156; }
 .le-seo-actions { justify-content: flex-end; }
 /* ---- AI assist ---- */
+.le-assist-group { display: flex; flex-direction: column; gap: 8px; }
 .le-assist-head { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
+.le-assist-name { font-size: 12px; font-weight: 600; color: var(--le-body); }
+.le-assist-row { display: flex; flex-wrap: wrap; gap: 8px; }
+.le-assist-row .le-assist { flex: 1 1 120px; width: auto; padding: 8px 12px; min-height: 36px; font-size: 13px; }
 .le-assist-balance { font-size: 12px; color: #9A9DA5; }
 .le-assist {
   display: flex; align-items: center; justify-content: space-between; gap: 10px;

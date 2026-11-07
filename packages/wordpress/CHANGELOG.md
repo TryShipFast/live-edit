@@ -1,5 +1,12 @@
 # ShipFast Live Edit for WordPress
 
+## 0.20.3
+
+- The AI assist in a text panel is compact (owner, 7 Nov 2026: "the AI credit space was also too big"). It was a
+  section heading with its own rule (drawn as a stray short line under the words) and padding, then Rewrite and
+  Shorten as two full-width bars: about 180px for two buttons. It is now one group: a slim "AI assist · 48 credits
+  left" line and the two actions side by side, each with its cost (about 60px).
+
 ## 0.20.2
 
 - Any section can be deleted (owner, 7 Nov 2026: "there is no way to delete a section"). Only a section the owner had

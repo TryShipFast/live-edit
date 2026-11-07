@@ -1793,10 +1793,23 @@ const bootLiveEdit = () => {
             // buttons that answer "not available" is worse than no row.
             if (!credits?.available || !box) return;
 
+            /*
+             * One compact group (owner, 7 Nov 2026: "the AI credit space was also too big"): a slim line naming it and
+             * the credits left, and the actions side by side under it. It was a section heading with its own rule and
+             * padding, then each action as a full-width bar, about 180px for two buttons.
+             */
+            const group = document.createElement('div');
+            group.className = 'le-assist-group';
             const heading = document.createElement('div');
             heading.className = 'le-assist-head';
-            heading.append(sectionHeading('AI assist'), balanceLabel());
-            drawerFields.append(heading);
+            const named = document.createElement('span');
+            named.className = 'le-assist-name';
+            named.textContent = 'AI assist';
+            heading.append(named, balanceLabel());
+            const row = document.createElement('div');
+            row.className = 'le-assist-row';
+            group.append(heading, row);
+            drawerFields.append(group);
 
             [['rewrite', 'Rewrite'], ['shorten', 'Shorten']].forEach(([action, label]) => {
                 const cost = credits.costs?.[action] ?? 1;
@@ -1820,7 +1833,7 @@ const bootLiveEdit = () => {
                 }
 
                 button.addEventListener('click', () => void runAssist(action, label, element, box, button, name));
-                drawerFields.append(button);
+                row.append(button);
             });
         };
 

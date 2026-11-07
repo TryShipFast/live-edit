@@ -62,3 +62,20 @@ test('a link’s page is chosen by name and writes its address', async ({ page }
     await picker.selectOption('products/blue-hour');
     await expect(ui(page).locator('[data-link-field=href]')).toHaveValue('../products/blue-hour/');
 });
+
+test('words sit close above a compact AI assist, its two actions side by side (owner, 7 Nov 2026)', async ({ page }) => {
+    // the server says a model is configured, with credits, as a site with AI does
+    await page.route(/\/credits(\?|$)/, (route) => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ available: true, balance: 48, costs: { rewrite: 1, shorten: 1 } }) }));
+    await page.reload();
+    await expect.poll(() => page.evaluate(() => document.body.classList.contains('editing'))).toBe(true);
+    await page.locator('[data-edit-item="aster"] p[data-edit]').click();
+    const words = ui(page).locator('.le-drawer textarea').first();
+    const group = ui(page).locator('.le-assist-group');
+    await expect(group).toContainText('48 credits left');
+    const [w, g] = [await words.boundingBox(), await group.boundingBox()];
+    // no stretched gap under the words, and the whole group no taller than a heading and one row of buttons
+    expect(g.y - (w.y + w.height)).toBeLessThan(40);
+    expect(g.height).toBeLessThan(90);
+    const [rewrite, shorten] = [await group.getByRole('button', { name: /Rewrite/ }).boundingBox(), await group.getByRole('button', { name: /Shorten/ }).boundingBox()];
+    expect(Math.abs(rewrite.y - shorten.y)).toBeLessThan(2);
+});
