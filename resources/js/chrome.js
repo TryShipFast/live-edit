@@ -835,7 +835,9 @@ a.le-mark:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
 .le-table-more[hidden] { display: none; }
 .le-table-why { display: grid; gap: 4px; }
 .le-table-status { margin-right: auto; }
-.le-fields { display: grid; gap: 12px; padding-top: 12px; }
+/* the collection editor's own list of fields: its own class, since .le-fields is every panel's body and a grid there
+   stretched each row to fill the drawer (owner, 7 Nov 2026: "unnecessary spaces between the text and AI credits") */
+.le-collection-fields { display: grid; gap: 12px; padding-top: 12px; }
 .le-fields-list { display: grid; gap: 10px; margin: 0; padding-left: 22px; }
 .le-field-row { display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 1fr); gap: 6px 10px; padding: 10px; border: 1px solid var(--le-line); border-radius: 10px; }
 .le-field-row > .le-hint, .le-field-row > .le-check, .le-field-row > .le-shop-actions, .le-field-options { grid-column: 1 / -1; margin: 0; }

@@ -550,7 +550,13 @@ const bootLiveEdit = () => {
             if (tag === 'HEADER') return 'Header';
             if (tag === 'FOOTER') return 'Footer';
             if (tag === 'FORM') return 'Form';
-            if (element.hasAttribute('data-edit-item')) return element.parentElement?.dataset?.editListKind === 'sections' ? 'Section' : 'Card';
+            if (element.hasAttribute('data-edit-item')) {
+                if (element.parentElement?.dataset?.editListKind === 'sections') return 'Section';
+                // a table's own parts are called what they are, not a card
+                if (element.matches('td, th')) return 'Cell';
+                if (element.matches('tr')) return 'Row';
+                return 'Card';
+            }
             if (element.hasAttribute('data-edit-icon')) return 'Icon';
             if (element.hasAttribute('data-edit-svg')) return 'Drawing';
             if (element.hasAttribute('data-edit')) return 'Text';
@@ -5359,7 +5365,15 @@ const bootLiveEdit = () => {
         /** A table's cell: the row and the column it sits in, kept in step. */
         const appendTableControls = (element) => {
             const block = renderTableControls({ element, ...dataDeps() });
-            if (block) drawerFields.prepend(block);
+            if (!block) return;
+            // A cell's own words come first, ready to type in; its row and column controls follow them.
+            const words = drawerFields.querySelector('textarea[name="value"]');
+            const field = words?.closest('.le-field');
+            if (field) {
+                field.after(block);
+            } else {
+                drawerFields.prepend(block);
+            }
         };
 
         const editStyle = (element) => {
@@ -6364,6 +6378,16 @@ const bootLiveEdit = () => {
 
                     return { element: shaped, kind: 'form', field: key || null, box: field ?? control, label: 'A question: press to shape this form' };
                 }
+            }
+            /*
+             * A table's cell: pressing anywhere in it edits its words. The words sit in a span on one side of the cell
+             * ("$0" at its right), so a press beside them took the cell as an item, with its row and column controls
+             * and nothing to type in (owner, 7 Nov 2026: "it's difficult to edit table").
+             */
+            const cell = node.closest?.('td, th');
+            if (cell && !node.closest('[data-edit]')) {
+                const words = cell.querySelectorAll('[data-edit^="setting:"]');
+                if (words.length === 1) return { element: words[0], kind: 'text' };
             }
             const text = node.closest('[data-edit]');
             if (text) return { element: text, kind: 'text' };

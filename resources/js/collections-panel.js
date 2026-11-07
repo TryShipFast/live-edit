@@ -281,7 +281,7 @@ export function renderTableEditor({ ui, collection, save, done, notify, openImpo
     }
 
     function drawFields() {
-        const wrap = el('div', 'le-fields');
+        const wrap = el('div', 'le-collection-fields');
         wrap.append(el('p', 'le-hint', 'The fields every record has. Visitors filter by a choice, a number, a date or a yes-or-no; words are searched. Renaming a field keeps what each record holds.'));
         const list = el('ol', 'le-fields-list');
         const problems = el('div', 'le-table-why');

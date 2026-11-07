@@ -209,6 +209,29 @@ test('a table takes columns added, moved and deleted in every row, and rows with
     await expect.poll(() => rowsDrawn('shop', id)).toEqual([['Small', '$40', '1 kg'], ['Large', '$70', '2 kg']]);
 });
 
+test('a press anywhere in a table cell opens its words first, ready to type (owner, 7 Nov 2026)', async ({ page }) => {
+    await openAsEditor(page, 'shop');
+    const id = await addAtTheEnd(page, 'Table');
+    const cell = page.locator(`[data-instance="shop.${id}"] tbody tr`).first().locator('td').first();
+    // the panel the add opened is closed first, so the press reaches the page
+    await page.keyboard.press('Escape');
+    await expect(drawer(page)).not.toHaveClass(/is-open/);
+    await cell.evaluate((el) => el.scrollIntoView({ block: 'center' }));
+    await page.waitForTimeout(300);
+    // beside its words, not on them: the left edge of the cell, where a right-aligned price leaves empty space
+    const box = await cell.boundingBox();
+    await page.mouse.click(box.x + 6, box.y + box.height / 2);
+    const words = drawer(page).locator('textarea[name="value"]').first();
+    await expect(words).toBeFocused();
+    await expect(words).toHaveValue(await cell.locator('span').innerText());
+    await expect(drawer(page).locator('.le-trail')).not.toContainText('Card');
+    // the row and column controls follow the words
+    await expect(drawer(page).getByRole('button', { name: '+ Add a column after' })).toBeVisible();
+    await words.fill('₦25,000');
+    await drawer(page).getByRole('button', { name: 'Save changes' }).click();
+    await expect.poll(() => rowsDrawn('shop', id)[0][1]).toBe('₦25,000');
+});
+
 test('an outside site is offered no chart and no table', async ({ page }) => {
     await site.close();
     site = await serveFakeHost({ outside: true, data: true });

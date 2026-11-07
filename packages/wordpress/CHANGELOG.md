@@ -6,6 +6,13 @@
   added offered "Remove this section"; the design's own could only be hidden. Every section's panel now has **Delete
   this section**, as every site builder people know has it: it takes the section out of the page, and **+ Add a
   section** offers it again later. Hide stays for "not now". A page keeps at least one section.
+- A table is easy to edit (owner, 7 Nov 2026: "it's difficult to edit table"). A cell's words sit in a span on one side
+  of the cell, so a press beside them opened the cell as a "Card": row and column controls, and nothing to type in.
+  A press anywhere in a cell now opens its words, first in the panel and ready to type, with the row and column
+  controls under them; a table's parts are named Cell and Row, not Card.
+- No more empty space in the panel (owner, 7 Nov 2026: "unnecessary spaces between the text and AI credits"). The
+  collection editor's list of fields used the panel body's own class name, and its grid stretched every row of every
+  panel to fill the drawer; it has a class of its own now.
 
 ## 0.20.1
 
