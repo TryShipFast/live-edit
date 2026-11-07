@@ -7,6 +7,9 @@
   `data-kit-product`, so its Add to bag put the first item in the bag at the first item's price. A copy now takes
   `<product>--<copy id>`, on the item and everything inside it. A card that opens a product's page
   (`commerce.product`) is still that product, as before.
+- A section with a background photo can be hidden. Its panel is the photo's, and ticking **Hide this section** then
+  Save was refused with "Choose a file from your computer or paste an image URL first", because no new picture was
+  chosen. A picture's panel holding only a style change now saves the style (19 pages of The Photographer, 7 Nov 2026).
 
 ## 0.20.0
 

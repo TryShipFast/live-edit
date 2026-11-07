@@ -3149,7 +3149,11 @@ const bootLiveEdit = () => {
                     if (file) formData.append('file', file);
                     else if (url) formData.append('url', url.startsWith('http') ? url : `https://${url}`);
                     changedAttrs.forEach((input) => formData.append(input.dataset.imgAttr, input.value));
-                    if (!file && !url && changedAttrs.length === 0 && !captionChanged) {
+                    // A picture's panel also holds its style ("Hide this section" on a section with a
+                    // background photo): a style change alone is saved below, with no picture asked for
+                    // (The Photographer's walk, 7 Nov 2026: 19 pages refused to hide such a section).
+                    const onlyItsStyle = Boolean(current.styleKey && current.dirty);
+                    if (!file && !url && changedAttrs.length === 0 && !captionChanged && !onlyItsStyle) {
                         restoreButton();
                         // Told apart, because they are different situations:
                         // a panel nobody typed in, and a panel with nowhere
