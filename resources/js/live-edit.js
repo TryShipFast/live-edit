@@ -512,6 +512,12 @@ const bootLiveEdit = () => {
             address: 'Address', date: 'Date', time: 'Time', question: 'Question', answer: 'Answer', story: 'Description',
             description: 'Description', amount: 'Amount', meta: 'Details', note: 'Note', fine: 'Small print',
             kind: 'Type', type: 'Type', conn: 'Connection', cloth: 'Cloth', cols: 'Colours', colours: 'Colours', k: 'Key numbers',
+            // Words templates name their fields with, said as an owner would (first-time owner walk, 7 Nov 2026).
+            car: 'Car', vehicle: 'Vehicle', role: 'Role', job: 'Job title', rating: 'Rating', location: 'Location', city: 'City',
+            hours: 'Opening hours', duration: 'How long it takes', eyebrow: 'Small heading above', subtitle: 'Subheading',
+            summary: 'Summary', excerpt: 'Summary', author: 'Author', company: 'Company', tag: 'Tag', badge: 'Badge',
+            sample: 'Sample note', step: 'Step', number: 'Number', stat: 'Figure', figure: 'Figure', unit: 'Unit',
+            day: 'Day', month: 'Month', year: 'Year', venue: 'Place', place: 'Place', detail: 'Details', details: 'Details',
         };
 
         /** What this element is, in words a non-technical editor recognises. */
@@ -540,6 +546,18 @@ const bootLiveEdit = () => {
              */
             const named = FIELD_NAMES[element.dataset.field];
             if (named) return named;
+            // Names made of parts ("price-saloon", "hero-lead"): the part an owner knows, and what it is of.
+            const parts = String(element.dataset.field ?? '').toLowerCase().split(/[-_]+/).filter(Boolean);
+            if (parts.length > 1) {
+                if (FIELD_NAMES[parts[0]]) return `${FIELD_NAMES[parts[0]]}, ${parts.slice(1).join(' ')}`;
+                if (FIELD_NAMES[parts.at(-1)]) return FIELD_NAMES[parts.at(-1)];
+            }
+            // A card is named for what its list holds ("Review"), before the tag it is written as ("List item").
+            if (element.hasAttribute('data-edit-item') && tag === 'LI' && element.parentElement?.dataset?.editListKind !== 'sections') {
+                const noun = itemNoun(element.parentElement);
+
+                return noun ? `${noun[0].toUpperCase()}${noun.slice(1)}` : 'Card';
+            }
 
             if (tag === 'IMG') return 'Image';
             if (tag === 'BUTTON') return 'Button';
@@ -4871,7 +4889,7 @@ const bootLiveEdit = () => {
                     const remove = document.createElement('button');
                     remove.type = 'button';
                     remove.className = 'le-btn-danger';
-                    remove.textContent = `Delete this ${itemNoun(list) ?? 'item'}`;
+                    remove.textContent = `Delete this ${itemNoun(list) ?? 'card'}`;
                     remove.disabled = lowest;
                     const deleteCard = (message) => saveOrder(currentOrder().filter((id) => id !== item.dataset.editItem), message);
                     remove.addEventListener('click', () => {
@@ -4882,7 +4900,7 @@ const bootLiveEdit = () => {
 
                             return;
                         }
-                        if (!window.confirm(`Delete this ${itemNoun(list) ?? 'item'}?`)) return;
+                        if (!window.confirm(`Delete this ${itemNoun(list) ?? 'card'}?`)) return;
                         deleteCard('Deleted \u2713');
                     });
                     row.append(remove);
@@ -4978,7 +4996,7 @@ const bootLiveEdit = () => {
                 said.textContent = separate
                     ? `This copy still opens ${page.title}. Give it its own page first: a copy of that page, with everything on it, that you can change without changing ${page.title}.`
                     : shared
-                        ? `Another card opens ${page.title} too, so a change to it shows on both.`
+                        ? `This card's link opens the “${page.title}” page, as another card's does: a change made there shows on both.`
                         : `This card opens ${page.title}. Edit all details shows that page here: click anything on it to change it.`;
                 block.append(own, said);
             }
@@ -5106,10 +5124,12 @@ const bootLiveEdit = () => {
                 const list = item.parentElement;
                 const items = list ? [...list.children].filter((child) => child.hasAttribute('data-edit-item')) : [item];
                 const index = Math.max(0, items.indexOf(item)) + 1;
-                const kind = list?.dataset.editListKind === 'sections' ? 'Section' : 'Item';
+                const noun = list?.dataset.editListKind === 'sections' ? null : itemNoun(list);
+                const kind = list?.dataset.editListKind === 'sections' ? 'Section' : noun ? `${noun[0].toUpperCase()}${noun.slice(1)}` : 'Card';
+                // Its heading as the page reads it now, before the design's own label for it.
                 const name = item.dataset.editItemLabel
-                    || item.dataset.editSectionLabel
                     || item.querySelector('h1, h2, h3, h4, h5, h6')?.textContent
+                    || item.dataset.editSectionLabel
                     || item.getAttribute('aria-label');
                 const context = document.createElement('div');
                 context.className = 'le-section-heading le-item-context';
@@ -5340,7 +5360,9 @@ const bootLiveEdit = () => {
          * remove from it then the info is useless". Pressing a thumbnail, or a photo of the gallery, leads here.
          */
         const galleryOf = (node) => {
-            const list = node?.closest?.('[data-edit-list]');
+            // Never a page's sections: they are a list too, so every photo in every section read as one photo of a
+            // gallery of the page, offering "← All the photos" (first-time owner walk, 7 Nov 2026).
+            const list = node?.closest?.('[data-edit-list]:not([data-edit-list-kind="sections"])');
             return list && [...list.children].some((item) => item.dataset.editItem && item.querySelector('img[data-edit-img]')) ? list : null;
         };
         const editGallery = (list) => {
@@ -6450,8 +6472,12 @@ const bootLiveEdit = () => {
                     // of site both fields opened empty — and an empty field is
                     // sent on save, so opening the drawer to change the
                     // picture silently wiped the description of it.
-                    textInput('alt', 'Alt text', attributeOf(element, 'alt', 'editAlt'), 'Describes the image for search engines and screen readers.'),
-                    textInput('imgTitle', 'Title attribute', attributeOf(element, 'title', 'editTitle'), 'Optional tooltip shown on hover.')
+                    textInput('alt', 'Describe the photo', attributeOf(element, 'alt', 'editAlt'), 'In a few words, for people who cannot see it and for Google.'),
+                    // Hover words, only where the photo already has some: a field most owners never need is a field
+                    // they have to wonder about (first-time owner walk, 7 Nov 2026). Saving sends only what was typed.
+                    ...(String(attributeOf(element, 'title', 'editTitle') ?? '').trim()
+                        ? [textInput('imgTitle', 'Words shown when the mouse is over it', attributeOf(element, 'title', 'editTitle'), 'Optional.')]
+                        : []),
                 );
             }
 

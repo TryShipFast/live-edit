@@ -1,5 +1,19 @@
 # ShipFast Live Edit for WordPress
 
+## 0.20.12
+
+- Words a first-time owner knows (first-time owner walk, 7 Nov 2026):
+  - A photo's description is "Describe the photo" ("In a few words, for people who cannot see it and for Google"),
+    not "Alt text"; the "Title attribute" field shows only where a photo already has hover words.
+  - A field is named by what the template calls it, in parts too: "price-saloon" is "Price, saloon", not "Text";
+    "car" is "Car", with more everyday names added (role, rating, hours, eyebrow, ...).
+  - A card is named for what its list holds ("Review 1 of 3", "Delete this review"), or "Card" ("Card 1 of 6",
+    "Delete this card"), never "List item" or "Item 1 of 6"; a section by its heading as the page reads it now.
+  - "Another card opens X too" is said as "This card's link opens the “X” page, as another card's does: a change made
+    there shows on both."
+- A photo in a section is no longer taken for one photo of a gallery of the page's sections: it offered "← All the
+  photos", which opened the page's sections as photos.
+
 ## 0.20.11
 
 - Brand shows what the website shows (first-time owner walk, 7 Nov 2026: Business name, Logo and Phone looked empty,
