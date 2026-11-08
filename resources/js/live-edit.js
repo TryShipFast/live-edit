@@ -1093,6 +1093,9 @@ const bootLiveEdit = () => {
             // arrives after it was built. See redrawPanel().
             lastOpened = node;
 
+            if (cardOf(node) === node && current?.kind === 'item-words' && editItemWords(node)) return;
+            // a word of a card, however it was reached (a link's words come this way): the whole card
+            if (String(node.dataset?.edit ?? '').startsWith('setting:') && cardOf(node) && editItemWords(cardOf(node), { focusOn: node })) return;
             if (node.matches?.('tr') && chartRowOf(node) === node) editChart(chartOf(node), node);
             else if (node.closest?.('td, th') && gridTableOf(node)) editTable(node.closest('td, th'));
             else if (node.hasAttribute('data-edit-list') && chartKindOf(chartOf(node)) && chartData(chartOf(node)).list === node) editChart(chartOf(node));
@@ -5493,16 +5496,32 @@ const bootLiveEdit = () => {
          * their own panel with their own Save, about nine presses for one review). Each with its name, the page following
          * as it is typed, one Save changes; its move and delete below. Opened on a card just added, ready to type in.
          */
-        const editItemWords = (item, { fresh = false } = {}) => {
+        /*
+         * The card a word belongs to, when it belongs to one (owner, 8 Nov 2026: "If I click on card I should be able to
+         * change its contents from the drawer"): an item of a list of cards on the page, not a section, a menu, a
+         * gallery, a table, a chart or a form. Null otherwise, and the word opens on its own as before.
+         */
+        const cardOf = (node) => {
+            const item = node?.closest?.('[data-edit-item]');
+            const list = item?.parentElement;
+            if (!item || !list?.dataset?.editList || list.dataset.editListKind === 'sections') return null;
+            if (item.closest('nav, header, footer, form, table, select, [data-chart], [data-kit-table], [data-search]')) return null;
+            if (galleryOf(item) && !item.querySelector('[data-edit^="setting:"]:not(img)')) return null;
+
+            return item;
+        };
+
+        const editItemWords = (item, { fresh = false, focusOn = null } = {}) => {
             const list = item.parentElement;
             const words = [...item.querySelectorAll('[data-edit^="setting:"]')]
                 .filter((node) => !node.parentElement?.closest('[data-edit^="setting:"]') || !item.contains(node.parentElement.closest('[data-edit^="setting:"]')))
                 .filter((node) => node.getBoundingClientRect().width > 0 && !node.querySelector('[data-edit]') && !heardNotSeen(node));
-            if (!words.length) return false;
+            // a card of one word is that word's own panel, as before
+            if (!words.length || (focusOn && words.length < 2)) return false;
             current = { kind: 'item-words' };
             lastOpened = item;
             const noun = itemNoun(list);
-            drawerTitle.textContent = noun ? `${noun[0].toUpperCase()}${noun.slice(1)}` : 'Item';
+            drawerTitle.textContent = noun ? `${noun[0].toUpperCase()}${noun.slice(1)}` : 'Card';
             drawerDelete.classList.add('le-hidden');
             drawerFields.replaceChildren();
             const hint = document.createElement('p');
@@ -5517,22 +5536,47 @@ const bootLiveEdit = () => {
                 const wrap = document.createElement('label');
                 wrap.className = 'le-field';
                 // Named by what the design calls it (data-field "car": Car), never "Text" twice.
-                const field = String(node.dataset.field ?? '').replace(/[-_]+/g, ' ').trim();
-                wrap.append(node.dataset.editLabel
-                    ?? (node.hasAttribute('data-sample-note') ? 'Sample note' : field ? `${field[0].toUpperCase()}${field.slice(1)}` : describeElement(node)));
+                wrap.append(node.dataset.editLabel ?? (node.hasAttribute('data-sample-note') ? 'Sample note' : describeElement(node)));
                 const box = document.createElement('textarea');
-                box.className = 'le-input le-textarea';
+                box.className = 'le-input le-textarea le-item-word';
                 box.rows = was.length > 60 ? 3 : 1;
                 box.value = was;
                 // The page follows as it is typed, where the words are all the element holds.
                 box.addEventListener('input', () => {
                     if (!node.children.length) node.textContent = box.value;
                     save.disabled = false;
+                    // unsaved: a redraw of the panel must not throw it away, and closing asks first
+                    if (current) current.dirty = true;
                 });
                 wrap.append(box);
                 drawerFields.append(wrap);
+                // The word pressed keeps its own styling and link, one press away.
+                if (node === focusOn) {
+                    const more = document.createElement('button');
+                    more.type = 'button';
+                    more.className = 'le-chip-btn le-item-words-more';
+                    more.textContent = node.closest('a[href]') ? 'Style and where it goes ›' : 'Style ›';
+                    more.addEventListener('click', () => { const link = node.closest('a[href]'); if (link && item.contains(link)) editLink(link); else { editText(node); offerTheFormBuilder(node); } });
+                    drawerFields.append(more);
+                }
 
                 return { node, key, was, box };
+            });
+            // Its photos, each replaced from here.
+            const photos = [...item.querySelectorAll('img[data-edit-img]')].filter((img) => img.getBoundingClientRect().width > 0);
+            photos.forEach((img, i) => {
+                const row = document.createElement('div');
+                row.className = 'le-item-photo';
+                const thumb = document.createElement('img');
+                thumb.src = img.currentSrc || img.src;
+                thumb.alt = '';
+                const swap = document.createElement('button');
+                swap.type = 'button';
+                swap.className = 'le-chip-btn';
+                swap.textContent = photos.length > 1 ? `Replace photo ${i + 1}` : 'Replace the photo';
+                swap.addEventListener('click', () => switchToNode(img));
+                row.append(thumb, swap);
+                drawerFields.append(row);
             });
             const save = document.createElement('button');
             save.type = 'button';
@@ -5546,6 +5590,7 @@ const bootLiveEdit = () => {
                     for (const field of fields) {
                         if (field.box.value !== field.was) await saveSetting(field.key, field.box.value);
                     }
+                    if (current) current.dirty = false;
                     await settle('Saved ✓', null, null, true);
                 } catch (error) {
                     notify(error.message);
@@ -5555,6 +5600,12 @@ const bootLiveEdit = () => {
                 }
             });
             drawerFields.append(save);
+            const cardStyle = document.createElement('button');
+            cardStyle.type = 'button';
+            cardStyle.className = 'le-chip-btn';
+            cardStyle.textContent = `${noun ? `${noun[0].toUpperCase()}${noun.slice(1)}` : 'Card'} style: colour and spacing ›`;
+            cardStyle.addEventListener('click', () => editStyle(item));
+            drawerFields.append(cardStyle);
             const own = [...drawerFields.children];
             listControlsFor(item, 'item');
             // Its words first, its move and delete after them.
@@ -5563,7 +5614,13 @@ const bootLiveEdit = () => {
             showTab('Edit');
             ui.drawerFoot.classList.add('le-hidden');
             openDrawer();
-            setTimeout(() => { fields[0].box.focus(); fields[0].box.select(); }, 120);
+            // The box pressed takes the focus at once, and again once the drawer has settled its own, so typing at
+            // any speed goes where the owner pressed.
+            const first = fields.find((field) => field.node === focusOn) ?? fields[0];
+            const focusIt = () => { first.box.focus(); if (fresh) first.box.select(); };
+            focusIt();
+            requestAnimationFrame(focusIt);
+            setTimeout(focusIt, 120);
 
             return true;
         };
@@ -6884,11 +6941,14 @@ const bootLiveEdit = () => {
             else if (kind === 'image') { const list = galleryOf(element); if (list) editGalleryPhoto(element, list); else editImage(element); }
             else if (kind === 'icon') void editIcon(element);
             else if (kind === 'svg') editDrawing(element);
+            else if (kind === 'text' && cardOf(element) && editItemWords(cardOf(element), { focusOn: element })) { /* the whole card, in one panel */ }
             else if (kind === 'text') { editText(element); offerTheFormBuilder(element); }
             else if (kind === 'choices') { editChoices(element); offerTheFormBuilder(element); }
+            else if (kind === 'link' && cardOf(element) && editItemWords(cardOf(element), { focusOn: element.matches('[data-edit^="setting:"]') ? element : element.querySelector('[data-edit^="setting:"]') ?? element })) { /* its card, with where it goes one press away */ }
             else if (kind === 'link') editLink(element);
             else if (kind === 'computed' && computedKind(element) === 'gallery' && galleryOf(element)) editGallery(galleryOf(element));
             else if (kind === 'computed') ui.toast(COMPUTED_SAYS[computedKind(element)] ?? COMPUTED_SAYS.count, 7000);
+            else if (cardOf(element) === element && editItemWords(element)) { /* a card pressed between its words */ }
             else editStyle(element);
         };
 
@@ -7283,7 +7343,9 @@ const bootLiveEdit = () => {
                             : anchor.matches('[data-edit]')
                                 ? anchor
                                 : null;
-                    if (linkText) editText(linkText, anchor);
+                    // a link's words in a card open the whole card, where it goes one press away
+                    if (linkText && cardOf(linkText) && editItemWords(cardOf(linkText), { focusOn: linkText })) { /* the card */ }
+                    else if (linkText) editText(linkText, anchor);
                     else if (target) openTarget(target);
                     else if (anchor.dataset.editHref !== undefined) editLink(anchor);
 

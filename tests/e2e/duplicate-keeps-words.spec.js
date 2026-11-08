@@ -39,9 +39,12 @@ const choose = async (page, selector) => {
     await page.locator(selector).first().click();
 };
 
+// A press on a card's words opens the whole card, the box pressed focused (owner, 8 Nov 2026); that box is typed in.
 const typeAndSave = async (page, words) => {
-    await page.locator('.le-drawer textarea').first().fill(words);
-    await ui(page).getByRole('button', { name: 'Save changes' }).click();
+    const focused = ui(page).locator('.le-drawer textarea:focus');
+    await expect(focused).toHaveCount(1);
+    await focused.fill(words);
+    await ui(page).locator('.le-item-words-save').click();
 };
 
 const drawn = (path = 'shop') => site.host.draw(path);

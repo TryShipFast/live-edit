@@ -1,5 +1,15 @@
 # ShipFast Live Edit for WordPress
 
+## 0.20.14
+
+- A press on a card opens the whole card (owner, 8 Nov 2026: "If I click on card I should be able to change its
+  contents from the drawer"). A word, a price, the card's link or the space between them opens one panel with every
+  word of the card, each named ("Name", "Price, saloon", "Car"), the one pressed focused, one Save changes; its photos
+  with a Replace button each; "Style ›" (or "Style and where it goes ›" for a link) for the word pressed; the card's
+  own style one press away; its move, add and delete below. Menus, galleries, tables, charts and forms keep their own
+  panels; a card of one word opens that word as before. Typing in it counts as unsaved (closing asks first, a redraw
+  keeps it), and the box pressed takes the focus at once.
+
 ## 0.20.13
 
 - The section's tools fold away while something inside it is edited (first-time owner walk, 7 Nov 2026). Opening a

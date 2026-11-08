@@ -417,6 +417,11 @@ a.le-mark:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
 .le-figures-foot { display: flex; gap: 8px; align-items: center; }
 .le-figures-foot .le-btn-primary { background: var(--le-accent); color: #fff; border-color: var(--le-accent); }
 .le-figures-foot .le-btn-primary:disabled { opacity: .45; cursor: default; }
+:host .le-item-word { min-height: 0; resize: vertical; field-sizing: content; max-height: 220px; }
+.le-item-word[rows="1"] { min-height: 44px; }
+.le-item-photo { display: flex; align-items: center; gap: 12px; margin: 6px 0; }
+.le-item-photo img { width: 72px; height: 48px; object-fit: cover; border-radius: 6px; border: 1px solid var(--le-line); }
+.le-item-words-more { margin: -4px 0 8px; }
 .le-fold { margin: 14px 0 4px; border-top: 1px solid var(--le-line); padding-top: 10px; }
 .le-fold > summary { cursor: pointer; font-size: 13px; font-weight: 600; color: var(--le-muted); padding: 6px 0; list-style: none; }
 .le-fold > summary::-webkit-details-marker { display: none; }

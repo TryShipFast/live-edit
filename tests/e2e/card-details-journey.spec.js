@@ -51,6 +51,14 @@ const choose = async (where, selector) => {
 
 /** Change the words in the open panel and save them. */
 const typeAndSave = async (where, words) => {
+    // A card's words open together, the one pressed focused (owner, 8 Nov 2026); a single word opens on its own.
+    await where.locator('.le-drawer textarea').first().waitFor();
+    if (await where.locator('.le-item-words-save').count()) {
+        await where.locator('.le-drawer textarea:focus').fill(words);
+        await where.locator('.le-item-words-save').click();
+
+        return;
+    }
     await where.locator('.le-drawer textarea').first().fill(words);
     await where.getByRole('button', { name: 'Save changes' }).click();
 };
