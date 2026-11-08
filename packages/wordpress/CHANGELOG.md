@@ -2,12 +2,15 @@
 
 ## 0.20.9
 
-- A card's move is named for where it goes (owner, 8 Nov 2026: "the move should be contextual to how each section or
-  container works"). A move swaps a card with the one before or after it in its list; in a grid of three reviews that
-  one sits beside it, so "Move down" moved it right. Now the editor looks at where the neighbour is drawn: beside it on
-  the same row, "← Move left" / "Move right →" (mirrored for right-to-left pages); above or below, "↑ Move up" /
-  "↓ Move down". The same reviews read left and right on a computer and up and down on a phone, where they stack;
-  a page's sections are always up and down.
+- A card moves where the button says (owner, 8 Nov 2026: "the move should be contextual to how each section or
+  container works"; "it's most likely default and won't work for every move"). A move swapped a card with the one
+  before or after it in its list, whatever the page drew: in a grid of three reviews "Move down" moved it right, and
+  nothing moved a card to the row below. Now each direction is the card drawn that way (moves.js): left and right on
+  its row, up and down the nearest card in the row above or below, in the same column; the card takes that card's
+  place and the rest close up. A button is offered only where there is a card that way, so the same reviews offer left
+  and right on a computer and up and down on a phone, where they stack. Lists drawn in another order than they are
+  kept (reversed rows, columns filled downwards) move by where they are drawn; a card that is not drawn (a slide off
+  its slider) moves earlier or later in the list.
 
 ## 0.20.8
 

@@ -4,6 +4,7 @@ import { keepClearOfTheBar } from './clear-of-the-bar.js';
 import { openDialogsInPlace } from './dialogs-in-place.js';
 import { PAIRINGS, PALETTES, renderBrandPanel } from './brand.js';
 import { BRAND_NAMES, COLOUR_KEYS, TYPE_KEYS, asMade, pairingNamed, paletteNamed } from './changes-as-made.js';
+import { MOVE_LABELS, movedOrder, placesToMove } from './moves.js';
 
 /** The marks a template puts on the business's own facts, each with the Branding setting it shows. */
 const BRAND_FIELDS = [
@@ -4770,35 +4771,24 @@ const bootLiveEdit = () => {
                 const ids = currentOrder();
                 const index = ids.indexOf(item.dataset.editItem);
                 /*
-                 * Named by where it goes on the page (owner, 8 Nov 2026: "will that work considering it's grid?"). A move
-                 * swaps it with the one before or after it in the list; in a grid of three reviews that one is beside it,
-                 * so "Move down" moved it right. Beside it on the same row: left and right; otherwise up and down.
+                 * Moved where the button says (owner, 8 Nov 2026: "the move should be contextual to how each section or
+                 * container works"): each direction is the card drawn that way, and the card takes its place (moves.js).
+                 * In a grid of three reviews: left and right on its row, up and down in its column.
                  */
-                const besideIt = (other) => {
-                    const a = item.getBoundingClientRect();
-                    const b = other?.getBoundingClientRect?.();
-
-                    return Boolean(b && a.height && b.height && Math.abs(a.top - b.top) < Math.min(a.height, b.height) / 2);
-                };
                 const items = [...list.children].filter((child) => child.dataset.editItem);
-                for (const delta of [-1, 1]) {
-                    const next = index + delta;
-                    if (next < 0 || next >= ids.length) continue;
-                    const sideways = !sections && besideIt(items[next]);
-                    const rtl = getComputedStyle(list).direction === 'rtl';
-                    const label = sideways
-                        ? ((delta < 0) !== rtl ? '\u2190 Move left' : 'Move right \u2192')
-                        : (delta < 0 ? '\u2191 Move up' : '\u2193 Move down');
+                const rects = items.map((child) => child.getBoundingClientRect());
+                const places = placesToMove(rects, items.indexOf(item));
+                for (const [direction, label] of MOVE_LABELS) {
+                    const to = places[direction];
+                    if (to === undefined) continue;
+                    const target = items[to].dataset.editItem;
                     const move = document.createElement('button');
                     move.type = 'button';
                     move.className = 'le-chip-btn';
                     move.textContent = label;
                     move.addEventListener('click', () => {
-                        const reordered = currentOrder();
-                        const from = reordered.indexOf(item.dataset.editItem);
-                        const to = from + delta;
-                        [reordered[from], reordered[to]] = [reordered[to], reordered[from]];
-                        saveOrder(reordered, sections ? 'Section moved \u2713' : 'Item moved \u2713');
+                        const order = currentOrder();
+                        saveOrder(movedOrder(order, order.indexOf(item.dataset.editItem), order.indexOf(target)), sections ? 'Section moved \u2713' : 'Moved \u2713');
                     });
                     row.append(move);
                 }
