@@ -28,10 +28,13 @@ const RUNTIME = fileURLToPath(new URL('../../resources/dist/live-edit.js', impor
  */
 const TEAM_ROUTES = /^(content|styles|session|team(\/[a-z-]+)?|changes|publish|versions(\/\d+\/undo)?|restore)$/;
 
-export async function serveFakeHost({ removable = false, library = false, outside = false, data = false, search = false, forms = null, pagesList = false, libraryForms = false, mayPublish, team = null, port: listenOn = 0 } = {}) {
+export async function serveFakeHost({ removable = false, library = false, outside = false, data = false, search = false, forms = null, pagesList = false, libraryForms = false, sale = false, mayPublish, team = null, port: listenOn = 0 } = {}) {
     const window = new Window();
     let publishAsked = 0;
-    const host = createHost({ makeDocument: (html) => new window.DOMParser().parseFromString(html, 'text/html'), removable, library, outside, data, search, forms, pagesList, libraryForms });
+    const host = createHost({ makeDocument: (html) => new window.DOMParser().parseFromString(html, 'text/html'), removable, library, outside, data, search, forms, pagesList, libraryForms, sale });
+    // The host's stock (KeepsShopStock), with sale: { stock: [...] }: GET and POST /stock, claimed by the editor.
+    const stock = Array.isArray(sale?.stock) ? sale.stock.map((row) => ({ ...row })) : null;
+    const drafts = [];
 
     const json = (response, status, body) => {
         response.writeHead(status, { 'Content-Type': 'application/json' });
@@ -116,6 +119,18 @@ export async function serveFakeHost({ removable = false, library = false, outsid
 
                 return;
             }
+            if (stock && url.pathname === '/stock') {
+                if (request.method === 'POST') {
+                    const { changes = [] } = await bodyOf(request);
+                    for (const change of changes) {
+                        const row = stock.find((r) => r.product === change.product && r.size === (change.size ?? ''));
+                        if (row) row.quantity = change.quantity ?? null;
+                    }
+                }
+                json(response, 200, { stock });
+
+                return;
+            }
             if (url.pathname === '/kit-data.js') {
                 response.writeHead(200, { 'Content-Type': 'text/javascript' });
                 response.end(readFileSync(fileURLToPath(new URL('./kit-data.js', import.meta.url))));
@@ -151,7 +166,9 @@ export async function serveFakeHost({ removable = false, library = false, outsid
             }
             if (url.pathname.startsWith('/edit/')) {
                 const page = url.pathname.slice('/edit/'.length).replace(/\/$/, '');
-                const html = host.editorPage(page, { editorBase: `http://${request.headers.host}/edit/`, api: `http://${request.headers.host}/api`, runtime: '/dist/live-edit.js' });
+                // With sale: { slow }: a product page read in the background takes this long (a busy host).
+                if (sale?.slow && page.startsWith('products/') && request.headers['sec-fetch-mode'] !== 'navigate') await new Promise((resolve) => setTimeout(resolve, sale.slow));
+                const html = host.editorPage(page, { editorBase: `http://${request.headers.host}/edit/`, api: `http://${request.headers.host}/api`, runtime: '/dist/live-edit.js', ...(sale ? { pending: drafts.length } : {}) });
                 if (!html) {
                     response.writeHead(404, { 'Content-Type': 'text/html' });
                     response.end('<!doctype html><title>Not found</title><p>There is no page at that address.</p>');
@@ -166,11 +183,20 @@ export async function serveFakeHost({ removable = false, library = false, outsid
             if (url.pathname.startsWith('/api/demo/')) {
                 const route = url.pathname.slice('/api/demo/'.length);
                 if (request.method === 'GET' && route === 'content') {
-                    json(response, 200, { settings: host.settings, styles: host.styles, pending: host.saves.length, version: 1 });
+                    json(response, 200, { settings: host.settings, styles: host.styles, pending: sale ? drafts.length : host.saves.length, version: 1 });
                 } else if (request.method === 'POST' && route === 'content') {
                     const { key, value } = await bodyOf(request);
                     host.save(key, value ?? '');
+                    if (sale) drafts.splice(0, drafts.length, ...drafts.filter((k) => k !== key), key);
                     json(response, 200, { saved: true, key });
+                } else if (sale && route === 'changes' && request.method === 'GET') {
+                    // With sale: the drafts as the engine lists them, newest first, so Undo can be walked.
+                    json(response, 200, { changes: [...drafts].reverse().map((key) => ({ key, kind: 'setting', after: host.settings[key] ?? '' })) });
+                } else if (sale && route === 'changes' && request.method === 'DELETE') {
+                    const { key } = await bodyOf(request);
+                    drafts.splice(0, drafts.length, ...drafts.filter((k) => k !== key));
+                    delete host.settings[key];
+                    json(response, 200, { reverted: true });
                 } else if (request.method === 'POST' && route === 'styles') {
                     const { key, props } = await bodyOf(request);
                     host.saveStyle(key, props ?? {});
@@ -201,6 +227,7 @@ export async function serveFakeHost({ removable = false, library = false, outsid
         url: `http://127.0.0.1:${port}`,
         host,
         publishAsked: () => publishAsked,
+        stock: () => stock,
         close: () => new Promise((resolve) => { server.closeAllConnections?.(); server.close(resolve); }),
     };
 }

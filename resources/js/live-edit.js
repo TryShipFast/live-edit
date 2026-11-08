@@ -35,9 +35,10 @@ import { LEAVE_QUESTION, guardLeaving } from './unsaved.js';
 import { insertionNear, sectionName, sectionUnder, shownSectionLists, shownSections } from './section-inserter.js';
 import { DETAIL_MODE, copiedItemSettings, copiedStyles, copyPageForCard, deletablePage, deletePage, detailAddress, keyMap, linksTo, linksWarning, showOnlyTheDetail } from './card-page.js';
 import { renderChoice } from './choice.js';
+import { SALE_HEADS, SALE_KINDS, STOCK_HEAD, dayOf, endSaid, flashSalePlan, keepRowInStep, keptProduct, ownPriceOf, ownPricesAmong, readSale, saleLabel, saleLineOf, saleRow, sizeKey, sizesSummary, stockFor, stockPlan, todayIs, withWrites } from './sale.js';
 import { TYPES as FORM_TYPES, seedForm } from './forms.js';
 import { renderFormBuilder } from './form-builder.js';
-import { chartRowOf, renderChartPanel, renderChartRow, renderTableControls, renderTablePanel } from './data-panel.js';
+import { chartRowOf, renderChartPanel, renderChartRow, renderDataGrid, renderTableControls, renderTablePanel } from './data-panel.js';
 import { KINDS as CHART_KINDS, chartData, chartOf, itemContext as chartItemContext, kindOf as chartKindOf, tableOf as kitTableOf } from './data-kit.js';
 import { commonQuestions, listGuides, profileFor, shopQuestions } from './help.js';
 import { dropdownTriggerFrom } from './dropdown-trigger.js';
@@ -358,6 +359,8 @@ const bootLiveEdit = () => {
         const { drawer, drawerTabs, drawerSubject, drawerTitle, drawerTrail, drawerFields, drawerDelete, toggleButton, statusText, linkHandle, bgHandle } = ui;
 
         let current = null;
+        // Set with Undo, below: changes one panel saved together, undone together.
+        let savedTogether = () => {};
 
         const fieldInput = (name, label, value, rows, rich = false) => {
             const wrap = document.createElement('label');
@@ -1603,6 +1606,7 @@ const bootLiveEdit = () => {
             // Add a product and Remove (the owner's own products), written as Import products writes them.
             catalogue: window.liveEditPages?.catalogue ?? null,
             taken: window.liveEditPages?.taken ?? [],
+            flashSale: () => void editFlashSale(),
             upload: async (file) => {
                 const body = new FormData();
                 body.append('file', file);
@@ -2569,6 +2573,7 @@ const bootLiveEdit = () => {
             // showing sits on top of it and looks like a fault.
             hideHandle();
             hideBgHandle();
+            drawer.classList.remove('is-grid');
             drawer.classList.add('is-open');
             ui.root.classList.add('le-drawer-open');
             ui.toolbar.classList.add('is-compact');
@@ -2612,7 +2617,7 @@ const bootLiveEdit = () => {
 
             current?.restore?.();
             clearStylePreview();
-            drawer.classList.remove('is-open', 'is-left');
+            drawer.classList.remove('is-open', 'is-left', 'is-grid');
             ui.root.classList.remove('le-drawer-open');
             ui.toolbar.classList.remove('is-compact');
             current = null;
@@ -4016,7 +4021,13 @@ const bootLiveEdit = () => {
             finishPanel(element);
         };
 
-        const editText = (element, linkElement = element) => {
+        const editText = (element, linkElement = element, { asWords = false } = {}) => {
+            // Any word of a product's sale line opens the whole sale, as a grid (editFlashSale).
+            if (!asWords && element.closest?.('[data-kit-sale]') && saleLineEditable(element.closest('[data-kit-sale]'))) {
+                void editFlashSale({ pressed: element, here: true });
+
+                return;
+            }
             const { kind, key, parts: rest } = parseEditKey(element.dataset.edit);
             drawerFields.replaceChildren();
             drawerDelete.classList.add('le-hidden');
@@ -4088,6 +4099,15 @@ const bootLiveEdit = () => {
                     box?.addEventListener('input', check);
                     check();
                     textField.append(said);
+                    // its sale is beside it, one press away (the whole sale, as a grid)
+                    if (saleLineOf(element) && saleLineEditable(saleLineOf(element))) {
+                        const toSale = document.createElement('button');
+                        toSale.type = 'button';
+                        toSale.className = 'le-chip-btn le-to-sale';
+                        toSale.textContent = 'Put it on sale ›';
+                        toSale.addEventListener('click', () => { closeDrawer(true); void editFlashSale({ pressed: element, productId: productIdOf(element), here: true }); });
+                        textField.after(toSale);
+                    }
                 }
                 /*
                  * The page changes as the words are typed, so they are judged where they will be read.
@@ -5702,6 +5722,533 @@ const bootLiveEdit = () => {
             openDrawer();
         };
 
+        /*
+         * A shop's flash sale, as a whole (sale.js; owner, 8 Nov 2026: "sales card must be editable at once, not each
+         * being editable one by one"; "just like we can edit tables, cards"; on the countdown, "it should open so that
+         * it can be edited"). Every product the shop lists, read from its own page (drafts included), in the same grid
+         * as a table: a tick for those on sale, its price, its sale price and % off, and one Starts and one Ends for
+         * the whole sale. Opened from a word of a product's sale line, a card's sale, a countdown, the editor's "On
+         * sale" label on a card, or the Shop tab, with the product pressed highlighted. Saved once, as the same words
+         * the shop already reads on each product page, and taken back together by one Undo.
+         */
+        const SALE_BITS = '[data-kit-sale], [data-pick-sale], [data-card-sale], [data-card-was], [data-card-off], [data-sale-off], [data-kit-sale-now], [data-countdown-box], [data-cd], [data-cd-until]';
+        const saleLineEditable = (line) => String(line?.querySelector?.('[data-kit-sale-price]')?.dataset?.edit ?? '').startsWith('setting:');
+        /** A part of the page that shows a sale the owner sets as a whole, or null. */
+        const saleBitOf = (node) => {
+            const bit = node?.closest?.(SALE_BITS);
+            if (bit) return bit;
+            const computed = computedOf(node);
+
+            return computed && ['price', 'countdown'].includes(computedKind(computed)) ? computed : null;
+        };
+        const isCountdown = (node) => Boolean(node?.closest?.('[data-countdown-box], [data-cd], [data-cd-until]') || computedKind(computedOf(node)) === 'countdown');
+        /** The product a card (or a product page's buy box) shows, by its shop id. */
+        const productIdOf = (node) => node?.closest?.('[data-kit-product]:not(button):not(a)')?.dataset?.kitProduct ?? null;
+        const pathOf = (href) => {
+            try {
+                return new URL(href, window.location.href).pathname.replace(/index\.html$/, '').replace(/\/+$/, '');
+            } catch {
+                return '';
+            }
+        };
+        /*
+         * Kept for this tab for ten minutes: reading every product page is a page load each (half a minute on a shop of
+         * twenty products), and their sale words change only through the grid, which writes what it saved in here. The
+         * page open now is always read as it is.
+         */
+        const SALE_KEPT = `live-edit:sale-products:${api?.site ?? window.location.host}`;
+        const keptSale = () => {
+            try {
+                const kept = JSON.parse(sessionStorage.getItem(SALE_KEPT) ?? 'null');
+
+                return kept && Date.now() - kept.at < 600000 && Array.isArray(kept.products) ? kept.products : null;
+            } catch {
+                return null;
+            }
+        };
+        const keepSale = (products) => {
+            try {
+                if (products) sessionStorage.setItem(SALE_KEPT, JSON.stringify({ at: Date.now(), products: products.map(keptProduct) }));
+                else sessionStorage.removeItem(SALE_KEPT);
+            } catch { /* read again next time */ }
+        };
+        /*
+         * Every product the shop lists, at once, in its order: [{ id, name, href, path, here, read }], where read is the
+         * product's sale line, undefined while its page is still being read, or null when it has none (a gift card).
+         * Known at once: the page open now and what was kept; the rest arrive one by one and are told to `saleHeard`.
+         */
+        let saleSlots = null;
+        let saleDone = null;
+        let stockAsked = null;
+        const saleHeard = new Set();
+        const startSaleReading = () => {
+            if (saleSlots) return saleSlots;
+            // the stock first: one quick question, asked before the product pages fill the host's queue
+            stockAsked ??= loadStock();
+            const listed = window.liveEditShop?.products ?? [];
+            const here = pathOf(window.location.href);
+            const lineIn = (doc) => [...doc.querySelectorAll('main [data-kit-sale], [data-kit-sale]')].find(saleLineEditable) ?? null;
+            const lineHere = lineIn(document);
+            const kept = keptSale();
+            const keptBy = new Map((kept ?? []).map((product) => [product.path, product]));
+            // a gift card is neither put on sale nor counted (the host marks it, or its page does: data-gift)
+            saleSlots = listed.filter((product) => !product.gift).map((product) => {
+                const path = pathOf(product.href);
+                if (path === here && lineHere) return { ...product, path, here: true, read: readSale(lineHere) };
+                if (keptBy.has(path)) return { ...keptBy.get(path), here: false };
+
+                return { ...product, path, here: false, read: kept ? null : undefined };
+            });
+            // a product page the shop does not list still has its own row
+            if (lineHere && !saleSlots.some((slot) => slot.here)) {
+                saleSlots.unshift({ id: productIdOf(lineHere) ?? '', name: (document.querySelector('main h1, h1')?.textContent ?? '').replace(/\s+/g, ' ').trim() || 'This product', href: window.location.href, path: here, here: true, read: readSale(lineHere) });
+            }
+            const slots = saleSlots;
+            saleDone = (async () => {
+                const waiting = slots.map((slot, i) => (slot.read === undefined ? i : null)).filter((i) => i !== null);
+                if (waiting.length) {
+                    let saved = null;
+                    try { saved = (await readSavedContent())?.settings ?? null; } catch { saved = null; }
+                    const { applyContent } = await import('./content.js');
+                    let next = 0;
+                    // a few at a time, so what the owner presses meanwhile is not queued behind them
+                    await Promise.all(Array.from({ length: Math.min(4, waiting.length) }, async () => {
+                        while (next < waiting.length) {
+                            const i = waiting[next];
+                            next += 1;
+                            try {
+                                const response = await fetch(slots[i].href, { credentials: 'same-origin', headers: { Accept: 'text/html' } });
+                                const doc = response.ok ? new DOMParser().parseFromString(await response.text(), 'text/html') : null;
+                                if (doc && saved) {
+                                    try { applyContent(doc, saved); } catch { /* the page's own words, then */ }
+                                }
+                                const line = doc ? lineIn(doc) : null;
+                                const gift = line?.closest('[data-kit-product]')?.hasAttribute('data-gift') || doc?.querySelector('main [data-gift][data-kit-product], main [data-giftcard]');
+                                slots[i].read = line && !gift ? keptProduct({ read: readSale(line) }).read : null;
+                            } catch {
+                                slots[i].read = null;
+                            }
+                            saleHeard.forEach((heard) => heard(i));
+                        }
+                    }));
+                }
+                keepSale(slots.filter((slot) => slot.read));
+
+                return slots.filter((slot) => slot.read);
+            })();
+
+            return saleSlots;
+        };
+        /** Every product with a sale line, once all are read. */
+        const loadSaleProducts = () => {
+            startSaleReading();
+
+            return saleDone;
+        };
+
+        /** The host's stock (KeepsShopStock), or null where it keeps none: then the grid has no In stock column. */
+        const loadStock = async () => {
+            try {
+                const response = await request('/live-edit/stock', { method: 'GET' });
+                const stock = (await response.json())?.stock;
+
+                return Array.isArray(stock) && stock.length ? stock : null;
+            } catch {
+                return null;
+            }
+        };
+
+        const editFlashSale = async ({ pressed = null, productId = null, here = false, ends = false } = {}) => {
+            current = { kind: 'flash-sale' };
+            const opened = current;
+            if (pressed) lastOpened = pressed;
+            drawerTitle.textContent = 'Sale and stock';
+            drawerDelete.classList.add('le-hidden');
+            const reading = el('p', 'le-hint le-sale-reading', 'Loading your products…');
+            reading.setAttribute('role', 'status');
+            drawerFields.replaceChildren(reading);
+            setTrail(pressed);
+            showTab('Edit');
+            ui.drawerFoot.classList.add('le-hidden');
+            openDrawer();
+            // wide enough for the grid's columns, as a spreadsheet wants
+            drawer.classList.add('is-grid');
+            const slots = startSaleReading();
+            const stock = await stockAsked;
+            if (current !== opened) return;
+            if (!slots.length) {
+                reading.textContent = 'None of your products can be put on sale here: their pages have no sale price.';
+
+                return;
+            }
+            const withStock = Array.isArray(stock);
+            if (!withStock) drawerTitle.textContent = 'Flash sale';
+            const today = todayIs();
+            const loaded = () => slots.map((slot, i) => (slot.read ? i : null)).filter((i) => i !== null);
+            const stockOfSlot = (slot) => (withStock ? stockFor(slot, stock) : { own: null, sizes: [] });
+            const cellsOf = (slot) => {
+                if (!slot.read) return ['', slot.name, slot.read === undefined ? 'Loading…' : '', '', '', ...(withStock ? [''] : [])];
+                const cells = saleRow(slot);
+                const own = stockOfSlot(slot).own;
+
+                return withStock ? [...cells, own && own.quantity !== null && own.quantity !== undefined ? String(own.quantity) : ''] : cells;
+            };
+            let picked = slots.findIndex((slot) => (productId ? slot.id === productId : here && slot.here));
+            const latestEnd = () => loaded().map((i) => slots[i]).filter((slot) => slot.read.onSale).map((slot) => dayOf(slot.read.until.words)).filter(Boolean).sort().at(-1) ?? '';
+            if (picked < 0 && ends) {
+                const latest = latestEnd();
+                picked = latest ? slots.findIndex((slot) => slot.read?.onSale && dayOf(slot.read.until.words) === latest) : -1;
+            }
+            // The sale's days, from what is known: the product pressed if it is on sale, else the products on sale, else
+            // from today with no end.
+            const daysNow = () => {
+                const shared = picked >= 0 && slots[picked].read?.onSale ? slots[picked] : null;
+                if (shared) return { from: dayOf(shared.read.from.words) ?? '', until: dayOf(shared.read.until.words) ?? '' };
+                const onSale = loaded().map((i) => slots[i]).filter((slot) => slot.read.onSale);
+                if (!onSale.length) return { from: today, until: '' };
+
+                return { from: onSale.map((slot) => dayOf(slot.read.from.words)).filter(Boolean).sort()[0] ?? '', until: latestEnd() };
+            };
+            let daysAtFirst = daysNow();
+            let daysChanged = false;
+
+            const hint = el('p', 'le-hint', 'Tick a product to put it on sale, then type its sale price or its % off: the other fills itself. Everything ticked is on sale from Starts to Ends. Its page, its cards and your countdowns show it, and checkout charges the sale price only on those days.');
+            const dayField = (label, value, empty) => {
+                const wrap = el('label', 'le-field');
+                const box = el('input', 'le-input le-sale-day');
+                box.type = 'date';
+                box.value = value;
+                wrap.append(label, box, el('span', 'le-hint', empty));
+
+                return { wrap, box };
+            };
+            const starts = dayField('Starts', daysAtFirst.from, 'Leave empty to start today');
+            const endsOn = dayField('Ends', daysAtFirst.until, 'Leave empty for no end day');
+            starts.box.name = 'starts';
+            endsOn.box.name = 'ends';
+            const days = el('div', 'le-sale-days');
+            days.append(starts.wrap, endsOn.wrap);
+            const endLine = el('p', 'le-hint le-hint--callout le-sale-ends');
+            const sayTheEnd = () => {
+                endLine.textContent = `${endSaid(endsOn.box.value || null, today)} Countdowns on your site count down to the last end day of your sale.`;
+            };
+            sayTheEnd();
+
+            // A product's sizes, folded under it: their counts typed here, in what was typed by size.
+            const sizeTyped = {};
+            const unfolded = new Set();
+            const summaryOf = (slot) => sizesSummary(stockOfSlot(slot).sizes, sizeTyped);
+
+            const allOff = el('div', 'le-row le-sale-all');
+            const allBox = el('input', 'le-input le-sale-all-box');
+            allBox.type = 'text';
+            allBox.inputMode = 'decimal';
+            allBox.placeholder = '20';
+            allBox.id = 'le-sale-all-box';
+            const allLabel = el('label', 'le-label', 'Same % off for every ticked product');
+            allLabel.htmlFor = allBox.id;
+            const allAsk = el('div', 'le-hint le-hint--callout le-sale-ask');
+            allAsk.hidden = true;
+
+            const grid = renderDataGrid({
+                heads: withStock ? [...SALE_HEADS, STOCK_HEAD] : SALE_HEADS,
+                rows: slots.map(cellsOf),
+                fixedColumns: true,
+                fixedRows: true,
+                numbered: false,
+                kinds: withStock ? [...SALE_KINDS, 'count'] : SALE_KINDS,
+                kindOf: (r, c) => {
+                    const slot = slots[r];
+                    if (!slot.read) return [0, 3, 4, 5].includes(c) ? 'blank' : null;
+                    if (c === 5 && !stockOfSlot(slot).own) return 'blank';
+
+                    return null;
+                },
+                // a product with sizes: its stock in a few words, and the sizes opened under it to type each count
+                renderCell: (r, c) => {
+                    const slot = slots[r];
+                    if (c !== 5 || !withStock || !slot.read) return null;
+                    const { sizes } = stockOfSlot(slot);
+                    if (!sizes.length) return null;
+                    const open = el('button', 'le-sale-sizes-toggle');
+                    open.type = 'button';
+                    open.dataset.summaryRow = String(r);
+                    open.setAttribute('aria-expanded', unfolded.has(r) ? 'true' : 'false');
+                    open.setAttribute('aria-label', `${slot.name}: ${summaryOf(slot)}. ${unfolded.has(r) ? 'Hide' : 'Show'} its ${sizes.length} sizes`);
+                    open.append(el('span', 'le-sale-sizes-said', summaryOf(slot)), el('span', 'le-sale-sizes-arrow', unfolded.has(r) ? '▾' : '▸'));
+                    open.addEventListener('click', () => {
+                        if (unfolded.has(r)) unfolded.delete(r);
+                        else unfolded.add(r);
+                        grid.redraw();
+                        grid.querySelector(`[data-summary-row="${r}"]`)?.focus();
+                    });
+
+                    return open;
+                },
+                afterRow: (r) => {
+                    const slot = slots[r];
+                    if (!withStock || !slot.read || !unfolded.has(r)) return null;
+                    const { sizes } = stockOfSlot(slot);
+                    if (!sizes.length) return null;
+                    const tr = el('tr', 'le-sale-sizes');
+                    const td = el('td');
+                    td.colSpan = withStock ? 6 : 5;
+                    const list = el('div', 'le-sale-sizes-list');
+                    list.setAttribute('role', 'group');
+                    list.setAttribute('aria-label', `${slot.name}: in stock by size`);
+                    sizes.forEach((row) => {
+                        const key = sizeKey(row);
+                        const item = el('label', 'le-sale-size');
+                        const box = el('input', 'le-input le-sale-size-box');
+                        box.type = 'text';
+                        box.inputMode = 'numeric';
+                        box.dataset.sizeKey = key;
+                        box.value = sizeTyped[key] ?? (row.quantity === null || row.quantity === undefined ? '' : String(row.quantity));
+                        box.setAttribute('aria-label', `${slot.name}, ${row.size}, in stock`);
+                        const sold = () => item.classList.toggle('is-sold-out', box.value.trim() === '0');
+                        sold();
+                        box.addEventListener('input', () => {
+                            sizeTyped[key] = box.value;
+                            sold();
+                            const said = grid.querySelector(`[data-summary-row="${r}"] .le-sale-sizes-said`);
+                            if (said) said.textContent = summaryOf(slot);
+                            grid.changed();
+                        });
+                        item.append(el('span', 'le-sale-size-name', row.size), box);
+                        list.append(item);
+                    });
+                    td.append(list);
+                    tr.append(td);
+
+                    return tr;
+                },
+                hiddenRow: (r) => slots[r].read === null,
+                mostRows: slots.length,
+                rowNoun: 'product',
+                picked: picked >= 0 ? picked : null,
+                focus: picked >= 0 && !ends && slots[picked].read ? { row: picked, col: 3 } : null,
+                onCell: (r, c, cells, done) => { if (slots[r].read && c !== 5) keepRowInStep(slots[r], c, cells, done); },
+                onUndo: () => {
+                    starts.box.value = daysAtFirst.from;
+                    endsOn.box.value = daysAtFirst.until;
+                    daysChanged = false;
+                    for (const key of Object.keys(sizeTyped)) delete sizeTyped[key];
+                    allAsk.hidden = true;
+                    sayTheEnd();
+                },
+                onSave: async ({ rows }) => {
+                    const ready = loaded();
+                    const plan = flashSalePlan(ready.map((i) => slots[i]), ready.map((i) => rows[i]), { from: starts.box.value || null, until: endsOn.box.value || null, daysChanged });
+                    const items = withStock ? ready.flatMap((i) => {
+                        const slot = slots[i];
+                        const { own, sizes } = stockOfSlot(slot);
+
+                        return [
+                            ...(own ? [{ row: own, typed: rows[i][5], label: slot.name }] : []),
+                            ...sizes.map((row) => ({ row, typed: sizeTyped[sizeKey(row)], label: `${slot.name}, ${row.size}` })),
+                        ];
+                    }) : [];
+                    const counts = stockPlan(items);
+                    if (plan.refused.length || counts.refused.length) return [...plan.refused, ...counts.refused];
+                    if (current) current.dirty = false;
+                    if (!plan.writes.length && !counts.changes.length) {
+                        closeDrawer(true);
+
+                        return [];
+                    }
+                    // Stock is the host's, kept at once (never a draft).
+                    if (counts.changes.length) {
+                        await request('/live-edit/stock', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ changes: counts.changes }),
+                        });
+                    }
+                    const keys = [];
+                    for (const { key, value } of plan.writes) {
+                        const plain = parseEditKey(key).key;
+                        await patiently(() => request('/live-edit/setting', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ key: plain, value, locale: window.liveEditLocale }),
+                        }));
+                        keys.push(plain);
+                    }
+                    // taken back together by one Undo
+                    savedTogether(keys, 'Flash sale');
+                    const waiting = slots.filter((slot) => slot.read === undefined).length;
+                    keepSale(waiting ? null : withWrites(slots.filter((slot) => slot.read), plan.writes));
+                    const changed = new Set(plan.writes.map((write) => write.name)).size;
+                    const said = [
+                        changed ? `Sale changed on ${changed} product${changed === 1 ? '' : 's'}.` : '',
+                        counts.changes.length ? `Stock set for ${counts.changes.length}.` : '',
+                        waiting ? `${waiting} product${waiting === 1 ? ' was' : 's were'} still loading and ${waiting === 1 ? 'was' : 'were'} left as ${waiting === 1 ? 'it was' : 'they were'}.` : '',
+                    ].filter(Boolean).join(' ');
+                    reloadWithToast(`Saved ✓ ${said}`);
+
+                    return [];
+                },
+            });
+            grid.classList.add('le-sale-grid');
+
+            // One % off for the ticked products without a price of their own; asked before changing those that have one
+            // (first-time owner walk, 8 Nov 2026: it silently replaced prices set one by one).
+            const applyShare = (share, all) => {
+                allAsk.hidden = true;
+                grid.update((cells, r) => {
+                    if (!slots[r].read || !cells[0]) return;
+                    if (!all && String(cells[3] ?? '').trim()) return;
+                    cells[4] = String(share);
+                    keepRowInStep(slots[r], 4, cells, true);
+                });
+            };
+            const apply = el('button', 'le-chip-btn', 'Apply to ticked');
+            apply.type = 'button';
+            apply.addEventListener('click', () => {
+                const share = Number(allBox.value.replace(/[^\d.]/g, ''));
+                if (!(share > 0 && share < 100)) {
+                    notify('Type a % off from 1 to 99, then press Apply to ticked.');
+
+                    return;
+                }
+                // those without a price get it at once; those with their own are asked about
+                const own = ownPricesAmong(grid.rowsNow(), (r) => Boolean(slots[r].read));
+                applyShare(share, false);
+                if (!own) return;
+                const both = el('div', 'le-row');
+                const too = el('button', 'le-chip-btn', `Change them too`);
+                too.type = 'button';
+                too.addEventListener('click', () => applyShare(share, true));
+                const keep = el('button', 'le-chip-btn', 'Keep their prices');
+                keep.type = 'button';
+                keep.addEventListener('click', () => applyShare(share, false));
+                both.append(too, keep);
+                allAsk.replaceChildren(el('p', null, `${own} ticked product${own === 1 ? ' has its' : 's have their'} own sale price. Change ${own === 1 ? 'it' : 'them'} to ${share}% off too?`), both);
+                allAsk.hidden = false;
+                too.focus();
+            });
+            allOff.append(allLabel, allBox, apply);
+            [starts.box, endsOn.box].forEach((box) => box.addEventListener('input', () => {
+                daysChanged = true;
+                grid.changed();
+                sayTheEnd();
+            }));
+
+            // The rest arrive as their pages are read; the grid can be used meanwhile.
+            const waitingNow = () => slots.filter((slot) => slot.read === undefined).length;
+            const sayReading = () => {
+                const left = waitingNow();
+                reading.hidden = left === 0;
+                reading.textContent = `Still loading ${left} of ${slots.length} products. You can start now: they fill in as they arrive.`;
+            };
+            const heard = (i) => {
+                if (current !== opened || !grid.isConnected) {
+                    saleHeard.delete(heard);
+
+                    return;
+                }
+                grid.setRow(i, cellsOf(slots[i]));
+                if (!daysChanged) {
+                    const now = daysNow();
+                    if (now.from !== daysAtFirst.from || now.until !== daysAtFirst.until) {
+                        daysAtFirst = now;
+                        starts.box.value = now.from;
+                        endsOn.box.value = now.until;
+                        sayTheEnd();
+                    }
+                }
+                sayReading();
+            };
+            saleHeard.add(heard);
+            sayReading();
+
+            const after = el('p', 'le-hint le-sale-after', withStock
+                ? 'Leave In stock empty if you do not count it. Paid orders take stock off for you. The sale is a draft until you press Publish, and Undo takes it back. Stock is saved as soon as you press Save changes: it is not a draft, so Publish and Undo do not change it.'
+                : 'The sale is a draft until you press Publish, and Undo takes it back.');
+            drawerFields.replaceChildren(hint, days, endLine, allOff, allAsk, reading, grid, after);
+            // Words pressed that are the sale's own (its name, "until"): theirs to change, one press away.
+            const words = pressed?.matches?.('[data-edit^="setting:"]') && !pressed.matches('[data-kit-sale-price], [data-kit-sale-from], [data-kit-sale-until]')
+                && ownTextOf(pressed).trim() ? pressed : null;
+            if (words) {
+                const change = el('button', 'le-chip-btn le-sale-words', `Change the words “${ownTextOf(words).replace(/\s+/g, ' ').trim().slice(0, 30)}” ›`);
+                change.type = 'button';
+                change.addEventListener('click', () => { closeDrawer(true); editText(words, words, { asWords: true }); });
+                drawerFields.append(change);
+            }
+            if (ends) endsOn.box.focus();
+            else if (picked >= 0) grid.querySelector('tr.is-picked')?.scrollIntoView?.({ block: 'nearest' });
+        };
+
+        /*
+         * The editor's own label on every card (and product page) whose product is on sale: "On sale · ₦49,950 · ends
+         * 31 Dec", "Sale starts 12 Nov", or "Sale ended", in the corner, never on the published page (owner, 8 Nov 2026:
+         * "we should be able to know this is a card containing a sales product"). Pressing it opens the sale.
+         */
+        const saleLabels = el('div', 'le-sale-labels');
+        ui.shadow.append(saleLabels);
+        let labelled = [];
+        const placeSaleLabels = () => {
+            const editing = document.body.classList.contains('editing');
+            saleLabels.hidden = !editing;
+            if (!editing) return;
+            labelled.forEach(({ node, label }) => {
+                const rect = node.getBoundingClientRect();
+                const shown = rect.width > 4 && rect.height > 4 && rect.bottom > 0 && rect.top < window.innerHeight;
+                label.hidden = !shown;
+                if (!shown) return;
+                label.style.top = `${Math.max(0, rect.top + 6)}px`;
+                label.style.left = `${Math.max(4, rect.left + 6)}px`;
+                label.style.maxWidth = `${Math.max(80, rect.width - 12)}px`;
+            });
+        };
+        const drawSaleLabels = async () => {
+            if (!window.liveEditShop?.products?.length && !document.querySelector('[data-kit-sale]')) return;
+            let products;
+            try {
+                products = await loadSaleProducts();
+            } catch {
+                return;
+            }
+            const today = todayIs();
+            const byId = new Map(products.filter((product) => product.id).map((product) => [product.id, product]));
+            const holders = [...document.querySelectorAll('[data-kit-product]:not(button):not(a)')]
+                .filter((node) => !node.parentElement?.closest('[data-kit-product]:not(button):not(a)') && !node.querySelector('[data-kit-sale]'));
+            // the product page open now: its label on its own price
+            const here = products.find((product) => product.here);
+            const lineHere = here && [...document.querySelectorAll('[data-kit-sale]')].find(saleLineEditable);
+            const ownHere = lineHere ? (ownPriceOf(lineHere) ?? lineHere) : null;
+            labelled = [...holders, ...(ownHere ? [ownHere] : [])].flatMap((node) => {
+                const product = node === ownHere ? here : byId.get(node.dataset.kitProduct);
+                const said = product && saleLabel(product.read, today);
+                if (!said) return [];
+                const label = el('button', `le-sale-label${said === 'Sale ended' ? ' is-ended' : ''}`, said);
+                label.type = 'button';
+                label.title = 'Edit the flash sale';
+                label.addEventListener('click', (event) => {
+                    event.preventDefault();
+                    event.stopPropagation();
+                    void editFlashSale({ pressed: node, productId: product.id || null, here: product.here });
+                });
+
+                return [{ node, label }];
+            });
+            saleLabels.replaceChildren(...labelled.map(({ label }) => label));
+            placeSaleLabels();
+        };
+        window.addEventListener('scroll', () => requestAnimationFrame(placeSaleLabels), { passive: true });
+        window.addEventListener('resize', () => requestAnimationFrame(placeSaleLabels));
+        // Read once editing starts (a visitor's page view never reads every product).
+        let labelsDrawn = false;
+        const whenEditing = () => {
+            if (!labelsDrawn && document.body.classList.contains('editing')) {
+                labelsDrawn = true;
+                void drawSaleLabels();
+            }
+            requestAnimationFrame(placeSaleLabels);
+        };
+        new MutationObserver(whenEditing).observe(document.body, { attributes: true, attributeFilter: ['class'] });
+        setTimeout(whenEditing, 600);
+
         /** A table's cell: the row and the column it sits in, kept in step. */
         const appendTableControls = (element) => {
             const block = renderTableControls({ element, ...dataDeps() });
@@ -6738,6 +7285,22 @@ const bootLiveEdit = () => {
             if (icon) return { element: icon, kind: 'icon' };
             const drawing = node.closest('[data-edit-svg]');
             if (drawing) return { element: drawing, kind: 'svg' };
+            /*
+             * A sale, wherever it shows (a product's sale line, a card's sale price, a countdown): it opens the whole
+             * sale as a grid, never "Counted for you" (owner, 8 Nov 2026: "when clicked, instead of displaying counted
+             * for you, it takes me to a place where I can edit it as a whole").
+             */
+            const sale = saleBitOf(node);
+            if (sale && (!sale.closest('[data-kit-sale]') || saleLineEditable(sale.closest('[data-kit-sale]')))) {
+                const words = node.closest('[data-kit-sale] [data-edit]');
+
+                return {
+                    element: words ?? sale,
+                    kind: 'sale',
+                    box: words ?? sale,
+                    label: isCountdown(sale) ? 'Countdown: press to change the sale' : 'Sale: press to change the sale',
+                };
+            }
             // A number the template works out (data-kit-computed): it is explained,
             // not typed over, because the next page load would count it again.
             const computed = computedOf(node);
@@ -6959,6 +7522,7 @@ const bootLiveEdit = () => {
             else if (kind === 'choices') { editChoices(element); offerTheFormBuilder(element); }
             else if (kind === 'link' && cardOf(element) && editItemWords(cardOf(element), { focusOn: element.matches('[data-edit^="setting:"]') ? element : element.querySelector('[data-edit^="setting:"]') ?? element })) { /* its card, with where it goes one press away */ }
             else if (kind === 'link') editLink(element);
+            else if (kind === 'sale') void editFlashSale({ pressed: element, productId: productIdOf(element), here: Boolean(element.closest('[data-kit-sale]')), ends: isCountdown(element) });
             else if (kind === 'computed' && computedKind(element) === 'gallery' && galleryOf(element)) editGallery(galleryOf(element));
             else if (kind === 'computed') ui.toast(COMPUTED_SAYS[computedKind(element)] ?? COMPUTED_SAYS.count, 7000);
             else if (cardOf(element) === element && editItemWords(element)) { /* a card pressed between its words */ }
@@ -8575,6 +9139,45 @@ const bootLiveEdit = () => {
             }
         };
 
+        /*
+         * Changes saved together by one panel ("Price and sale" writes the sale price and its days), kept so one
+         * Undo takes them all back, as the owner made them: one press, one change. Per site and tab, like redo.
+         */
+        const TOGETHER_KEY = `live-edit:together:${api?.site ?? window.location.host}`;
+        const savedGroups = () => {
+            try {
+                return JSON.parse(sessionStorage.getItem(TOGETHER_KEY) ?? '[]');
+            } catch {
+                return [];
+            }
+        };
+        const keepGroups = (groups) => {
+            try {
+                sessionStorage.setItem(TOGETHER_KEY, JSON.stringify(groups.slice(-20)));
+            } catch {
+                // without it, each word is undone on its own
+            }
+        };
+        savedTogether = (keys, label) => {
+            if (keys.length > 1) keepGroups([...savedGroups(), { keys, label }]);
+        };
+        /** The newest changes that were saved together with the newest one, or just that one. */
+        const changesTogether = (changes) => {
+            const top = changes[0];
+            const groups = savedGroups();
+            const index = groups.map((group) => group.keys.includes(top.key)).lastIndexOf(true);
+            if (index < 0) return { changes: [top], label: null };
+            const group = groups[index];
+            const newest = changes.slice(0, group.keys.length);
+            keepGroups(groups.filter((_, i) => i !== index));
+            // only while they are still the newest: anything saved since stands between them
+            if (newest.length !== group.keys.length || !newest.every((change) => group.keys.includes(change.key) && change.kind === 'setting')) {
+                return { changes: [top], label: null };
+            }
+
+            return { changes: newest, label: group.label };
+        };
+
         // Read rather than passed in, so this can be called from anywhere
         // without threading the count through every caller.
         const showUndoState = () => {
@@ -8595,10 +9198,12 @@ const bootLiveEdit = () => {
             ui.undoButton.disabled = true;
 
             let change;
+            let changes = [];
 
             try {
                 const response = await request('/live-edit/changes', { method: 'GET' });
-                change = ((await response.json())?.changes ?? [])[0];
+                changes = (await response.json())?.changes ?? [];
+                change = changes[0];
             } catch (error) {
                 ui.toast(plainly(error, 'undo that'));
                 showUndoState();
@@ -8613,22 +9218,27 @@ const bootLiveEdit = () => {
                 return;
             }
 
-            const label = labelForChange(change);
+            const together = changesTogether(changes);
+            const label = together.label ?? labelForChange(change);
+            const undone = [];
 
             try {
-                await request('/live-edit/changes', {
-                    method: 'DELETE',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ key: change.key, kind: change.kind }),
-                });
+                for (const each of together.changes) {
+                    await request('/live-edit/changes', {
+                        method: 'DELETE',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ key: each.key, kind: each.kind }),
+                    });
+                    undone.push(each);
+                }
             } catch (error) {
                 ui.toast(plainly(error, 'undo that'));
                 showUndoState();
-
-                return;
+                if (!undone.length) return;
             }
 
-            setRedoStack([...redoStack(), { key: change.key, kind: change.kind, value: change.after, label }]);
+            const steps = undone.map((each) => ({ key: each.key, kind: each.kind, value: each.after }));
+            setRedoStack([...redoStack(), steps.length > 1 ? { together: steps, label } : { ...steps[0], label }]);
             reloadWithToast(`Undone: ${label}`);
         };
 
@@ -8652,11 +9262,16 @@ const bootLiveEdit = () => {
                     throw new Error('A styling change cannot be put back automatically yet.');
                 }
 
-                await request('/live-edit/setting', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ key: step.key, value: step.value, locale: window.liveEditLocale }),
-                });
+                // a change saved together (one panel's) comes back together
+                const each = step.together ?? [step];
+                for (const one of each) {
+                    await request('/live-edit/setting', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ key: one.key, value: one.value, locale: window.liveEditLocale }),
+                    });
+                }
+                if (each.length > 1) savedTogether(each.map((one) => one.key), step.label);
             } catch (error) {
                 ui.toast(plainly(error, 'put that back'));
                 ui.redoButton.disabled = false;

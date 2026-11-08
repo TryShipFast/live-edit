@@ -361,7 +361,7 @@ const nameListsAndSections = (doc, page) => {
  * `outside` hands over no page builder at all: an outside site (the plugin or
  * another adapter), which gets in-place editing only.
  */
-export function createHost({ makeDocument, serialise = (doc) => `<!doctype html>${doc.documentElement.outerHTML}`, removable = false, library = false, outside = false, data = false, search = false, forms = null, pagesList = false, libraryForms = false } = {}) {
+export function createHost({ makeDocument, serialise = (doc) => `<!doctype html>${doc.documentElement.outerHTML}`, removable = false, library = false, outside = false, data = false, search = false, forms = null, pagesList = false, libraryForms = false, sale = false } = {}) {
     // With pagesList: the About, checkout, brand and privacy pages too, the menu linking About, a logo with
     // words only a screen reader hears, and the owner's pages put in the menu as the host does (putThemInTheMenus).
     const DESIGN_HERE = pagesList ? { ...DESIGN, ...MORE_PAGES } : DESIGN;
@@ -426,6 +426,29 @@ export function createHost({ makeDocument, serialise = (doc) => `<!doctype html>
             .replace('</nav>', ` <a href="${root}about/" data-key="nav.about" data-edit="link" data-link-page="about">About</a></nav>`);
     };
 
+    /*
+     * With sale: a shop that sells (LIVE-EDIT-STRUCTURE.md, "Flash sales"). Each product page's buy box carries its
+     * id, its price and a sale line ("No sale" until the owner starts one); the shop's cards show a sale the way a
+     * template's script draws it (computed), and a countdown sits above them.
+     */
+    const asASale = (html, id) => {
+        if (!sale) return html;
+        const product = { 'products/aster-veil': 'aster', 'products/blue-hour': 'blue' }[id];
+        if (product) {
+            return html
+                .replace(/<section data-instance="([a-z-]+)\.detail"/, `<section data-kit-product="${product}" data-instance="$1.detail"`)
+                .replace('data-field="price" data-price-out>', 'data-field="price" data-kit-price data-price-out>')
+                .replace('</span></p>\n      <p data-edit="text" data-field="notes">', '</span></p>\n      <p class="sale" data-kit-sale><span data-edit="text" data-field="sale-word">Flash sale</span> <span data-kit-sale-price data-edit="text" data-field="sale-price">No sale</span> <span data-edit="text" data-field="sale-from-word">from</span> <span data-kit-sale-from data-edit="text" data-field="sale-from">Today</span> <span data-edit="text" data-field="sale-say">until</span> <span data-kit-sale-until data-edit="text" data-field="sale-until">No end date</span></p>\n      <p data-edit="text" data-field="notes">');
+        }
+        if (id === 'shop') {
+            return html
+                .replace('<h1 data-edit="text">Shop</h1>', '<h1 data-edit="text">Shop</h1>\n    <div class="countdown" data-countdown><p data-countdown-box>Ends in <span data-cd="d" data-kit-computed="countdown">3</span> days</p></div>')
+                .replace(/(<span data-edit="text" data-kit-price data-field="price">[^<]*<\/span>)/g, '$1 <span class="card-sale" data-card-sale data-kit-computed="price">Sale</span>');
+        }
+
+        return html;
+    };
+
     /** The owner's pages in the menu, in the order they listed them, after the menu's own links (putThemInTheMenus). */
     const putThemInTheMenu = (doc, here) => {
         const nav = doc.querySelector('header nav');
@@ -471,7 +494,7 @@ export function createHost({ makeDocument, serialise = (doc) => `<!doctype html>
                 }
             }
         } else if (DESIGN_HERE[id]) {
-            doc = makeDocument(asThisSite(DESIGN_HERE[id].html, id));
+            doc = makeDocument(asASale(asThisSite(DESIGN_HERE[id].html, id), id));
             keyMarkers(doc, id);
         } else {
             const mine = made().find((entry) => entry.id === id);
@@ -551,10 +574,11 @@ export function createHost({ makeDocument, serialise = (doc) => `<!doctype html>
                 tag.textContent = text;
                 doc.body.append(tag);
             };
-            script(`window.liveEditApi=${JSON.stringify({ base: api, site: 'demo', token })};`
+            script(`window.liveEditApi=${JSON.stringify({ base: api, site: 'demo', token, ...(sale?.stock ? { routes: { '/live-edit/stock': '/stock' } } : {}) })};`
                 + `window.liveEditContent=${JSON.stringify({ base: api, site: 'demo', key: token })};`
                 + `window.liveEditPublishing={pending:${Number(pending) || 0}};`);
             if (!outside) script(`window.liveEditPages=${JSON.stringify(builderFor(id, editorBase))};`);
+            if (sale) script(`window.liveEditShop=${JSON.stringify({ products: [{ id: 'aster', name: 'Aster Veil', href: `${editorBase}products/aster-veil` }, { id: 'blue', name: 'Blue Hour', href: `${editorBase}products/blue-hour` }] })};`);
             // Only a hosted template that gets search is handed its collections; an outside site never.
             if (search && !outside) script(`window.liveEditCollections=${JSON.stringify({ collections: collections(), missed: { href: '/dashboard#search', count: 0 } })};`);
             if (doc.querySelector('[data-search]')) {

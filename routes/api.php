@@ -16,6 +16,7 @@ use ShipFast\LiveEdit\Http\Api\V1\SessionController;
 use ShipFast\LiveEdit\Http\Api\V1\SignInController;
 use ShipFast\LiveEdit\Http\Api\V1\SiteController;
 use ShipFast\LiveEdit\Http\Api\V1\TeamController;
+use ShipFast\LiveEdit\Http\Controllers\ShopStockController;
 use ShipFast\LiveEdit\Http\Middleware\RecoversAnExpiredSignIn;
 
 /*
@@ -193,6 +194,21 @@ Route::prefix(config('live-edit.api.prefix', 'api/live-edit/v1').'/{site}')
             Route::post('/team/discard-left', [TeamController::class, 'discardLeft'])->name('live-edit.api.team.discard-left');
             Route::post('/team/discard', [TeamController::class, 'discard'])->name('live-edit.api.team.discard');
         });
+
+        /*
+         * The shop's stock, for the sale grid's "In stock" column (KeepsShopStock). The host's, never a draft:
+         * ShopStockController reads and writes it through the host's binding, for the site on this key only.
+         */
+        Route::middleware([
+            ThrottleApi::class.':read',
+            AuthenticateApiToken::class.':read',
+            ThrottleApi::class.':read',
+        ])->get('/stock', [ShopStockController::class, 'show'])->name('live-edit.api.stock');
+        Route::middleware([
+            ThrottleApi::class.':write',
+            AuthenticateApiToken::class.':write',
+            ThrottleApi::class.':write',
+        ])->post('/stock', [ShopStockController::class, 'update'])->name('live-edit.api.stock.update');
 
         // How a section looks. The same key and the same cost as a word: the
         // reading half of this was always here, so only the write was missing

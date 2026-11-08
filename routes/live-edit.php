@@ -4,6 +4,7 @@ use Illuminate\Support\Facades\Route;
 use ShipFast\LiveEdit\Http\Api\V1\EmbedController;
 use ShipFast\LiveEdit\Http\Controllers\EditorSessionController;
 use ShipFast\LiveEdit\Http\Controllers\LiveEditController;
+use ShipFast\LiveEdit\Http\Controllers\ShopStockController;
 use ShipFast\LiveEdit\Http\Controllers\ThemeController;
 use ShipFast\LiveEdit\Http\Middleware\RequiresLicence;
 use ShipFast\LiveEdit\Support\DraftStore;
@@ -55,6 +56,13 @@ Route::middleware(array_merge(
          * adapter, which is how a working install gets reported as broken.
          */
         Route::get('/translations', [LiveEditController::class, 'translations'])->name('translations');
+
+        /*
+         * The shop's stock, for the Flash sale grid (KeepsShopStock): the host's, never a draft. Without a host
+         * binding the editor shows no "In stock" column.
+         */
+        Route::get('/stock', [ShopStockController::class, 'show'])->name('stock');
+        Route::post('/stock', [ShopStockController::class, 'update'])->name('stock.update');
     });
 
 /*

@@ -377,11 +377,24 @@ export const renderTableControls = ({ element, save, saveOrder, refresh, notify,
  * straight from Excel or Google Sheets into any cell, then Save changes. Saving runs the same rules as pasting
  * (chartPlan, tablePlan), so a donut still takes six slices at most and a figure must be a figure.
  */
-export const renderDataGrid = ({ heads = [], rows = [], fixedColumns = false, mostRows = 40, mostColumns = 8, figures = [], rowNoun = 'row', focus = null, onSave }) => {
+/*
+ * The same grid for a list the page already has (a shop's flash sale, sale.js): `fixedRows` (no rows added or
+ * deleted, no count), `kinds` per column ('tick' a box, 'read' words that are shown and not typed, 'text' the
+ * default), headings that are the columns' names (`fixedColumns`), `onCell(row, col, cells)` to keep one cell in
+ * step with another (a sale price and its percent off), `picked` a row drawn as the one pressed on the page, and
+ * `wrap.changed()` for fields beside the grid that are saved with it. `kindOf(row, col)` overrides a column's kind
+ * for one cell ('blank' shows nothing: a row still loading); a 'count' cell is a whole number whose 0 reads "Sold
+ * out". `renderCell(row, col, value)` draws a cell of its own (a product's stock across its sizes), `afterRow(row)` a row
+ * of its own under it (those sizes, opened), `hiddenRow(row)` leaves one out; `wrap.setRow(row, cells)` fills a row that
+ * arrived later (as it now stands, so Undo changes keeps it), and `wrap.redraw()` draws again, keeping the box typed in.
+ */
+export const renderDataGrid = ({ heads = [], rows = [], fixedColumns = false, mostRows = 40, mostColumns = 8, figures = [], rowNoun = 'row', focus = null, onSave, fixedRows = false, kinds = [], onCell = null, picked = null, numbered = true, onUndo = null, kindOf = null, renderCell = null, afterRow = null, hiddenRow = null }) => {
     const state = {
         heads: [...heads],
         rows: rows.map((cells) => [...cells]),
     };
+    // what Undo changes goes back to: the rows as they were given, and as they arrived since
+    const base = rows.map((cells) => [...cells]);
     const width = () => Math.max(state.heads.length, ...state.rows.map((cells) => cells.length), 1);
     const wrap = el('div', 'le-figures-wrap');
     const scroll = el('div', 'le-figures-scroll');
@@ -394,7 +407,8 @@ export const renderDataGrid = ({ heads = [], rows = [], fixedColumns = false, mo
     const saveButton = button('Save changes', 'le-btn le-btn-primary', () => void saveNow());
     const undo = button('Undo changes', 'le-chip-btn', () => {
         state.heads = [...heads];
-        state.rows = rows.map((cells) => [...cells]);
+        state.rows = base.map((cells) => [...cells]);
+        onUndo?.();
         dirty(false);
         draw();
     });
@@ -415,9 +429,15 @@ export const renderDataGrid = ({ heads = [], rows = [], fixedColumns = false, mo
         box.dataset.row = String(r);
         box.dataset.col = String(c);
         if (r >= 0 && figures[c]) box.inputMode = 'decimal';
+        // left: the row says it as it will be kept (a price with its currency)
+        if (r >= 0 && onCell) box.addEventListener('change', () => { onCell(r, c, state.rows[r], true); syncRow(r, -1); });
         box.addEventListener('input', () => {
             if (r < 0) state.heads[c] = box.value;
             else state.rows[r][c] = box.value;
+            if (r >= 0 && onCell) {
+                onCell(r, c, state.rows[r]);
+                syncRow(r, c);
+            }
             dirty();
         });
         // Enter goes down a row, as in a spreadsheet.
@@ -454,15 +474,75 @@ export const renderDataGrid = ({ heads = [], rows = [], fixedColumns = false, mo
         return box;
     };
 
+    // A row's other cells, after onCell changed them, without drawing the grid again (the box typed in keeps its place).
+    const syncRow = (r, typedIn) => {
+        table.querySelectorAll(`[data-row="${r}"]`).forEach((box) => {
+            const c = Number(box.dataset.col);
+            if (c === typedIn) return;
+            if (box.type === 'checkbox') box.checked = Boolean(state.rows[r][c]);
+            else if (box.tagName === 'INPUT') box.value = state.rows[r][c] ?? '';
+            else box.textContent = state.rows[r][c] ?? '';
+        });
+    };
+    const tick = (value, label, r, c) => {
+        const box = el('input', 'le-figures-tick');
+        box.type = 'checkbox';
+        box.checked = Boolean(value);
+        box.setAttribute('aria-label', label);
+        box.dataset.row = String(r);
+        box.dataset.col = String(c);
+        box.addEventListener('change', () => {
+            state.rows[r][c] = box.checked ? '1' : '';
+            if (onCell) { onCell(r, c, state.rows[r]); syncRow(r, c); }
+            dirty();
+        });
+        // the whole cell is the box to press (44px high), not only the small square
+        const hit = el('label', 'le-figures-tick-hit');
+        hit.append(box);
+
+        return hit;
+    };
+    const cellFor = (value, r, c) => {
+        const label = `${state.rows[r][kinds.indexOf('read')] || `Row ${r + 1}`}, ${state.heads[c] || `column ${c + 1}`}`;
+        const kind = kindOf?.(r, c) ?? kinds[c];
+        if (kind === 'blank') return el('span', 'le-figures-blank');
+        if (kind === 'tick') return tick(value, label, r, c);
+        if (kind === 'count') {
+            const box = input(value, label, r, c);
+            box.inputMode = 'numeric';
+            box.classList.add('le-figures-count-cell');
+            const sold = () => {
+                const out = box.value.trim() === '0';
+                box.closest('td')?.classList.toggle('is-sold-out', out);
+                // said as well as shown
+                box.setAttribute('aria-label', out ? `${label}, sold out` : label);
+            };
+            box.addEventListener('input', sold);
+            requestAnimationFrame(sold);
+
+            return box;
+        }
+        if (kind === 'read') {
+            const words = el('span', 'le-figures-read', value ?? '');
+            words.dataset.row = String(r);
+            words.dataset.col = String(c);
+
+            return words;
+        }
+
+        return input(value, label, r, c);
+    };
+
     const draw = (focusOn = null) => {
         const w = width();
         state.rows = state.rows.map((cells) => Array.from({ length: w }, (_, i) => cells[i] ?? ''));
         state.heads = Array.from({ length: w }, (_, i) => state.heads[i] ?? '');
         const head = el('tr');
-        head.append(el('th', 'le-figures-corner'));
+        if (numbered) head.append(el('th', 'le-figures-corner'));
         state.heads.forEach((name, c) => {
-            const th = el('th');
-            th.append(input(name, `Column ${c + 1} name`, -1, c));
+            const th = el('th', kinds[c] ? `le-col-${kinds[c]}` : undefined);
+            if (fixedColumns && kinds.length) th.append(el('span', 'le-figures-head', name));
+            else th.append(input(name, `Column ${c + 1} name`, -1, c));
             if (!fixedColumns && w > 1) {
                 th.append(button('✕', 'le-figures-x', () => {
                     state.heads.splice(c, 1);
@@ -475,16 +555,28 @@ export const renderDataGrid = ({ heads = [], rows = [], fixedColumns = false, mo
             }
             head.append(th);
         });
-        head.append(el('th', 'le-figures-corner'));
+        if (!fixedRows) head.append(el('th', 'le-figures-corner'));
         const body = el('tbody');
         state.rows.forEach((cells, r) => {
-            const tr = el('tr');
-            tr.append(el('th', 'le-figures-n', String(r + 1)));
+            const tr = el('tr', r === picked ? 'is-picked' : undefined);
+            if (numbered) tr.append(el('th', 'le-figures-n', String(r + 1)));
+            if (hiddenRow?.(r)) return;
             cells.forEach((value, c) => {
-                const td = el('td');
-                td.append(input(value, `Row ${r + 1}, ${state.heads[c] || `column ${c + 1}`}`, r, c));
+                const td = el('td', kinds[c] ? `le-col-${kinds[c]}` : undefined);
+                // its column's name, for a phone, where each row reads as a small card (CSS, a narrow drawer)
+                if (fixedColumns && kinds.length) td.dataset.th = state.heads[c] ?? '';
+                const own = renderCell?.(r, c, value) ?? null;
+                if (!own && kindOf?.(r, c) === 'blank') td.classList.add('is-blank');
+                td.append(own ?? (kinds.length ? cellFor(value, r, c) : input(value, `Row ${r + 1}, ${state.heads[c] || `column ${c + 1}`}`, r, c)));
                 tr.append(td);
             });
+            if (fixedRows) {
+                body.append(tr);
+                const under = afterRow?.(r);
+                if (under) body.append(under);
+
+                return;
+            }
             const x = el('td');
             if (state.rows.length > 1) {
                 const del = button('✕', 'le-figures-x', () => {
@@ -503,6 +595,12 @@ export const renderDataGrid = ({ heads = [], rows = [], fixedColumns = false, mo
         thead.append(head);
         table.replaceChildren(thead, body);
 
+        if (fixedRows) {
+            tools.hidden = true;
+            if (focusOn) table.querySelector(`input[data-row="${focusOn.row}"][data-col="${focusOn.col}"]`)?.focus();
+
+            return;
+        }
         const addRow = button(`+ Add a ${rowNoun}`, 'le-chip-btn', () => {
             state.rows.push(Array(width()).fill(''));
             dirty();
@@ -551,6 +649,31 @@ export const renderDataGrid = ({ heads = [], rows = [], fixedColumns = false, mo
     wrap.append(scroll, tools, why, foot);
     dirty(false);
     draw(focus);
+    // fields beside the grid, saved with it
+    wrap.changed = () => dirty();
+    wrap.saveNow = () => saveNow();
+    // a change to many rows at once (one % off for every product ticked)
+    wrap.update = (change) => { state.rows.forEach((cells, r) => change(cells, r)); dirty(); redraw(); };
+    // drawn again where it was: the box being typed in keeps its place and its caret
+    const redraw = () => {
+        const active = table.getRootNode?.()?.activeElement;
+        const at = active && table.contains(active) ? { row: active.dataset.row, col: active.dataset.col, sizeKey: active.dataset.sizeKey, start: active.selectionStart, end: active.selectionEnd } : null;
+        const scrolled = scroll.scrollLeft;
+        draw();
+        scroll.scrollLeft = scrolled;
+        if (!at) return;
+        const again = at.sizeKey ? table.querySelector(`[data-size-key="${CSS.escape(at.sizeKey)}"]`) : table.querySelector(`[data-row="${at.row}"][data-col="${at.col}"]`);
+        if (!again) return;
+        again.focus({ preventScroll: true });
+        try { if (at.start !== null && at.start !== undefined) again.setSelectionRange(at.start, at.end); } catch { /* a box with no caret */ }
+    };
+    wrap.redraw = redraw;
+    wrap.setRow = (r, cells) => {
+        base[r] = [...cells];
+        state.rows[r] = [...cells];
+        redraw();
+    };
+    wrap.rowsNow = () => state.rows.map((cells) => [...cells]);
 
     return wrap;
 };

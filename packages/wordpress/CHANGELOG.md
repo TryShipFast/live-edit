@@ -1,5 +1,41 @@
 # ShipFast Live Edit for WordPress
 
+## 0.20.18 (unreleased)
+
+- A flash sale is set as a whole, in one grid (owner, 8 Nov 2026: "sales card must be editable at once, not each being
+  editable one by one"; "just like we can edit tables, cards"; on a countdown, "it should open so that it can be
+  edited"; "live edit should be sufficient to setup their store"). A product's sale price, its sale days, a card's sale
+  price, a countdown, the new "On sale" label on a card, and "Edit sale and stock" in the Shop tab all open the same
+  grid as a table: every product with a tick for On sale, its price, its sale price and its % off (typing either fills
+  the other, a typed "49950" reads "₦49,950"), "Same % off for every ticked product", and one Starts and one Ends date
+  for the whole sale, with "Ends 15 Nov 2026, in 7 days" and what the countdowns follow. The product pressed is
+  highlighted. Saving writes the words the shop already reads on each product page (the sale price as the page writes
+  its prices, "No sale" when unticked, days as "8 Nov 2026", "Today", "No end date"), so nothing changes on the server
+  or in the templates; one Undo takes the whole sale back. A countdown or a card's sale no longer says "Counted for
+  you". While editing, a card or product page whose product is on sale wears a label in the editor's own chrome ("On
+  sale · ₦49,950 · ends 15 Nov", "Sale starts 12 Nov", "Sale ended"); pressing it opens the sale. A product's price
+  panel offers "Put it on sale ›". The grid opens at once with what is known (the page open and the products read in
+  the last ten minutes) and fills in as the other product pages arrive ("Still loading 14 of 22 products. You can start
+  now"); a save before then writes only the products shown. Every column is in view at 1440 without scrolling sideways,
+  a product's name wraps rather than being cut. "Same % off for every ticked product" fills the ticked products with no
+  sale price and asks before changing those with their own ("Change them too" / "Keep their prices"). With nothing on
+  sale, the sale starts today. On a phone (600px or less) each product reads as a small card from the same rows: its
+  tick and name, then Price, Sale price and % off side by side, each named, then In stock; "Loading…" sits in the price
+  until the page arrives. Gift cards are left out (a product the host marks `gift`, or whose page carries data-gift).
+- In stock, in the same grid, where the host keeps stock: a product without sizes is counted on its row; a product with
+  sizes shows its stock in a few words ("12 in 9 sizes", "2 sizes sold out", "Not counted") and opens its sizes under it,
+  each by its own name, to type each count. Empty is not counted, 0 shows Sold out. Saved with the sale by the one Save changes; stock is the host's and is not a draft,
+  which the grid says. New host contract `ShipFast\LiveEdit\Contracts\KeepsShopStock` (`stock()`, `saveStock()`),
+  behind `GET` and `POST /live-edit/stock` (`live-edit.stock`, `live-edit.stock.update`) inside the editor's own
+  middleware; without a binding the column is not shown. A host on the content API claims the route
+  (`liveEditApi.routes['/live-edit/stock']`).
+- The editor's help answers how to put products on sale, end a sale, change when it ends, set stock, and what selling
+  out does, pointing to the grid.
+- The table grid (`renderDataGrid`) takes fixed rows, ticks, words that are read, per-cell kinds and a picked row.
+- Proved in `a-flash-sale-is-set-as-a-whole.spec.js` and `a-flash-sale-is-set-as-a-whole.test.js`, and in the website's
+  real editor on Oyin Kids and Car Wash Auto: the sale set in the grid, published, and a visitor's order recorded at the
+  sale price.
+
 ## 0.20.17
 
 - "+ Form" on the editor's bar (owner, 8 Nov 2026, on Car Wash Auto: "why is there no create a new form"). Adding a form

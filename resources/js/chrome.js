@@ -221,6 +221,8 @@ a.le-mark:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
 @keyframes le-slide { from { transform: translateX(16px); opacity: 0; } to { transform: none; opacity: 1; } }
 /* Opened from a menu's trigger whose menu is on the right, so the menu stays reachable beside it. */
 .le-drawer.is-left { right: auto; left: 12px; }
+/* A grid that wants its columns side by side (the flash sale and stock grid). */
+.le-drawer.is-grid { width: min(760px, calc(100vw - 24px)); }
 .le-drawer-head {
   display: flex; align-items: center; justify-content: space-between; gap: 12px;
   padding: 0 12px 0 24px; border-bottom: 1px solid var(--le-line); background: #fff;
@@ -428,6 +430,98 @@ a.le-mark:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
 .le-fold > summary::before { content: '▸'; display: inline-block; width: 1em; transition: transform .15s; }
 .le-fold[open] > summary::before { transform: rotate(90deg); }
 .le-figures-more { margin: 8px 0 12px; }
+/* The flash sale and stock grid (sale.js): the table grid with a tick, words that are read, and counts. */
+.le-figures-head { display: block; padding: 9px 10px; font-weight: 600; font-size: 13px; color: #3b4150; white-space: nowrap; }
+.le-figures-read { display: block; padding: 9px 10px; color: #3b4150; white-space: nowrap; }
+.le-figures td.le-col-read .le-figures-read { max-width: 220px; overflow: hidden; text-overflow: ellipsis; }
+.le-figures th.le-col-tick, .le-figures td.le-col-tick { width: 64px; min-width: 64px; text-align: center; }
+.le-figures thead th.le-col-tick { min-width: 64px; }
+.le-figures thead th.le-col-read { min-width: 0; }
+.le-figures td.le-col-tick { padding: 0 10px; }
+/* The tick and the product's name stay in view while the grid scrolls sideways (a phone). */
+.le-figures .le-col-tick { position: sticky; left: 0; z-index: 1; background: #fff; }
+.le-figures thead .le-col-tick { background: #f6f7f9; }
+.le-figures tr > .le-col-read:nth-child(2) { position: sticky; left: 64px; z-index: 1; background: #fff; box-shadow: inset -1px 0 0 #eef0f3; }
+.le-figures thead tr > .le-col-read:nth-child(2) { background: #f6f7f9; }
+.le-figures tr.is-picked > .le-col-tick, .le-figures tr.is-picked > .le-col-read:nth-child(2) { background: #f2f6ff; }
+.le-figures-tick { width: 18px; height: 18px; accent-color: var(--le-accent); cursor: pointer; }
+.le-figures-tick-hit { display: flex; align-items: center; justify-content: center; min-height: 44px; cursor: pointer; }
+.le-figures tr.is-picked td, .le-figures tr.is-picked th { background: #f2f6ff; }
+.le-figures td.is-sold-out { position: relative; }
+.le-figures td.is-sold-out::after { content: 'Sold out'; position: absolute; right: 8px; top: 50%; transform: translateY(-50%); font-size: 11px; font-weight: 600; color: #b42318; background: #fdecea; padding: 2px 6px; border-radius: 4px; pointer-events: none; }
+.le-figures td.is-sold-out .le-figures-cell { text-align: left; }
+.le-sale-days { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.le-sale-all { gap: 8px; }
+.le-sale-all .le-label { font-size: 13px; font-weight: 600; color: var(--le-body); }
+.le-sale-all .le-sale-all-box { width: 88px; flex: none; }
+/* Every column in view at a laptop's width: fixed columns, the product's name wrapping rather than cut. */
+.le-sale-grid .le-figures { table-layout: fixed; }
+.le-sale-grid .le-figures thead th, .le-sale-grid .le-figures thead th.le-col-tick, .le-sale-grid .le-figures thead th:not(.le-figures-corner) { min-width: 0; }
+.le-sale-grid .le-figures-cell { min-width: 0; }
+.le-sale-grid .le-figures tr > :nth-child(1) { width: 56px; min-width: 56px; }
+.le-sale-grid .le-figures tr > :nth-child(3) { width: 96px; }
+.le-sale-grid .le-figures tr > :nth-child(4) { width: 108px; }
+.le-sale-grid .le-figures tr > :nth-child(5) { width: 64px; }
+.le-sale-grid .le-figures tr > :nth-child(6) { width: 148px; }
+.le-sale-grid .le-figures-head { white-space: normal; padding: 9px 8px; }
+.le-sale-grid td.le-col-read .le-figures-read { white-space: normal; max-width: none; overflow: visible; padding: 9px 8px; line-height: 1.35; }
+.le-sale-grid .le-figures tr > .le-col-read:nth-child(2) { left: 56px; }
+.le-sale-grid .le-figures-cell { padding: 9px 8px; }
+.le-sale-reading { margin: 0; }
+.le-sale-ask { display: grid; gap: 8px; margin: -6px 0 0; }
+.le-sale-ask p { margin: 0; }
+/* A product's sizes: their stock in a few words, opened under the product to type each count. */
+.le-sale-sizes-toggle { display: flex; align-items: center; justify-content: space-between; gap: 6px; width: 100%; min-height: 44px; border: 0; background: transparent; padding: 6px 8px; font: inherit; font-size: 13px; color: #1f3fb8; text-align: left; cursor: pointer; }
+.le-sale-sizes-toggle:hover { background: #f2f6ff; }
+.le-sale-sizes-arrow { flex: none; font-size: 12px; }
+.le-figures tr.le-sale-sizes > td { padding: 6px 10px 12px 64px; background: #fafbfc; }
+.le-sale-sizes-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 6px 16px; }
+.le-sale-size { display: flex; align-items: center; justify-content: space-between; gap: 8px; font-size: 13px; color: #3b4150; }
+.le-sale-size-name { min-width: 0; }
+.le-sale-size .le-sale-size-box { width: 68px; flex: none; min-height: 36px; padding: 6px 8px; text-align: right; }
+.le-sale-size.is-sold-out .le-sale-size-name::after { content: ' · Sold out'; color: #b42318; font-weight: 600; }
+.le-sale-grid td.le-col-read:nth-child(3) .le-figures-read { color: #3b4150; }
+/* A phone: each product reads as a small card (the same rows, stacked): its tick and name, then its price, sale price and
+   % off side by side, each named, then its stock. No sideways scroll. */
+@media (max-width: 600px) {
+  .le-sale-grid .le-figures-scroll { overflow: visible; border: 0; background: transparent; }
+  .le-sale-grid .le-figures, .le-sale-grid .le-figures tbody { display: block; table-layout: auto; }
+  .le-sale-grid .le-figures thead { display: none; }
+  .le-sale-grid .le-figures tbody > tr:not(.le-sale-sizes) {
+    display: grid; grid-template-columns: 44px repeat(3, minmax(0, 1fr)); column-gap: 6px; align-items: end;
+    border: 1px solid #e3e5ea; border-radius: 12px; margin-bottom: 8px; padding: 4px 8px 8px 0; background: #fff;
+  }
+  .le-sale-grid .le-figures tbody > tr > td { display: block; width: auto !important; min-width: 0 !important; border: 0; position: static !important; box-shadow: none !important; background: transparent !important; }
+  .le-sale-grid .le-figures tr > td:nth-child(1) { grid-column: 1; grid-row: 1; align-self: center; padding: 0; }
+  .le-sale-grid .le-figures tr > td:nth-child(2) { grid-column: 2 / -1; grid-row: 1; align-self: center; }
+  .le-sale-grid .le-figures tr > td:nth-child(2) .le-figures-read { font-weight: 600; color: #0b0c0f; padding: 10px 0 6px; }
+  .le-sale-grid .le-figures tr > td:nth-child(3) { grid-column: 2; grid-row: 2; }
+  .le-sale-grid .le-figures tr > td:nth-child(4) { grid-column: 3; grid-row: 2; }
+  .le-sale-grid .le-figures tr > td:nth-child(5) { grid-column: 4; grid-row: 2; }
+  .le-sale-grid .le-figures tr > td:nth-child(6) { grid-column: 2 / -1; grid-row: 3; margin-top: 6px; }
+  .le-sale-grid .le-figures tr > td:nth-child(n+3)::before { content: attr(data-th); display: block; font-size: 11px; font-weight: 600; color: #6b7280; margin-bottom: 3px; }
+  .le-sale-grid .le-figures tr > td.is-blank:nth-child(n+4) { display: none; }
+  .le-sale-grid .le-figures tr > td:nth-child(n+3) .le-figures-read { padding: 8px 0; }
+  .le-sale-grid .le-figures tr > td:nth-child(n+3) .le-figures-cell { border: 1px solid #d9dde4; border-radius: 8px; padding: 8px; min-height: 40px; background: #fff; }
+  .le-sale-grid .le-figures tr > td:nth-child(6) .le-figures-cell { max-width: 120px; }
+  .le-sale-grid .le-sale-sizes-toggle { border: 1px solid #d9dde4; border-radius: 8px; }
+  .le-sale-grid .le-figures tr.is-picked { background: #f2f6ff; }
+  .le-figures tr.le-sale-sizes { display: block; margin: -4px 0 10px 44px; }
+  .le-figures tr.le-sale-sizes > td { display: block; padding: 8px; border-radius: 10px; }
+  .le-sale-sizes-list { grid-template-columns: 1fr; }
+  .le-sale-size-name { white-space: nowrap; }
+  .le-sale-grid .le-figures-foot { bottom: -20px; }
+}
+/* Save stays in reach at the foot of the drawer however many products there are, as in a shop's bulk editor. */
+.le-sale-grid .le-figures-foot { position: sticky; bottom: -22px; z-index: 2; background: #fff; padding: 12px 0; margin-bottom: -12px; border-top: 1px solid var(--le-line); }
+/* A product not ticked: its sale price is kept, greyed, and not used until it is ticked again. */
+.le-figures tr:has(.le-figures-tick:not(:checked)) td.le-col-text .le-figures-cell { color: #6b7280; }
+.le-sale-labels { position: fixed; inset: 0; pointer-events: none; z-index: 2147482998; }
+.le-sale-labels[hidden] { display: none; }
+.le-sale-label { position: fixed; pointer-events: auto; border: 0; border-radius: 6px; padding: 4px 9px; background: #b42318; color: #fff; font: 600 11px/1.3 system-ui, -apple-system, 'Segoe UI', sans-serif; letter-spacing: .01em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; cursor: pointer; box-shadow: 0 1px 3px rgba(0,0,0,.25); }
+.le-sale-label:hover, .le-sale-label:focus-visible { background: #8f1c13; outline: none; }
+.le-sale-label.is-ended { background: #6b7280; }
+@media (max-width: 480px) { .le-sale-days { grid-template-columns: 1fr; } }
 .le-figures-more > summary { cursor: pointer; font-weight: 600; font-size: 13px; padding: 6px 0; }
 .le-browser-note { margin: 0 0 10px; padding: 10px 12px; border-radius: 10px; background: #fff7e6; color: #7a4b00; font-size: 14px; line-height: 1.45; }
 .le-browser-note[hidden] { display: none; }

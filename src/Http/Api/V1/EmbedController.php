@@ -60,6 +60,7 @@ class EmbedController
         'linked-detail-scope.js' => 'linked-detail-scope.js',
         'card-page.js' => 'card-page.js',
         'choice.js' => 'choice.js',
+        'sale.js' => 'sale.js',
         'shop.js' => 'shop.js',
         'catalogue.js' => 'catalogue.js',
         'help.js' => 'help.js',

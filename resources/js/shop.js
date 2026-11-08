@@ -75,7 +75,7 @@ const kindOf = (field) => {
 export const renderShopPanel = ({
     container, config, save, done, notify = () => {}, doc = document,
     categories = [], newCategory = null, categoryProducts = null, importProducts = null, undoImport = null,
-    catalogue = null, upload = null, taken = [],
+    catalogue = null, upload = null, taken = [], flashSale = null,
 }) => {
     const el = (tag, className, text) => {
         const node = doc.createElement(tag);
@@ -404,6 +404,15 @@ export const renderShopPanel = ({
         pay.append(open);
     }
     parts.push(pay);
+
+    // A flash sale and stock: every product in one grid (live-edit.js editFlashSale), the same one a sale on the page opens.
+    if (flashSale && designed.length) {
+        const part = section('Sale and stock', 'Put products on sale and set how many you have, all in one grid.', 'flash-sale');
+        const open = button('le-btn le-shop-flash-sale', 'Edit sale and stock');
+        open.addEventListener('click', () => flashSale());
+        part.append(open);
+        parts.push(part);
+    }
 
     // 5. Offers.
     const offers = fields.filter((f) => f.part === 'offer');
