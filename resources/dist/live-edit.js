@@ -1689,6 +1689,7 @@ textarea.le-input { border-radius: var(--le-r-control); }
 .le-crumb-back { margin-right: 0; }
 .le-fields input, .le-fields textarea, .le-fields select { scroll-margin: 12px 0 96px; }
 @media (min-width: 761px) { .le-toolbar { gap: 8px; } }
+.le-browser-head, .le-browser-sizes, .le-browser-top { align-items: baseline; }
 /* the smallest phones: the bar's words whole (Publish was cut to "Publi") */
 @media (max-width: 360px) { .le-toolbar { gap: 3px; } .le-toolbar .le-publish { gap: 4px; } .le-toolbar .le-publish > span:first-child { overflow: visible; text-overflow: clip; } }
 .le-fields-dock { flex: none; background: #fff; }
