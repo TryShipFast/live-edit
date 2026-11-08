@@ -13,6 +13,7 @@
  */
 
 import { linkIcon, sheetEntries, toolbarIcon } from './toolbar-icons.js';
+import { iconizeGlyphs } from './glyphs.js';
 
 /** Styles for the overlay itself — scoped to the shadow root. */
 const CHROME_CSS = `
@@ -28,7 +29,7 @@ const CHROME_CSS = `
 :host {
   --le-ink: #0B0C0F;
   --le-body: #45484F;
-  --le-muted: #9A9DA5;
+  --le-muted: var(--le-muted);
   --le-line: #E6E7EA;
   --le-field: #DADCE0;
   --le-soft: #F4F5F7;
@@ -103,7 +104,7 @@ button, input, select, textarea { font: inherit; color: inherit; margin: 0; }
 a.le-mark { cursor: pointer; transition: transform .12s ease, box-shadow .12s ease; }
 a.le-mark:hover { transform: translateY(-1px); box-shadow: 0 0 0 3px rgba(255,255,255,.16); }
 a.le-mark:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
-.le-sep { width: 1px; height: 20px; flex: none; background: #2A2C31; }
+.le-sep { width: 1px; height: 20px; flex: none; background: var(--le-ink); }
 /* A round button for the one-glyph controls: undo, redo. */
 .le-round {
   width: 34px; height: 34px; flex: none; cursor: pointer; border: 0;
@@ -111,15 +112,15 @@ a.le-mark:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
   display: inline-flex; align-items: center; justify-content: center;
   transition: background .15s ease, opacity .15s ease;
 }
-.le-round:hover { background: #2A2C31; }
+.le-round:hover { background: var(--le-ink); }
 .le-round:disabled { opacity: .3; cursor: default; background: none; }
 .le-bar-btn {
   cursor: pointer; border: 0; border-radius: 999px; padding: 8px 14px;
-  background: none; color: #fff; font-size: 13px; font-weight: 500;
+  background: none; color: #fff; font-size: 13px; font-weight: 600;
   transition: background .15s ease;
 }
-.le-bar-btn:hover { background: #2A2C31; }
-.le-bar-btn.is-on { background: #2A2C31; }
+.le-bar-btn:hover { background: var(--le-ink); }
+.le-bar-btn.is-on { background: var(--le-ink); }
 /* Pointed at when somebody presses the page while editing is off, so the
    message beside it has somewhere to send them. Still, not flashing: motion
    that repeats is an alarm, and nothing is wrong. */
@@ -133,10 +134,10 @@ a.le-mark:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
   cursor: pointer; flex: none; appearance: none;
   background: #1B1D22 url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%23fff' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E") no-repeat right 10px center;
   color: #fff; border: 0; border-radius: 999px;
-  padding: 7px 26px 7px 12px; font-size: 12px; font-weight: 500;
+  padding: 7px 26px 7px 12px; font-size: 12px; font-weight: 600;
   font-family: inherit; line-height: 1.2;
 }
-.le-lang:hover { background-color: #2A2C31; }
+.le-lang:hover { background-color: var(--le-ink); }
 .le-lang:disabled { opacity: .5; cursor: progress; }
 .le-lang:focus-visible { outline: 2px solid var(--le-blue); outline-offset: 2px; }
 /* The options themselves are drawn by the operating system, which does not
@@ -148,7 +149,7 @@ a.le-mark:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
    A count is the difference between "publish" as a habit and as a decision. */
 .le-publish {
   cursor: pointer; border: 0; border-radius: 999px; padding: 8px 16px;
-  background: var(--le-blue); color: #fff; font-size: 13px; font-weight: 500;
+  background: var(--le-blue); color: #fff; font-size: 13px; font-weight: 600;
   display: inline-flex; align-items: center; gap: 8px;
   transition: background .15s ease, opacity .15s ease;
 }
@@ -178,7 +179,7 @@ a.le-mark:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
   /* dividers mark groups on one line; once the bar wraps they were left hanging at a row's end */
   .le-sep { display: none; }
 }
-.le-status { display: flex; align-items: center; gap: 8px; font-size: 12px; color: #9A9DA5; padding: 0 6px 0 2px; }
+.le-status { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--le-muted); padding: 0 6px 0 2px; }
 /* No gap where no words are: an empty label still reserved its padding, which
    left the greeting sitting oddly far from the mark. */
 .le-status:not(.is-saying) { gap: 0; padding-right: 0; }
@@ -194,7 +195,7 @@ a.le-mark:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
 .le-btn:active { transform: translateY(0); }
 .le-btn-ghost {
   cursor: pointer; border: 1px solid rgba(255,255,255,.16); background: rgba(255,255,255,.04);
-  color: #cbd5e1; border-radius: 999px; padding: 8px 14px; font-size: 13px; font-weight: 500;
+  color: var(--le-field); border-radius: 999px; padding: 8px 14px; font-size: 13px; font-weight: 600;
   text-decoration: none; display: inline-flex; align-items: center; transition: background .15s ease, color .15s ease;
 }
 .le-btn-ghost:hover { background: rgba(255,255,255,.12); color: #fff; }
@@ -202,7 +203,7 @@ a.le-mark:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
 .le-toolbar .le-btn:hover { background: #e9edf3; }
 .le-locale {
   cursor: pointer; border: 1px solid rgba(255,255,255,.16); background: rgba(255,255,255,.04);
-  color: #cbd5e1; border-radius: 999px; padding: 8px 12px; font-size: 13px;
+  color: var(--le-field); border-radius: 999px; padding: 8px 12px; font-size: 13px;
 }
 
 /* ---- drawer ---- */
@@ -230,7 +231,7 @@ a.le-mark:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
 .le-tabs { display: flex; align-items: center; gap: 18px; }
 .le-tab {
   cursor: pointer; border: 0; background: none; padding: 16px 0 14px;
-  font-size: 13px; font-weight: 500; color: #9A9DA5;
+  font-size: 13px; font-weight: 600; color: var(--le-muted);
   border-bottom: 2px solid transparent; transition: color .15s ease;
 }
 .le-tab:hover { color: #45484F; }
@@ -238,12 +239,12 @@ a.le-mark:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
 :host :is(input, textarea, select):focus { border-color: var(--le-accent); outline: 1px solid var(--le-accent); }
 .le-tab-count {
   display: inline-block; margin-left: 5px; min-width: 16px; padding: 0 4px;
-  border-radius: 999px; background: #EEEFF1; color: #45484F;
-  font-size: 11px; font-weight: 500; line-height: 16px; text-align: center;
+  border-radius: 999px; background: var(--le-line); color: #45484F;
+  font-size: 12px; font-weight: 600; line-height: 16px; text-align: center;
 }
 .le-tab.is-on .le-tab-count { background: #0B0C0F; color: #fff; }
 .le-seo-preview { display: grid; gap: 5px; padding: 14px; border: 1px solid var(--le-line); border-radius: 10px; color: #202124; font: 13px/1.45 Arial, sans-serif; }
-.le-seo-preview-title { color: #1a0dab; font-size: 16px; font-weight: 400; }
+.le-seo-preview-title { color: #1a0dab; font-size: 14px; font-weight: 400; }
 .le-seo-preview-address { color: #188038; font-size: 12px; }
 .le-seo-preview-description { color: #4d5156; }
 .le-seo-actions { justify-content: flex-end; }
@@ -253,26 +254,26 @@ a.le-mark:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
 .le-assist-name { font-size: 12px; font-weight: 600; color: var(--le-body); }
 .le-assist-row { display: flex; flex-wrap: wrap; gap: 8px; }
 .le-assist-row .le-assist { flex: 1 1 120px; width: auto; padding: 8px 12px; min-height: 36px; font-size: 13px; }
-.le-assist-balance { font-size: 12px; color: #9A9DA5; }
+.le-assist-balance { font-size: 12px; color: var(--le-muted); }
 .le-assist {
   display: flex; align-items: center; justify-content: space-between; gap: 10px;
   width: 100%; cursor: pointer; border: 0; border-radius: 10px;
   padding: 11px 14px; background: #F4F5F7; color: #0B0C0F;
-  font-size: 14px; font-weight: 500; text-align: left;
+  font-size: 14px; font-weight: 600; text-align: left;
   transition: background .15s ease, opacity .15s ease;
 }
-.le-assist:hover { background: #EBECEF; }
+.le-assist:hover { background: var(--le-line); }
 .le-assist:disabled { opacity: .5; cursor: default; background: #F4F5F7; }
 /* The price, next to the thing it buys. Somebody about to spend a credit
    should not have to remember what it costs. */
-.le-assist-cost { font-size: 12px; color: #9A9DA5; font-weight: 400; }
+.le-assist-cost { font-size: 12px; color: var(--le-muted); font-weight: 400; }
 .le-assist-cost.is-short { color: #C0392B; }
 
 /* ---- the Changes and History lists ---- */
-.le-change { display: flex; flex-direction: column; gap: 4px; padding-bottom: 16px; border-bottom: 1px solid #EEEFF1; }
+.le-change { display: flex; flex-direction: column; gap: 4px; padding-bottom: 16px; border-bottom: 1px solid var(--le-line); }
 .le-change:last-child { border-bottom: 0; padding-bottom: 0; }
 .le-change-head { justify-content: space-between; align-items: baseline; }
-.le-change-label { font-size: 13px; font-weight: 500; color: #0B0C0F; }
+.le-change-label { font-size: 13px; font-weight: 600; color: #0B0C0F; }
 /* New page: a window of two steps. First the kinds of page the design has, as
    small pictures of the real pages; then a title, with the address following it. */
 .le-modal.is-wide { max-width: 980px; height: min(760px, 90vh); max-height: min(760px, 90vh); }
@@ -293,13 +294,13 @@ a.le-mark:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
 .le-start-thumb.is-outline { display: flex; align-items: stretch; justify-content: center; padding: 14px 18px 0; background: linear-gradient(180deg, var(--le-soft), #fff); }
 .le-outline { display: flex; flex-direction: column; gap: 5px; width: 100%; padding: 8px 9px; background: #fff; border: 1px solid var(--le-line); border-bottom: 0; border-radius: 8px 8px 0 0; box-shadow: 0 1px 2px rgba(17,19,24,.05); }
 .le-outline-bar { height: 6px; width: 38%; border-radius: 3px; background: var(--le-field); margin-bottom: 2px; }
-.le-outline-block { display: flex; align-items: center; min-height: 18px; padding: 0 8px; border-radius: 5px; background: var(--le-soft); color: var(--le-muted); font-size: 10.5px; font-weight: 550; letter-spacing: .01em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.le-outline-block { display: flex; align-items: center; min-height: 18px; padding: 0 8px; border-radius: 5px; background: var(--le-soft); color: var(--le-muted); font-size: 12px; font-weight: 600; letter-spacing: .01em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .le-outline-block.is-first { min-height: 36px; background: var(--le-accent-soft); color: var(--le-ink); }
-.le-outline-more { color: var(--le-muted); font-size: 10.5px; padding-left: 2px; }
+.le-outline-more { color: var(--le-muted); font-size: 12px; padding-left: 2px; }
 .le-start-own { display: flex; flex-direction: column; align-items: flex-start; justify-content: flex-end; gap: 3px; min-height: 188px; padding: 13px; border: 1.5px dashed var(--le-field); border-radius: 12px; background: transparent; text-align: left; cursor: pointer; font: inherit; color: var(--le-body); transition: border-color .15s ease, background .15s ease; }
 .le-start-own:hover { border-color: var(--le-ink); background: var(--le-soft); }
 .le-start-own:focus-visible { outline: none; border-color: var(--le-accent); box-shadow: 0 0 0 3px var(--le-accent-soft); }
-.le-start-own-plus { display: grid; place-items: center; width: 34px; height: 34px; margin-bottom: auto; border-radius: 50%; background: var(--le-soft); color: var(--le-ink); font-size: 20px; line-height: 1; }
+.le-start-own-plus { display: grid; place-items: center; width: 34px; height: 34px; margin-bottom: auto; border-radius: 50%; background: var(--le-soft); color: var(--le-ink); font-size: 17px; line-height: 1; }
 .le-starts-none { grid-column: 1 / -1; }
 .le-modal.is-pages { max-width: 720px; }
 .le-review-short { display: none; }
@@ -317,16 +318,16 @@ a.le-mark:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
 .le-page-row.is-dragging { opacity: .5; }
 .le-page-row[draggable="true"] { cursor: grab; }
 .le-page-line { display: flex; align-items: center; gap: 10px; min-width: 0; }
-.le-page-handle { flex: none; color: var(--le-muted); font-size: 18px; line-height: 1; }
+.le-page-handle { flex: none; color: var(--le-muted); font-size: 17px; line-height: 1; }
 .le-page-name { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; flex: 1; min-width: 0; }
-.le-page-title { color: var(--le-ink); font-size: 15px; font-weight: 650; overflow-wrap: anywhere; }
-.le-page-badge { padding: 2px 8px; border-radius: 999px; background: var(--le-soft); color: var(--le-ink); font-size: 11.5px; font-weight: 600; }
+.le-page-title { color: var(--le-ink); font-size: 14px; font-weight: 600; overflow-wrap: anywhere; }
+.le-page-badge { padding: 2px 8px; border-radius: 999px; background: var(--le-soft); color: var(--le-ink); font-size: 12px; font-weight: 600; }
 .le-page-badge.is-quiet { color: #5B5F68; }
 .le-page-rename { flex: 1 1 180px; min-width: 0; }
 .le-page-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; }
 .le-page-actions .le-switch { margin-left: 4px; font-size: 13px; }
 .le-page-why { flex-basis: 100%; margin: 0; font-size: 12px; }
-.le-pages-needed > summary { cursor: pointer; padding: 8px 0; color: var(--le-ink); font-size: 13px; font-weight: 650; }
+.le-pages-needed > summary { cursor: pointer; padding: 8px 0; color: var(--le-ink); font-size: 13px; font-weight: 600; }
 .le-pages-needed > .le-hint { margin: 0 0 8px; }
 @media (max-width: 760px) {
   .le-page-row .le-chip-btn, .le-pages-add, .le-pages-needed > summary, .le-pages-reload { min-height: 44px; min-width: 44px; }
@@ -335,13 +336,13 @@ a.le-mark:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
 .le-modal.is-fit { height: auto; }
 .le-name-look .le-start-thumb.is-outline { padding: 28px 40px 0; }
 .le-name-look .le-outline { gap: 8px; padding: 14px; }
-.le-name-look .le-outline-block { min-height: 34px; font-size: 12.5px; }
+.le-name-look .le-outline-block { min-height: 34px; font-size: 12px; }
 .le-name-look .le-outline-block.is-first { min-height: 84px; }
 .le-start-frame { position: absolute; top: 0; left: 0; width: 1280px; height: 800px; border: 0; transform: scale(.17); transform-origin: 0 0; pointer-events: none; background: #fff; }
 .le-start-text { display: flex; flex-direction: column; gap: 3px; padding: 11px 13px 13px; }
-.le-start-name { color: var(--le-ink); font-size: 14px; font-weight: 650; }
+.le-start-name { color: var(--le-ink); font-size: 14px; font-weight: 600; }
 .le-start-meta { color: var(--le-muted); font-size: 12px; line-height: 1.4; }
-.le-link-btn { flex: none; padding: 6px 2px; border: 0; background: none; color: var(--le-blue); font: inherit; font-size: 13px; font-weight: 600; cursor: pointer; }
+.le-link-btn { flex: none; padding: 6px 2px; border: 0; background: none; color: var(--le-ink); font: inherit; font-size: 13px; font-weight: 600; cursor: pointer; }
 .le-link-btn:hover { text-decoration: underline; }
 .le-starts-own .le-library-list { max-height: 52vh; }
 .le-name-page { display: flex; flex-direction: column; gap: 14px; max-width: 520px; }
@@ -355,9 +356,9 @@ a.le-mark:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
 .le-switch input:checked + .le-switch-track::after { transform: translateX(16px); }
 .le-switch input:focus-visible + .le-switch-track { box-shadow: 0 0 0 3px var(--le-accent-soft); }
 .le-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; text-transform: none; letter-spacing: normal; }
-.le-chip { display: inline-flex; align-items: center; gap: 4px; padding: 5px 6px 5px 11px; border-radius: 999px; background: var(--le-soft); color: var(--le-ink); font-size: 13px; font-weight: 500; }
+.le-chip { display: inline-flex; align-items: center; gap: 4px; padding: 5px 6px 5px 11px; border-radius: 999px; background: var(--le-soft); color: var(--le-ink); font-size: 13px; font-weight: 600; }
 .le-chip:not(:has(button)) { padding-right: 11px; }
-.le-chip-x { width: 22px; height: 22px; border: 0; border-radius: 50%; background: none; color: var(--le-muted); font-size: 15px; line-height: 1; cursor: pointer; }
+.le-chip-x { width: 22px; height: 22px; border: 0; border-radius: 50%; background: none; color: var(--le-muted); font-size: 14px; line-height: 1; cursor: pointer; }
 .le-chip-x:hover { background: #fff; color: var(--le-danger); }
 .le-name-layout { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 32px; align-items: start; }
 .le-name-look .le-start-thumb { height: 300px; border: 1px solid var(--le-line); border-radius: 12px; }
@@ -387,7 +388,7 @@ a.le-mark:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
 .le-browser .le-library-item:hover:not(.is-looking) { background: var(--le-soft); }
 .le-browser-stage { display: flex; flex-direction: column; gap: 12px; min-height: 0; }
 .le-browser-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
-.le-browser-name { color: var(--le-ink); font-size: 15px; font-weight: 650; }
+.le-browser-name { color: var(--le-ink); font-size: 14px; font-weight: 600; }
 .le-browser-from { color: var(--le-muted); font-size: 12px; margin-top: 2px; }
 .le-browser-sizes { display: flex; gap: 2px; padding: 3px; border-radius: 10px; background: var(--le-soft); }
 .le-browser-sizes .le-subtab { flex: none; padding: 5px 12px; }
@@ -399,23 +400,23 @@ a.le-mark:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
 .le-browser-foot { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 10px 14px; }
 /* The data grid: a chart's figures or a table's cells, as a small spreadsheet (data-panel.js renderDataGrid). */
 .le-figures-wrap { display: flex; flex-direction: column; gap: 10px; margin: 4px 0 14px; }
-.le-figures-scroll { overflow-x: auto; border: 1px solid #e3e5ea; border-radius: 10px; background: #fff; }
+.le-figures-scroll { overflow-x: auto; border: 1px solid var(--le-line); border-radius: 10px; background: #fff; }
 .le-figures { border-collapse: collapse; width: 100%; font-size: 14px; }
-.le-figures th, .le-figures td { border-bottom: 1px solid #eef0f3; padding: 0; vertical-align: middle; }
-.le-figures thead th { background: #f6f7f9; position: relative; }
+.le-figures th, .le-figures td { border-bottom: 1px solid var(--le-line); padding: 0; vertical-align: middle; }
+.le-figures thead th { background: var(--le-soft); position: relative; }
 .le-figures thead th:not(.le-figures-corner) { min-width: 104px; }
 .le-figures thead .le-figures-cell { font-weight: 600; padding-right: 26px; text-overflow: ellipsis; }
 .le-figures tbody tr:last-child th, .le-figures tbody tr:last-child td { border-bottom: 0; }
 .le-figures-corner { width: 28px; min-width: 28px; }
-.le-figures-n { width: 28px; color: #8a8f98; font-size: 12px; font-weight: 500; text-align: center; background: #fafbfc; }
-:host .le-figures-cell { width: 100%; min-width: 96px; box-sizing: border-box; border: 0; border-left: 1px solid #eef0f3; border-radius: 0; padding: 9px 10px; font: inherit; background: transparent; color: #0b0c0f; outline: none; }
-:host .le-figures-cell:focus { background: #f2f6ff; box-shadow: inset 0 0 0 2px #2f6fed; border-color: #eef0f3; outline: none; }
+.le-figures-n { width: 28px; color: var(--le-muted); font-size: 12px; font-weight: 600; text-align: center; background: var(--le-tint); }
+:host .le-figures-cell { width: 100%; min-width: 96px; box-sizing: border-box; border: 0; border-left: 1px solid var(--le-line); border-radius: 0; padding: 9px 10px; font: inherit; background: transparent; color: #0b0c0f; outline: none; }
+:host .le-figures-cell:focus { background: #f2f6ff; box-shadow: inset 0 0 0 2px var(--le-ink); border-color: var(--le-line); outline: none; }
 .le-figures-cell[inputmode="decimal"] { text-align: right; font-variant-numeric: tabular-nums; }
-.le-figures-x { border: 0; background: transparent; color: #8a8f98; cursor: pointer; width: 28px; height: 32px; font-size: 13px; border-radius: 6px; }
+.le-figures-x { border: 0; background: transparent; color: var(--le-muted); cursor: pointer; width: 28px; height: 32px; font-size: 13px; border-radius: 6px; }
 .le-figures-x:hover, .le-figures-x:focus-visible { color: #b42318; background: #fdecea; outline: none; }
-.le-figures thead .le-figures-x { position: absolute; top: 50%; right: 2px; transform: translateY(-50%); width: 22px; height: 22px; font-size: 11px; }
+.le-figures thead .le-figures-x { position: absolute; top: 50%; right: 2px; transform: translateY(-50%); width: 22px; height: 22px; font-size: 12px; }
 .le-figures-tools { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
-.le-figures-count { color: #8a8f98; font-size: 12px; margin-left: auto; }
+.le-figures-count { color: var(--le-muted); font-size: 12px; margin-left: auto; }
 .le-figures-foot { display: flex; gap: 8px; align-items: center; }
 .le-figures-foot .le-btn-primary { background: var(--le-accent); color: #fff; border-color: var(--le-accent); }
 .le-figures-foot .le-btn-primary:disabled { opacity: .45; cursor: default; }
@@ -431,8 +432,8 @@ a.le-mark:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
 .le-fold[open] > summary::before { transform: rotate(90deg); }
 .le-figures-more { margin: 8px 0 12px; }
 /* The flash sale and stock grid (sale.js): the table grid with a tick, words that are read, and counts. */
-.le-figures-head { display: block; padding: 9px 10px; font-weight: 600; font-size: 13px; color: #3b4150; white-space: nowrap; }
-.le-figures-read { display: block; padding: 9px 10px; color: #3b4150; white-space: nowrap; }
+.le-figures-head { display: block; padding: 9px 10px; font-weight: 600; font-size: 13px; color: var(--le-body); white-space: nowrap; }
+.le-figures-read { display: block; padding: 9px 10px; color: var(--le-body); white-space: nowrap; }
 .le-figures td.le-col-read .le-figures-read { max-width: 220px; overflow: hidden; text-overflow: ellipsis; }
 .le-figures th.le-col-tick, .le-figures td.le-col-tick { width: 64px; min-width: 64px; text-align: center; }
 .le-figures thead th.le-col-tick { min-width: 64px; }
@@ -440,15 +441,15 @@ a.le-mark:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
 .le-figures td.le-col-tick { padding: 0 10px; }
 /* The tick and the product's name stay in view while the grid scrolls sideways (a phone). */
 .le-figures .le-col-tick { position: sticky; left: 0; z-index: 1; background: #fff; }
-.le-figures thead .le-col-tick { background: #f6f7f9; }
+.le-figures thead .le-col-tick { background: var(--le-soft); }
 .le-figures tr > .le-col-read:nth-child(2) { position: sticky; left: 64px; z-index: 1; background: #fff; }
-.le-figures thead tr > .le-col-read:nth-child(2) { background: #f6f7f9; }
+.le-figures thead tr > .le-col-read:nth-child(2) { background: var(--le-soft); }
 .le-figures tr.is-picked > .le-col-tick, .le-figures tr.is-picked > .le-col-read:nth-child(2) { background: #f2f6ff; }
 .le-figures-tick { width: 18px; height: 18px; accent-color: var(--le-accent); cursor: pointer; }
 .le-figures-tick-hit { display: flex; align-items: center; justify-content: center; min-height: 44px; cursor: pointer; }
 .le-figures tr.is-picked td, .le-figures tr.is-picked th { background: #f2f6ff; }
 .le-figures td.is-sold-out { position: relative; }
-.le-figures td.is-sold-out::after { content: 'Sold out'; position: absolute; right: 8px; top: 50%; transform: translateY(-50%); font-size: 11px; font-weight: 600; color: #b42318; background: #fdecea; padding: 2px 6px; border-radius: 4px; pointer-events: none; }
+.le-figures td.is-sold-out::after { content: 'Sold out'; position: absolute; right: 8px; top: 50%; transform: translateY(-50%); font-size: 12px; font-weight: 600; color: #b42318; background: #fdecea; padding: 2px 6px; border-radius: 4px; pointer-events: none; }
 .le-figures td.is-sold-out .le-figures-cell { text-align: left; }
 .le-sale-days { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
 .le-sale-all { gap: 8px; }
@@ -481,16 +482,16 @@ a.le-mark:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
 .le-sale-ask { display: grid; gap: 8px; margin: -6px 0 0; }
 .le-sale-ask p { margin: 0; }
 /* A product's sizes: their stock in a few words, opened under the product to type each count. */
-.le-sale-sizes-toggle { display: flex; align-items: center; justify-content: space-between; gap: 6px; width: 100%; min-height: 44px; border: 0; background: transparent; padding: 6px 8px; font: inherit; font-size: 13px; color: #1f3fb8; text-align: left; cursor: pointer; }
+.le-sale-sizes-toggle { display: flex; align-items: center; justify-content: space-between; gap: 6px; width: 100%; min-height: 44px; border: 0; background: transparent; padding: 6px 8px; font: inherit; font-size: 13px; color: var(--le-ink); text-align: left; cursor: pointer; }
 .le-sale-sizes-toggle:hover { background: #f2f6ff; }
 .le-sale-sizes-arrow { flex: none; font-size: 12px; }
-.le-figures tr.le-sale-sizes > td { padding: 6px 10px 12px 64px; background: #fafbfc; }
+.le-figures tr.le-sale-sizes > td { padding: 6px 10px 12px 64px; background: var(--le-tint); }
 .le-sale-sizes-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 6px 16px; }
-.le-sale-size { display: flex; align-items: center; justify-content: space-between; gap: 8px; font-size: 13px; color: #3b4150; }
+.le-sale-size { display: flex; align-items: center; justify-content: space-between; gap: 8px; font-size: 13px; color: var(--le-body); }
 .le-sale-size-name { min-width: 0; }
 .le-sale-size .le-sale-size-box { width: 68px; flex: none; min-height: 36px; padding: 6px 8px; text-align: right; }
 .le-sale-size.is-sold-out .le-sale-size-name::after { content: ' · Sold out'; color: #b42318; font-weight: 600; }
-.le-sale-grid td.le-col-read:nth-child(3) .le-figures-read { color: #3b4150; }
+.le-sale-grid td.le-col-read:nth-child(3) .le-figures-read { color: var(--le-body); }
 /* A phone: each product reads as a small card (the same rows, stacked): its tick and name, then its price, sale price and
    % off side by side, each named, then its stock; its sizes, opened, inside the same card. One spacing throughout: 10px
    between cards, 12px inside them, 8px between columns, 10px between lines, 4px between a name and its value. */
@@ -500,7 +501,7 @@ a.le-mark:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
   .le-sale-grid .le-figures thead { display: none; }
   .le-sale-grid .le-figures tbody > tr:not(.le-sale-sizes) {
     display: grid; grid-template-columns: 28px repeat(3, minmax(0, 1fr)); gap: 10px 8px; align-items: start;
-    border: 1px solid #e3e5ea; border-radius: 12px; margin: 0 0 10px; padding: 12px; background: #fff; box-sizing: border-box;
+    border: 1px solid var(--le-line); border-radius: 12px; margin: 0 0 10px; padding: 12px; background: #fff; box-sizing: border-box;
   }
   .le-sale-grid .le-figures tbody > tr > td { display: block; width: auto !important; min-width: 0 !important; padding: 0 !important; border: 0 !important; position: static !important; box-shadow: none !important; background: transparent !important; }
   .le-sale-grid .le-figures tr > td:nth-child(1) { grid-column: 1; grid-row: 1; align-self: center; text-align: left; }
@@ -512,17 +513,17 @@ a.le-mark:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
   .le-sale-grid .le-figures tr > td:nth-child(5) { grid-column: 4; grid-row: 2; }
   .le-sale-grid .le-figures tr > td:nth-child(6) { grid-column: 2 / -1; grid-row: 3; }
   .le-sale-grid .le-figures tr > td:nth-child(-n+2) .le-figures-th { display: none; }
-  .le-sale-grid .le-figures tr > td:nth-child(n+3) .le-figures-th { display: block; font-size: 11px; line-height: 16px; height: 16px; font-weight: 600; color: #6b7280; margin: 0 0 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .le-sale-grid .le-figures tr > td:nth-child(n+3) .le-figures-th { display: block; font-size: 12px; line-height: 16px; height: 16px; font-weight: 600; color: var(--le-muted); margin: 0 0 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .le-sale-grid .le-figures tr > td.is-blank:nth-child(n+4) { display: none; }
   /* a value that is read sits on the same line as the boxes beside it */
   .le-sale-grid .le-figures tr > td:nth-child(n+3) .le-figures-read { display: flex; align-items: center; min-height: 40px; padding: 0; border: 1px solid transparent; box-sizing: border-box; line-height: 1.2; }
-  .le-sale-grid .le-figures tr > td:nth-child(n+3) .le-figures-cell { display: block; width: 100%; box-sizing: border-box; border: 1px solid #d9dde4; border-radius: 8px; padding: 0 8px; height: 40px; min-height: 40px; background: #fff; }
+  .le-sale-grid .le-figures tr > td:nth-child(n+3) .le-figures-cell { display: block; width: 100%; box-sizing: border-box; border: 1px solid var(--le-field); border-radius: 8px; padding: 0 8px; height: 40px; min-height: 40px; background: #fff; }
   .le-sale-grid .le-figures tr > td:nth-child(6) .le-figures-cell { max-width: 120px; }
-  .le-sale-grid .le-sale-sizes-toggle { min-height: 40px; height: 40px; border: 1px solid #d9dde4; border-radius: 8px; padding: 0 10px; box-sizing: border-box; }
+  .le-sale-grid .le-sale-sizes-toggle { min-height: 40px; height: 40px; border: 1px solid var(--le-field); border-radius: 8px; padding: 0 10px; box-sizing: border-box; }
   .le-sale-grid .le-figures tr.is-picked { background: #f2f6ff; }
   /* a product with its sizes open: its card goes on round them */
   .le-sale-grid .le-figures tbody > tr.has-under { margin-bottom: 0; border-bottom-color: transparent; border-radius: 12px 12px 0 0; padding-bottom: 6px; }
-  .le-figures tr.le-sale-sizes { display: block; margin: 0 0 10px; padding: 0 12px 12px 48px; border: 1px solid #e3e5ea; border-top-color: transparent; border-radius: 0 0 12px 12px; background: #fff; box-sizing: border-box; }
+  .le-figures tr.le-sale-sizes { display: block; margin: 0 0 10px; padding: 0 12px 12px 48px; border: 1px solid var(--le-line); border-top-color: transparent; border-radius: 0 0 12px 12px; background: #fff; box-sizing: border-box; }
   .le-sale-grid .le-figures tr.is-picked + tr.le-sale-sizes { background: #f2f6ff; }
   .le-figures tr.le-sale-sizes > td { display: block; padding: 0 !important; border: 0 !important; background: transparent !important; }
   .le-sale-sizes-list { grid-template-columns: 1fr; gap: 8px; }
@@ -535,12 +536,12 @@ a.le-mark:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
 /* Save stays in reach at the foot of the drawer however many products there are, as in a shop's bulk editor. */
 .le-sale-grid .le-figures-foot { position: sticky; bottom: -22px; z-index: 2; background: #fff; padding: 12px 0; margin-bottom: -12px; }
 /* A product not ticked: its sale price is kept, greyed, and not used until it is ticked again. */
-.le-figures tr:has(.le-figures-tick:not(:checked)) td.le-col-text .le-figures-cell { color: #6b7280; }
+.le-figures tr:has(.le-figures-tick:not(:checked)) td.le-col-text .le-figures-cell { color: var(--le-muted); }
 .le-sale-labels { position: fixed; inset: 0; pointer-events: none; z-index: 2147482998; }
 .le-sale-labels[hidden] { display: none; }
 .le-sale-label { position: fixed; pointer-events: auto; border: 0; border-radius: 6px; padding: 4px 9px; background: #b42318; color: #fff; font: 600 11px/1.3 system-ui, -apple-system, 'Segoe UI', sans-serif; letter-spacing: .01em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; cursor: pointer; box-shadow: 0 1px 3px rgba(0,0,0,.25); }
 .le-sale-label:hover, .le-sale-label:focus-visible { background: #8f1c13; outline: none; }
-.le-sale-label.is-ended { background: #6b7280; }
+.le-sale-label.is-ended { background: var(--le-muted); }
 @media (max-width: 480px) { .le-sale-days { grid-template-columns: 1fr; } }
 .le-figures-more > summary { cursor: pointer; font-weight: 600; font-size: 13px; padding: 6px 0; }
 .le-browser-note { margin: 0 0 10px; padding: 10px 12px; border-radius: 10px; background: #fff7e6; color: #7a4b00; font-size: 14px; line-height: 1.45; }
@@ -575,7 +576,7 @@ a.le-mark:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
 .le-style-group[open] { padding-bottom: 8px; }
 .le-style-group > :not(summary) { margin-top: 16px; }
 .le-style-group > summary + * { margin-top: 6px; }
-.le-style-group .le-default { font-size: 13px; font-weight: 500; color: var(--le-muted); }
+.le-style-group .le-default { font-size: 13px; font-weight: 600; color: var(--le-muted); }
 .le-subtabs { display: flex; gap: 4px; margin: 14px 24px 0; padding: 3px; border-radius: 10px; background: var(--le-soft); }
 .le-subtab { flex: 1; padding: 7px 10px; border: 0; border-radius: 8px; background: none; color: var(--le-muted); font: inherit; font-size: 12px; font-weight: 600; cursor: pointer; }
 .le-subtab.is-on { background: #fff; color: var(--le-ink); box-shadow: 0 1px 2px rgba(11,12,15,.1); }
@@ -611,13 +612,13 @@ a.le-mark:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
 .le-fb-name:hover, .le-fb-name:focus-visible { background: var(--le-soft); }
 .le-fb-label { font-weight: 600; font-size: 14px; overflow-wrap: anywhere; }
 .le-fb-about { font-size: 12px; color: var(--le-muted); }
-.le-fb-badge { font-size: 11px; font-weight: 600; color: #8a4b00; background: #fff4e0; border-radius: 999px; padding: 2px 8px; margin-top: 2px; }
+.le-fb-badge { font-size: 12px; font-weight: 600; color: #8a4b00; background: #fff4e0; border-radius: 999px; padding: 2px 8px; margin-top: 2px; }
 .le-fb-move { min-width: 36px; min-height: 36px !important; padding: 0 !important; flex: none; }
 .le-fb-move:disabled { opacity: .35; cursor: default; }
 .le-fb-edit { display: flex; flex-direction: column; gap: 12px; padding: 4px 14px 14px; border-top: 1px solid var(--le-line); margin-top: 2px; padding-top: 14px; }
 .le-fb-edit .le-hint { margin: 0; }
 .le-fb-choices { display: flex; flex-direction: column; gap: 8px; }
-.le-fb-sub { font-size: 12px; font-weight: 700; color: var(--le-muted); text-transform: uppercase; letter-spacing: .04em; }
+.le-fb-sub { font-size: 12px; font-weight: 600; color: var(--le-muted); text-transform: uppercase; letter-spacing: .04em; }
 .le-fb-option { display: flex; gap: 8px; align-items: center; min-width: 0; }
 .le-fb-option .le-input { flex: 1; min-width: 0; }
 .le-fb-option .le-fb-label { flex: 1; min-width: 0; }
@@ -633,13 +634,13 @@ a.le-mark:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
 .le-fb-error[hidden] { display: none; }
 .le-fb-gap { flex: 1; }
 .le-modal-foot:has(.le-fb-gap) { flex-wrap: wrap; gap: 8px; }
-.le-form-handle { position: fixed; z-index: 2147483000; display: none; align-items: center; gap: 6px; padding: 6px 12px; border-radius: 999px; border: 0; background: var(--le-accent, #2563eb); color: #fff; font: 600 13px/1.2 system-ui, sans-serif; box-shadow: 0 4px 14px rgba(15,23,42,.18); cursor: pointer; }
+.le-form-handle { position: fixed; z-index: 2147483000; display: none; align-items: center; gap: 6px; padding: 6px 12px; border-radius: 999px; border: 0; background: var(--le-accent, var(--le-ink)); color: #fff; font: 600 13px/1.2 system-ui, sans-serif; box-shadow: 0 4px 14px rgba(15,23,42,.18); cursor: pointer; }
 .le-form-handle.is-visible { display: inline-flex; }
 .le-library { display: flex; flex-direction: column; gap: 10px; text-transform: none; letter-spacing: normal; }
 .le-library-list { display: flex; flex-direction: column; gap: 2px; max-height: 46vh; overflow: auto; margin: 0 -6px; padding: 0 2px; }
 .le-library-page { margin: 12px 6px 4px; font-size: 12px; font-weight: 600; color: var(--le-muted); }
 .le-library-page:first-child { margin-top: 2px; }
-.le-library-item { display: flex; align-items: center; justify-content: space-between; gap: 12px; width: 100%; padding: 10px 12px; border: 1px solid transparent; border-radius: 10px; background: none; color: var(--le-ink); font: inherit; font-size: 14px; font-weight: 500; text-align: left; cursor: pointer; }
+.le-library-item { display: flex; align-items: center; justify-content: space-between; gap: 12px; width: 100%; padding: 10px 12px; border: 1px solid transparent; border-radius: 10px; background: none; color: var(--le-ink); font: inherit; font-size: 14px; font-weight: 600; text-align: left; cursor: pointer; }
 .le-library-item:hover { background: var(--le-soft); }
 .le-library-item:focus-visible { outline: none; border-color: var(--le-accent); box-shadow: 0 0 0 3px var(--le-accent-soft); }
 .le-library-item[aria-pressed="true"] { background: var(--le-accent-soft); border-color: var(--le-accent-soft); }
@@ -683,7 +684,7 @@ a.le-mark:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
 .le-brand-swatch::-webkit-color-swatch { border: 0; border-radius: 9px; }
 .le-brand-swatch::-moz-color-swatch { border: 0; border-radius: 9px; }
 .le-brand-words { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
-.le-brand-label { font-size: 13px; font-weight: 500; color: #0B0C0F; }
+.le-brand-label { font-size: 13px; font-weight: 600; color: #0B0C0F; }
 .le-brand-hint { font-size: 12px; color: #6B6F76; }
 .le-link-btn { border: 0; background: none; padding: 4px 2px; font: inherit; font-size: 12px; color: #4A4D55; text-decoration: underline; text-underline-offset: 2px; cursor: pointer; }
 .le-link-btn:hover { color: #0B0C0F; }
@@ -743,33 +744,33 @@ a.le-mark:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
 .le-brand-fine { margin-bottom: 8px; }
 /* Struck through, because it is what the page USED to say. Somebody checking
    a change reads these two lines as a before and an after. */
-.le-change-before { font-size: 13px; color: #9A9DA5; text-decoration: line-through; margin: 0; }
-.le-change-after { font-size: 14px; font-weight: 500; color: #2A2C31; margin: 0; }
-.le-change-when { font-size: 12px; color: #9A9DA5; margin: 2px 0 0; }
+.le-change-before { font-size: 13px; color: var(--le-muted); text-decoration: line-through; margin: 0; }
+.le-change-after { font-size: 14px; font-weight: 600; color: var(--le-ink); margin: 0; }
+.le-change-when { font-size: 12px; color: var(--le-muted); margin: 2px 0 0; }
 /* A replaced picture, shown rather than described. Two addresses truncated to
    seventy characters told somebody nothing about which row to revert. */
 .le-change-pictures { display: flex; gap: 12px; align-items: flex-start; margin-top: 6px; }
 /* Sized by the picture rather than by the row: one frame on its own, which is
    the commonest case, stretched across the drawer and left most of it grey. */
 .le-change-shot { margin: 0; flex: 0 1 auto; min-width: 0; }
-.le-change-shot figcaption { font-size: 12px; color: #9A9DA5; margin-bottom: 4px; }
+.le-change-shot figcaption { font-size: 12px; color: var(--le-muted); margin-bottom: 4px; }
 /* Contained rather than cropped: which picture it is matters here, and the
    shape is part of recognising it. */
 .le-change-shot img { display: block; height: 72px; width: auto; max-width: 100%; object-fit: contain; border-radius: 6px; background: #F4F5F7; }
 .le-change-shot.is-before img { opacity: .55; }
-.le-change-missing { display: block; font-size: 12px; color: #9A9DA5; word-break: break-all; }
+.le-change-missing { display: block; font-size: 12px; color: var(--le-muted); word-break: break-all; }
 .le-version { display: flex; gap: 12px; align-items: flex-start; padding-bottom: 14px; }
 .le-version-dot { width: 8px; height: 8px; margin-top: 6px; border-radius: 999px; background: #DADCE0; flex: none; }
 .le-version-dot.is-latest { background: var(--le-ink); }
 .le-history-list { display: grid; gap: 22px; margin: 0 0 16px; }
 .le-history { display: grid; gap: 8px; justify-items: start; }
-.le-history-head { margin: 0; font-size: 14px; line-height: 1.4; color: #2A2C31; }
+.le-history-head { margin: 0; font-size: 14px; line-height: 1.4; color: var(--le-ink); }
 .le-history-title { font-weight: 600; }
-.le-history-dot, .le-history-when { color: #6B6F78; font-size: 13px; }
+.le-history-dot, .le-history-when { color: var(--le-muted); font-size: 13px; }
 .le-history-changes { display: grid; gap: 8px; width: 100%; }
 .le-history-place { display: grid; gap: 2px; }
 .le-history-where { margin: 0; font-size: 12px; font-weight: 600; color: #4A4D55; }
-.le-history-what { margin: 0; font-size: 13px; line-height: 1.45; color: #2A2C31; overflow-wrap: anywhere; }
+.le-history-what { margin: 0; font-size: 13px; line-height: 1.45; color: var(--le-ink); overflow-wrap: anywhere; }
 .le-history-more { padding: 2px 0; }
 .le-history-older { margin: 0 0 12px; }
 .le-pagination { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 4px 0 12px; color: var(--le-muted); font-size: 12px; }
@@ -782,12 +783,12 @@ a.le-mark:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
 .le-subject.le-hidden + .le-fields, .le-subject.le-hidden { border-bottom: 0; }
 .le-subject .le-eyebrow { display: none; }
 .le-eyebrow { font-size: 12px; font-weight: 600; color: var(--le-muted); margin-bottom: 6px; }
-.le-title { font-size: 19px; font-weight: 700; color: var(--le-ink); letter-spacing: -.01em; }
-.le-trail { display: none; flex-wrap: wrap; align-items: center; gap: 4px; font-size: 11px; color: var(--le-muted); margin-bottom: 6px; }
+.le-title { font-size: 17px; font-weight: 600; color: var(--le-ink); letter-spacing: -.01em; }
+.le-trail { display: none; flex-wrap: wrap; align-items: center; gap: 4px; font-size: 12px; color: var(--le-muted); margin-bottom: 6px; }
 .le-trail.is-visible { display: flex; }
 .le-crumb {
   cursor: pointer; border: 0; background: none; color: var(--le-muted);
-  padding: 0; font: inherit; font-size: 12px; font-weight: 500;
+  padding: 0; font: inherit; font-size: 12px; font-weight: 600;
 }
 .le-crumb + .le-crumb::before { content: '›'; margin-right: 6px; color: var(--le-field); }
 .le-crumb:hover { color: var(--le-ink); text-decoration: underline; }
@@ -843,7 +844,7 @@ a.le-mark:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
    than a form control: a longer measure, room to breathe, and a surface that
    lifts to white as they type. */
 .le-prose {
-  font-size: 15px; line-height: 1.65; padding: 14px 16px; min-height: 76px;
+  font-size: 14px; line-height: 1.65; padding: 14px 16px; min-height: 76px;
   background: var(--le-soft); border-radius: 14px; resize: none; overflow: hidden;
   transition: border-color .15s ease, box-shadow .15s ease, background .15s ease;
 }
@@ -852,7 +853,7 @@ a.le-mark:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
 /* The address sits beside the words, so it is built from the same surface:
    one field, not a form control bolted under a designed one. */
 .le-link {
-  font-size: 15px; padding: 13px 16px; border-radius: 14px; background: var(--le-soft);
+  font-size: 14px; padding: 13px 16px; border-radius: 14px; background: var(--le-soft);
   transition: border-color .15s ease, box-shadow .15s ease, background .15s ease;
 }
 .le-link:hover, .le-link:focus { background: #fff; }
@@ -867,7 +868,7 @@ a.le-mark:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
     aspect-ratio: 1;
     display: grid;
     place-items: center;
-    font-size: 19px;
+    font-size: 17px;
     color: var(--le-muted);
     background: #eef1f4;
     border: 1px solid transparent;
@@ -903,10 +904,10 @@ a.le-mark:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
   margin-top: 10px; padding: 10px 12px; border-radius: 10px;
   background: #fff8e6; border: 1px solid #f0dfae; color: #7a5b12;
 }
-.le-hint { font-size: 11px; font-weight: 400; letter-spacing: normal; text-transform: none; color: var(--le-muted); }
+.le-hint { font-size: 12px; font-weight: 400; letter-spacing: normal; text-transform: none; color: var(--le-muted); }
 .le-section-heading {
   margin-top: 4px; border-top: 1px solid var(--le-line); padding-top: 18px;
-  font-size: 14px; font-weight: 650; color: var(--le-ink);
+  font-size: 14px; font-weight: 600; color: var(--le-ink);
 }
 .le-section-heading + .le-section-heading,
 .le-section-heading + .le-item-actions .le-section-heading,
@@ -915,7 +916,7 @@ a.le-mark:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
 .le-label { font-size: 13px; font-weight: 600; color: var(--le-body); letter-spacing: normal; text-transform: none; }
 .le-card-settings { display: grid; gap: 12px; }
 .le-shop-section { display: grid; gap: 10px; padding: 4px 0 18px; border-bottom: 1px solid var(--le-line); margin-bottom: 16px; }
-.le-shop-heading { margin: 0; font-size: 14px; font-weight: 650; color: var(--le-ink); }
+.le-shop-heading { margin: 0; font-size: 14px; font-weight: 600; color: var(--le-ink); }
 .le-shop-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
 .le-shop-row { display: grid; gap: 2px; font-size: 13px; color: var(--le-body); }
 .le-shop-category { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 8px 0; border-bottom: 1px solid var(--le-line); }
@@ -928,7 +929,7 @@ a.le-mark:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
 .le-shop-name { color: var(--le-ink); font-weight: 600; font-size: 14px; margin-right: auto; overflow-wrap: anywhere; }
 .le-shop-count { margin: 0; }
 .le-shop-actions { display: flex; flex-wrap: wrap; gap: 4px 14px; flex-basis: 100%; }
-.le-shop-section .le-link-btn { padding: 6px 2px; color: var(--le-blue); font-size: 13px; font-weight: 600; text-decoration: none; justify-self: start; }
+.le-shop-section .le-link-btn { padding: 6px 2px; color: var(--le-ink); font-size: 13px; font-weight: 600; text-decoration: none; justify-self: start; }
 .le-shop-section .le-link-btn:hover { text-decoration: underline; }
 .le-shop-section .le-shop-remove { color: #A1260D; }
 .le-shop-choice { display: grid; gap: 10px; margin: 0; padding: 12px; border: 1px solid var(--le-line); border-radius: 10px; }
@@ -944,18 +945,18 @@ a.le-mark:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
 .le-shop-new-go { justify-self: start; }
 .le-shop-layouts { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; }
 .le-shop-layout { position: relative; display: grid; gap: 8px; padding: 10px; border: 1px solid var(--le-field); border-radius: 10px; cursor: pointer; font-size: 13px; color: var(--le-body); }
-.le-shop-layout:has(input:checked) { border-color: var(--le-blue); box-shadow: 0 0 0 1px var(--le-blue); }
-.le-shop-layout:has(input:focus-visible) { outline: 2px solid var(--le-blue); outline-offset: 2px; }
+.le-shop-layout:has(input:checked) { border-color: var(--le-ink); }
+.le-shop-layout:has(input:focus-visible) { outline: 2px solid var(--le-ink); outline-offset: 2px; }
 .le-shop-layout input { position: absolute; opacity: 0; pointer-events: none; }
 .le-shop-layout.is-locked { cursor: not-allowed; opacity: .6; }
 .le-shop-layout-words { display: grid; gap: 2px; }
 .le-shop-layout-words strong { color: var(--le-ink); }
 .le-shop-layout-words .le-hint { margin: 0; }
-.le-shop-layout-plan { justify-self: start; padding: 1px 8px; border-radius: 999px; background: var(--le-soft); font-size: 11px; font-weight: 600; }
+.le-shop-layout-plan { justify-self: start; padding: 1px 8px; border-radius: 999px; background: var(--le-soft); font-size: 12px; font-weight: 600; }
 .le-shop-layout-drawing { display: grid; gap: 4px; height: 64px; padding: 6px; border-radius: 6px; background: var(--le-soft); }
 .le-shop-layout-drawing.is-top { grid-template-rows: 10px 1fr; }
 .le-shop-layout-drawing.is-side { grid-template-columns: 26% 1fr; }
-.le-shop-layout-filters { border-radius: 3px; background: var(--le-blue); opacity: .45; }
+.le-shop-layout-filters { border-radius: 3px; background: var(--le-ink); opacity: .45; }
 .le-shop-layout-grid { border-radius: 3px; background: repeating-linear-gradient(90deg, var(--le-field) 0 22%, transparent 22% 26%); }
 .le-product-picker { display: grid; gap: 8px; }
 .le-product-picker-head { display: flex; align-items: baseline; justify-content: space-between; }
@@ -985,13 +986,13 @@ a.le-mark:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
 .le-collection { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 12px; padding: 8px 0; border-bottom: 1px solid var(--le-line); }
 .le-collection:last-child { border-bottom: 0; }
 .le-collection-table .le-modal-body { padding: 0 24px 16px; overflow: auto; display: flex; flex-direction: column; gap: 12px; }
-.le-collection-table .le-link-btn { color: var(--le-blue); font-size: 13px; font-weight: 600; text-decoration: none; }
+.le-collection-table .le-link-btn { color: var(--le-ink); font-size: 13px; font-weight: 600; text-decoration: none; }
 .le-table-tools { display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: center; position: sticky; top: 0; z-index: 2; padding: 12px 0 8px; background: #fff; }
 .le-table-find { flex: 1 1 220px; min-width: 0; max-width: 360px; }
 .le-table-scroll { overflow: auto; border: 1px solid var(--le-line); border-radius: 10px; flex: 1 1 auto; min-height: 160px; }
 .le-table { border-collapse: separate; border-spacing: 0; font-size: 13px; min-width: 100%; }
-.le-table th { position: sticky; top: 0; z-index: 1; background: var(--le-soft); text-align: left; font-weight: 650; color: var(--le-ink); padding: 8px 10px; border-bottom: 1px solid var(--le-line); white-space: nowrap; }
-.le-table-type { display: block; font-weight: 500; font-size: 11px; color: var(--le-muted); }
+.le-table th { position: sticky; top: 0; z-index: 1; background: var(--le-soft); text-align: left; font-weight: 600; color: var(--le-ink); padding: 8px 10px; border-bottom: 1px solid var(--le-line); white-space: nowrap; }
+.le-table-type { display: block; font-weight: 600; font-size: 12px; color: var(--le-muted); }
 .le-table td { padding: 4px 6px; border-bottom: 1px solid var(--le-line); vertical-align: middle; }
 .le-table .le-cell { min-width: 120px; width: 100%; padding: 6px 8px; font-size: 13px; }
 .le-table .le-cell[aria-invalid="true"] { border-color: var(--le-danger); box-shadow: 0 0 0 1px var(--le-danger); }
@@ -1008,7 +1009,7 @@ a.le-mark:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
 .le-fields-list { display: grid; gap: 10px; margin: 0; padding-left: 22px; }
 .le-field-row { display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 1fr); gap: 6px 10px; padding: 10px; border: 1px solid var(--le-line); border-radius: 10px; }
 .le-field-row > .le-hint, .le-field-row > .le-check, .le-field-row > .le-shop-actions, .le-field-options { grid-column: 1 / -1; margin: 0; }
-.le-field-row .le-link-btn { color: var(--le-blue); font-weight: 600; text-decoration: none; }
+.le-field-row .le-link-btn { color: var(--le-ink); font-weight: 600; text-decoration: none; }
 .le-field-row .le-shop-remove { color: #A1260D; }
 .le-import-map { border-collapse: collapse; font-size: 13px; width: 100%; }
 .le-import-map th { text-align: left; font-weight: 600; color: var(--le-ink); padding: 6px 10px 6px 0; overflow-wrap: anywhere; }
@@ -1026,7 +1027,7 @@ a.le-mark:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
 .le-card-setting { display: grid; gap: 6px; }
 .le-card-setting-boxes { display: grid; gap: 4px; }
 .le-check { display: flex; align-items: center; gap: 8px; min-height: 32px; font-size: 13px; color: var(--le-body); cursor: pointer; }
-.le-check input { width: 18px; height: 18px; margin: 0; accent-color: var(--le-accent, #2563eb); }
+.le-check input { width: 18px; height: 18px; margin: 0; accent-color: var(--le-accent, var(--le-ink)); }
 .le-chip-btn {
   cursor: pointer; border: 1px solid var(--le-field); background: #fff; color: var(--le-body);
   border-radius: 999px; padding: 8px 14px; font-size: 12px; font-weight: 600; transition: background .15s ease, border-color .15s ease;
@@ -1038,11 +1039,11 @@ a.le-chip-btn { display: inline-flex; align-items: center; justify-content: cent
    under it says why, rather than the button vanishing without a word. */
 .le-chip-btn:disabled, .le-btn-danger:disabled { opacity: .45; cursor: not-allowed; background: transparent; border-color: var(--le-line); color: inherit; }
 .le-color { width: 56px; height: 38px; cursor: pointer; border: 1px solid var(--le-field); border-radius: 10px; background: #fff; padding: 3px; }
-.le-default { display: flex; align-items: center; gap: 6px; cursor: pointer; font-size: 12px; font-weight: 500; letter-spacing: normal; text-transform: none; color: var(--le-muted); }
+.le-default { display: flex; align-items: center; gap: 6px; cursor: pointer; font-size: 12px; font-weight: 600; letter-spacing: normal; text-transform: none; color: var(--le-muted); }
 .le-tools { display: flex; align-items: center; gap: 5px; }
 .le-tool { height: 28px; min-width: 28px; cursor: pointer; border: 1px solid var(--le-field); border-radius: 8px; background: #fff; color: var(--le-body); padding: 0 7px; font-size: 12px; transition: background .15s ease; }
 .le-tool:hover { background: var(--le-soft); }
-.le-tool.is-bold { font-weight: 700; }
+.le-tool.is-bold { font-weight: 600; }
 .le-tool.is-italic { font-style: italic; }
 .le-icons { display: grid; grid-template-columns: repeat(6, 1fr); gap: 6px; }
 .le-icon { display: flex; height: 40px; cursor: pointer; align-items: center; justify-content: center; border: 1px solid transparent; border-radius: 10px; background: #eef1f4; color: var(--le-muted); transition: background .15s ease, border-color .15s ease, color .15s ease; }
@@ -1094,12 +1095,12 @@ select.le-input {
 .le-choices { display: flex; flex-wrap: wrap; gap: 8px; }
 .le-gallery-photos { display: grid; grid-template-columns: repeat(auto-fill, minmax(72px, 1fr)); gap: 8px; margin: 8px 0 4px; }
 .le-gallery-photo { padding: 0; border: 1px solid var(--le-line); border-radius: 8px; background: var(--le-soft); aspect-ratio: 1; overflow: hidden; cursor: pointer; }
-.le-gallery-photo:hover, .le-gallery-photo:focus-visible { outline: 2px solid var(--le-accent, #2563eb); outline-offset: 1px; }
+.le-gallery-photo:hover, .le-gallery-photo:focus-visible { outline: 2px solid var(--le-accent, var(--le-ink)); outline-offset: 1px; }
 .le-gallery-photo img { width: 100%; height: 100%; object-fit: cover; display: block; }
 .le-choice {
   display: inline-flex; align-items: center; gap: 8px; cursor: pointer;
   border: 1px solid var(--le-field); border-radius: 999px; padding: 7px 14px;
-  font-size: 13px; font-weight: 500; letter-spacing: normal; text-transform: none;
+  font-size: 13px; font-weight: 600; letter-spacing: normal; text-transform: none;
   color: var(--le-body); background: #fff; transition: border-color .15s ease, background .15s ease, color .15s ease;
 }
 .le-choice:hover { border-color: var(--le-ink); }
@@ -1113,11 +1114,11 @@ select.le-input {
 .le-upload-inner { display: flex; align-items: center; gap: 12px; }
 .le-upload-icon {
   width: 36px; height: 36px; flex: none; border-radius: 10px; background: #fff;
-  border: 1px solid var(--le-line); display: grid; place-content: center; font-size: 15px; color: var(--le-body);
+  border: 1px solid var(--le-line); display: grid; place-content: center; font-size: 14px; color: var(--le-body);
 }
 .le-upload-text { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
-.le-upload-title { font-size: 13px; font-weight: 650; color: var(--le-body); }
-.le-upload-hint { font-size: 11px; font-weight: 400; letter-spacing: normal; text-transform: none; color: var(--le-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.le-upload-title { font-size: 13px; font-weight: 600; color: var(--le-body); }
+.le-upload-hint { font-size: 12px; font-weight: 400; letter-spacing: normal; text-transform: none; color: var(--le-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .le-upload-btn {
   margin-left: auto; flex: none; border: 1px solid var(--le-field); background: #fff;
   border-radius: 999px; padding: 7px 14px; font-size: 12px; font-weight: 600; color: var(--le-ink);
@@ -1135,7 +1136,7 @@ select.le-input {
 .le-hover.is-visible { display: block; }
 .le-hover-label {
   position: absolute; top: -23px; left: -2px;
-  background: var(--le-ink); color: #fff; font-size: 11px; font-weight: 600;
+  background: var(--le-ink); color: #fff; font-size: 12px; font-weight: 600;
   letter-spacing: .02em; padding: 3px 8px; border-radius: 5px; white-space: nowrap;
 }
 .le-hover.is-flipped .le-hover-label { top: auto; bottom: -23px; }
@@ -1170,7 +1171,7 @@ select.le-input {
   font-family: inherit; font-size: 12px; font-weight: 600; line-height: 1.2; letter-spacing: .01em; background: #0b1220; color: #fff;
   box-shadow: 0 8px 20px -6px rgba(11,18,32,.7), 0 0 0 3px #fff;
 }
-.le-insert-btn:hover, .le-insert-form:hover { background: #2A2C31; }
+.le-insert-btn:hover, .le-insert-form:hover { background: var(--le-ink); }
 /* The two buttons on the line, side by side, centred on it. */
 .le-insert-btns { position: absolute; left: 50%; top: 0; transform: translate(-50%, -50%); display: flex; gap: 8px; pointer-events: auto; }
 .le-insert-btns .le-insert-btn, .le-insert-btns .le-insert-form { position: static; transform: none; }
@@ -1202,7 +1203,7 @@ select.le-input {
 .le-modal.is-medium { max-width: 500px; }
 .le-modal-head { display: flex; align-items: flex-start; gap: 12px; padding: 22px 24px 0; }
 .le-modal-heading { flex: 1; min-width: 0; }
-.le-modal-title { font-size: 19px; font-weight: 700; color: var(--le-ink); letter-spacing: -.01em; }
+.le-modal-title { font-size: 17px; font-weight: 600; color: var(--le-ink); letter-spacing: -.01em; }
 .le-modal-sub { font-size: 13px; color: var(--le-muted); margin-top: 3px; }
 .le-modal-tabs { display: flex; gap: 22px; padding: 16px 24px 0; border-bottom: 1px solid var(--le-line); }
 .le-modal-tab {
@@ -1232,7 +1233,7 @@ select.le-input {
 }
 .le-walkthrough-actions .le-btn.is-ready { box-shadow: 0 0 0 3px rgba(27,110,243,.35); }
 @media (max-width: 700px) { .le-walkthrough, .le-walkthrough-pill { bottom: 104px; } }
-.le-walkthrough h2 { margin: 0; color: var(--le-ink); font-size: 17px; font-weight: 650; line-height: 1.3; }
+.le-walkthrough h2 { margin: 0; color: var(--le-ink); font-size: 17px; font-weight: 600; line-height: 1.3; }
 .le-walkthrough p { margin: 7px 0 16px; color: var(--le-body); font-size: 13px; line-height: 1.5; }
 .le-walkthrough-actions { display: flex; align-items: center; justify-content: flex-end; gap: 8px; }
 .le-walkthrough-actions .le-walkthrough-end { margin-right: auto; border: 0; background: transparent; color: var(--le-muted); cursor: pointer; font: inherit; font-size: 12px; }
@@ -1242,7 +1243,7 @@ select.le-input {
 .le-help-group { margin: 16px 0 0; }
 .le-help-more { margin-top: 8px; padding: 6px 0; border: 0; background: none; color: var(--le-accent); font: inherit; font-size: 13px; font-weight: 600; cursor: pointer; }
 .le-help-more:focus-visible { outline: 2px solid var(--le-accent); outline-offset: 2px; border-radius: 4px; }
-.le-help-group-title { margin: 0 0 8px; color: var(--le-muted); font-size: 11px; font-weight: 650; letter-spacing: .06em; text-transform: uppercase; }
+.le-help-group-title { margin: 0 0 8px; color: var(--le-muted); font-size: 12px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; }
 .le-help-faq details { border-top: 1px solid var(--le-line); padding: 9px 0; }
 .le-help-faq details:last-child { border-bottom: 1px solid var(--le-line); margin-bottom: 16px; }
 .le-help-faq summary { cursor: pointer; color: var(--le-ink); font-size: 13px; font-weight: 600; line-height: 1.4; }
@@ -1250,7 +1251,7 @@ select.le-input {
 .le-help-faq details p { margin: 6px 0 0; color: var(--le-body); font-size: 13px; line-height: 1.5; }
 .le-help-option { display: flex; flex-direction: column; gap: 3px; width: 100%; padding: 10px 12px; text-align: left; border: 1px solid var(--le-line); border-radius: 10px; background: #fff; color: var(--le-body); cursor: pointer; font: inherit; }
 .le-help-option:hover, .le-help-option:focus-visible { border-color: var(--le-accent); background: var(--le-soft); outline: none; }
-.le-help-option-title { color: var(--le-ink); font-size: 13px; font-weight: 650; }
+.le-help-option-title { color: var(--le-ink); font-size: 13px; font-weight: 600; }
 .le-help-option-detail { color: var(--le-muted); font-size: 12px; line-height: 1.4; }
 /* A guide step rings what it points at in the editor too: a tab, a part of the Shop tab, the bar's mark. */
 [data-live-edit-tour-focus] { outline: 3px solid #1B6EF3; outline-offset: 4px; border-radius: 8px; }
@@ -1297,10 +1298,10 @@ select.le-input {
 }
 .le-grid.is-square .le-pick-shot { aspect-ratio: 1 / 1; }
 .le-pick:hover .le-pick-shot { border-color: var(--le-accent); box-shadow: 0 0 0 3px var(--le-accent-soft); }
-.le-pick-by { display: block; font-size: 11px; color: var(--le-muted); margin-top: 6px; }
+.le-pick-by { display: block; font-size: 12px; color: var(--le-muted); margin-top: 6px; }
 .le-shimmer {
   width: 100%; aspect-ratio: 4 / 3; border-radius: 10px;
-  background: #EEEFF1;
+  background: var(--le-line);
 }
 .le-grid.is-square .le-shimmer { aspect-ratio: 1 / 1; }
 
@@ -1315,7 +1316,7 @@ select.le-input {
 }
 .le-tag {
   position: absolute; top: 8px; left: 8px; border-radius: 999px;
-  background: rgba(11,12,15,.7); color: #fff; font-size: 10px; font-weight: 700;
+  background: rgba(11,12,15,.7); color: #fff; font-size: 12px; font-weight: 600;
   letter-spacing: .08em; padding: 3px 7px;
 }
 .le-pick { position: relative; }
@@ -1333,9 +1334,9 @@ select.le-input {
 }
 .le-back-btn {
   cursor: pointer; border: 0; background: none; color: #fff;
-  border-radius: 999px; padding: 8px 16px; font-size: 13px; font-weight: 500;
+  border-radius: 999px; padding: 8px 16px; font-size: 13px; font-weight: 600;
 }
-.le-back-btn:hover { background: #2A2C31; }
+.le-back-btn:hover { background: var(--le-ink); }
 .le-back-btn.is-on { background: #fff; color: var(--le-ink); font-weight: 600; }
 
 /* A phone is a different width, and a width is what a stylesheet listens to.
@@ -1376,10 +1377,10 @@ select.le-input {
 
 /* ---- what is about to go live ---- */
 .le-review { display: flex; flex-direction: column; gap: 2px; }
-.le-review-row { padding: 11px 0; border-bottom: 1px solid var(--le-line-soft, #EEEFF1); }
+.le-review-row { padding: 11px 0; border-bottom: 1px solid var(--le-line-soft, var(--le-line)); }
 .le-review-row:last-child { border-bottom: 0; }
 .le-review-what { font-size: 12px; color: var(--le-muted); }
-.le-review-to { font-size: 14px; font-weight: 500; color: var(--le-ink); margin-top: 2px; }
+.le-review-to { font-size: 14px; font-weight: 600; color: var(--le-ink); margin-top: 2px; }
 .le-review-picture { display: block; width: 120px; height: 72px; object-fit: cover; border-radius: 8px; margin-top: 6px; border: 1px solid var(--le-line); }
 .le-review-swatches { display: inline-flex; margin-right: 8px; vertical-align: -3px; }
 .le-review-swatch { width: 16px; height: 16px; border-radius: 50%; border: 2px solid #fff; box-shadow: 0 0 0 1px rgba(0,0,0,.12); margin-left: -4px; }
@@ -1391,14 +1392,14 @@ select.le-input {
    sticky footer whose only main button is Save. One spacing scale (4/8/12/16/24),
    one type scale (12/13/14/15/17), text at 4.5:1 or better, and a focus ring on
    everything that can be pressed. */
-:host { --le-muted: #6B6F78; --le-space: 16px; }
+:host { --le-muted: var(--le-muted); --le-space: 16px; }
 .le-subject { padding: 16px 20px 14px; }
-.le-title { font-size: 17px; font-weight: 650; line-height: 1.3; }
+.le-title { font-size: 17px; font-weight: 600; line-height: 1.3; }
 .le-fields { padding: 20px; gap: 16px; }
 .le-field { gap: 8px; font-size: 13px; font-weight: 600; color: var(--le-ink); }
-.le-hint { font-size: 12.5px; line-height: 1.5; color: var(--le-muted); }
+.le-hint { font-size: 12px; line-height: 1.5; color: var(--le-muted); }
 .le-default { font-size: 13px; color: var(--le-body); }
-.le-prose { min-height: 48px; font-size: 15px; line-height: 1.55; padding: 12px 14px; }
+.le-prose { min-height: 48px; font-size: 14px; line-height: 1.55; padding: 12px 14px; }
 /* Where you are: the location, and apart from it a way back to where you came from. */
 .le-trail { gap: 6px; font-size: 12px; margin-bottom: 4px; }
 .le-crumb { font-size: 12px; color: var(--le-muted); }
@@ -1410,7 +1411,7 @@ select.le-input {
 .le-crumb-back + .le-crumb::before { content: none; }
 /* The item the field belongs to, after the field: a titled group, not a grey box. */
 .le-group { display: grid; gap: 10px; padding-top: 16px; border-top: 1px solid var(--le-line); }
-.le-group > .le-item-context { margin: 0; padding: 0; border: 0; font-size: 13px; font-weight: 650; color: var(--le-ink); }
+.le-group > .le-item-context { margin: 0; padding: 0; border: 0; font-size: 13px; font-weight: 600; color: var(--le-ink); }
 .le-group .le-item-actions { padding: 0; margin: 0; background: none; border-radius: 0; gap: 10px; }
 .le-group .le-item-actions > .le-section-heading { margin: 0; padding: 0; border: 0; font-size: 12px; font-weight: 600; color: var(--le-muted); }
 .le-chip-btn { min-height: 36px; padding: 0 14px; font-size: 13px; color: var(--le-ink); border-color: var(--le-field); }
@@ -1432,7 +1433,7 @@ select.le-input {
 .le-foot-status.is-dirty::before { content: ''; display: inline-block; width: 8px; height: 8px; margin-right: 8px; border-radius: 50%; background: #e0a400; vertical-align: 1px; }
 .le-foot .le-btn { min-height: 40px; }
 /* Published is a state, not a button that is switched off. */
-.le-publish[disabled] { opacity: 1; background: transparent; color: rgba(255,255,255,.72); font-weight: 500; }
+.le-publish[disabled] { opacity: 1; background: transparent; color: rgba(255,255,255,.72); font-weight: 600; }
 .le-publish[disabled]::before { content: '✓ '; }
 /* The page's sections, as a list of rows. */
 .le-section-rows { display: grid; gap: 6px; }
@@ -1463,7 +1464,7 @@ select.le-input {
   :host(.le-drawer-open) .le-walkthrough-pill { display: none; }
   .le-walkthrough.le-walkthrough-top { top: 12px; bottom: auto; }
   :host(.le-drawer-open) .le-walkthrough:not(.le-help-menu) { top: 12px; bottom: auto; left: 12px; right: 12px; width: auto; padding: 12px 14px 14px; max-height: calc(38vh - 20px); overflow-y: auto; }
-  :host(.le-drawer-open) .le-walkthrough:not(.le-help-menu) h2 { font-size: 15px; margin: 4px 0 2px; }
+  :host(.le-drawer-open) .le-walkthrough:not(.le-help-menu) h2 { font-size: 14px; margin: 4px 0 2px; }
   :host(.le-drawer-open) .le-walkthrough:not(.le-help-menu) p { font-size: 13px; margin-bottom: 10px; }
 }
 
@@ -1490,13 +1491,13 @@ select.le-input {
 .le-toolbar.is-tight .le-status { padding: 0 2px; gap: 0; }
 /* A one-glyph link (Dashboard, Tracking and ads, Log out): a 44px target drawn as the bar's round buttons,
    its outer 5px reaching into the bar's padding so the bar is no taller. */
-.le-icon-link { width: 44px; height: 44px; margin: -5px -3px; color: #cbd5e1; text-decoration: none; }
+.le-icon-link { width: 44px; height: 44px; margin: -5px -3px; color: var(--le-field); text-decoration: none; }
 .le-icon-link:hover { color: #fff; }
 .le-logout { display: inline-flex; margin: 0; }
 .le-tip {
   position: fixed; z-index: 2147483002; pointer-events: none; max-width: 240px;
   padding: 6px 10px; border-radius: 8px; background: #fff; color: #0B0C0F;
-  font-size: 12px; font-weight: 500; line-height: 1.3; white-space: nowrap;
+  font-size: 12px; font-weight: 600; line-height: 1.3; white-space: nowrap;
   box-shadow: 0 8px 24px -8px rgba(11,12,15,.35), 0 0 0 1px rgba(11,12,15,.08);
 }
 .le-sheet-scrim { position: fixed; inset: 0; z-index: 2147483001; background: rgba(11,12,15,.32); }
@@ -1508,7 +1509,7 @@ select.le-input {
   box-shadow: 0 30px 80px -20px rgba(11,12,15,.45);
 }
 .le-sheet-head { display: flex; align-items: center; justify-content: space-between; padding: 0 0 4px 6px; }
-.le-sheet-title { margin: 0; font-size: 15px; font-weight: 600; color: var(--le-ink); }
+.le-sheet-title { margin: 0; font-size: 14px; font-weight: 600; color: var(--le-ink); }
 .le-sheet-close { width: 44px; height: 44px; color: var(--le-ink); }
 .le-sheet-close:hover { background: #F4F5F7; }
 .le-sheet-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(88px, 1fr)); gap: 6px; }
@@ -1517,10 +1518,10 @@ select.le-input {
   display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px;
   min-height: 72px; min-width: 44px; padding: 10px 6px; border: 0; border-radius: 12px;
   background: #F4F5F7; color: var(--le-ink); cursor: pointer; text-decoration: none; text-align: center;
-  font-size: 13px; font-weight: 500; line-height: 1.2;
+  font-size: 13px; font-weight: 600; line-height: 1.2;
 }
-.le-sheet-item:hover { background: #EBECEF; }
-.le-sheet-item:disabled { color: #6B6F78; cursor: default; background: #F4F5F7; }
+.le-sheet-item:hover { background: var(--le-line); }
+.le-sheet-item:disabled { color: var(--le-muted); cursor: default; background: #F4F5F7; }
 .le-sheet-item:disabled svg { opacity: .45; }
 .le-sheet :is(button, a, select):focus-visible { outline: 2px solid var(--le-blue); outline-offset: 2px; }
 .le-sheet-field { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 10px; padding: 0 6px; font-size: 13px; color: var(--le-body); }
@@ -1574,7 +1575,7 @@ select.le-input {
   position: relative; gap: 2px; padding: 11px 32px 11px 10px; margin: 0 -10px; width: calc(100% + 20px);
   border: 0; border-radius: 10px; background: none;
 }
-.le-help-option::after { content: '›'; position: absolute; right: 12px; top: 50%; transform: translateY(-50%); color: var(--le-muted); font-size: 18px; line-height: 1; }
+.le-help-option::after { content: '›'; position: absolute; right: 12px; top: 50%; transform: translateY(-50%); color: var(--le-muted); font-size: 17px; line-height: 1; }
 .le-help-option + .le-help-option { box-shadow: 0 -1px 0 var(--le-line); }
 .le-help-option:hover, .le-help-option:focus-visible { background: var(--le-soft); box-shadow: none; }
 .le-help-option:hover + .le-help-option, .le-help-option:focus-visible + .le-help-option { box-shadow: none; }
@@ -1593,6 +1594,113 @@ select.le-input {
 @media (max-width: 760px) {
   .le-help-menu { left: 0; right: 0; bottom: 0; width: 100%; max-height: 78vh; border-radius: 18px 18px 0 0; z-index: 2147483006; }
 }
+
+/* ==== The editor's one system (0.20.19; owner, 8 Nov 2026: "make it professional"; "no border decoration making the
+   app looking AI"; "all list items are properly spaced"; "nothing is overlapping"; "especially on the edit tab").
+   Last in this sheet, so it is what holds: one spacing scale (4, 8, 12, 16, 24), one control height, four type sizes
+   (12, 13, 14, 17) in two weights (400, 600), one accent (blue on Publish only), greys from tokens, radii 10 / 12 / 16,
+   and no lines that spacing already does the job of. ==== */
+:host {
+  --le-control: 40px; --le-chip: 36px;
+  --le-r-control: 10px; --le-r-card: 12px; --le-r-panel: 16px;
+  --le-muted: var(--le-muted); --le-body: #45484F; --le-line: #E6E7EA; --le-field: #DADCE0; --le-soft: #F4F5F7; --le-tint: #F7F8FA;
+}
+@media (max-width: 760px) { :host { --le-control: 44px; } }
+
+/* type: titles 17/600, body 14/400, labels 13/600, hints 12/400 */
+.le-title, .le-modal-title { font-size: 17px; font-weight: 600; }
+.le-field, .le-label, .le-section-heading, .le-group > .le-item-context { font-size: 13px; font-weight: 600; color: var(--le-ink); letter-spacing: normal; text-transform: none; }
+.le-hint, .le-change-when, .le-crumb, .le-trail { font-size: 12px; font-weight: 400; }
+.le-input, .le-btn, .le-btn-outline, .le-chip-btn, .le-link-btn { font-size: 14px; }
+.le-chip-btn { font-size: 13px; font-weight: 600; }
+
+/* one control height, one radius */
+.le-input:not(textarea), select.le-input, .le-btn, .le-btn-outline, .le-btn-danger, .le-btn-publish, .le-foot .le-btn, .le-foot .le-btn-outline { min-height: var(--le-control); height: auto; border-radius: var(--le-r-control); }
+.le-input:not(textarea) { height: var(--le-control); padding-top: 0; padding-bottom: 0; }
+textarea.le-input { border-radius: var(--le-r-control); }
+.le-chip-btn { min-height: var(--le-chip); border-radius: var(--le-r-control); }
+.le-input { box-shadow: none; }
+.le-input:focus { box-shadow: 0 0 0 3px var(--le-accent-soft); border-color: var(--le-ink); }
+
+/* one accent: blue is Publish's alone */
+.le-link-btn, .le-crumb-back, .le-page-open, .le-shop-edit, .le-add-page, .le-sale-sizes-toggle { color: var(--le-ink); }
+
+/* no lines where spacing does it; the active tab's marker and focus rings stay */
+.le-drawer-head, .le-subject, .le-foot, .le-modal-foot, .le-modal-tabs, .le-sheet-links, .le-brand-dock, .le-sitemap-actions,
+.le-help-head, .le-detail-frame, .le-start-thumb, .le-change, .le-review-row, .le-collection,
+.le-shop-section, .le-shop-row, .le-shop-category, .le-shop-product, .le-pages-group > .le-section-heading,
+.le-section-heading, summary.le-section-heading, .le-group, .le-fold, .le-field.le-divided,
+.le-help-faq details, .le-help-faq details:last-child, .le-help-group > details { border-top: 0; border-bottom: 0; }
+.le-help-option { box-shadow: none; }
+.le-dot { box-shadow: none; }
+.le-palette-sample, .le-palette-strip, .le-brand-strip { box-shadow: none; border: 1px solid rgba(11, 12, 15, .1); }
+.le-shop-layout { box-shadow: none; }
+.le-figures th, .le-figures td { border-bottom: 0; }
+:host .le-figures-cell { border-left: 0; }
+.le-figures tbody tr:nth-child(even) > td, .le-figures tbody tr:nth-child(even) > th { background: var(--le-tint); }
+.le-figures tbody tr:focus-within > td, .le-figures tbody tr:focus-within > th { background: #EEF1F6; }
+.le-foot { background: #fff; }
+.le-group { padding-top: 8px; margin-top: 8px; }
+.le-field.le-divided { padding-top: 8px; }
+.le-fold { margin: 0; padding-top: 0; }
+.le-section-heading, summary.le-section-heading { padding-top: 8px; margin-top: 8px; }
+
+/* spacing: 24 around a panel's fields, 16 between them; 8 between rows of a list; 16 on a phone */
+.le-fields { padding: 24px; gap: 16px; }
+.le-subject { padding: 16px 24px; }
+.le-shop-list { display: grid; gap: 8px; }
+.le-shop-row { padding: 8px 12px; border-radius: var(--le-r-card); background: var(--le-tint); }
+.le-shop-section { padding: 0; margin: 0 0 24px; }
+.le-help-faq details { padding: 0; }
+.le-help-faq summary { padding: 12px 0; }
+.le-help-options { display: grid; gap: 8px; }
+.le-help-option { border-radius: var(--le-r-card); background: var(--le-tint); }
+.le-row-end { padding-top: 0; }
+@media (max-width: 760px) {
+  .le-fields { padding: 16px; }
+  .le-subject { padding: 12px 16px; }
+  /* the bar gives way to an open panel: never two layers of buttons over each other */
+  :host(.le-drawer-open) .le-toolbar { display: none; }
+  .le-drawer { border: 0; box-shadow: 0 -12px 40px -12px rgba(11, 12, 15, .3); }
+}
+
+/* a grid's wide panel: the bar moves into the space left of it, never under it */
+@media (min-width: 761px) {
+  :host(.le-grid-open) .le-toolbar { left: calc((100vw - min(760px, 100vw - 24px) - 12px) / 2); }
+}
+.le-drawer.is-grid .le-subject { border-bottom: 0; }
+
+/* drawn icons in place of typed arrows (glyphs.js) */
+.le-icon-svg { display: inline-flex; align-items: center; justify-content: center; flex: none; line-height: 0; }
+.le-has-icon { display: inline-flex; align-items: center; gap: 6px; }
+.le-close.le-has-icon { justify-content: center; }
+.le-fold > summary::before { content: none; }
+.le-fold > summary { display: flex; align-items: center; gap: 6px; }
+.le-fold > summary::after { content: ''; width: 12px; height: 12px; background: currentColor; -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m9 6 6 6-6 6'/%3E%3C/svg%3E") center / contain no-repeat; mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m9 6 6 6-6 6'/%3E%3C/svg%3E") center / contain no-repeat; transition: transform .15s; order: -1; }
+.le-fold[open] > summary::after { transform: rotate(90deg); }
+.le-crumb + .le-crumb::before { content: ''; display: inline-block; width: 10px; height: 10px; margin: 0 6px 0 0; vertical-align: -1px; background: var(--le-field); -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.6' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m9 6 6 6-6 6'/%3E%3C/svg%3E") center / contain no-repeat; mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.6' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m9 6 6 6-6 6'/%3E%3C/svg%3E") center / contain no-repeat; }
+.le-crumb, .le-crumb-back { display: inline-flex; align-items: center; min-height: 24px; padding: 0 8px; border-radius: 8px; line-height: 1; }
+.le-crumb { padding: 0 2px; }
+.le-trail { gap: 6px; align-items: center; }
+.le-help-option::after { content: ''; width: 14px; height: 14px; background: var(--le-muted); -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m9 6 6 6-6 6'/%3E%3C/svg%3E") center / contain no-repeat; mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m9 6 6 6-6 6'/%3E%3C/svg%3E") center / contain no-repeat; }
+.le-faq-chevron { border: 0; width: 14px; height: 14px; transform: none; background: var(--le-muted); -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E") center / contain no-repeat; mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E") center / contain no-repeat; }
+.le-help-faq details[open] .le-faq-chevron { transform: rotate(180deg); }
+.le-publish[disabled]::before { content: none; }
+
+/* one danger style: quiet red words, left, at control height */
+.le-btn-danger, .le-btn-quiet-danger, .le-delete, .le-drawer-delete { background: none; border: 0; box-shadow: none; color: var(--le-danger); font-weight: 600; min-height: var(--le-control); padding: 0; justify-content: flex-start; text-align: left; }
+.le-btn-danger:hover, .le-btn-quiet-danger:hover { text-decoration: underline; background: none; }
+
+/* names in a list wrap to two lines rather than being cut */
+.le-library-name, .le-section-name, .le-pick-name, .le-insert-name { white-space: normal; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; text-overflow: clip; }
+
+/* the sale grid: words and chevron in ink; the editor's own label above what it names */
+.le-sale-sizes-toggle .le-icon-svg { color: var(--le-muted); }
+.le-sale-label { white-space: nowrap; max-width: none !important; }
+.le-inside-list { display: grid; gap: 8px; }
+.le-inside-item { display: block; width: 100%; min-height: var(--le-chip); padding: 8px 12px; border: 0; border-radius: var(--le-r-control); background: var(--le-tint); color: var(--le-ink); font: inherit; font-size: 13px; text-align: left; cursor: pointer; overflow-wrap: anywhere; }
+.le-inside-item:hover { background: var(--le-soft); }
+textarea[data-img-attr] { min-height: 64px; resize: vertical; }
 
 `;
 
@@ -2398,6 +2506,8 @@ export function createChrome() {
     const sectionInsertEnd = inserter('le-insert-end');
 
     shadow.append(toolbar, sheetScrim, sheet, tip, drawer, linkHandle, bgHandle, hoverBox, sectionInsert.line, sectionInsertEnd.line);
+    // arrows, chevrons and crosses drawn, not typed (glyphs.js)
+    iconizeGlyphs(shadow);
 
     // "Saved" can go by in a second; "this didn't take effect" is a sentence
     // somebody has to finish reading before it disappears.

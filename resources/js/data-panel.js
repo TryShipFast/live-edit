@@ -21,6 +21,9 @@ const el = (tag, className, text) => {
     return node;
 };
 
+/** A question asked in the editor (its own dialog), or the browser's where there is none. */
+const askFirst = async (ask, title) => (ask ? ask({ title, subtitle: 'Undo brings it back.', yes: 'Delete', no: 'Keep it' }) : window.confirm(title));
+
 const button = (text, className, onClick, disabled = false) => {
     const node = el('button', className, text);
     node.type = 'button';
@@ -59,7 +62,7 @@ const said = (problems) => {
  *
  * @param {{ row: HTMLElement, save: Function, saveOrder: Function, refresh: Function, notify: Function }} deps
  */
-export const renderChartRow = ({ row, save, saveOrder, refresh, notify }) => {
+export const renderChartRow = ({ row, save, saveOrder, refresh, notify, ask = null }) => {
     const chart = chartOf(row);
     const kind = kindOf(chart);
     const spec = KINDS[kind];
@@ -153,8 +156,8 @@ export const renderChartRow = ({ row, save, saveOrder, refresh, notify }) => {
             }
         })();
     }, ids.length >= most));
-    actions.append(button(`Delete this ${one}`, 'le-btn-danger', () => {
-        if (!window.confirm(`Delete this ${one}?`)) return;
+    actions.append(button(`Delete this ${one}`, 'le-btn-danger', async () => {
+        if (!await askFirst(ask, `Delete this ${one}?`)) return;
         void reorder(ids.filter((other) => other !== id), `${spec.one} deleted ✓`);
     }, ids.length <= 1));
     wrap.append(el('div', 'le-section-heading', `This ${one}`), actions);
@@ -268,7 +271,7 @@ const fillRows = async ({ list, plan, values, heads = null, headCells = null, sa
  * A table's cell: its row and its column, each added to, moved and deleted, and the whole table
  * filled from pasted rows. A column is one order saved for the header and every row.
  */
-export const renderTableControls = ({ element, save, saveOrder, refresh, notify, applyOrder }) => {
+export const renderTableControls = ({ element, save, saveOrder, refresh, notify, applyOrder, ask = null }) => {
     const place = cellPlace(element);
     if (!place) return null;
     const wrap = el('div', 'le-data le-item-actions');
@@ -297,8 +300,8 @@ export const renderTableControls = ({ element, save, saveOrder, refresh, notify,
         next.splice(place.columnIndex + 1, 0, freshIds(1, [...columnIds, ...place.rows.map((tr) => tr.dataset.editItem)], Date.now(), sourceOf(place.column))[0]);
         void go(columnsList, next, 'Column added to every row ✓ Name it in the heading.');
     }, columnIds.length >= columnsMost));
-    col.append(button('Delete this column', 'le-btn-danger', () => {
-        if (!window.confirm(`Delete the column “${place.columns[place.columnIndex]?.name ?? ''}” from every row?`)) return;
+    col.append(button('Delete this column', 'le-btn-danger', async () => {
+        if (!await askFirst(ask, `Delete the column “${place.columns[place.columnIndex]?.name ?? ''}” from every row?`)) return;
         void go(columnsList, columnIds.filter((id) => id !== place.column), 'Column deleted ✓');
     }, columnIds.length <= 1));
     wrap.append(el('div', 'le-section-heading', 'This column'), col);
@@ -318,8 +321,8 @@ export const renderTableControls = ({ element, save, saveOrder, refresh, notify,
             next.splice(place.rowIndex + 1, 0, freshIds(1, [...rowIds, ...columnIds], Date.now(), sourceOf(id))[0]);
             void go(info.rowsList, next, 'Row added ✓');
         }, rowIds.length >= rowsMost));
-        r.append(button('Delete this row', 'le-btn-danger', () => {
-            if (!window.confirm('Delete this row?')) return;
+        r.append(button('Delete this row', 'le-btn-danger', async () => {
+            if (!await askFirst(ask, 'Delete this row?')) return;
             void go(info.rowsList, rowIds.filter((other) => other !== id), 'Row deleted ✓');
         }, rowIds.length <= 1));
         wrap.append(el('div', 'le-section-heading', 'This row'), r);

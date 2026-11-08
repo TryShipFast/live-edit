@@ -1454,7 +1454,7 @@ const bootLiveEdit = () => {
             return handle;
         };
         const undoImport = async () => {
-            if (!window.confirm('Take back the last import? Its products leave the shop and its categories.')) return;
+            if (!await askTo({ title: 'Take back the last import?', subtitle: 'Its products leave the shop and its categories.', yes: 'Take it back', no: 'Keep them' })) return;
             try {
                 const count = await undoTheLastImport({ config: window.liveEditPages, save: (key, value) => saveSetting(key, value) });
                 sessionStorage.setItem('tb_editing', '1');
@@ -4880,7 +4880,7 @@ const bootLiveEdit = () => {
                     remove.textContent = 'Remove this section';
                     remove.addEventListener('click', async () => {
                         if (!arrangementIsFree()) return;
-                        if (!window.confirm('Remove this section and what you wrote in it?')) return;
+                        if (!await askTo({ title: 'Remove this section?', subtitle: 'What you wrote in it goes too. Undo brings it back.', yes: 'Remove section', no: 'Keep it' })) return;
                         try {
                             await saveSetting(builder.structureKey, addedWith(builder.added, addedId, null, builder.beside));
                             await saveOrder(currentOrder().filter((id) => id !== item.dataset.editItem), 'Section removed ✓');
@@ -4904,7 +4904,7 @@ const bootLiveEdit = () => {
                     remove.disabled = lowest;
                     remove.addEventListener('click', async () => {
                         if (!arrangementIsFree()) return;
-                        if (!window.confirm('Delete this section from the page? You can add it back later from + Add a section.')) return;
+                        if (!await askTo({ title: 'Delete this section?', subtitle: 'Undo brings it back, and you can add it again from + Section.', yes: 'Delete section', no: 'Keep it' })) return;
                         await saveOrder(currentOrder().filter((id) => id !== item.dataset.editItem), 'Section deleted ✓');
                     });
                     row.append(remove);
@@ -4917,7 +4917,7 @@ const bootLiveEdit = () => {
                     remove.textContent = `Delete this ${itemNoun(list) ?? 'card'}`;
                     remove.disabled = lowest;
                     const deleteCard = (message) => saveOrder(currentOrder().filter((id) => id !== item.dataset.editItem), message);
-                    remove.addEventListener('click', () => {
+                    remove.addEventListener('click', async () => {
                         // A card that opens a page of its own offers that page too; a page other
                         // cards still open is theirs as well, so it is never offered.
                         if (opens && !shared) {
@@ -4925,7 +4925,7 @@ const bootLiveEdit = () => {
 
                             return;
                         }
-                        if (!window.confirm(`Delete this ${itemNoun(list) ?? 'card'}?`)) return;
+                        if (!await askTo({ title: `Delete this ${itemNoun(list) ?? 'card'}?`, subtitle: 'Undo brings it back.', yes: 'Delete', no: 'Keep it' })) return;
                         deleteCard('Deleted \u2713');
                     });
                     row.append(remove);
@@ -5183,7 +5183,10 @@ const bootLiveEdit = () => {
                     || item.getAttribute('aria-label');
                 const context = document.createElement('div');
                 context.className = 'le-section-heading le-item-context';
-                context.textContent = `${kind} ${index} of ${items.length}${name ? ` · ${String(name).replace(/\s+/g, ' ').trim().slice(0, 40)}` : ''}`;
+                const named = String(name ?? '').replace(/\s+/g, ' ').trim();
+                // never "Photo 1 of 6 · 1 of 6"
+                const said = named && !/^\d+ of \d+$/.test(named) ? ` · ${named.slice(0, 40)}` : '';
+                context.textContent = `${kind} ${index} of ${items.length}${said}`;
                 drawerFields.prepend(context);
             }
 
@@ -5260,10 +5263,12 @@ const bootLiveEdit = () => {
         };
 
         const nameInside = (node) => {
-            const words = (ownTextOf(node) || node.textContent || '').replace(/\s+/g, ' ').trim();
+            const words = [...node.childNodes].filter((child) => child.nodeType === 3).map((child) => child.textContent).join(' ').replace(/\s+/g, ' ').trim()
+                || [...node.querySelectorAll('*')].filter((child) => !child.children.length).map((child) => child.textContent).join(' ').replace(/\s+/g, ' ').trim()
+                || String(node.textContent ?? '').replace(/\s+/g, ' ').trim();
 
             if (words) {
-                return words.slice(0, 28);
+                return words.length > 60 ? `${words.slice(0, 58).replace(/\s+\S*$/, '')}…` : words;
             }
 
             const spoken = (node.getAttribute('aria-label') ?? node.getAttribute('title') ?? '').trim();
@@ -5365,14 +5370,16 @@ const bootLiveEdit = () => {
                 : 'Inside this';
             drawerFields.append(heading);
 
+            // one a line, the whole name, 8px apart (owner, 8 Nov 2026: "all list items are properly spaced")
             const row = document.createElement('div');
-            row.className = 'le-row';
+            row.className = 'le-inside-list';
 
             shown.forEach((node) => {
                 const button = document.createElement('button');
                 button.type = 'button';
-                button.className = 'le-chip-btn';
+                button.className = 'le-inside-item';
                 button.textContent = nameInside(node);
+                button.title = String(node.textContent ?? '').replace(/\s+/g, ' ').trim().slice(0, 200);
                 button.addEventListener('click', () => switchToNode(node));
                 row.append(button);
             });
@@ -5388,6 +5395,7 @@ const bootLiveEdit = () => {
             applyOrder(document, { [list.dataset.editList]: JSON.stringify(ids) });
         };
         const dataDeps = () => ({
+            ask: askTo,
             save: saveSetting,
             saveOrder: saveListOrder,
             refresh: (message) => settle(message, null, null, true),
@@ -6820,8 +6828,10 @@ const bootLiveEdit = () => {
                 const w = document.createElement('label');
                 w.className = 'le-field le-divided';
                 w.append(label);
-                const input = document.createElement('input');
-                input.type = 'text';
+                // two lines that grow, so a description is read whole, never cut at the box's edge
+                const input = document.createElement('textarea');
+                input.rows = 2;
+                input.addEventListener('input', () => { input.style.height = 'auto'; input.style.height = `${input.scrollHeight + 2}px`; });
                 input.dataset.imgAttr = name;
                 input.value = value ?? '';
                 // What it said when the panel opened, so saving can tell a
@@ -7185,7 +7195,7 @@ const bootLiveEdit = () => {
                     const prompt = isBackground
                         ? 'Remove this background image? The section keeps its layout and colour.'
                         : 'Remove this image? The section keeps its layout; you can add a new image any time.';
-                    if (!window.confirm(prompt)) return;
+                    if (!await askTo({ title: isBackground ? 'Remove this background image?' : 'Remove this image?', subtitle: prompt.replace(/^[^?]*\?\s*/, ''), yes: 'Remove', no: 'Keep it' })) return;
                     const f = new FormData();
                     f.append('target', current.target);
                     f.append('remove', '1');
@@ -9333,7 +9343,7 @@ const bootLiveEdit = () => {
 
         drawerDelete?.addEventListener('click', async () => {
             if (!current || current.kind !== 'record') return;
-            if (!window.confirm('Delete this item?')) return;
+            if (!await askTo({ title: 'Delete this item?', subtitle: 'It goes from the website straight away.', yes: 'Delete', no: 'Keep it' })) return;
             await request(`/live-edit/record/${current.type}/${current.id}`, { method: 'DELETE' });
             reloadWithToast('Deleted \u2713');
         });
