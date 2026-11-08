@@ -1,5 +1,14 @@
 # ShipFast Live Edit for WordPress
 
+## 0.20.9
+
+- A card's move is named for where it goes (owner, 8 Nov 2026: "the move should be contextual to how each section or
+  container works"). A move swaps a card with the one before or after it in its list; in a grid of three reviews that
+  one sits beside it, so "Move down" moved it right. Now the editor looks at where the neighbour is drawn: beside it on
+  the same row, "← Move left" / "Move right →" (mirrored for right-to-left pages); above or below, "↑ Move up" /
+  "↓ Move down". The same reviews read left and right on a computer and up and down on a phone, where they stack;
+  a page's sections are always up and down.
+
 ## 0.20.8
 
 - Adding a card is "+ Add a review" (first-time owner walk, 7 Nov 2026). An item's "Duplicate" is named for what the

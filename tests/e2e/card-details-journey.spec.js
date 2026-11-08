@@ -115,7 +115,9 @@ test('a journal post is edited in place: its body and its pictures', async ({ pa
     await expect.poll(() => words(drawn('journal/first-light'), '.body p')).toBe('We walked before the town woke.');
 
     await choose(detail(page), '[data-item="p2"] span');
-    await detail(page).getByRole('button', { name: '↑ Move up' }).click();
+    // Two pictures side by side: the move is named for where it goes (owner, 8 Nov 2026), left, not up.
+    await expect(detail(page).getByRole('button', { name: '↑ Move up' })).toHaveCount(0);
+    await detail(page).getByRole('button', { name: '← Move left' }).click();
     await expect(detail(page).locator('[data-list="pictures"] [data-edit-item]').first()).toHaveAttribute('data-edit-item', 'p2');
     await done(page);
 
