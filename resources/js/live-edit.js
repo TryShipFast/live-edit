@@ -6064,12 +6064,16 @@ const bootLiveEdit = () => {
                         const plain = parseEditKey(key).key;
                         // each named for History by its own product, not by what was pressed to open the grid
                         const product = slots.find((slot) => slot.name === name);
+                        // its product page's own part of the page ("section:products-kemi-gingham-dress.sale"), so
+                        // History names the page; the unit is one the host accepts (LockUnit::DECLARED)
+                        const base = window.liveEditPages?.editorBase ?? '';
+                        const pageId = String(product?.href ?? '').startsWith(base) ? String(product.href).slice(base.length).replace(/^\/+|\/+$/g, '') : '';
+                        const unit = pageId ? `section:${pageId.replace(/\//g, '-')}.sale` : null;
                         await patiently(() => request('/live-edit/setting', {
                             method: 'POST',
                             headers: {
                                 'Content-Type': 'application/json',
-                                'X-Live-Edit-Unit': encodeURIComponent(`sale:${product?.id || pathOf(product?.href ?? '') || name}`),
-                                'X-Live-Edit-Unit-Label': encodeURIComponent(name),
+                                ...(unit ? { 'X-Live-Edit-Unit': encodeURIComponent(unit), 'X-Live-Edit-Unit-Label': encodeURIComponent(name) } : {}),
                                 ...(what ? { 'X-Live-Edit-What': encodeURIComponent(what) } : {}),
                             },
                             body: JSON.stringify({ key: plain, value, locale: window.liveEditLocale }),

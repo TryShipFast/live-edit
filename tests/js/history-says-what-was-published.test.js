@@ -45,6 +45,7 @@ describe('what', () => {
         expect(listSaid('1 item removed, leaving 9 items', 'section')).toBe('Removed a section');
         expect(listSaid('2 items added, leaving 5 items')).toBe('Added 2 cards');
         expect(listSaid('The order changed')).toBe('Changed the order of the cards');
+        expect(listSaid('A list of 3 items')).toBeNull();
         expect(changeSaid({ unit: 'arrangement:packages', list: '1 item removed, leaving 9 items' })).toBe('Removed a section');
     });
 });
@@ -59,8 +60,8 @@ describe('a publish', () => {
         lines: [
             { unit: 'section:packages.prices', label: 'Service price list', what: 'the price', before: '₦25,000', after: '₦28,000' },
             { unit: 'arrangement:packages', label: 'Page layout', list: '1 item removed, leaving 9 items' },
-            { unit: 'sale:kemi', label: 'Kemi gingham dress', what: 'the sale price', before: 'No sale', after: '₦49,950' },
-            { unit: 'sale:kemi', label: 'Kemi gingham dress', what: 'the sale end day', before: 'No end date', after: '15 Nov 2026' },
+            { unit: 'section:products-kemi-gingham-dress.sale', label: 'Kemi gingham dress', what: 'the sale price', before: 'No sale', after: '₦49,950' },
+            { unit: 'section:products-kemi-gingham-dress.sale', label: 'Kemi gingham dress', what: 'the sale end day', before: 'No end date', after: '15 Nov 2026' },
         ],
     };
 

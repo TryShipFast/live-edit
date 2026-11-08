@@ -70,8 +70,8 @@ export const listSaid = (list, noun = 'card') => {
     if (found) return `Removed ${many(Number(found[1]))}`;
     if (/order changed/i.test(said)) return `Changed the order of the ${noun}s`;
     if (/unchanged/i.test(said)) return null;
-    found = said.match(/A list of (\d+) items?/);
-    if (found) return `Set ${found[1]} ${noun}${found[1] === '1' ? '' : 's'}`;
+    // a list saved as it already was (a table's columns written with its cells): nothing to say
+    if (/^A list of \d+ items?$/.test(said)) return null;
 
     return said || null;
 };
