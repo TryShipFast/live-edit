@@ -6234,11 +6234,13 @@ const bootLiveEdit = () => {
                 const shown = rect.width > 4 && rect.height > 4 && rect.bottom > 0 && rect.top < window.innerHeight && hovered !== node && !node.contains(hovered);
                 label.hidden = !shown;
                 if (!shown) return;
-                // above what it names, never over its words (a struck price); inside its top when there is no room
+                // a product page's price: above it, never over its words (the struck price); a card: in its own top
+                // corner, over its photo, so nothing beside the card is covered
                 const tall = label.offsetHeight || 22;
                 const above = rect.top - tall - 4;
-                label.style.top = `${above >= 8 ? above : Math.max(0, rect.top + 6)}px`;
-                label.style.left = `${Math.min(Math.max(4, rect.left), window.innerWidth - (label.offsetWidth || 200) - 4)}px`;
+                const overPrice = node.matches('[data-kit-price]');
+                label.style.top = `${overPrice && above >= 8 ? above : Math.max(0, rect.top + 8)}px`;
+                label.style.left = `${Math.min(Math.max(4, overPrice ? rect.left : rect.left + 8), window.innerWidth - (label.offsetWidth || 200) - 4)}px`;
             });
         };
         const drawSaleLabels = async () => {

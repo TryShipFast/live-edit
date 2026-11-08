@@ -12,6 +12,27 @@
   Proved by measuring every text, box and button of the grid at 320, 390, 768 and 1440 pixels, while rows are loading
   and with a product's sizes open (`a-flash-sale-is-set-as-a-whole.spec.js`): no two overlap, none runs out of its row,
   its card, the panel's padding or the drawer, and nothing scrolls sideways.
+- History (Changes, Published) says what was published the way Google Docs' Version history does (owner, 8 Nov 2026:
+  "published changes needs to be fixed too, it's confusing"). Each publish is one entry: who ("You" or the teammate)
+  and when ("1 day ago", the exact day and time on hover), then what changed by page and section as they are named
+  ("Packages & pricing · Service price list"), with the words before and after ("Price: “₦25,000” → “₦28,000”"), a
+  table's cell by its row and column ("Express wash, Saloon / hatchback: “₦9,000”"), a list by what happened ("Removed
+  a section"), a sale by what shoppers see ("On sale at ₦49,950 until 15 Nov"; "Sale now ends 15 Nov"). Two changes
+  show, "Show all 6 changes" opens the rest; a publish of nothing is not shown; "Show older" at the foot replaces Newer
+  / Page 1 of 3; "1 days" is gone. One action an entry, worded for what it does: "Undo these 6 changes", asked first
+  with what happens. The versions endpoint now returns each change's words before and after; the sale grid names each
+  write by its own product.
+- The editor made one system (owner, 8 Nov 2026: "make it professional"; "no border decoration making the app looking
+  AI"; "nothing is overlapping"; "especially on the edit tab"; from the editor audit): lines that spacing already does
+  the job of are gone (under the panel head and title, above the foot, between fields, groups, sections, Shop rows,
+  Help questions, table cells; a light tint marks every other grid row instead), one spacing scale (4 / 8 / 12 / 16 /
+  24), one control height (40, 44 on a phone), four type sizes (12, 13, 14, 17) in two weights, blue for Publish alone,
+  greys from tokens, rings as outlines, drawn icons in place of typed arrows and crosses, one quiet danger style, the
+  editor's own question in place of the browser's confirm, one Save in a card's panel (its foot) with its style in one
+  fold, "Inside this" one name a line, a photo's description in a two-line box, "Photo 1 of 6 · 1 of 6" no more. On a
+  phone the bar gives way to an open panel; beside a wide grid it moves into the space left of it. Tables and charts
+  open in the wide panel. The "On sale" label sits above a product page's price and inside a card's top corner, and
+  steps aside while the thing is pointed at. The sale grid opens without waiting for a slow stock answer.
 
 ## 0.20.18 (8 Nov 2026)
 

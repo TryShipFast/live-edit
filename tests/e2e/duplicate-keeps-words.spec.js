@@ -101,7 +101,8 @@ test('a duplicated item keeps the words it was copied with, after the page is dr
         await choose(page, `[data-edit-item="${gone}"] [data-field="notes"]`);
         await ui(page).getByRole('button', { name: /^Delete this (?!section)\w+$/ }).click();
         const ask = ui(page).locator('.le-modal');
-        if (await ask.isVisible().catch(() => false)) await ask.getByRole('button', { name: 'Delete the card', exact: true }).click();
+        await expect(ask).toBeVisible();
+        await ask.getByRole('button', { name: /^(Delete the card|Delete)$/ }).first().click();
         await expect(page.locator(`[data-edit-item="${gone}"]`)).toHaveCount(0);
     }
     expect(idsIn(drawn())).toEqual([copy, second]);

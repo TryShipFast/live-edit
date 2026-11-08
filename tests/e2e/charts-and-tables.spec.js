@@ -297,6 +297,8 @@ test('the section holding a table is deleted from its own panel, with no Hide (o
     const remove = drawer(page).getByRole('button', { name: /^(Remove|Delete) this section$/ });
     await expect(remove).toBeVisible();
     await remove.click();
+    // asked in the editor's own dialog first
+    await ui(page).locator('.le-modal .le-btn-danger').click();
     await expect.poll(() => Object.keys(site.host.builderFor('shop', '').added ?? {}).includes(id)).toBe(false);
     await expect.poll(() => site.host.draw('shop').querySelector(`[data-instance="shop.${id}"]`)).toBe(null);
 });

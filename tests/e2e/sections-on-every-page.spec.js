@@ -1,5 +1,12 @@
 import { expect, test } from '@playwright/test';
 import { serveFakeHost } from '../support/fake-host-server.js';
+
+/** The editor's own question (in its dialog, not the browser's), answered yes when it is asked. */
+const yes = async (page) => {
+    const ask = page.locator('#live-edit-ui .le-modal .le-btn-danger').first();
+    if (await ask.isVisible({ timeout: 3000 }).catch(() => false)) await ask.click();
+    else await ask.waitFor({ timeout: 3000 }).then(() => ask.click()).catch(() => {});
+};
 import { keyOf } from '../support/fake-host.js';
 
 /*
@@ -140,6 +147,7 @@ test('the bar\'s + Section opens the add window at the end of the page; an added
     await openSection(page, `s-${id}`);
     const drawer = ui(page).locator('.le-drawer');
     await drawer.getByRole('button', { name: 'Remove this section' }).click();
+    await yes(page);
     await expect.poll(() => sectionsOf('journal/salt-air')).toEqual(['s-article=Post', 's-related=More posts']);
     expect(site.host.builderFor('journal/salt-air', '').added).toEqual({});
 });
@@ -252,6 +260,7 @@ test('a section the design came with can be deleted too, and is gone from the pa
     // the design's own section offers Delete as well as Hide; an added one says "Remove this section"
     await expect(drawer.getByRole('button', { name: 'Remove this section' })).toHaveCount(0);
     await drawer.getByRole('button', { name: 'Delete this section' }).click();
+    await yes(page);
     await expect.poll(() => sectionsOf('journal/salt-air')).toEqual(['s-article=Post']);
 });
 
@@ -262,6 +271,7 @@ test('after a section is deleted, Undo is ready at once (owner, 8 Nov 2026: dele
     const drawer = ui(page).locator('.le-drawer');
     await expect(drawer).not.toContainText('Hide this');
     await drawer.getByRole('button', { name: 'Delete this section' }).click();
+    await yes(page);
     await expect.poll(() => sectionsOf('journal/salt-air')).toEqual(['s-article=Post']);
     await page.keyboard.press('Escape');
     const undo = ui(page).getByRole('button', { name: 'Undo' });
@@ -276,6 +286,7 @@ test('the last section of a page cannot be deleted', async ({ page }) => {
     await openSection(page, 's-related');
     const drawer = ui(page).locator('.le-drawer');
     await drawer.getByRole('button', { name: 'Delete this section' }).click();
+    await yes(page);
     await expect.poll(() => sectionsOf('journal/salt-air')).toEqual(['s-article=Post']);
     await page.reload();
     await expect.poll(() => page.evaluate(() => document.body.classList.contains('editing'))).toBe(true);
