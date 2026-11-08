@@ -1,5 +1,12 @@
 # ShipFast Live Edit for WordPress
 
+## 0.20.11
+
+- Brand shows what the website shows (first-time owner walk, 7 Nov 2026: Business name, Logo and Phone looked empty,
+  their values only grey hints). Business name, phone, second phone, email and address open filled with what the page
+  says now, and are saved only when changed. Logo shows the logo in use, then "Upload your logo", then "Or paste a
+  link to your logo" (it led with "Paste a logo URL").
+
 ## 0.20.10
 
 - A photo chosen shows on the page at once (first-time owner walk, 7 Nov 2026). The panel showed the new picture and

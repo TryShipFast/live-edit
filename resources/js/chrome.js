@@ -568,6 +568,8 @@ a.le-mark:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
 .le-brand-face:focus-within { border-color: #0B0C0F; }
 .le-brand-logo-fields { display: grid; grid-template-columns: minmax(0, 1fr); align-items: stretch; gap: 8px; min-width: 0; width: 100%; }
 .le-brand-logo-fields > .le-input { box-sizing: border-box; min-width: 0; width: 100%; }
+.le-brand-logo-now { display: block; max-width: 160px; max-height: 64px; object-fit: contain; padding: 8px; border: 1px solid var(--le-line); border-radius: 10px; background: #fff; }
+.le-brand-logo-now[hidden] { display: none; }
 .le-brand-logo-fields .le-upload { box-sizing: border-box; min-width: 0; max-width: 100%; width: 100%; justify-content: center; gap: 0; padding: 6px 8px; border-radius: 10px; overflow: hidden; }
 .le-brand-logo-fields .le-upload-inner { min-width: 0; width: 100%; justify-content: center; gap: 6px; overflow: hidden; }
 .le-brand-logo-fields .le-upload-icon { width: 24px; height: 24px; border-radius: 7px; font-size: 13px; }

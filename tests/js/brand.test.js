@@ -29,7 +29,8 @@ describe('the Brand tab reads colours the way a browser reports them', () => {
         expect(madeHardToRead(before, after).map((x) => x.el)).toEqual([a]);
     });
 
-    it('keeps the styled logo picker beside the URL field in a compact row', () => {
+    // The logo now, then upload, then a link (first-time owner walk, 7 Nov 2026: Logo led with "Paste a logo URL").
+    it('offers the logo now, then upload, then a link to paste', () => {
         const container = document.createElement('div');
         renderBrandPanel({
             container,
@@ -43,7 +44,9 @@ describe('the Brand tab reads colours the way a browser reports them', () => {
         const controls = container.querySelector('.le-brand-logo-fields');
         expect(controls.querySelector('input[type="url"]')).not.toBeNull();
         expect(controls.querySelector('.le-upload-compact')).not.toBeNull();
-        expect(controls.children).toHaveLength(2);
+        expect([...controls.children].map((child) => child.matches('.le-brand-logo-now') ? 'logo' : child.matches('.le-upload-compact, .le-upload') || child.querySelector('.le-upload-compact') ? 'upload' : child.matches('input[type="url"]') ? 'link' : child.className))
+            .toEqual(['logo', 'upload', 'link']);
+        expect(controls.querySelector('input[type="url"]').placeholder).toBe('Or paste a link to your logo');
     });
 
     /*

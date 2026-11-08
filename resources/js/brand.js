@@ -337,28 +337,42 @@ export const renderBrandPanel = ({ container, config, save, upload, done, notify
         if (identity.nameKey) {
             const row = el('label', 'le-brand-face');
             row.append(el('span', 'le-brand-label', 'Business name'));
-            const input = el('input', 'le-input'); input.maxLength = 120; input.value = identityValue(identity.nameKey); input.placeholder = 'Business name'; input.dataset.brandField = identity.nameKey;
+            // What the website shows now, so the field never looks empty while the page has a name (first-time owner
+            // walk, 7 Nov 2026: Brand read as though nothing was set). Saved only when changed.
+            const shownName = String(doc.querySelector('[data-brand-name]')?.textContent ?? '').replace(/\s+/g, ' ').trim();
+            const input = el('input', 'le-input'); input.maxLength = 120; input.value = identityValue(identity.nameKey) || shownName; input.placeholder = 'Business name'; input.dataset.brandField = identity.nameKey;
             input.addEventListener('input', () => { pending[identity.nameKey] = input.value; changed(); });
             row.append(input); fields.append(row);
         }
         if (identity.logoKey) {
             const row = el('div', 'le-brand-face'); row.append(el('span', 'le-brand-label', 'Logo'));
             const logoFields = el('div', 'le-brand-logo-fields');
-            const input = el('input', 'le-input'); input.type = 'url'; input.value = identityValue(identity.logoKey); input.placeholder = 'Paste a logo URL'; input.dataset.brandField = identity.logoKey;
-            input.addEventListener('input', () => { pending[identity.logoKey] = input.value.trim(); changed(); });
-            logoFields.append(input);
+            // The logo the website shows now, then upload, then a link for whoever has one: the order an owner reaches
+            // for them (first-time owner walk, 7 Nov 2026: Logo led with "Paste a logo URL" and showed no logo).
+            const onPage = doc.querySelector('img[data-logo], [data-logo] img');
+            const shownLogo = identityValue(identity.logoKey) || onPage?.currentSrc || onPage?.getAttribute('src') || '';
+            const now = el('img', 'le-brand-logo-now');
+            now.alt = 'Your logo now';
+            const showLogo = (src) => { now.hidden = !src; if (src) now.src = src; };
+            showLogo(shownLogo);
+            logoFields.append(now);
+            const input = el('input', 'le-input'); input.type = 'url'; input.value = identityValue(identity.logoKey); input.placeholder = 'Or paste a link to your logo'; input.dataset.brandField = identity.logoKey;
+            input.setAttribute('aria-label', 'Or paste a link to your logo');
+            input.addEventListener('input', () => { pending[identity.logoKey] = input.value.trim(); changed(); showLogo(input.value.trim() || shownLogo); });
             if (upload) {
                 const picker = uploadWidget({
-                    hint: 'Choose an image file',
+                    title: 'Upload your logo',
+                    hint: 'PNG, JPG, SVG or WEBP, or drag one here',
                     compact: true,
                     onFile: async (file) => {
-                        try { input.value = await upload(file); pending[identity.logoKey] = input.value; changed(); }
+                        try { input.value = await upload(file); pending[identity.logoKey] = input.value; changed(); showLogo(input.value); }
                         catch (error) { notify(error?.message || 'Your logo could not be uploaded.'); }
                     },
                 });
-                picker.setAttribute('aria-label', 'Upload logo');
+                picker.setAttribute('aria-label', 'Upload your logo');
                 logoFields.append(picker);
             }
+            logoFields.append(input);
             row.append(logoFields);
             fields.append(row);
         }
@@ -376,8 +390,10 @@ export const renderBrandPanel = ({ container, config, save, upload, done, notify
             if (!isAddress) input.type = contact.link === 'mailto' ? 'email' : 'tel';
             else input.rows = 2;
             input.maxLength = isAddress ? 240 : (contact.link === 'mailto' ? 120 : 32);
-            input.value = identityValue(contact.key);
-            input.placeholder = (doc.querySelector(`[${contact.marker}]:not([${contact.marker}="link"])`)?.textContent ?? '').trim() || contact.label;
+            // What the website shows now, not a grey hint of it; saved only when changed.
+            const shown = String(doc.querySelector(`[${contact.marker}]:not([${contact.marker}="link"])`)?.textContent ?? '').replace(/\s+/g, ' ').trim();
+            input.value = identityValue(contact.key) || shown;
+            input.placeholder = contact.label;
             input.dataset.brandField = contact.key;
             input.addEventListener('input', () => { pending[contact.key] = input.value.trim(); changed(); });
             row.append(input); fields.append(row);
