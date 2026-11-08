@@ -5870,8 +5870,23 @@ const bootLiveEdit = () => {
             // wide enough for the grid's columns, as a spreadsheet wants
             drawer.classList.add('is-grid');
             const slots = startSaleReading();
-            const stock = await stockAsked;
+            // The stock is asked first, but a busy host can be slow to answer: the grid opens without its In stock
+            // column rather than wait, and draws it once the answer comes (or says so, if the owner is typing).
+            const waited = await Promise.race([stockAsked, new Promise((resolve) => window.setTimeout(() => resolve(undefined), 1500))]);
             if (current !== opened) return;
+            const stock = waited === undefined ? null : waited;
+            if (waited === undefined) {
+                void stockAsked.then((late) => {
+                    if (!Array.isArray(late) || current !== opened) return;
+                    if (!current.dirty) {
+                        void editFlashSale({ pressed, productId, here, ends });
+
+                        return;
+                    }
+                    const ready = el('p', 'le-hint le-hint--callout', 'In stock is ready. Save or undo your changes here to see it.');
+                    drawerFields.prepend(ready);
+                });
+            }
             if (!slots.length) {
                 reading.textContent = 'None of your products can be put on sale here: their pages have no sale price.';
 
