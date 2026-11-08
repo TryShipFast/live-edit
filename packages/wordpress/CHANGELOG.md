@@ -1,6 +1,6 @@
 # ShipFast Live Edit for WordPress
 
-## 0.20.18 (unreleased)
+## 0.20.18 (8 Nov 2026)
 
 - A flash sale is set as a whole, in one grid (owner, 8 Nov 2026: "sales card must be editable at once, not each being
   editable one by one"; "just like we can edit tables, cards"; on a countdown, "it should open so that it can be
