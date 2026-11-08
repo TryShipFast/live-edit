@@ -6070,10 +6070,50 @@ const bootLiveEdit = () => {
                 measuring.src = src;
             };
 
+            /*
+             * The page shows the picture chosen, not only this panel (first-time owner walk, 7 Nov 2026: the hero kept
+             * the old photo until a reload, while the panel said "This is a preview"). A srcset or a <picture>'s sources
+             * outrank src, so they are set aside while it is previewed; all of it is put back on Discard, and replaced
+             * by what was saved on Save, as words are.
+             */
+            let pagePutBack = null;
+            const previewOnThePage = (src) => {
+                const target = current?.element;
+                if (!target?.isConnected) return;
+                if (!pagePutBack) {
+                    const isImage = target.tagName === 'IMG';
+                    const sources = isImage && target.parentElement?.tagName === 'PICTURE'
+                        ? [...target.parentElement.children].filter((child) => child.tagName === 'SOURCE') : [];
+                    const was = isImage
+                        ? { src: target.getAttribute('src'), srcset: target.getAttribute('srcset'), sizes: target.getAttribute('sizes'), sources: sources.map((source) => [source, source.getAttribute('srcset')]) }
+                        : { background: target.style.backgroundImage };
+                    pagePutBack = () => {
+                        if (!target.isConnected) return;
+                        if (!isImage) { target.style.backgroundImage = was.background; return; }
+                        for (const [name, value] of [['src', was.src], ['srcset', was.srcset], ['sizes', was.sizes]]) {
+                            if (value === null) target.removeAttribute(name); else target.setAttribute(name, value);
+                        }
+                        was.sources.forEach(([source, value]) => { if (value !== null) source.setAttribute('srcset', value); });
+                    };
+                    const restoreBefore = current.restore;
+                    current.restore = () => { pagePutBack?.(); restoreBefore?.(); };
+                }
+                if (target.tagName === 'IMG') {
+                    target.removeAttribute('srcset');
+                    target.removeAttribute('sizes');
+                    if (target.parentElement?.tagName === 'PICTURE') {
+                        [...target.parentElement.children].filter((child) => child.tagName === 'SOURCE').forEach((source) => source.setAttribute('srcset', src));
+                    }
+                    target.src = src;
+                } else {
+                    target.style.backgroundImage = `url("${String(src).replace(/"/g, '%22')}")`;
+                }
+            };
             const showPreview = (src) => {
                 preview.replaceChildren(previewImg);
                 previewImg.src = src;
                 sayIfItWillBeCut(src);
+                previewOnThePage(src);
             };
 
             const fileWrap = uploadWidget({

@@ -1,5 +1,12 @@
 # ShipFast Live Edit for WordPress
 
+## 0.20.10
+
+- A photo chosen shows on the page at once (first-time owner walk, 7 Nov 2026). The panel showed the new picture and
+  said "This is a preview", while the page kept the old one until a reload: a photo with a srcset (or a <picture>'s
+  sources) ignores a new src. The page's picture, or background, now shows the one chosen, its srcset and sources set
+  aside meanwhile; Discard puts all of it back, Save keeps the new one (checked on Car Wash Auto's hero).
+
 ## 0.20.9
 
 - A card moves where the button says (owner, 8 Nov 2026: "the move should be contextual to how each section or
