@@ -1707,6 +1707,19 @@ textarea.le-input { border-radius: var(--le-r-control); }
 .le-crumb-back { margin-right: 0; }
 .le-fields input, .le-fields textarea, .le-fields select { scroll-margin: 12px 0 96px; }
 @media (min-width: 761px) { .le-toolbar { gap: 8px; } }
+.le-toolbar.is-editing .le-dot { box-shadow: none; }
+/* a sticky foot inside the fields runs the panel's full width, no wider */
+.le-brand-dock, .le-sitemap-actions { margin-left: -24px; margin-right: -24px; padding-left: 24px; padding-right: 24px; }
+.le-page-line, .le-modal-foot { align-items: baseline; }
+/* the line between sections is the page's, not drawn over a wide grid */
+:host(.le-grid-open) .le-insert { display: none !important; }
+@media (max-width: 760px) {
+  .le-brand-dock, .le-sitemap-actions { margin-left: -16px; margin-right: -16px; padding-left: 16px; padding-right: 16px; }
+  /* on a phone the open panel or help is the whole subject: the bar and the page's outline give way */
+  :host(.le-help-open) .le-toolbar { display: none; }
+  :host(.le-drawer-open) .le-hover { display: none !important; }
+  :host(.le-drawer-open) .le-insert, :host(.le-drawer-open) .le-sale-labels { display: none !important; }
+}
 .le-inside-list { display: grid; gap: 8px; }
 /* a table in its wide panel: the first column's names whole, a column's delete beside its name, never on it */
 .le-drawer.is-grid .le-figures:not(.le-sale-grid .le-figures) tr > :nth-child(2) { min-width: 200px; }
@@ -2524,6 +2537,8 @@ export function createChrome() {
     shadow.append(toolbar, sheetScrim, sheet, tip, drawer, linkHandle, bgHandle, hoverBox, sectionInsert.line, sectionInsertEnd.line);
     // arrows, chevrons and crosses drawn, not typed (glyphs.js)
     iconizeGlyphs(shadow);
+    // help open: said on the host, so on a phone the bar gives way to it
+    new MutationObserver(() => root.classList.toggle('le-help-open', Boolean(shadow.querySelector('.le-help-menu')))).observe(shadow, { childList: true });
 
     // "Saved" can go by in a second; "this didn't take effect" is a sentence
     // somebody has to finish reading before it disappears.
