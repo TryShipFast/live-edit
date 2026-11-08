@@ -441,7 +441,7 @@ a.le-mark:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
 /* The tick and the product's name stay in view while the grid scrolls sideways (a phone). */
 .le-figures .le-col-tick { position: sticky; left: 0; z-index: 1; background: #fff; }
 .le-figures thead .le-col-tick { background: #f6f7f9; }
-.le-figures tr > .le-col-read:nth-child(2) { position: sticky; left: 64px; z-index: 1; background: #fff; box-shadow: inset -1px 0 0 #eef0f3; }
+.le-figures tr > .le-col-read:nth-child(2) { position: sticky; left: 64px; z-index: 1; background: #fff; }
 .le-figures thead tr > .le-col-read:nth-child(2) { background: #f6f7f9; }
 .le-figures tr.is-picked > .le-col-tick, .le-figures tr.is-picked > .le-col-read:nth-child(2) { background: #f2f6ff; }
 .le-figures-tick { width: 18px; height: 18px; accent-color: var(--le-accent); cursor: pointer; }
@@ -467,7 +467,17 @@ a.le-mark:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
 .le-sale-grid td.le-col-read .le-figures-read { white-space: normal; max-width: none; overflow: visible; padding: 9px 8px; line-height: 1.35; }
 .le-sale-grid .le-figures tr > .le-col-read:nth-child(2) { left: 56px; }
 .le-sale-grid .le-figures-cell { padding: 9px 8px; }
+/* a price that is read and the boxes beside it: one height, so their words share a line */
+.le-sale-grid td:nth-child(n+3) .le-figures-read { display: flex; align-items: center; min-height: 40px; padding: 0 8px; box-sizing: border-box; }
+.le-sale-grid td:nth-child(n+3) .le-figures-cell { height: 40px; padding: 0 8px; box-sizing: border-box; }
 .le-sale-reading { margin: 0; }
+.le-figures-th { display: none; }
+/* Lines only where spacing does not already do it (owner, 8 Nov 2026: "there are some unneeded lines"): light row
+   separators, no line between cells, none under the panel's title while the grid is open. */
+:host .le-sale-grid .le-figures-cell { border-left: 0; }
+.le-drawer.is-grid .le-subject { border-bottom: 0; padding-bottom: 6px; }
+/* a box being typed in is kept clear of the Save bar stuck to the foot */
+.le-sale-grid input { scroll-margin: 12px 0 84px; }
 .le-sale-ask { display: grid; gap: 8px; margin: -6px 0 0; }
 .le-sale-ask p { margin: 0; }
 /* A product's sizes: their stock in a few words, opened under the product to type each count. */
@@ -482,38 +492,48 @@ a.le-mark:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
 .le-sale-size.is-sold-out .le-sale-size-name::after { content: ' · Sold out'; color: #b42318; font-weight: 600; }
 .le-sale-grid td.le-col-read:nth-child(3) .le-figures-read { color: #3b4150; }
 /* A phone: each product reads as a small card (the same rows, stacked): its tick and name, then its price, sale price and
-   % off side by side, each named, then its stock. No sideways scroll. */
+   % off side by side, each named, then its stock; its sizes, opened, inside the same card. One spacing throughout: 10px
+   between cards, 12px inside them, 8px between columns, 10px between lines, 4px between a name and its value. */
 @media (max-width: 600px) {
-  .le-sale-grid .le-figures-scroll { overflow: visible; border: 0; background: transparent; }
-  .le-sale-grid .le-figures, .le-sale-grid .le-figures tbody { display: block; table-layout: auto; }
+  .le-sale-grid .le-figures-scroll { overflow: visible; border: 0; background: transparent; border-radius: 0; }
+  .le-sale-grid .le-figures, .le-sale-grid .le-figures tbody { display: block; table-layout: auto; width: 100%; }
   .le-sale-grid .le-figures thead { display: none; }
   .le-sale-grid .le-figures tbody > tr:not(.le-sale-sizes) {
-    display: grid; grid-template-columns: 44px repeat(3, minmax(0, 1fr)); column-gap: 6px; align-items: end;
-    border: 1px solid #e3e5ea; border-radius: 12px; margin-bottom: 8px; padding: 4px 8px 8px 0; background: #fff;
+    display: grid; grid-template-columns: 28px repeat(3, minmax(0, 1fr)); gap: 10px 8px; align-items: start;
+    border: 1px solid #e3e5ea; border-radius: 12px; margin: 0 0 10px; padding: 12px; background: #fff; box-sizing: border-box;
   }
-  .le-sale-grid .le-figures tbody > tr > td { display: block; width: auto !important; min-width: 0 !important; border: 0; position: static !important; box-shadow: none !important; background: transparent !important; }
-  .le-sale-grid .le-figures tr > td:nth-child(1) { grid-column: 1; grid-row: 1; align-self: center; padding: 0; }
+  .le-sale-grid .le-figures tbody > tr > td { display: block; width: auto !important; min-width: 0 !important; padding: 0 !important; border: 0 !important; position: static !important; box-shadow: none !important; background: transparent !important; }
+  .le-sale-grid .le-figures tr > td:nth-child(1) { grid-column: 1; grid-row: 1; align-self: center; text-align: left; }
+  .le-sale-grid .le-figures tr > td:nth-child(1) .le-figures-tick-hit { min-height: 28px; justify-content: flex-start; }
   .le-sale-grid .le-figures tr > td:nth-child(2) { grid-column: 2 / -1; grid-row: 1; align-self: center; }
-  .le-sale-grid .le-figures tr > td:nth-child(2) .le-figures-read { font-weight: 600; color: #0b0c0f; padding: 10px 0 6px; }
+  .le-sale-grid .le-figures tr > td:nth-child(2) .le-figures-read { font-weight: 600; color: #0b0c0f; padding: 0; line-height: 1.35; }
   .le-sale-grid .le-figures tr > td:nth-child(3) { grid-column: 2; grid-row: 2; }
   .le-sale-grid .le-figures tr > td:nth-child(4) { grid-column: 3; grid-row: 2; }
   .le-sale-grid .le-figures tr > td:nth-child(5) { grid-column: 4; grid-row: 2; }
-  .le-sale-grid .le-figures tr > td:nth-child(6) { grid-column: 2 / -1; grid-row: 3; margin-top: 6px; }
-  .le-sale-grid .le-figures tr > td:nth-child(n+3)::before { content: attr(data-th); display: block; font-size: 11px; font-weight: 600; color: #6b7280; margin-bottom: 3px; }
+  .le-sale-grid .le-figures tr > td:nth-child(6) { grid-column: 2 / -1; grid-row: 3; }
+  .le-sale-grid .le-figures tr > td:nth-child(-n+2) .le-figures-th { display: none; }
+  .le-sale-grid .le-figures tr > td:nth-child(n+3) .le-figures-th { display: block; font-size: 11px; line-height: 16px; height: 16px; font-weight: 600; color: #6b7280; margin: 0 0 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .le-sale-grid .le-figures tr > td.is-blank:nth-child(n+4) { display: none; }
-  .le-sale-grid .le-figures tr > td:nth-child(n+3) .le-figures-read { padding: 8px 0; }
-  .le-sale-grid .le-figures tr > td:nth-child(n+3) .le-figures-cell { border: 1px solid #d9dde4; border-radius: 8px; padding: 8px; min-height: 40px; background: #fff; }
+  /* a value that is read sits on the same line as the boxes beside it */
+  .le-sale-grid .le-figures tr > td:nth-child(n+3) .le-figures-read { display: flex; align-items: center; min-height: 40px; padding: 0; border: 1px solid transparent; box-sizing: border-box; line-height: 1.2; }
+  .le-sale-grid .le-figures tr > td:nth-child(n+3) .le-figures-cell { display: block; width: 100%; box-sizing: border-box; border: 1px solid #d9dde4; border-radius: 8px; padding: 0 8px; height: 40px; min-height: 40px; background: #fff; }
   .le-sale-grid .le-figures tr > td:nth-child(6) .le-figures-cell { max-width: 120px; }
-  .le-sale-grid .le-sale-sizes-toggle { border: 1px solid #d9dde4; border-radius: 8px; }
+  .le-sale-grid .le-sale-sizes-toggle { min-height: 40px; height: 40px; border: 1px solid #d9dde4; border-radius: 8px; padding: 0 10px; box-sizing: border-box; }
   .le-sale-grid .le-figures tr.is-picked { background: #f2f6ff; }
-  .le-figures tr.le-sale-sizes { display: block; margin: -4px 0 10px 44px; }
-  .le-figures tr.le-sale-sizes > td { display: block; padding: 8px; border-radius: 10px; }
-  .le-sale-sizes-list { grid-template-columns: 1fr; }
-  .le-sale-size-name { white-space: nowrap; }
+  /* a product with its sizes open: its card goes on round them */
+  .le-sale-grid .le-figures tbody > tr.has-under { margin-bottom: 0; border-bottom-color: transparent; border-radius: 12px 12px 0 0; padding-bottom: 6px; }
+  .le-figures tr.le-sale-sizes { display: block; margin: 0 0 10px; padding: 0 12px 12px 48px; border: 1px solid #e3e5ea; border-top-color: transparent; border-radius: 0 0 12px 12px; background: #fff; box-sizing: border-box; }
+  .le-sale-grid .le-figures tr.is-picked + tr.le-sale-sizes { background: #f2f6ff; }
+  .le-figures tr.le-sale-sizes > td { display: block; padding: 0 !important; border: 0 !important; background: transparent !important; }
+  .le-sale-sizes-list { grid-template-columns: 1fr; gap: 8px; }
+  .le-sale-size { min-width: 0; }
+  .le-sale-size-name { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+  .le-sale-size .le-sale-size-box { width: 88px; height: 40px; min-height: 40px; box-sizing: border-box; }
   .le-sale-grid .le-figures-foot { bottom: -20px; }
 }
+}
 /* Save stays in reach at the foot of the drawer however many products there are, as in a shop's bulk editor. */
-.le-sale-grid .le-figures-foot { position: sticky; bottom: -22px; z-index: 2; background: #fff; padding: 12px 0; margin-bottom: -12px; border-top: 1px solid var(--le-line); }
+.le-sale-grid .le-figures-foot { position: sticky; bottom: -22px; z-index: 2; background: #fff; padding: 12px 0; margin-bottom: -12px; }
 /* A product not ticked: its sale price is kept, greyed, and not used until it is ticked again. */
 .le-figures tr:has(.le-figures-tick:not(:checked)) td.le-col-text .le-figures-cell { color: #6b7280; }
 .le-sale-labels { position: fixed; inset: 0; pointer-events: none; z-index: 2147482998; }

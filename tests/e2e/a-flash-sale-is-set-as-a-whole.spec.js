@@ -193,3 +193,95 @@ test.describe('on a phone', () => {
         await expect(row.locator('td:nth-child(4)')).toHaveAttribute('data-th', 'Sale price');
     });
 });
+
+/*
+ * Nothing overlaps, nothing runs out of its card or the drawer, nothing scrolls sideways (owner, 8 Nov 2026: "make sure
+ * nothing is overlapping"; "all list items are properly spaced"): measured on every text, box and button of the grid,
+ * with a product's sizes open and with rows still loading, at a small phone, a phone, a tablet and a laptop.
+ */
+const layoutProblems = (page) => page.evaluate(() => {
+    const root = document.getElementById('live-edit-ui').shadowRoot;
+    const drawerBox = root.querySelector('.le-drawer').getBoundingClientRect();
+    const grid = root.querySelector('.le-sale-grid');
+    const shown = (node) => {
+        const r = node.getBoundingClientRect();
+        return r.width > 0 && r.height > 0 && getComputedStyle(node).visibility !== 'hidden';
+    };
+    const name = (node) => `${node.tagName.toLowerCase()}.${String(node.className).split(' ')[0]}${node.getAttribute('aria-label') ? `[${node.getAttribute('aria-label')}]` : ''} “${(node.value ?? node.textContent ?? '').trim().slice(0, 24)}”`;
+    const foot = grid.querySelector('.le-figures-foot');
+    const parts = [...grid.querySelectorAll('input, button, .le-figures-read, .le-figures-th, .le-sale-size-name')]
+        .filter((node) => !foot.contains(node) && shown(node));
+    const problems = [];
+    const inside = (a, b) => a.left >= b.left - 0.5 && a.right <= b.right + 0.5 && a.top >= b.top - 0.5 && a.bottom <= b.bottom + 0.5;
+    for (let i = 0; i < parts.length; i += 1) {
+        const a = parts[i].getBoundingClientRect();
+        for (let j = i + 1; j < parts.length; j += 1) {
+            if (parts[i].contains(parts[j]) || parts[j].contains(parts[i])) continue;
+            const b = parts[j].getBoundingClientRect();
+            const w = Math.min(a.right, b.right) - Math.max(a.left, b.left);
+            const h = Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top);
+            if (w > 1 && h > 1) problems.push(`${name(parts[i])} overlaps ${name(parts[j])}`);
+        }
+        const card = parts[i].closest('tr');
+        if (card && !inside(a, card.getBoundingClientRect())) problems.push(`${name(parts[i])} runs outside its row`);
+        if (a.left < drawerBox.left - 0.5 || a.right > drawerBox.right + 0.5) problems.push(`${name(parts[i])} runs outside the drawer`);
+    }
+    // nothing past the panel's own padding
+    const fields = root.querySelector('.le-fields');
+    const fieldsBox = fields.getBoundingClientRect();
+    const pad = getComputedStyle(fields);
+    const left = fieldsBox.left + parseFloat(pad.paddingLeft) - 0.5;
+    const right = fieldsBox.right - parseFloat(pad.paddingRight) + 0.5;
+    for (const node of parts) {
+        const r = node.getBoundingClientRect();
+        if (r.left < left || r.right > right) problems.push(`${name(node)} runs past the panel's padding`);
+    }
+    // a product's sizes are inside its card: the same width, straight under it
+    for (const sizes of grid.querySelectorAll('tr.le-sale-sizes')) {
+        const s = sizes.getBoundingClientRect();
+        const p = sizes.previousElementSibling.getBoundingClientRect();
+        if (Math.abs(s.left - p.left) > 1 || Math.abs(s.right - p.right) > 1 || Math.abs(s.top - p.bottom) > 1) problems.push('a product\'s sizes sit outside its card');
+    }
+    // in a row: the column names on one line, the values on one line
+    for (const tr of grid.querySelectorAll('tbody > tr:not(.le-sale-sizes)')) {
+        const cells = [3, 4, 5].map((n) => tr.querySelector(`td:nth-child(${n})`)).filter((td) => td && shown(td));
+        const tops = (pick) => cells.map(pick).filter((node) => node && shown(node)).map((node) => node.getBoundingClientRect().top);
+        const spread = (list) => (list.length ? Math.max(...list) - Math.min(...list) : 0);
+        if (spread(tops((td) => td.querySelector('.le-figures-th'))) > 1) problems.push(`${tr.textContent.trim().slice(0, 20)}: its column names are not on one line`);
+        if (spread(tops((td) => td.querySelector('input, .le-figures-read'))) > 1) problems.push(`${tr.textContent.trim().slice(0, 20)}: its values are not on one line`);
+    }
+    for (const scroller of [root.querySelector('.le-fields'), grid.querySelector('.le-figures-scroll')]) {
+        if (scroller.scrollWidth > scroller.clientWidth + 1) problems.push(`${scroller.className} scrolls sideways (${scroller.scrollWidth} in ${scroller.clientWidth})`);
+    }
+    // a box typed in is never under the Save bar
+    const typing = root.activeElement;
+    if (typing?.matches?.('input') && grid.contains(typing)) {
+        const t = typing.getBoundingClientRect();
+        const f = foot.getBoundingClientRect();
+        if (t.bottom > f.top + 1 && t.top < f.bottom) problems.push(`${name(typing)} is under the Save bar`);
+    }
+
+    return problems;
+});
+
+for (const [width, height] of [[320, 640], [390, 844], [768, 1024], [1440, 900]]) {
+    test(`at ${width}px nothing in the grid overlaps or runs out, loading or with sizes open`, async ({ page }) => {
+        await site.close();
+        site = await serveFakeHost({ sale: { stock: STOCK, slow: 4000 } });
+        await page.setViewportSize({ width, height });
+        await openAsEditor(page, 'products/aster-veil');
+        await page.locator('[data-kit-sale-price]').click();
+        await expect(drawer(page).locator('.le-sale-reading')).toBeVisible();
+        await sheet(page).locator('[data-summary-row="0"]').click();
+        await expect(sheet(page).locator('.le-sale-size')).toHaveCount(2);
+        expect(await layoutProblems(page)).toEqual([]);
+        // every row loaded
+        await expect(drawer(page).locator('.le-sale-reading')).toBeHidden({ timeout: 15000 });
+        expect(await layoutProblems(page)).toEqual([]);
+        // typing in the last box: brought clear of the Save bar
+        await sheet(page).getByLabel('Aster Veil, 100ml, in stock').fill('3');
+        await sheet(page).locator('[data-row="1"][data-col="5"]').focus();
+        await page.waitForTimeout(300);
+        expect(await layoutProblems(page)).toEqual([]);
+    });
+}

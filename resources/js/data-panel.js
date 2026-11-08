@@ -400,6 +400,10 @@ export const renderDataGrid = ({ heads = [], rows = [], fixedColumns = false, mo
     const scroll = el('div', 'le-figures-scroll');
     const table = el('table', 'le-figures');
     scroll.append(table);
+    // a box taken to is brought into view, clear of anything stuck over the panel's foot (its scroll margin)
+    table.addEventListener('focusin', (event) => {
+        if (event.target.matches?.('input')) event.target.scrollIntoView?.({ block: 'nearest' });
+    });
     const tools = el('div', 'le-figures-tools');
     const count = el('span', 'le-figures-count');
     const why = el('div', 'le-data-why');
@@ -564,7 +568,13 @@ export const renderDataGrid = ({ heads = [], rows = [], fixedColumns = false, mo
             cells.forEach((value, c) => {
                 const td = el('td', kinds[c] ? `le-col-${kinds[c]}` : undefined);
                 // its column's name, for a phone, where each row reads as a small card (CSS, a narrow drawer)
-                if (fixedColumns && kinds.length) td.dataset.th = state.heads[c] ?? '';
+                if (fixedColumns && kinds.length) {
+                    td.dataset.th = state.heads[c] ?? '';
+                    // said above the value where rows stack; the box itself is named for a screen reader
+                    const th = el('span', 'le-figures-th', state.heads[c] ?? '');
+                    th.setAttribute('aria-hidden', 'true');
+                    td.append(th);
+                }
                 const own = renderCell?.(r, c, value) ?? null;
                 if (!own && kindOf?.(r, c) === 'blank') td.classList.add('is-blank');
                 td.append(own ?? (kinds.length ? cellFor(value, r, c) : input(value, `Row ${r + 1}, ${state.heads[c] || `column ${c + 1}`}`, r, c)));
@@ -573,7 +583,10 @@ export const renderDataGrid = ({ heads = [], rows = [], fixedColumns = false, mo
             if (fixedRows) {
                 body.append(tr);
                 const under = afterRow?.(r);
-                if (under) body.append(under);
+                if (under) {
+                    tr.classList.add('has-under');
+                    body.append(under);
+                }
 
                 return;
             }

@@ -1,5 +1,18 @@
 # ShipFast Live Edit for WordPress
 
+## 0.20.19 (unreleased)
+
+- The sale and stock grid is evenly spaced and nothing in it overlaps (owner, 8 Nov 2026: "make sure nothing is
+  overlapping"; "all list items are properly spaced"; "there are some unneeded lines"). On a phone a product's sizes
+  open inside its card (the same box and padding), each size a line with its name on the left and its box on the right;
+  Price, Sale price and % off share one line of names and one line of values; every card has the same 12px inside and
+  10px between; a box being typed in is brought clear of the Save bar stuck to the foot. On a laptop the price that is
+  read and the boxes beside it share a line too. Lines that spacing already does the job of are gone: none between
+  cells, none above the Save bar, none under the panel's title while the grid is open; light row separators stay.
+  Proved by measuring every text, box and button of the grid at 320, 390, 768 and 1440 pixels, while rows are loading
+  and with a product's sizes open (`a-flash-sale-is-set-as-a-whole.spec.js`): no two overlap, none runs out of its row,
+  its card, the panel's padding or the drawer, and nothing scrolls sideways.
+
 ## 0.20.18 (8 Nov 2026)
 
 - A flash sale is set as a whole, in one grid (owner, 8 Nov 2026: "sales card must be editable at once, not each being
