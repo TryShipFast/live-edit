@@ -5150,7 +5150,9 @@ const bootLiveEdit = () => {
              * steps named alike, the list, so the section's panel was never reached). The Photographer, 7 Nov 2026.
              */
             const around = element.parentElement?.closest?.('a[href], button');
-            const beside = element.matches?.('[data-edit-list]') && element.parentElement
+            // Not a page's list of sections: everything beside it is the header and footer, whose logo's
+            // ", home" showed as two stray chips over the page's sections (first-time owner walk, 7 Nov 2026).
+            const beside = element.matches?.('[data-edit-list]') && element.dataset.editListKind !== 'sections' && element.parentElement
                 ? [...element.parentElement.children].filter((child) => child !== element) : [];
             const spoken = [...new Set([element, around, ...beside].filter(Boolean).flatMap((scope) => [scope, ...scope.querySelectorAll('[data-edit]')]))]
                 .filter((node) => node !== element && node.matches?.('[data-edit]') && heardNotSeen(node) && node.textContent.trim() !== '');
@@ -6860,7 +6862,11 @@ const bootLiveEdit = () => {
             hideInserts();
             if (list) openSectionPicker({ list, after: null, only: formsGroup() });
         });
-        // The bar's "+ Section": the page's sections panel, which adds one at the end and lists the rest.
+        /*
+         * The bar's "+ Section": the add window, at the end of the page (first-time owner walk, 7 Nov 2026: it
+         * opened the page's list of sections, and adding was one more press away). The list of sections is still
+         * there from any section's own panel.
+         */
         const refreshSectionsButton = () => {
             if (ui.sectionsButton) ui.sectionsButton.hidden = !(canAddSections() && shownSectionLists().length);
             if (document.body.classList.contains('editing')) drawEndInsert();
@@ -6869,7 +6875,7 @@ const bootLiveEdit = () => {
         ui.sectionsButton?.addEventListener('click', () => {
             if (!document.body.classList.contains('editing')) setEditing(true);
             const list = endList();
-            if (list) switchToNode(list);
+            if (list) openSectionPicker({ list, after: null });
         });
         refreshSectionsButton();
         new MutationObserver(refreshSectionsButton).observe(document.body, { attributes: true, attributeFilter: ['class'] });

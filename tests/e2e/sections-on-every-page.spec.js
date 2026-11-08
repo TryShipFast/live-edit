@@ -47,6 +47,16 @@ const sectionsOf = (path) => [...site.host.draw(path).querySelectorAll('[data-ed
 /** Where every section sits on the page, so nothing can be seen to move. */
 const positions = (page) => page.evaluate(() => [...document.querySelectorAll('[data-edit-item]')].map((el) => Math.round(el.getBoundingClientRect().top + window.scrollY)));
 
+/** A section opened the way an owner opens it: pressing its words on the page; its panel has the section's tools. */
+const openSection = async (page, item) => {
+    await page.keyboard.press('Escape');
+    const words = page.locator(`[data-edit-item="${item}"] [data-edit]`).first();
+    await words.scrollIntoViewIfNeeded();
+    // the line for adding between sections can sit over a heading at the top of a section
+    await words.dispatchEvent('click');
+    await expect(ui(page).locator('.le-drawer').getByText('This section', { exact: true })).toBeVisible();
+};
+
 /** Choose one from the library window and add it; the page loads again to draw it. */
 const addFromLibrary = async (page, label) => {
     const window_ = ui(page).locator('.le-modal');
@@ -114,23 +124,17 @@ test('the end of a page the design came with offers a section, and it goes last'
     await expect(page.locator(`[data-edit-item="s-${id}"] p`)).toHaveText('Neroli picked at dawn, laid over cedar.');
 });
 
-test('the bar opens the page sections panel: add one, open one, and take an added one off again', async ({ page }) => {
+test('the bar\'s + Section opens the add window at the end of the page; an added one can be taken off again', async ({ page }) => {
     await openAsEditor(page, 'journal/salt-air');
+    // First-time owner walk, 7 Nov 2026: "+ Section" opened a list of the page's sections, and adding was one more press.
     await ui(page).getByRole('button', { name: '+ Section' }).click();
-    const drawer = ui(page).locator('.le-drawer');
-    await expect(drawer.getByText('On this page')).toBeVisible();
-    await expect(drawer.getByRole('button', { name: '1. Post' })).toBeVisible();
-    await expect(drawer.getByRole('button', { name: '2. More posts' })).toBeVisible();
-
-    await drawer.getByRole('button', { name: '+ Add a section' }).click();
     await addFromLibrary(page, 'Story');
     const [id] = Object.keys(site.host.builderFor('journal/salt-air', '').added);
     expect(sectionsOf('journal/salt-air')).toEqual(['s-article=Post', 's-related=More posts', `s-${id}=Story`]);
 
-    // Opened from the list, the added section can go again ("Remove this section").
-    await ui(page).getByRole('button', { name: '+ Section' }).click();
-    await drawer.getByRole('button', { name: '3. Story' }).click();
-    await expect(drawer.getByText('This section', { exact: true })).toBeVisible();
+    // Opened on the page, the added section can go again ("Remove this section").
+    await openSection(page, `s-${id}`);
+    const drawer = ui(page).locator('.le-drawer');
     await drawer.getByRole('button', { name: 'Remove this section' }).click();
     await expect.poll(() => sectionsOf('journal/salt-air')).toEqual(['s-article=Post', 's-related=More posts']);
     expect(site.host.builderFor('journal/salt-air', '').added).toEqual({});
@@ -214,17 +218,15 @@ test('+ Add a form opens on the forms, shows the form, and puts it where the own
     expect(site.host.builderFor('shop', '').added[id]).toBe('kit.form.contact');
     expect(sectionsOf('shop')[0]).toMatch(new RegExp(`^s-${id}=`));
 
-    // The page's sections panel offers it too.
+    // The bar's + Section offers forms too, in the add window.
     await ui(page).getByRole('button', { name: /^\+ Section$|^Sections$/ }).first().click();
-    await expect(ui(page).locator('.le-drawer').getByRole('button', { name: '+ Add a form' })).toBeVisible();
+    await expect(ui(page).locator('.le-modal').getByRole('button', { name: 'Forms', exact: true })).toBeVisible();
 });
 
 test('a section the design came with can be deleted too, and is gone from the page (owner, 7 Nov 2026)', async ({ page }) => {
     await openAsEditor(page, 'journal/salt-air');
-    await ui(page).getByRole('button', { name: '+ Section' }).click();
+    await openSection(page, 's-related');
     const drawer = ui(page).locator('.le-drawer');
-    await drawer.getByRole('button', { name: '2. More posts' }).click();
-    await expect(drawer.getByText('This section', { exact: true })).toBeVisible();
     // the design's own section offers Delete as well as Hide; an added one says "Remove this section"
     await expect(drawer.getByRole('button', { name: 'Remove this section' })).toHaveCount(0);
     await drawer.getByRole('button', { name: 'Delete this section' }).click();
@@ -233,14 +235,12 @@ test('a section the design came with can be deleted too, and is gone from the pa
 
 test('the last section of a page cannot be deleted', async ({ page }) => {
     await openAsEditor(page, 'journal/salt-air');
-    await ui(page).getByRole('button', { name: '+ Section' }).click();
+    await openSection(page, 's-related');
     const drawer = ui(page).locator('.le-drawer');
-    await drawer.getByRole('button', { name: '2. More posts' }).click();
     await drawer.getByRole('button', { name: 'Delete this section' }).click();
     await expect.poll(() => sectionsOf('journal/salt-air')).toEqual(['s-article=Post']);
     await page.reload();
     await expect.poll(() => page.evaluate(() => document.body.classList.contains('editing'))).toBe(true);
-    await ui(page).getByRole('button', { name: '+ Section' }).click();
-    await drawer.getByRole('button', { name: '1. Post' }).click();
+    await openSection(page, 's-article');
     await expect(drawer.getByRole('button', { name: 'Delete this section' })).toBeDisabled();
 });

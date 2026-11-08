@@ -1,5 +1,13 @@
 # ShipFast Live Edit for WordPress
 
+## 0.20.7
+
+- "+ Section" in the bar opens Add a section (first-time owner walk, 7 Nov 2026). It opened the page's list of
+  sections, with adding one more press away; it now opens the add window with Put it at the end of the page, as the
+  "+ Add a section" line between sections does. A section's move, delete and remove stay in its own panel.
+- The page's list of sections no longer shows the header's hidden screen-reader words as two chips reading
+  "“, home”" under "Read aloud by screen readers": that list looked at everything beside it, the header and footer.
+
 ## 0.20.6
 
 - The publish review says what was done, the way it was done (first-time owner walk, 7 Nov 2026: "Our promise to
