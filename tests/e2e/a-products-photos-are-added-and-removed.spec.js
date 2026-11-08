@@ -39,7 +39,8 @@ test('a thumbnail opens the product’s photos, to add one or open each to repla
         // A hidden photo (the third) is reached from here, with its own Duplicate and Delete, and the way back.
         await drawer.getByRole('button', { name: 'Photo 3 of 3' }).click();
         await expect(drawer.getByRole('button', { name: /Delete/ }).first()).toBeVisible();
-        await expect(drawer.getByRole('button', { name: /Duplicate/ }).first()).toBeVisible();
+        // copied with + Add a photo (first-time owner walk, 7 Nov 2026: an owner adds one, not duplicates one)
+        await expect(drawer.getByRole('button', { name: /^(\+ Add a|Duplicate)/ }).first()).toBeVisible();
         await drawer.getByRole('button', { name: 'All the photos' }).click();
         await expect(drawer.locator('.le-gallery-photo')).toHaveCount(3);
 

@@ -1707,6 +1707,12 @@ textarea.le-input { border-radius: var(--le-r-control); }
 .le-crumb-back { margin-right: 0; }
 .le-fields input, .le-fields textarea, .le-fields select { scroll-margin: 12px 0 96px; }
 @media (min-width: 761px) { .le-toolbar { gap: 8px; } }
+/* the smallest phones: the bar's words whole (Publish was cut to "Publi") */
+@media (max-width: 360px) { .le-toolbar { gap: 3px; } .le-toolbar .le-publish { gap: 4px; } .le-toolbar .le-publish > span:first-child { overflow: visible; text-overflow: clip; } }
+.le-fields-dock { flex: none; background: #fff; }
+.le-fields-dock:empty { display: none; }
+.le-fields-dock > .le-brand-dock, .le-fields-dock > .le-sitemap-actions { position: static; margin: 0; padding: 12px 24px 16px; }
+@media (max-width: 760px) { .le-fields-dock > .le-brand-dock, .le-fields-dock > .le-sitemap-actions { padding: 12px 16px 16px; } }
 .le-toolbar.is-editing .le-dot { box-shadow: none; }
 /* a sticky foot inside the fields runs the panel's full width, no wider */
 .le-brand-dock, .le-sitemap-actions { margin-left: -24px; margin-right: -24px; padding-left: 24px; padding-right: 24px; }
@@ -2496,7 +2502,21 @@ export function createChrome() {
     footStatus.setAttribute('aria-live', 'polite');
     foot.append(footStatus, drawerDelete, cancelButton, saveButton);
 
-    drawer.append(head, subtabs, subject, drawerFields, foot);
+    /*
+     * A panel's own Save bar (Brand's, the sitemap's) sits under its fields, outside what scrolls, so nothing is ever
+     * under it (owner, 8 Nov 2026: "nothing is overlapping"). Moved here from the fields when a panel draws one, and
+     * let go when that panel is replaced.
+     */
+    const fieldsDock = el('div', 'le-fields-dock');
+    const DOCKED = '.le-brand-dock, .le-sitemap-actions';
+    new MutationObserver(() => {
+        for (const kept of [...fieldsDock.children]) if (!drawerFields.contains(kept.__home)) kept.remove();
+        for (const dock of drawerFields.querySelectorAll(`:scope > ${DOCKED}`)) {
+            fieldsDock.append(dock);
+            dock.__home = drawerFields.firstElementChild;
+        }
+    }).observe(drawerFields, { childList: true });
+    drawer.append(head, subtabs, subject, drawerFields, fieldsDock, foot);
 
     // ---- floating link handle ---------------------------------------------
     const linkHandle = el('button', 'le-handle');
@@ -2535,6 +2555,30 @@ export function createChrome() {
     const sectionInsertEnd = inserter('le-insert-end');
 
     shadow.append(toolbar, sheetScrim, sheet, tip, drawer, linkHandle, bgHandle, hoverBox, sectionInsert.line, sectionInsertEnd.line);
+    /*
+     * "+ Add a section" never sits under the editor's bar: placed by the page's sections, its buttons slide along
+     * their line to the left of the bar, or rise above it when there is no room (owner, 8 Nov 2026: "nothing is
+     * overlapping").
+     */
+    const clearOfTheBar = (insert) => {
+        const buttons = insert.line.querySelector('.le-insert-btns');
+        const place = () => {
+            buttons.style.left = '';
+            buttons.style.marginTop = '';
+            const bar = toolbar.getBoundingClientRect();
+            const b = buttons.getBoundingClientRect();
+            if (!bar.width || !b.width || getComputedStyle(toolbar).display === 'none') return;
+            const under = b.bottom > bar.top - 8 && b.top < bar.bottom + 8 && b.right > bar.left - 8 && b.left < bar.right + 8;
+            if (!under) return;
+            const line = insert.line.getBoundingClientRect();
+            const centre = bar.left - 16 - b.width / 2;
+            if (centre - b.width / 2 >= Math.max(8, line.left)) buttons.style.left = `${centre - line.left}px`;
+            else buttons.style.marginTop = `${-(b.bottom - bar.top + 12)}px`;
+        };
+        new MutationObserver(() => requestAnimationFrame(place)).observe(insert.line, { attributes: true, attributeFilter: ['style', 'class'] });
+    };
+    clearOfTheBar(sectionInsert);
+    clearOfTheBar(sectionInsertEnd);
     // arrows, chevrons and crosses drawn, not typed (glyphs.js)
     iconizeGlyphs(shadow);
     // help open: said on the host, so on a phone the bar gives way to it
