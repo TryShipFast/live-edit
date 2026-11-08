@@ -75,7 +75,7 @@ const kindOf = (field) => {
 export const renderShopPanel = ({
     container, config, save, done, notify = () => {}, doc = document,
     categories = [], newCategory = null, categoryProducts = null, importProducts = null, undoImport = null,
-    catalogue = null, upload = null, taken = [], flashSale = null,
+    catalogue = null, upload = null, taken = [], flashSale = null, ask = null,
 }) => {
     const el = (tag, className, text) => {
         const node = doc.createElement(tag);
@@ -311,7 +311,7 @@ export const renderShopPanel = ({
                 const remove = button('le-link-btn le-shop-remove le-shop-remove-choice', 'Remove this choice', `Remove ${choice.name || 'this delivery choice'}`);
                 remove.addEventListener('click', async () => {
                     const win = doc.defaultView ?? window;
-                    if (!win.confirm(`Remove “${choice.name}” from your checkout?`)) return;
+                    if (!(ask ? await ask({ title: `Remove “${choice.name}” from your checkout?`, subtitle: 'Customers no longer see it as a delivery choice.', yes: 'Remove', no: 'Keep it' }) : win.confirm(`Remove “${choice.name}” from your checkout?`))) return;
                     try {
                         await save(list.listKey, JSON.stringify(list.ids.filter((id) => id !== choice.id)));
                         done?.(`“${choice.name}” is removed from your checkout.`);
@@ -549,7 +549,7 @@ export const renderShopPanel = ({
     /* Remove one of the owner's own products: out of the shop and out of every category that shows it. */
     async function removeProduct(product) {
         const win = doc.defaultView ?? window;
-        if (!win.confirm(`Remove ${product.name} from your shop? Its page and its place in your categories go too.`)) return;
+        if (!(ask ? await ask({ title: `Remove ${product.name} from your shop?`, subtitle: 'Its page and its place in your categories go too.', yes: 'Remove', no: 'Keep it' }) : win.confirm(`Remove ${product.name} from your shop? Its page and its place in your categories go too.`))) return;
         try {
             await save(catalogue.key, JSON.stringify(own.filter((p) => p.id !== product.id)));
             for (const category of categories) {

@@ -62,6 +62,7 @@ class EmbedController
         'choice.js' => 'choice.js',
         'sale.js' => 'sale.js',
         'history.js' => 'history.js',
+        'glyphs.js' => 'glyphs.js',
         'shop.js' => 'shop.js',
         'catalogue.js' => 'catalogue.js',
         'help.js' => 'help.js',

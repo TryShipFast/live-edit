@@ -53,9 +53,9 @@ const choose = async (where, selector) => {
 const typeAndSave = async (where, words) => {
     // A card's words open together, the one pressed focused (owner, 8 Nov 2026); a single word opens on its own.
     await where.locator('.le-drawer textarea').first().waitFor();
-    if (await where.locator('.le-item-words-save').count()) {
+    if (await where.locator('.le-item-word').count()) {
         await where.locator('.le-drawer textarea:focus').fill(words);
-        await where.locator('.le-item-words-save').click();
+        await where.locator('.le-foot').getByRole('button', { name: 'Save changes' }).click();
 
         return;
     }
@@ -124,8 +124,8 @@ test('a journal post is edited in place: its body and its pictures', async ({ pa
 
     await choose(detail(page), '[data-item="p2"] span');
     // Two pictures side by side: the move is named for where it goes (owner, 8 Nov 2026), left, not up.
-    await expect(detail(page).getByRole('button', { name: '↑ Move up' })).toHaveCount(0);
-    await detail(page).getByRole('button', { name: '← Move left' }).click();
+    await expect(detail(page).getByRole('button', { name: 'Move up' })).toHaveCount(0);
+    await detail(page).getByRole('button', { name: 'Move left' }).click();
     await expect(detail(page).locator('[data-list="pictures"] [data-edit-item]').first()).toHaveAttribute('data-edit-item', 'p2');
     await done(page);
 

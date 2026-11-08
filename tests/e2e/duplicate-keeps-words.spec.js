@@ -44,7 +44,8 @@ const typeAndSave = async (page, words) => {
     const focused = ui(page).locator('.le-drawer textarea:focus');
     await expect(focused).toHaveCount(1);
     await focused.fill(words);
-    await ui(page).locator('.le-item-words-save').click();
+    // the panel's one Save, at its foot
+    await ui(page).locator('.le-foot').getByRole('button', { name: 'Save changes' }).click();
 };
 
 const drawn = (path = 'shop') => site.host.draw(path);

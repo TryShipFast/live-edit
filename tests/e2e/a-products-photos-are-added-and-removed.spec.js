@@ -40,13 +40,13 @@ test('a thumbnail opens the product’s photos, to add one or open each to repla
         await drawer.getByRole('button', { name: 'Photo 3 of 3' }).click();
         await expect(drawer.getByRole('button', { name: /Delete/ }).first()).toBeVisible();
         await expect(drawer.getByRole('button', { name: /Duplicate/ }).first()).toBeVisible();
-        await drawer.getByRole('button', { name: '← All the photos' }).click();
+        await drawer.getByRole('button', { name: 'All the photos' }).click();
         await expect(drawer.locator('.le-gallery-photo')).toHaveCount(3);
 
         // The photo on show leads to the same panel, with the way back to all of them.
         await page.keyboard.press('Escape');
         await page.locator('.gal-slide img[data-shot="0"]').click();
-        await expect(drawer.getByRole('button', { name: '← All the photos' })).toBeVisible();
+        await expect(drawer.getByRole('button', { name: 'All the photos' })).toBeVisible();
     } finally {
         await site.close();
     }

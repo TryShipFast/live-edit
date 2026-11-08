@@ -1698,6 +1698,12 @@ textarea.le-input { border-radius: var(--le-r-control); }
 .le-sale-sizes-toggle .le-icon-svg { color: var(--le-muted); }
 .le-sale-label { white-space: nowrap; max-width: none !important; }
 .le-inside-list { display: grid; gap: 8px; }
+/* a table in its wide panel: the first column's names whole, a column's delete beside its name, never on it */
+.le-drawer.is-grid .le-figures:not(.le-sale-grid .le-figures) tr > :nth-child(2) { min-width: 200px; }
+.le-figures thead th { position: relative; }
+.le-figures thead .le-figures-x { position: static; transform: none; margin: 0 4px; }
+.le-figures thead th:has(.le-figures-x) { display: table-cell; white-space: nowrap; }
+.le-figures thead th:has(.le-figures-x) .le-figures-cell { display: inline-block; width: calc(100% - 32px); padding-right: 8px; vertical-align: middle; }
 .le-inside-item { display: block; width: 100%; min-height: var(--le-chip); padding: 8px 12px; border: 0; border-radius: var(--le-r-control); background: var(--le-tint); color: var(--le-ink); font: inherit; font-size: 13px; text-align: left; cursor: pointer; overflow-wrap: anywhere; }
 .le-inside-item:hover { background: var(--le-soft); }
 textarea[data-img-attr] { min-height: 64px; resize: vertical; }

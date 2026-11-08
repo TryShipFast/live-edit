@@ -1,6 +1,7 @@
 import { createChrome } from './chrome.js';
 import { createTeam, splitChanges, TEAM_CSS } from './team.js';
 import { describeVersion, versionsWorthShowing } from './history.js';
+import { glyphIcon } from './glyphs.js';
 import { keepClearOfTheBar } from './clear-of-the-bar.js';
 import { openDialogsInPlace } from './dialogs-in-place.js';
 import { PAIRINGS, PALETTES, renderBrandPanel } from './brand.js';
@@ -1609,6 +1610,7 @@ const bootLiveEdit = () => {
             catalogue: window.liveEditPages?.catalogue ?? null,
             taken: window.liveEditPages?.taken ?? [],
             flashSale: () => void editFlashSale(),
+            ask: askTo,
             upload: async (file) => {
                 const body = new FormData();
                 body.append('file', file);
@@ -2570,6 +2572,7 @@ const bootLiveEdit = () => {
             hideHandle();
             hideBgHandle();
             drawer.classList.remove('is-grid');
+            ui.root.classList.remove('le-grid-open');
             drawer.classList.add('is-open');
             ui.root.classList.add('le-drawer-open');
             ui.toolbar.classList.add('is-compact');
@@ -2614,6 +2617,7 @@ const bootLiveEdit = () => {
             current?.restore?.();
             clearStylePreview();
             drawer.classList.remove('is-open', 'is-left', 'is-grid');
+            ui.root.classList.remove('le-grid-open');
             ui.root.classList.remove('le-drawer-open');
             ui.toolbar.classList.remove('is-compact');
             current = null;
@@ -3163,6 +3167,15 @@ const bootLiveEdit = () => {
                             }),
                         });
                     }
+                } else if (current.kind === 'item-words') {
+                    // a card's words, all typed in one panel, saved by its one Save
+                    if (!await current.saveWords()) {
+                        restoreButton();
+                        closeDrawer(true);
+
+                        return;
+                    }
+                    current.dirty = false;
                 } else if (current.kind === 'record') {
                     const fields = {};
                     drawerFields.querySelectorAll('textarea, select, input[type=hidden][name]').forEach((input) => (fields[input.name] = input.value));
@@ -5581,21 +5594,11 @@ const bootLiveEdit = () => {
                 // The page follows as it is typed, where the words are all the element holds.
                 box.addEventListener('input', () => {
                     if (!node.children.length) node.textContent = box.value;
-                    save.disabled = false;
                     // unsaved: a redraw of the panel must not throw it away, and closing asks first
                     if (current) current.dirty = true;
                 });
                 wrap.append(box);
                 drawerFields.append(wrap);
-                // The word pressed keeps its own styling and link, one press away.
-                if (node === focusOn) {
-                    const more = document.createElement('button');
-                    more.type = 'button';
-                    more.className = 'le-chip-btn le-item-words-more';
-                    more.textContent = node.closest('a[href]') ? 'Style and where it goes ›' : 'Style ›';
-                    more.addEventListener('click', () => { const link = node.closest('a[href]'); if (link && item.contains(link)) editLink(link); else { editText(node); offerTheFormBuilder(node); } });
-                    drawerFields.append(more);
-                }
 
                 return { node, key, was, box };
             });
@@ -5615,41 +5618,39 @@ const bootLiveEdit = () => {
                 row.append(thumb, swap);
                 drawerFields.append(row);
             });
-            const save = document.createElement('button');
-            save.type = 'button';
-            save.className = 'le-btn le-btn-primary le-item-words-save';
-            save.textContent = 'Save changes';
-            save.disabled = true;
-            save.addEventListener('click', async () => {
-                save.disabled = true;
-                save.textContent = 'Saving…';
-                try {
-                    for (const field of fields) {
-                        if (field.box.value !== field.was) await saveSetting(field.key, field.box.value);
-                    }
-                    if (current) current.dirty = false;
-                    await settle('Saved ✓', null, null, true);
-                } catch (error) {
-                    notify(error.message);
-                    save.disabled = false;
-                } finally {
-                    save.textContent = 'Save changes';
-                }
-            });
-            drawerFields.append(save);
-            const cardStyle = document.createElement('button');
-            cardStyle.type = 'button';
-            cardStyle.className = 'le-chip-btn';
-            cardStyle.textContent = `${noun ? `${noun[0].toUpperCase()}${noun.slice(1)}` : 'Card'} style: colour and spacing ›`;
-            cardStyle.addEventListener('click', () => editStyle(item));
-            drawerFields.append(cardStyle);
+            // One Save, the panel's own at its foot (editor audit A11): it writes every word typed here.
+            current.saveWords = async () => {
+                const changed = fields.filter((field) => field.box.value !== field.was);
+                for (const field of changed) await saveSetting(field.key, field.box.value);
+
+                return changed.length > 0;
+            };
+            // Style in one place: the word pressed (and where it goes, for a link), or the whole card.
+            const styleFold = document.createElement('details');
+            styleFold.className = 'le-fold le-item-style';
+            const styleSummary = document.createElement('summary');
+            styleSummary.textContent = 'Style';
+            const styleRows = el('div', 'le-inside-list');
+            const pressedWords = fields.find((field) => field.node === focusOn)?.node ?? null;
+            if (pressedWords) {
+                const link = pressedWords.closest('a[href]');
+                const one = el('button', 'le-inside-item', link && item.contains(link) ? `“${shownWords(pressedWords, pressedWords.textContent).slice(0, 40)}”: style and where it goes` : `“${shownWords(pressedWords, pressedWords.textContent).slice(0, 40)}”`);
+                one.type = 'button';
+                one.addEventListener('click', () => { if (link && item.contains(link)) editLink(link); else { editText(pressedWords); offerTheFormBuilder(pressedWords); } });
+                styleRows.append(one);
+            }
+            const whole = el('button', 'le-inside-item', `The whole ${noun || 'card'}: colour and spacing`);
+            whole.type = 'button';
+            whole.addEventListener('click', () => editStyle(item));
+            styleRows.append(whole);
+            styleFold.append(styleSummary, styleRows);
+            drawerFields.append(styleFold);
             const own = [...drawerFields.children];
             listControlsFor(item, 'item');
             // Its words first, its move and delete after them.
             drawerFields.append(...[...drawerFields.children].filter((child) => !own.includes(child)));
             setTrail(item);
             showTab('Edit');
-            ui.drawerFoot.classList.add('le-hidden');
             openDrawer();
             // The box pressed takes the focus at once, and again once the drawer has settled its own, so typing at
             // any speed goes where the owner pressed.
@@ -5691,6 +5692,8 @@ const bootLiveEdit = () => {
             // Each field saves as it is changed (data-panel.js): no Save button to press.
             ui.drawerFoot.classList.add('le-hidden');
             openDrawer();
+            drawer.classList.add('is-grid');
+            ui.root.classList.add('le-grid-open');
         };
 
         /** A table whose columns and rows are lists: edited as a grid. Null for any other table. */
@@ -5724,6 +5727,9 @@ const bootLiveEdit = () => {
             // The grid has its own Save changes.
             ui.drawerFoot.classList.add('le-hidden');
             openDrawer();
+            // a table reads as a spreadsheet: wide, its names whole (editor audit B3)
+            drawer.classList.add('is-grid');
+            ui.root.classList.add('le-grid-open');
         };
 
         /*
@@ -5875,8 +5881,9 @@ const bootLiveEdit = () => {
             showTab('Edit');
             ui.drawerFoot.classList.add('le-hidden');
             openDrawer();
-            // wide enough for the grid's columns, as a spreadsheet wants
+            // wide enough for the grid's columns, as a spreadsheet wants; the bar moves aside
             drawer.classList.add('is-grid');
+            ui.root.classList.add('le-grid-open');
             const slots = startSaleReading();
             // The stock is asked first, but a busy host can be slow to answer: the grid opens without its In stock
             // column rather than wait, and draws it once the answer comes (or says so, if the owner is typing).
@@ -5994,7 +6001,7 @@ const bootLiveEdit = () => {
                     open.dataset.summaryRow = String(r);
                     open.setAttribute('aria-expanded', unfolded.has(r) ? 'true' : 'false');
                     open.setAttribute('aria-label', `${slot.name}: ${summaryOf(slot)}. ${unfolded.has(r) ? 'Hide' : 'Show'} its ${sizes.length} sizes`);
-                    open.append(el('span', 'le-sale-sizes-said', summaryOf(slot)), el('span', 'le-sale-sizes-arrow', unfolded.has(r) ? '▾' : '▸'));
+                    open.append(el('span', 'le-sale-sizes-said', summaryOf(slot)), glyphIcon(unfolded.has(r) ? 'chevronDown' : 'chevronRight'));
                     open.addEventListener('click', () => {
                         if (unfolded.has(r)) unfolded.delete(r);
                         else unfolded.add(r);
@@ -6223,12 +6230,15 @@ const bootLiveEdit = () => {
             if (!editing) return;
             labelled.forEach(({ node, label }) => {
                 const rect = node.getBoundingClientRect();
-                const shown = rect.width > 4 && rect.height > 4 && rect.bottom > 0 && rect.top < window.innerHeight;
+                // out of the way of the outline and its name while that thing is pointed at
+                const shown = rect.width > 4 && rect.height > 4 && rect.bottom > 0 && rect.top < window.innerHeight && hovered !== node && !node.contains(hovered);
                 label.hidden = !shown;
                 if (!shown) return;
-                label.style.top = `${Math.max(0, rect.top + 6)}px`;
-                label.style.left = `${Math.max(4, rect.left + 6)}px`;
-                label.style.maxWidth = `${Math.max(80, rect.width - 12)}px`;
+                // above what it names, never over its words (a struck price); inside its top when there is no room
+                const tall = label.offsetHeight || 22;
+                const above = rect.top - tall - 4;
+                label.style.top = `${above >= 8 ? above : Math.max(0, rect.top + 6)}px`;
+                label.style.left = `${Math.min(Math.max(4, rect.left), window.innerWidth - (label.offsetWidth || 200) - 4)}px`;
             });
         };
         const drawSaleLabels = async () => {
@@ -6266,6 +6276,7 @@ const bootLiveEdit = () => {
             placeSaleLabels();
         };
         window.addEventListener('scroll', () => requestAnimationFrame(placeSaleLabels), { passive: true });
+        document.addEventListener('pointerover', () => requestAnimationFrame(placeSaleLabels), { passive: true });
         window.addEventListener('resize', () => requestAnimationFrame(placeSaleLabels));
         // Read once editing starts (a visitor's page view never reads every product).
         let labelsDrawn = false;
