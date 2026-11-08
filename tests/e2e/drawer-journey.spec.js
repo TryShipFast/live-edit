@@ -181,11 +181,11 @@ test('history shows twenty recent versions and pages older ones', async ({ page,
     // Published changes are the second half of Changes, switched under the tabs.
     await panel(page).locator('.le-tab[data-tab="Changes"]').click();
     await panel(page).locator('.le-subtab[data-tab="History"]').click();
-    await expect(panel(page).locator('.le-version')).toHaveCount(20);
-    await expect(panel(page).locator('.le-pagination')).toContainText('Page 1 of 2');
-    await panel(page).locator('.le-pagination button', { hasText: 'Older' }).click();
-    await expect(panel(page).locator('.le-version')).toHaveCount(5);
-    await expect(panel(page).locator('.le-pagination')).toContainText('Page 2 of 2');
+    // Newest first, with "Show older" at the foot adding the next ones below (owner, 8 Nov 2026).
+    await expect(panel(page).locator('.le-history')).toHaveCount(20);
+    await panel(page).getByRole('button', { name: 'Show older' }).click();
+    await expect(panel(page).locator('.le-history')).toHaveCount(25);
+    await expect(panel(page).getByRole('button', { name: 'Show older' })).toHaveCount(0);
 });
 
 test('an edit does not take the picture beside it', async ({ page, request }) => {

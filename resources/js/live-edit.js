@@ -1,5 +1,6 @@
 import { createChrome } from './chrome.js';
-import { createTeam, groupLines, sentenceFor, splitChanges, TEAM_CSS, versionHeadline } from './team.js';
+import { createTeam, splitChanges, TEAM_CSS } from './team.js';
+import { describeVersion, versionsWorthShowing } from './history.js';
 import { keepClearOfTheBar } from './clear-of-the-bar.js';
 import { openDialogsInPlace } from './dialogs-in-place.js';
 import { PAIRINGS, PALETTES, renderBrandPanel } from './brand.js';
@@ -2369,39 +2370,42 @@ const bootLiveEdit = () => {
             return line;
         };
 
+        /*
+         * History, the way people already read it (Google Docs' Version history, Wix's Site history): each publish
+         * one entry, newest first, with when, who and what by page and section, the words before and after
+         * (history.js); a publish of nothing is not shown; "Show older" at the foot.
+         */
+        let historyShown = [];
         let historyPage = 1;
+        let historyLast = 1;
 
         /*
-         * Taking back one published version, and only that one.
-         *
-         * Says whose work it undoes before it does it, and what it will leave
-         * because somebody changed it again since, so one person's rollback
-         * never quietly takes away another person's work.
+         * Taking back one published version, and only that one: worded for what it does (the engine undoes that
+         * publish's changes; it does not put the whole site back), and asked first.
          */
-        const undoVersion = async (version, button) => {
-            const by = version.published_by ? `${version.published_by}'s` : 'the';
-            const sheet = ui.modal({ title: `Undo ${by} changes from version ${version.number}?`, subtitle: 'Only what that publish changed is put back. Anything somebody changed again since is left as it is.', size: 'is-narrow is-fit' });
-            const list = el('div', 'le-version-lines');
-            for (const group of groupLines(version.lines ?? [])) {
-                list.append(el('p', 'le-version-group', group.label));
-                group.lines.forEach((line) => list.append(el('p', 'le-version-line', sentenceFor(line, team?.you?.id ?? null))));
-            }
-            sheet.body.append(list);
+        const undoVersion = async (version, said, button) => {
+            const count = said.count;
+            const sheet = ui.modal({
+                title: count === 1 ? 'Undo this change?' : `Undo these ${count} changes?`,
+                subtitle: `What you published on ${said.exact} goes back to how it was before, and your site shows that straight away. Anything changed again since then is kept as it is. This undo is kept in History too.`,
+                size: 'is-narrow is-fit',
+            });
+            sheet.body.append(historyChanges(said, Infinity));
             sheet.foot.hidden = false;
             const keep = el('button', 'le-btn-outline', 'Keep them');
             keep.type = 'button';
             keep.addEventListener('click', () => sheet.close());
-            const go = el('button', 'le-btn-publish', 'Undo and publish');
+            const go = el('button', 'le-btn-publish', `Undo ${count} change${count === 1 ? '' : 's'}`);
             go.type = 'button';
             go.addEventListener('click', async () => {
                 go.disabled = true;
-                go.textContent = 'Undoing\u2026';
+                go.textContent = 'Undoing…';
                 try {
                     const response = await request(`/live-edit/versions/${version.number}/undo`, { method: 'POST' });
                     const result = await response.json();
                     sheet.close();
                     const kept = (result.kept ?? []).length;
-                    reloadWithToast(kept ? `Undone. ${kept} change${kept === 1 ? ' was' : 's were'} kept because someone changed ${kept === 1 ? 'it' : 'them'} again later.` : 'Undone \u2713');
+                    reloadWithToast(kept ? `Undone. ${kept} change${kept === 1 ? ' was' : 's were'} kept because someone changed ${kept === 1 ? 'it' : 'them'} again later.` : 'Undone ✓');
                 } catch (error) {
                     go.disabled = false;
                     go.textContent = 'Try again';
@@ -2412,11 +2416,69 @@ const bootLiveEdit = () => {
             button.blur();
         };
 
-        const renderHistory = async () => {
-            drawerFields.replaceChildren(note('Loading…'));
+        /** An entry's changes, by page and section, the first `most` of them. */
+        const historyChanges = (said, most) => {
+            const list = el('div', 'le-history-changes');
+            let shown = 0;
+            for (const group of said.places) {
+                if (shown >= most) break;
+                const block = el('div', 'le-history-place');
+                if (group.place) block.append(el('p', 'le-history-where', group.place));
+                for (const change of group.changes) {
+                    if (shown >= most) break;
+                    block.append(el('p', 'le-history-what', change));
+                    shown += 1;
+                }
+                list.append(block);
+            }
 
+            return list;
+        };
+
+        const historyEntry = (version, said, latest) => {
+            const entry = el('article', `le-history${latest ? ' is-latest' : ''}`);
+            entry.setAttribute('aria-label', `${said.title}, ${said.exact}`);
+            const head = el('p', 'le-history-head');
+            const time = el('time', 'le-history-when', said.when);
+            time.dateTime = version.published_at ?? '';
+            time.title = said.exact;
+            head.append(el('span', 'le-history-title', said.title), el('span', 'le-history-dot', ' · '), time);
+            entry.append(head);
+            const total = said.places.reduce((sum, group) => sum + group.changes.length, 0);
+            let body = historyChanges(said, 2);
+            entry.append(body);
+            if (total > 2) {
+                const more = el('button', 'le-link-btn le-history-more', `Show all ${total} changes`);
+                more.type = 'button';
+                more.setAttribute('aria-expanded', 'false');
+                more.addEventListener('click', () => {
+                    const open = more.getAttribute('aria-expanded') !== 'true';
+                    const next = historyChanges(said, open ? Infinity : 2);
+                    body.replaceWith(next);
+                    body = next;
+                    more.textContent = open ? 'Show fewer' : `Show all ${total} changes`;
+                    more.setAttribute('aria-expanded', open ? 'true' : 'false');
+                });
+                entry.append(more);
+            }
+            if (said.undoneLater) entry.append(el('p', 'le-hint', 'Undone later.'));
+            else if (said.undoable) {
+                const undo = el('button', 'le-chip-btn le-version-undo', said.count === 1 ? 'Undo this change' : `Undo these ${said.count} changes`);
+                undo.type = 'button';
+                undo.addEventListener('click', () => void undoVersion(version, said, undo));
+                entry.append(undo);
+            }
+
+            return entry;
+        };
+
+        const renderHistory = async ({ more = false } = {}) => {
+            if (!more) {
+                historyShown = [];
+                historyPage = 1;
+                drawerFields.replaceChildren(note('Loading…'));
+            }
             let payload;
-
             try {
                 const response = await request(`/live-edit/versions?page=${historyPage}`, { method: 'GET' });
                 payload = await response.json();
@@ -2426,98 +2488,31 @@ const bootLiveEdit = () => {
                 return;
             }
             if (drawerTab !== 'History') return;
-
-            const versions = payload?.versions ?? [];
-            const pagination = payload?.pagination ?? { page: historyPage, per_page: 20, total: versions.length, last_page: 1 };
-            historyPage = pagination.page ?? historyPage;
-
-            if (versions.length === 0) {
-                drawerFields.replaceChildren(note('Nothing published yet. Your first publish will appear here.'));
-
-                const only = engineLine();
-                if (only) drawerFields.append(only);
-
-                return;
-            }
-
+            historyShown = [...historyShown, ...(payload?.versions ?? [])];
+            historyLast = payload?.pagination?.last_page ?? 1;
+            const shown = versionsWorthShowing(historyShown);
             drawerFields.replaceChildren();
-
-            versions.forEach((version, index) => {
-                const row = document.createElement('div');
-                row.className = 'le-version';
-
-                const dot = document.createElement('span');
-                dot.className = pagination.page === 1 && index === 0 ? 'le-version-dot is-latest' : 'le-version-dot';
-
-                const text = document.createElement('div');
-                const what = document.createElement('p');
-                what.className = 'le-change-after';
-                // Who, and what: "Ada published 2 changes", newest first.
-                what.textContent = versionHeadline(version, team?.you?.id ?? null);
-
-                const when = document.createElement('p');
-                when.className = 'le-change-when';
-                when.textContent = ago(version.published_at);
-
-                text.append(what, when);
-
-                /*
-                 * Each change under the section it was in, with who made it:
-                 * "Ada changed the headline in Hero". A version recorded
-                 * before team editing has no lines and reads as it always did.
-                 */
-                if ((version.lines ?? []).length > 0) {
-                    const lines = document.createElement('div');
-                    lines.className = 'le-version-lines';
-                    for (const group of groupLines(version.lines)) {
-                        lines.append(el('p', 'le-version-group', group.label));
-                        group.lines.forEach((line) => lines.append(el('p', 'le-version-line', sentenceFor(line, team?.you?.id ?? null))));
-                    }
-                    text.append(lines);
-
-                    // Undo this one publish, and nobody else's work since.
-                    const undoneBy = versions.find((later) => later.undoes === version.number);
-                    if (undoneBy) {
-                        text.append(el('p', 'le-change-who', `Undone in version ${undoneBy.number}${undoneBy.published_by ? ` by ${undoneBy.published_by}` : ''}`));
-                    } else if (!version.undoes && !version.restored_from && version.changes > 0) {
-                        const undo = el('button', 'le-chip-btn le-version-undo', 'Undo these changes');
-                        undo.type = 'button';
-                        undo.addEventListener('click', () => void undoVersion(version, undo));
-                        text.append(undo);
-                    }
-                }
-
-                row.append(dot, text);
-                drawerFields.append(row);
-            });
-
-            if (pagination.last_page > 1) {
-                const pager = document.createElement('div');
-                pager.className = 'le-pagination';
-                const previous = document.createElement('button');
-                previous.type = 'button';
-                previous.className = 'le-chip-btn';
-                previous.textContent = 'Newer';
-                previous.disabled = pagination.page <= 1;
-                previous.addEventListener('click', () => {
-                    historyPage = pagination.page - 1;
-                    void renderHistory();
-                });
-                const pageLabel = document.createElement('span');
-                pageLabel.textContent = `Page ${pagination.page} of ${pagination.last_page}`;
-                const next = document.createElement('button');
-                next.type = 'button';
-                next.className = 'le-chip-btn';
-                next.textContent = 'Older';
-                next.disabled = pagination.page >= pagination.last_page;
-                next.addEventListener('click', () => {
-                    historyPage = pagination.page + 1;
-                    void renderHistory();
-                });
-                pager.append(previous, pageLabel, next);
-                drawerFields.append(pager);
+            if (shown.length === 0 && historyPage >= historyLast) {
+                drawerFields.append(note('Nothing published yet. Your first publish will appear here.'));
             }
-
+            const pages = window.liveEditPages?.pages ?? [];
+            const list = el('div', 'le-history-list');
+            shown.forEach((version, index) => {
+                const said = describeVersion(version, { you: team?.you?.id ?? null, pages, all: historyShown });
+                list.append(historyEntry(version, said, index === 0));
+            });
+            drawerFields.append(list);
+            if (historyPage < historyLast) {
+                const older = el('button', 'le-chip-btn le-history-older', 'Show older');
+                older.type = 'button';
+                older.addEventListener('click', () => {
+                    historyPage += 1;
+                    older.disabled = true;
+                    older.textContent = 'Loading…';
+                    void renderHistory({ more: true });
+                });
+                drawerFields.append(older);
+            }
             const stamp = engineLine();
             if (stamp) drawerFields.append(stamp);
         };
@@ -6065,11 +6060,18 @@ const bootLiveEdit = () => {
                         });
                     }
                     const keys = [];
-                    for (const { key, value } of plan.writes) {
+                    for (const { key, value, name, what } of plan.writes) {
                         const plain = parseEditKey(key).key;
+                        // each named for History by its own product, not by what was pressed to open the grid
+                        const product = slots.find((slot) => slot.name === name);
                         await patiently(() => request('/live-edit/setting', {
                             method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'X-Live-Edit-Unit': encodeURIComponent(`sale:${product?.id || pathOf(product?.href ?? '') || name}`),
+                                'X-Live-Edit-Unit-Label': encodeURIComponent(name),
+                                ...(what ? { 'X-Live-Edit-What': encodeURIComponent(what) } : {}),
+                            },
                             body: JSON.stringify({ key: plain, value, locale: window.liveEditLocale }),
                         }));
                         keys.push(plain);

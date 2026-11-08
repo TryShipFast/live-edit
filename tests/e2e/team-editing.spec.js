@@ -443,14 +443,14 @@ test('undoing one person\'s published version leaves the other person\'s work', 
 
     const olu = await member(browser, 'olu');
     await openChanges(olu.page, 'History');
-    const rows = ui(olu.page).locator('.le-version');
+    const rows = ui(olu.page).locator('.le-history');
     const adas = rows.filter({ hasText: 'Ada published 1 change' });
-    await adas.getByRole('button', { name: 'Undo these changes' }).click();
+    await adas.getByRole('button', { name: 'Undo this change' }).click();
     const confirm = ui(olu.page).locator('.le-modal');
-    await expect(confirm).toContainText("Undo Ada's changes from version");
-    await expect(confirm).toContainText('Ada changed');
+    await expect(confirm).toContainText('Undo this change?');
+    await expect(confirm).toContainText('Ada renamed it');
     await shot(olu.page, '16-undo-adas-version-asks-first-1440');
-    await confirm.getByRole('button', { name: 'Undo and publish' }).click();
+    await confirm.getByRole('button', { name: 'Undo 1 change' }).click();
     await olu.page.waitForLoadState('load');
     await settle(olu.page);
 
@@ -460,8 +460,8 @@ test('undoing one person\'s published version leaves the other person\'s work', 
     await visitor.context.close();
 
     await openChanges(olu.page, 'History');
-    await expect(ui(olu.page).locator('.le-drawer')).toContainText('You undid the changes in version');
-    await expect(ui(olu.page).locator('.le-drawer')).toContainText('You put back');
+    await expect(ui(olu.page).locator('.le-drawer')).toContainText('You undid the changes published');
+    await expect(ui(olu.page).locator('.le-drawer')).toContainText('Undone later.');
     await shot(olu.page, '17-history-after-undo-1440');
 
     for (const one of [ada, tunde, olu]) await one.context.close();

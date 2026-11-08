@@ -296,10 +296,29 @@ class ContentController
                         'what' => $entry['what'] ?? null,
                         'undid' => (bool) ($entry['undid'] ?? false),
                         'list' => ListChanges::describeList($entry['after'] ?? null, $entry['before'] ?? null),
+                        // The words before and after, for "Price: “₦25,000” → “₦28,000”" (a list or a style says
+                        // what happened instead).
+                        'before' => ($entry['kind'] ?? 'setting') === 'setting' ? self::wordsOf($entry['before'] ?? null) : null,
+                        'after' => ($entry['kind'] ?? 'setting') === 'setting' ? self::wordsOf($entry['after'] ?? null) : null,
                     ])->values()->all(),
                     'url' => $snapshot->url($v->number),
                 ])->all(),
         ]);
+    }
+
+    /** A saved value as the words a reader sees, shortened; null for what is not words (a list, nothing at all). */
+    private static function wordsOf(mixed $value): ?string
+    {
+        if (! is_string($value)) {
+            return null;
+        }
+        $words = trim((string) preg_replace('/\s+/u', ' ', strip_tags($value)));
+        // a list, or a picture's address: said as what happened, not as its raw value
+        if ($words !== '' && ($words[0] === '[' || $words[0] === '{' || preg_match('~^\S+\.(jpe?g|png|webp|gif|svg|avif)(\?\S*)?$~i', $words))) {
+            return null;
+        }
+
+        return mb_strlen($words) > 200 ? mb_substr($words, 0, 199).'…' : $words;
     }
 
     /**

@@ -761,6 +761,17 @@ a.le-mark:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
 .le-version { display: flex; gap: 12px; align-items: flex-start; padding-bottom: 14px; }
 .le-version-dot { width: 8px; height: 8px; margin-top: 6px; border-radius: 999px; background: #DADCE0; flex: none; }
 .le-version-dot.is-latest { background: var(--le-ink); }
+.le-history-list { display: grid; gap: 22px; margin: 0 0 16px; }
+.le-history { display: grid; gap: 8px; justify-items: start; }
+.le-history-head { margin: 0; font-size: 14px; line-height: 1.4; color: #2A2C31; }
+.le-history-title { font-weight: 600; }
+.le-history-dot, .le-history-when { color: #6B6F78; font-size: 13px; }
+.le-history-changes { display: grid; gap: 8px; width: 100%; }
+.le-history-place { display: grid; gap: 2px; }
+.le-history-where { margin: 0; font-size: 12px; font-weight: 600; color: #4A4D55; }
+.le-history-what { margin: 0; font-size: 13px; line-height: 1.45; color: #2A2C31; overflow-wrap: anywhere; }
+.le-history-more { padding: 2px 0; }
+.le-history-older { margin: 0 0 12px; }
 .le-pagination { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 4px 0 12px; color: var(--le-muted); font-size: 12px; }
 .le-pagination button:disabled { opacity: .45; cursor: default; }
 

@@ -139,7 +139,9 @@ export const readSale = (line) => {
  */
 export const saleWrites = (read, { on, price, sale, from, until }) => {
     const writes = [];
-    const write = (part, value) => { if (part.key && value !== part.words) writes.push({ key: part.key, node: part.node ?? null, value }); };
+    // what each is called in History ("the sale price"), beside its key
+    const WHAT = new Map([[read.price, 'the price'], [read.sale, 'the sale price'], [read.from, 'the sale start day'], [read.until, 'the sale end day']]);
+    const write = (part, value) => { if (part.key && value !== part.words) writes.push({ key: part.key, node: part.node ?? null, value, what: WHAT.get(part) }); };
     const priceStyle = priceStyleOf(read.price.words);
     if (price !== null && price !== read.own) write(read.price, writePrice(price, priceStyle));
     if (!on) {
