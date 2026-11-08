@@ -4791,7 +4791,9 @@ const bootLiveEdit = () => {
                     const duplicate = document.createElement('button');
                     duplicate.type = 'button';
                     duplicate.className = 'le-chip-btn';
-                    duplicate.textContent = sections ? 'Duplicate section' : 'Duplicate';
+                    // An owner adds a review; they do not duplicate one (first-time owner walk, 7 Nov 2026).
+                    duplicate.textContent = sections ? 'Duplicate section'
+                        : itemNoun(list) ? `+ Add a${/^[aeiou]/.test(itemNoun(list)) ? 'n' : ''} ${itemNoun(list)}` : '+ Add another';
                     duplicate.disabled = !sections && full;
                     duplicate.addEventListener('click', async () => {
                         const reordered = currentOrder();
@@ -4808,7 +4810,13 @@ const bootLiveEdit = () => {
                             return;
                         }
                         reordered.splice(at + 1, 0, id);
-                        saveOrder(reordered, sections ? 'Section duplicated \u2713' : 'Item duplicated \u2713');
+                        await saveOrder(reordered, sections ? 'Section duplicated \u2713' : 'Added \u2713');
+                        // The new one, open with all its words, ready to type its own.
+                        const added = !sections && list.querySelector(`:scope > [data-edit-item="${CSS.escape(id)}"]`);
+                        if (added) {
+                            added.scrollIntoView({ block: 'center', behavior: 'smooth' });
+                            editItemWords(added, { fresh: true });
+                        }
                     });
                     row.append(duplicate);
                 }
@@ -4856,7 +4864,7 @@ const bootLiveEdit = () => {
                     const remove = document.createElement('button');
                     remove.type = 'button';
                     remove.className = 'le-btn-danger';
-                    remove.textContent = 'Delete this item';
+                    remove.textContent = `Delete this ${itemNoun(list) ?? 'item'}`;
                     remove.disabled = lowest;
                     const deleteCard = (message) => saveOrder(currentOrder().filter((id) => id !== item.dataset.editItem), message);
                     remove.addEventListener('click', () => {
@@ -4867,7 +4875,7 @@ const bootLiveEdit = () => {
 
                             return;
                         }
-                        if (!window.confirm('Delete this item?')) return;
+                        if (!window.confirm(`Delete this ${itemNoun(list) ?? 'item'}?`)) return;
                         deleteCard('Deleted \u2713');
                     });
                     row.append(remove);
@@ -5431,6 +5439,94 @@ const bootLiveEdit = () => {
             // Each field saves as it is changed (data-panel.js): no Save button to press.
             ui.drawerFoot.classList.add('le-hidden');
             openDrawer();
+        };
+
+        /*
+         * A card's words, all in one panel (first-time owner walk, 7 Nov 2026: a review's quote, name and car were each
+         * their own panel with their own Save, about nine presses for one review). Each with its name, the page following
+         * as it is typed, one Save changes; its move and delete below. Opened on a card just added, ready to type in.
+         */
+        const editItemWords = (item, { fresh = false } = {}) => {
+            const list = item.parentElement;
+            const words = [...item.querySelectorAll('[data-edit^="setting:"]')]
+                .filter((node) => !node.parentElement?.closest('[data-edit^="setting:"]') || !item.contains(node.parentElement.closest('[data-edit^="setting:"]')))
+                .filter((node) => node.getBoundingClientRect().width > 0 && !node.querySelector('[data-edit]') && !heardNotSeen(node));
+            if (!words.length) return false;
+            current = { kind: 'item-words' };
+            lastOpened = item;
+            const noun = itemNoun(list);
+            drawerTitle.textContent = noun ? `${noun[0].toUpperCase()}${noun.slice(1)}` : 'Item';
+            drawerDelete.classList.add('le-hidden');
+            drawerFields.replaceChildren();
+            const hint = document.createElement('p');
+            hint.className = 'le-hint';
+            hint.textContent = fresh
+                ? `Your new ${noun || 'item'} is a copy of the one before it. Type its own words, then Save changes.`
+                : 'Type its words, then Save changes.';
+            drawerFields.append(hint);
+            const fields = words.map((node) => {
+                const key = parseEditKey(node.dataset.edit).key;
+                const was = shownWords(node, displayedValue({ editValue: node.dataset.editValue, ownText: ownTextOf(node), fullText: node.textContent }));
+                const wrap = document.createElement('label');
+                wrap.className = 'le-field';
+                // Named by what the design calls it (data-field "car": Car), never "Text" twice.
+                const field = String(node.dataset.field ?? '').replace(/[-_]+/g, ' ').trim();
+                wrap.append(node.dataset.editLabel
+                    ?? (node.hasAttribute('data-sample-note') ? 'Sample note' : field ? `${field[0].toUpperCase()}${field.slice(1)}` : describeElement(node)));
+                const box = document.createElement('textarea');
+                box.className = 'le-input le-textarea';
+                box.rows = was.length > 60 ? 3 : 1;
+                box.value = was;
+                // The page follows as it is typed, where the words are all the element holds.
+                box.addEventListener('input', () => {
+                    if (!node.children.length) node.textContent = box.value;
+                    save.disabled = false;
+                });
+                wrap.append(box);
+                drawerFields.append(wrap);
+
+                return { node, key, was, box };
+            });
+            const save = document.createElement('button');
+            save.type = 'button';
+            save.className = 'le-btn le-btn-primary le-item-words-save';
+            save.textContent = 'Save changes';
+            save.disabled = true;
+            save.addEventListener('click', async () => {
+                save.disabled = true;
+                save.textContent = 'Saving…';
+                try {
+                    for (const field of fields) {
+                        if (field.box.value !== field.was) await saveSetting(field.key, field.box.value);
+                    }
+                    await settle('Saved ✓', null, null, true);
+                } catch (error) {
+                    notify(error.message);
+                    save.disabled = false;
+                } finally {
+                    save.textContent = 'Save changes';
+                }
+            });
+            drawerFields.append(save);
+            const own = [...drawerFields.children];
+            listControlsFor(item, 'item');
+            // Its words first, its move and delete after them.
+            drawerFields.append(...[...drawerFields.children].filter((child) => !own.includes(child)));
+            setTrail(item);
+            showTab('Edit');
+            ui.drawerFoot.classList.add('le-hidden');
+            openDrawer();
+            setTimeout(() => { fields[0].box.focus(); fields[0].box.select(); }, 120);
+
+            return true;
+        };
+
+        /** What one thing in a list is called, from the list's own one-word name ("Reviews": "review"), or null. */
+        const itemNoun = (list) => {
+            const label = String(list?.dataset?.editListLabel ?? '').trim().toLowerCase();
+            if (!/^[a-z]+$/.test(label) || label === 'items') return null;
+
+            return label.endsWith('ies') ? `${label.slice(0, -3)}y` : label.endsWith('s') ? label.slice(0, -1) : label;
         };
 
         /** A chart: its settings and its figures as a grid (the bar, point or slice pressed, ready to type in). */

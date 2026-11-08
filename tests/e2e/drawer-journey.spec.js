@@ -541,7 +541,7 @@ test('an item added to a list is on the page, and can be taken off again', async
     };
 
     await openItem(items);
-    await panel(page).getByRole('button', { name: /^Duplicate$|Add item/ }).click();
+    await panel(page).getByRole('button', { name: /^\+ Add (an? (?!section|form)\w+|another)$|Add item/ }).click();
     await settled(page);
     await page.reload();
     await settled(page);
@@ -553,7 +553,7 @@ test('an item added to a list is on the page, and can be taken off again', async
     // And off again, so the suite leaves the site as it found it.
     await openItem(`${items}:last-child`);
     page.once('dialog', (d) => d.accept());
-    await panel(page).getByRole('button', { name: /Delete this item/ }).click();
+    await panel(page).getByRole('button', { name: /^Delete this (?!section)\w+$/ }).click();
     await settled(page);
     await page.reload();
     await settled(page);
@@ -566,7 +566,7 @@ test('an item added to a list is on the page, and can be taken off again', async
     while (await count() > 0) {
         await openItem(`${items}:first-child`);
         page.once('dialog', (d) => d.accept());
-        await panel(page).getByRole('button', { name: /Delete this item/ }).click();
+        await panel(page).getByRole('button', { name: /^Delete this (?!section)\w+$/ }).click();
         await settled(page);
         await page.reload();
         await settled(page);

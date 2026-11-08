@@ -76,7 +76,7 @@ test('a duplicated item keeps the words it was copied with, after the page is dr
 
     // Duplicated: the copy carries the edited words when the page is drawn again.
     await choose(page, '[data-edit-item="blue"] [data-field="notes"]');
-    await ui(page).getByRole('button', { name: 'Duplicate' }).click();
+    await ui(page).getByRole('button', { name: /^\+ Add (an? (?!section|form)\w+|another)$/ }).click();
     await expect(page.locator(cards)).toHaveCount(3);
     const copy = idsIn(drawn()).find((id) => !['aster', 'blue'].includes(id));
     expect(card(drawn(), copy)).toEqual(edited);
@@ -85,7 +85,7 @@ test('a duplicated item keeps the words it was copied with, after the page is dr
 
     // A copy of the copy, too.
     await choose(page, `[data-edit-item="${copy}"] [data-field="notes"]`);
-    await ui(page).getByRole('button', { name: 'Duplicate' }).click();
+    await ui(page).getByRole('button', { name: /^\+ Add (an? (?!section|form)\w+|another)$/ }).click();
     await expect(page.locator(cards)).toHaveCount(4);
     const second = idsIn(drawn()).find((id) => !['aster', 'blue', copy].includes(id));
     expect(card(drawn(), second)).toEqual(edited);
@@ -95,7 +95,7 @@ test('a duplicated item keeps the words it was copied with, after the page is dr
     // The original and the design's first card deleted: the copies keep their words.
     for (const gone of ['blue', 'aster']) {
         await choose(page, `[data-edit-item="${gone}"] [data-field="notes"]`);
-        await ui(page).getByRole('button', { name: 'Delete this item' }).click();
+        await ui(page).getByRole('button', { name: /^Delete this (?!section)\w+$/ }).click();
         const ask = ui(page).locator('.le-modal');
         if (await ask.isVisible().catch(() => false)) await ask.getByRole('button', { name: 'Delete the card', exact: true }).click();
         await expect(page.locator(`[data-edit-item="${gone}"]`)).toHaveCount(0);

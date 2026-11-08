@@ -1,5 +1,14 @@
 # ShipFast Live Edit for WordPress
 
+## 0.20.8
+
+- Adding a card is "+ Add a review" (first-time owner walk, 7 Nov 2026). An item's "Duplicate" is named for what the
+  list holds, from its one-word label ("Reviews": "+ Add a review"; "+ Add another" where the label is longer), and
+  so is its delete ("Delete this review"). The new one opens at once with all its words in one panel, each named by
+  what the design calls it (Quote, Name, Car, Sample note), the first selected so typing replaces it, the page
+  following as it is typed, one Save changes; its move and delete below. A review took about nine presses (Duplicate,
+  then the quote, the name and the car each in their own panel with their own Save); it takes three.
+
 ## 0.20.7
 
 - "+ Section" in the bar opens Add a section (first-time owner walk, 7 Nov 2026). It opened the page's list of

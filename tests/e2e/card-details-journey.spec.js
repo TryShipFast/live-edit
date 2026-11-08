@@ -89,7 +89,7 @@ test('a product is edited on its own page, inside the window over the shop, opti
 
     // A size added from the size itself, with the same panel as anywhere else.
     await choose(detail(page), '[data-item="s100"] [data-field="size"]');
-    await detail(page).getByRole('button', { name: 'Duplicate' }).click();
+    await detail(page).getByRole('button', { name: /^\+ Add (an? (?!section|form)\w+|another)$/ }).click();
     await expect(detail(page).locator('[data-list="sizes"] [data-edit-item]')).toHaveCount(3);
     await done(page);
 
@@ -137,7 +137,7 @@ test('a copied card gets its own page, a full copy, and the two never change eac
 
     await openAsEditor(page);
     await choose(page, '[data-edit-item="aster"] [data-kit-price]');
-    await ui(page).getByRole('button', { name: 'Duplicate' }).click();
+    await ui(page).getByRole('button', { name: /^\+ Add (an? (?!section|form)\w+|another)$/ }).click();
     await expect(page.locator('[data-list="products"] [data-edit-item]')).toHaveCount(3);
     const copy = await page.locator('[data-list="products"] [data-edit-item]').nth(1).getAttribute('data-edit-item');
     expect(copy).toMatch(/^n[0-9a-z]+(?:_[A-Za-z0-9-]+)?$/);
@@ -181,7 +181,7 @@ test('a design card named apart from its page stays the original when another ca
     await choose(page, '[data-edit-item="aster"] h3 a');
     await typeAndSave(page, 'The grey one');
     await choose(page, '[data-edit-item="aster"] [data-kit-price]');
-    await ui(page).getByRole('button', { name: 'Duplicate' }).click();
+    await ui(page).getByRole('button', { name: /^\+ Add (an? (?!section|form)\w+|another)$/ }).click();
     await expect(page.locator('[data-list="products"] [data-edit-item]')).toHaveCount(3);
 
     await choose(page, '[data-edit-item="aster"] [data-edit]:not(a)');
@@ -194,7 +194,7 @@ test('a copied card’s own page is opened by its name, not by another link on t
     // "Give it its own page" re-addressed the first slot, so the name still opened the original page.
     await openAsEditor(page);
     await choose(page, '[data-edit-item="second"] p[data-edit]');
-    await ui(page).getByRole('button', { name: 'Duplicate' }).click();
+    await ui(page).getByRole('button', { name: /^\+ Add (an? (?!section|form)\w+|another)$/ }).click();
     await expect(page.locator('[data-list="posts"] [data-edit-item]')).toHaveCount(3);
     const copy = await page.locator('[data-list="posts"] [data-edit-item]').nth(2).getAttribute('data-edit-item');
     expect(copy).toMatch(/^n[0-9a-z]+(?:_[A-Za-z0-9-]+)?$/);
@@ -215,7 +215,7 @@ test('a copied card’s own page is opened by its name, not by another link on t
 test('deleting a card that has its own page offers to delete the page too', async ({ page }) => {
     await openAsEditor(page);
     await choose(page, '[data-edit-item="aster"] [data-kit-price]');
-    await ui(page).getByRole('button', { name: 'Duplicate' }).click();
+    await ui(page).getByRole('button', { name: /^\+ Add (an? (?!section|form)\w+|another)$/ }).click();
     await expect(page.locator('[data-list="products"] [data-edit-item]')).toHaveCount(3);
     const copy = await page.locator('[data-list="products"] [data-edit-item]').nth(1).getAttribute('data-edit-item');
     await choose(page, `[data-edit-item="${copy}"] h3 a`);
@@ -225,7 +225,7 @@ test('deleting a card that has its own page offers to delete the page too', asyn
     expect(site.host.made().map((made) => made.id)).toEqual(['fig-archive']);
 
     await choose(page, `[data-edit-item="${copy}"] [data-kit-price]`);
-    await ui(page).getByRole('button', { name: 'Delete this item' }).click();
+    await ui(page).getByRole('button', { name: /^Delete this (?!section)\w+$/ }).click();
     const ask = ui(page).locator('.le-modal');
     await expect(ask).toContainText('opens its own page, “Fig Archive”');
     await expect(ask).toContainText('Nothing else on your site links to it.');
@@ -238,7 +238,7 @@ test('deleting a card that has its own page offers to delete the page too', asyn
 
     // A sample product's page came with the design; without the host's say-so it stays.
     await choose(page, '[data-edit-item="aster"] [data-kit-price]');
-    await ui(page).getByRole('button', { name: 'Delete this item' }).click();
+    await ui(page).getByRole('button', { name: /^Delete this (?!section)\w+$/ }).click();
     await expect(ask).toContainText('cannot be deleted here yet');
     await expect(ask.getByRole('button', { name: 'Delete the card and its page' })).toHaveCount(0);
     await ask.getByRole('button', { name: 'Delete the card' }).click();
@@ -249,7 +249,7 @@ test('deleting a card that has its own page offers to delete the page too', asyn
 test('a sample page the design came with is deleted with its card where the host allows it', async ({ page }) => {
     await openAsEditor(page);
     await choose(page, '[data-edit-item="blue"] [data-kit-price]');
-    await ui(page).getByRole('button', { name: 'Delete this item' }).click();
+    await ui(page).getByRole('button', { name: /^Delete this (?!section)\w+$/ }).click();
     const ask = ui(page).locator('.le-modal');
     await expect(ask).toContainText('opens its own page, “Blue Hour”');
     await ask.getByRole('button', { name: 'Delete the card and its page' }).click();
