@@ -81,6 +81,9 @@ export const changeSaid = (line) => {
     if (line.list) return listSaid(line.list, String(line.unit ?? '').startsWith('arrangement:') ? 'section' : 'card');
     if (line.kind === 'style') return 'Changed how it looks';
     const what = capital(String(line.what ?? '').replace(/^the /, '')) || 'Words';
+    // a sale's end or start on its own (the price unchanged)
+    if (line.what === 'the sale end day' && typeof line.after === 'string') return /\d/.test(line.after) ? `Sale now ends ${line.after.replace(/ \d{4}$/, '')}` : 'Sale now has no end day';
+    if (line.what === 'the sale start day' && typeof line.after === 'string') return /\d/.test(line.after) ? `Sale now starts ${line.after.replace(/ \d{4}$/, '')}` : 'Sale now starts today';
     const after = typeof line.after === 'string' ? shortWords(line.after) : null;
     const before = typeof line.before === 'string' ? shortWords(line.before) : null;
     if (after === null) return `${what} changed`;

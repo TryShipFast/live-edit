@@ -1345,10 +1345,11 @@ const bootLiveEdit = () => {
          */
         // Set once the editor is drawn (guardLeaving, below); every way out of the page goes through it.
         let leaving = { leave: (go) => { go(); return Promise.resolve(true); }, allow: () => {} };
-        const saveSetting = async (key, value) => {
+        // `what` names the change for History ("Express wash, Saloon"), where the panel knows it better than the press
+        const saveSetting = async (key, value, what = null) => {
             await request('/live-edit/setting', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: { 'Content-Type': 'application/json', ...(what ? { 'X-Live-Edit-What': encodeURIComponent(what) } : {}) },
                 body: JSON.stringify({ key, value }),
             });
         };

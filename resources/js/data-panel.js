@@ -703,12 +703,16 @@ const fillTable = async ({ info, plan, save, saveOrder, applyOrder }) => {
     await applyOrder(info.rowsList, plan.rows);
     const rows = rowsOf(info);
     const cells = [...(plan.heads ? [[info.head, plan.heads]] : []), ...rows.map((tr, i) => [tr, plan.grid[i]])];
-    for (const [tr, values] of cells) {
+    const heads = plan.heads ?? [...info.head.children].filter((n) => n.dataset?.editItem).map((cell) => String(wordsIn(cell)?.textContent ?? cell.textContent ?? '').replace(/\s+/g, ' ').trim());
+    for (const [r, [tr, values]] of cells.entries()) {
+        const isHead = Boolean(plan.heads) && r === 0;
         for (const [c, cell] of [...tr.children].filter((n) => n.dataset?.editItem).entries()) {
             const target = wordsIn(cell);
             const key = keyOf(target);
             if (key && values?.[c] !== undefined && target.textContent.trim() !== values[c]) {
-                await save(key, values[c]);
+                // named for History by its row and column: "Express wash, Saloon / hatchback"
+                const where = isHead ? `the heading of column ${c + 1}` : [c > 0 ? values[0] : null, heads[c]].filter(Boolean).join(', ');
+                await save(key, values[c], where || null);
                 target.textContent = values[c];
             }
         }

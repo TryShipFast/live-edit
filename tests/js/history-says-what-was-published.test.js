@@ -38,6 +38,8 @@ describe('what', () => {
         expect(changeSaid({ what: 'the heading', before: null, after: 'Spring sale' })).toBe('Heading: “Spring sale”');
         expect(changeSaid({ what: null, before: 'a', after: null })).toBe('Words changed');
         expect(changeSaid({ kind: 'style', what: 'the styling' })).toBe('Changed how it looks');
+        expect(changeSaid({ what: 'Express wash, Saloon / hatchback', before: null, after: '₦9,000' })).toBe('Express wash, Saloon / hatchback: “₦9,000”');
+        expect(changeSaid({ what: 'the sale end day', before: 'No end date', after: '15 Nov 2026' })).toBe('Sale now ends 15 Nov');
         expect(shortWords('word '.repeat(30)).length).toBeLessThanOrEqual(61);
     });
 

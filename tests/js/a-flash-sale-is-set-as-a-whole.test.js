@@ -100,7 +100,7 @@ describe('a product page\'s sale line', () => {
     it('writes only what changed, in the shop\'s own words', () => {
         const read = readSale(productPage());
         expect(saleWrites(read, { on: true, price: null, sale: 4995000, from: '2026-11-08', until: '2026-12-31' }))
-            .toEqual([{ key: 'setting:tpl:kemi.sale', node: read.sale.node, value: '₦49,950' }]);
+            .toEqual([{ key: 'setting:tpl:kemi.sale', node: read.sale.node, value: '₦49,950', what: 'the sale price' }]);
         expect(saleWrites(read, { on: true, price: null, sale: 5495000, from: null, until: null }).map((w) => w.value))
             .toEqual(['Today', 'No end date']);
         expect(saleWrites(read, { on: false, price: null, sale: null }).map((w) => w.value)).toEqual(['No sale']);
