@@ -1,5 +1,14 @@
 # ShipFast Live Edit for WordPress
 
+## 0.20.17
+
+- "+ Form" on the editor's bar (owner, 8 Nov 2026, on Car Wash Auto: "why is there no create a new form"). Adding a form
+  was only in the add window's Forms tab and on the "+ Add a form" pill shown between sections on hover, so an owner
+  looking at the bar found none. The bar now has "+ Form" beside "+ Section" (and "Add a form" under More on a phone),
+  shown wherever the website has forms to add; it opens the add window on the forms (contact, quote, or start blank),
+  where the plan's limit is said as before. "+ Section"'s tip no longer mentions hiding. Proved in
+  `sections-on-every-page.spec.js`: the bar's + Form opens the forms; a website without forms shows none.
+
 ## 0.20.16
 
 - Undo is ready the moment something is saved. A deleted section (or any change saved without the page reloading)

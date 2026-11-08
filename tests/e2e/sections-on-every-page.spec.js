@@ -227,6 +227,24 @@ test('+ Add a form opens on the forms, shows the form, and puts it where the own
     await expect(ui(page).locator('.le-modal').getByRole('button', { name: 'Forms', exact: true })).toBeVisible();
 });
 
+test('the bar has + Form, which opens the add window on the forms (owner, 8 Nov 2026: "why is there no create a new form")', async ({ page }) => {
+    await site.close();
+    site = await serveFakeHost({ library: true, libraryForms: true });
+    await openAsEditor(page, 'shop');
+    const form = ui(page).getByRole('button', { name: /^\+ Form$|^Add a form$/ }).first();
+    // On a narrow bar it sits under More, as Sections does.
+    if (!(await form.isVisible().catch(() => false))) await ui(page).getByRole('button', { name: 'More' }).click();
+    await form.click();
+    const window_ = ui(page).locator('.le-modal');
+    await expect(window_.locator('.le-modal-title, h2').first()).toHaveText('Add a form');
+    await expect(window_.locator('.le-library-item')).toHaveText(['Form: contact']);
+});
+
+test('a website with no forms to add shows no + Form on the bar', async ({ page }) => {
+    await openAsEditor(page, 'shop');
+    await expect(ui(page).locator('.le-toolbar').getByRole('button', { name: '+ Form' })).toBeHidden();
+});
+
 test('a section the design came with can be deleted too, and is gone from the page (owner, 7 Nov 2026)', async ({ page }) => {
     await openAsEditor(page, 'journal/salt-air');
     await openSection(page, 's-related');

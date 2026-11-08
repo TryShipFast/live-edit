@@ -1783,8 +1783,15 @@ export function createChrome() {
        the design came with takes sections from the library just as a new one does. */
     const sectionsButton = el('button', 'le-bar-btn le-when-roomy', '+ Section');
     sectionsButton.type = 'button';
-    sectionsButton.title = 'Add a section to this page, or move and hide the ones on it';
+    sectionsButton.title = 'Add a section to this page';
     sectionsButton.hidden = true;
+
+    /* A form, named on the bar where it is looked for (owner, 8 Nov 2026: "why is there no create a new form"): it was
+       only in the add window and between sections, on hover. Opens the add window on the forms. */
+    const formButton = el('button', 'le-bar-btn le-when-roomy', '+ Form');
+    formButton.type = 'button';
+    formButton.title = 'Add a form to this page: contact, quote, or start blank';
+    formButton.hidden = true;
 
     const changesButton = el('button', 'le-bar-btn le-when-roomy', 'Changes');
     changesButton.type = 'button';
@@ -1851,6 +1858,7 @@ export function createChrome() {
         languagePicker,
         pagesButton,
         sectionsButton,
+        formButton,
         brandButton,
         searchButton,
         changesButton,
@@ -1915,7 +1923,7 @@ export function createChrome() {
     const foldOrder = [
         logout?.node,
         ...hostLinks.map(({ anchor }) => anchor).reverse(),
-        helpButton, searchButton, brandButton, sectionsButton, previewButton, pagesButton,
+        helpButton, searchButton, brandButton, formButton, sectionsButton, previewButton, pagesButton,
         localeSelect, languagePicker, changesButton, redoButton,
     ].filter(Boolean);
     const isOut = (node) => Boolean(node?.classList.contains('le-out'));
@@ -1974,6 +1982,7 @@ export function createChrome() {
         { control: redoButton, label: 'Redo', icon: 'redo' },
         { control: pagesButton, label: 'Pages', icon: 'page' },
         { control: sectionsButton, label: 'Sections', icon: 'section' },
+        { control: formButton, label: 'Add a form', icon: 'form' },
         { control: brandButton, label: 'Brand', icon: 'brand' },
         { control: searchButton, label: 'Search', icon: 'search' },
         { control: changesButton, label: 'Changes', icon: 'changes' },
@@ -2408,6 +2417,7 @@ export function createChrome() {
         searchButton,
         pagesButton,
         sectionsButton,
+        formButton,
         sectionInsert,
         sectionInsertEnd,
         changesButton,

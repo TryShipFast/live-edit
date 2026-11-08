@@ -7129,6 +7129,7 @@ const bootLiveEdit = () => {
          */
         const refreshSectionsButton = () => {
             if (ui.sectionsButton) ui.sectionsButton.hidden = !(canAddSections() && shownSectionLists().length);
+            if (ui.formButton) ui.formButton.hidden = !(canAddSections() && formsGroup() && shownSectionLists().length);
             if (document.body.classList.contains('editing')) drawEndInsert();
             else hideInserts();
         };
@@ -7136,6 +7137,11 @@ const bootLiveEdit = () => {
             if (!document.body.classList.contains('editing')) setEditing(true);
             const list = endList();
             if (list) openSectionPicker({ list, after: null });
+        });
+        ui.formButton?.addEventListener('click', () => {
+            if (!document.body.classList.contains('editing')) setEditing(true);
+            const list = endList();
+            if (list) openSectionPicker({ list, after: null, only: formsGroup() });
         });
         refreshSectionsButton();
         new MutationObserver(refreshSectionsButton).observe(document.body, { attributes: true, attributeFilter: ['class'] });

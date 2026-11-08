@@ -117,7 +117,7 @@ describe('the links on the bar', () => {
         [ui.toggleButton, ui.undoButton, ui.publishButton, ui.moreButton].forEach((node) => expect(ui.foldOrder).not.toContain(node));
         const dashboard = ui.toolbar.querySelector('a[href="/dashboard"]');
         const logout = ui.toolbar.querySelector('a[href="/logout"]');
-        expect(ui.foldOrder).toEqual([logout, dashboard, ui.helpButton, ui.searchButton, ui.brandButton, ui.sectionsButton, ui.previewButton, ui.pagesButton, ui.languagePicker, ui.changesButton, ui.redoButton]);
+        expect(ui.foldOrder).toEqual([logout, dashboard, ui.helpButton, ui.searchButton, ui.brandButton, ui.formButton, ui.sectionsButton, ui.previewButton, ui.pagesButton, ui.languagePicker, ui.changesButton, ui.redoButton]);
     });
 });
 
