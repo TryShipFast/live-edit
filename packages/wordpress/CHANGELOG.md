@@ -2,6 +2,16 @@
 
 ## 0.20.19 (unreleased)
 
+- A part the page works out says where it comes from, and a press takes the owner there (owner, 8 Nov 2026: Car Wash's
+  service prices and "Hand washes from" said "This number counts itself from the products on this page"; "if it's
+  counted for me, a click should lead me there"). Each kind a template marks with `data-kit-computed` has its own
+  sentence (a price from the price list, an opening time, a date, a rating, reviews, an SKU, a category, a total), and
+  any other kind says it is filled in from elsewhere on the website, never a sentence about products. A part that also
+  names its source with `data-kit-from-page` (a page of the website, like `packages/`, or a part of this page, like
+  `#find-us`) opens a small window with one button, "Open the price list", that goes to that page in the editor; a part
+  of this page is scrolled to. Proved in the real editor on Car Wash: the button landed on the Prices page with the
+  price list there to change.
+
 - The sale and stock grid is evenly spaced and nothing in it overlaps (owner, 8 Nov 2026: "make sure nothing is
   overlapping"; "all list items are properly spaced"; "there are some unneeded lines"). On a phone a product's sizes
   open inside its card (the same box and padding), each size a line with its name on the left and its box on the right;

@@ -7420,6 +7420,60 @@ const bootLiveEdit = () => {
             'bag-count': 'This counts what the shopper has in their bag, on every page. It is worked out for each visitor, so there is nothing to type here.',
             bag: 'This line is the shopper’s bag: each product’s name, size and price come from what they added on its page. To change them, edit the product’s page.',
             product: 'This card shows the product its link leads to: its photo, name and price come from that product’s own page. To show another product, change the card’s “See the product” link; to change the words, edit the product’s page.',
+            // A price copied from the price list on another page (Car Wash's services and its "from" price).
+            'price-list': 'This price comes from your price list. Change it there and every place that shows it follows.',
+            time: 'This time is worked out from your opening hours, for the day the visitor looks. Change the hours where they are listed and it follows.',
+            date: 'This date is worked out for each visitor, so there is nothing to type here.',
+            rating: 'This rating is worked out from the reviews. Approve or remove a review and it follows.',
+            reviews: 'This counts the reviews. Approve or remove a review and it follows.',
+            sku: 'This shows the code of the size the shopper picks. Change each size’s code on the size itself.',
+            category: 'This shows the product’s category, taken from the page it sits in.',
+            total: 'This total is worked out from what the shopper chose, so there is nothing to type here.',
+            // Anything else a template works out: never a sentence about products where there are none.
+            filled: 'This is filled in for you from elsewhere on your website, so there is nothing to type here.',
+        };
+        /*
+         * A worked-out part whose source is on another page (data-kit-from-page, a link relative to the website): said,
+         * with the one button that goes there, so "change it there" is a press away, not a page to find (owner, 8 Nov 2026:
+         * Car Wash's service prices said they were "counted from the products on this page").
+         */
+        const explainComputed = (element) => {
+            const kind = computedKind(element);
+            const says = COMPUTED_SAYS[kind] ?? (kind === 'count' ? COMPUTED_SAYS.count : COMPUTED_SAYS.filled);
+            const from = element.closest('[data-kit-from-page]')?.getAttribute('data-kit-from-page');
+            if (!from) {
+                ui.toast(says, 7000);
+                return;
+            }
+            // On this page (a #part, like the opening hours): taken there, with nothing to confirm.
+            if (from.startsWith('#')) {
+                const there = document.getElementById(from.slice(1));
+                if (there) {
+                    there.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                    ui.toast(says, 7000);
+                    return;
+                }
+            }
+            const handle = ui.modal({ title: kind === 'price-list' ? 'Set on your price list' : 'Set on another page' });
+            const text = document.createElement('p');
+            text.className = 'le-hint';
+            text.textContent = says;
+            const go = document.createElement('button');
+            go.type = 'button';
+            go.className = 'le-btn';
+            go.textContent = kind === 'price-list' ? 'Open the price list' : 'Open that page';
+            go.addEventListener('click', () => {
+                sessionStorage.setItem('tb_editing', '1');
+                leaving.allow();
+                // The page's own link to it carries the editor's address (data-editor-href) where the host adds one.
+                const target = new URL(from, window.location.href).pathname.replace(/index\.html$/, '');
+                const same = [...document.querySelectorAll('a[href]')].find((a) => new URL(a.href, window.location.href).pathname.replace(/index\.html$/, '') === target);
+                window.location.href = same?.dataset.editorHref || same?.href || new URL(from, window.location.href).href;
+            });
+            handle.body.append(text);
+            handle.foot.hidden = false;
+            handle.foot.append(go);
+            go.focus();
         };
         /*
          * What is really under the pointer when a link has been stretched over
@@ -7569,7 +7623,7 @@ const bootLiveEdit = () => {
             else if (kind === 'link') editLink(element);
             else if (kind === 'sale') void editFlashSale({ pressed: element, productId: productIdOf(element), here: Boolean(element.closest('[data-kit-sale]')), ends: isCountdown(element) });
             else if (kind === 'computed' && computedKind(element) === 'gallery' && galleryOf(element)) editGallery(galleryOf(element));
-            else if (kind === 'computed') ui.toast(COMPUTED_SAYS[computedKind(element)] ?? COMPUTED_SAYS.count, 7000);
+            else if (kind === 'computed') explainComputed(element);
             else if (cardOf(element) === element && editItemWords(element)) { /* a card pressed between its words */ }
             else editStyle(element);
         };
