@@ -1,5 +1,13 @@
 # ShipFast Live Edit for WordPress
 
+## 0.20.16
+
+- Undo is ready the moment something is saved. A deleted section (or any change saved without the page reloading)
+  left Undo greyed out until the next load, so "Undo brings it back" was not true right after a delete. Undo now hears
+  the same count of unsaved changes as Publish. Proved in the website's real editor: every section of Stillwater's
+  home page deleted from its panel and put back with Undo, then moved and moved back (14 of 14); and in
+  `sections-on-every-page.spec.js`, Undo enabled straight after a delete.
+
 ## 0.20.15
 
 - A section is deleted, not hidden (owner, 8 Nov 2026: "fix the idea of hiding a section, i want to be to delete it";

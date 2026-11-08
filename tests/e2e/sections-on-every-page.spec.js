@@ -237,6 +237,22 @@ test('a section the design came with can be deleted too, and is gone from the pa
     await expect.poll(() => sectionsOf('journal/salt-air')).toEqual(['s-article=Post']);
 });
 
+test('after a section is deleted, Undo is ready at once (owner, 8 Nov 2026: delete, not hide)', async ({ page }) => {
+    await openAsEditor(page, 'journal/salt-air');
+    const before = await sectionsOf('journal/salt-air');
+    await openSection(page, 's-related');
+    const drawer = ui(page).locator('.le-drawer');
+    await expect(drawer).not.toContainText('Hide this');
+    await drawer.getByRole('button', { name: 'Delete this section' }).click();
+    await expect.poll(() => sectionsOf('journal/salt-air')).toEqual(['s-article=Post']);
+    await page.keyboard.press('Escape');
+    const undo = ui(page).getByRole('button', { name: 'Undo' });
+    // Undo is ready at once (it waited for a reload before). Putting the section back is the content API's
+    // (DELETE /changes), which this stand-in host does not run; the website's editor walk proves that part.
+    await expect(undo).toBeEnabled();
+    expect(before).toContain('s-related=More posts');
+});
+
 test('the last section of a page cannot be deleted', async ({ page }) => {
     await openAsEditor(page, 'journal/salt-air');
     await openSection(page, 's-related');

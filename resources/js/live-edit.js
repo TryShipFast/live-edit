@@ -8578,6 +8578,12 @@ const bootLiveEdit = () => {
 
         whenPublishingKnown(showUndoState);
         showUndoState();
+        /*
+         * A save refreshes the count of unpublished changes in place (settle, "live-edit:pending"); Undo heard of it
+         * only on the next load, so right after deleting a section (or any change saved without a reload) Undo stayed
+         * greyed out (owner, 8 Nov 2026: a deleted section must come back with Undo).
+         */
+        document.addEventListener('live-edit:pending', showUndoState);
 
         const undoLast = async () => {
             ui.undoButton.disabled = true;
