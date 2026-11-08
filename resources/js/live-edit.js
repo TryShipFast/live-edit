@@ -5001,6 +5001,24 @@ const bootLiveEdit = () => {
                 block.append(own, said);
             }
             const context = item ? drawerFields.querySelector('.le-item-context') : null;
+            /*
+             * Something inside a section was opened (its heading, a price): the section's own tools are folded into one
+             * line at the end, "This section: Section 1 of 9 · ...", opened on a press. They took half a phone's panel
+             * for a one-line edit (first-time owner walk, 7 Nov 2026). The section opened itself keeps them open.
+             */
+            if (sections && item && element !== item && as === null) {
+                const fold = document.createElement('details');
+                fold.className = 'le-fold';
+                const summary = document.createElement('summary');
+                summary.textContent = `This section${context ? `: ${context.textContent.replace(/^Section\s+/, '')}` : ''}`;
+                fold.append(summary);
+                context?.remove();
+                heading.remove();
+                fold.append(block);
+                drawerFields.append(fold);
+
+                return;
+            }
             if (context) context.after(block);
             else if (item) drawerFields.prepend(block);
             else drawerFields.append(block);

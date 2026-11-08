@@ -54,7 +54,11 @@ const openSection = async (page, item) => {
     await words.scrollIntoViewIfNeeded();
     // the line for adding between sections can sit over a heading at the top of a section
     await words.dispatchEvent('click');
-    await expect(ui(page).locator('.le-drawer').getByText('This section', { exact: true })).toBeVisible();
+    // Opened from something inside it, the section's tools are folded into one line (first-time owner walk): opened.
+    const fold = ui(page).locator('.le-drawer .le-fold > summary');
+    await expect(fold).toContainText('This section');
+    await fold.click();
+    await expect(ui(page).locator('.le-drawer .le-fold')).toHaveAttribute('open', '');
 };
 
 /** Choose one from the library window and add it; the page loads again to draw it. */

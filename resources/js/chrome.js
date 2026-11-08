@@ -417,6 +417,11 @@ a.le-mark:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
 .le-figures-foot { display: flex; gap: 8px; align-items: center; }
 .le-figures-foot .le-btn-primary { background: var(--le-accent); color: #fff; border-color: var(--le-accent); }
 .le-figures-foot .le-btn-primary:disabled { opacity: .45; cursor: default; }
+.le-fold { margin: 14px 0 4px; border-top: 1px solid var(--le-line); padding-top: 10px; }
+.le-fold > summary { cursor: pointer; font-size: 13px; font-weight: 600; color: var(--le-muted); padding: 6px 0; list-style: none; }
+.le-fold > summary::-webkit-details-marker { display: none; }
+.le-fold > summary::before { content: '▸'; display: inline-block; width: 1em; transition: transform .15s; }
+.le-fold[open] > summary::before { transform: rotate(90deg); }
 .le-figures-more { margin: 8px 0 12px; }
 .le-figures-more > summary { cursor: pointer; font-weight: 600; font-size: 13px; padding: 6px 0; }
 .le-browser-note { margin: 0 0 10px; padding: 10px 12px; border-radius: 10px; background: #fff7e6; color: #7a4b00; font-size: 14px; line-height: 1.45; }

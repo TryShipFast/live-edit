@@ -1,5 +1,12 @@
 # ShipFast Live Edit for WordPress
 
+## 0.20.13
+
+- The section's tools fold away while something inside it is edited (first-time owner walk, 7 Nov 2026). Opening a
+  heading or a price showed the section's name and its add, move, duplicate and delete under the words, half of a
+  phone's panel for a one-line edit. They are one line at the end, "▸ This section: 1 of 9 · <its heading>", opened on
+  a press; a section opened itself keeps them open.
+
 ## 0.20.12
 
 - Words a first-time owner knows (first-time owner walk, 7 Nov 2026):
