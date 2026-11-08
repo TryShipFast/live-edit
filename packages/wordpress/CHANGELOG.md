@@ -1,5 +1,17 @@
 # ShipFast Live Edit for WordPress
 
+## 0.20.15
+
+- A section is deleted, not hidden (owner, 8 Nov 2026: "fix the idea of hiding a section, i want to be to delete it";
+  "it's the section holding table"; "that is not having delete section"). The section that holds a table the owner
+  added was taken for one of its own cells, so its panel offered only "Hide this section" and never Move or Delete; it
+  now has This section with Move up, Move down, Duplicate and Delete (Remove for a section the owner added), like
+  every other section. "Hide this section" (and "Hide this card") is offered nowhere any more: Delete beside Move and
+  Duplicate is the one way, as in every site builder people know, and Undo brings a deleted section back. A section
+  hidden before this keeps its place and offers one box, "Show this section to visitors again". The panel's buttons,
+  the help answer and the walkthrough say move or delete. Proved in the browser: a table added, its section opened
+  from the table's grid, Remove pressed, gone from the page; no section of the design offers Hide.
+
 ## 0.20.14
 
 - A press on a card opens the whole card (owner, 8 Nov 2026: "If I click on card I should be able to change its

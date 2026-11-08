@@ -619,27 +619,28 @@ const bootLiveEdit = () => {
 
             if (type === 'toggle') {
                 /*
-                 * The box sits beside the words it answers.
-                 *
-                 * It was a field label with the box underneath it, so "Hide
-                 * this card" read as a heading over a lone checkbox that
-                 * answered nothing in particular. A checkbox is only a
-                 * question when its question is next to it, which is how the
-                 * rest of the drawer already asks ("Show it in the menu").
+                 * No "Hide" (owner, 8 Nov 2026: "fix the idea of hiding a section, i want to be to delete it").
+                 * Every site builder people know takes a section or card away with Delete, and the panel already
+                 * has Delete beside Move and Duplicate; a second way that keeps it but hides it was one more thing
+                 * to learn, and a hidden section still looked like part of the page while editing. So nothing is
+                 * offered here, unless this element is already hidden (a site edited before this change): then
+                 * one box brings it back, ticked to show, so nothing an owner hid is lost.
                  */
+                if (value !== '1') return null;
                 const input = document.createElement('input');
                 input.type = 'checkbox';
-                input.checked = value === '1';
+                input.checked = false;
                 input.dataset.styleProp = name;
+                input.dataset.styleShows = '1';
                 const thing = element ? describeElement(element).toLowerCase() : 'section';
                 const asked = document.createElement('span');
-                asked.textContent = `Hide this ${thing}`;
+                asked.textContent = `Show this ${thing} to visitors again`;
                 const row = document.createElement('div');
                 row.className = 'le-default';
                 row.append(input, asked);
                 const hint = document.createElement('span');
                 hint.className = 'le-hint';
-                hint.textContent = 'Hidden from visitors. You still see it, dimmed, while editing.';
+                hint.textContent = `It was hidden before. To take it away for good, use Delete this ${thing}.`;
                 wrap.replaceChildren(row, hint);
                 wrap.className = 'le-field le-divided';
 
@@ -914,7 +915,9 @@ const bootLiveEdit = () => {
                  */
                 const type = (window.liveEditStyleProps ?? {})[name] ?? KINDS_OF_STYLE[name];
                 if (!type) return;
-                group.append(styleField(name, type, values[name], element));
+                const field = styleField(name, type, values[name], element);
+                if (!field) return;
+                group.append(field);
                 offered++;
             });
             if (offered === 0) {
@@ -1021,7 +1024,10 @@ const bootLiveEdit = () => {
         const collectStyleProps = () => {
             const props = {};
             drawerFields.querySelectorAll('[data-style-prop]').forEach((input) => {
-                if (input.type === 'checkbox') {
+                if (input.type === 'checkbox' && input.dataset.styleShows) {
+                    // "Show this section to visitors again": ticked shows it, so it is no longer hidden.
+                    props[input.dataset.styleProp] = input.checked ? '' : '1';
+                } else if (input.type === 'checkbox') {
                     props[input.dataset.styleProp] = input.checked ? '1' : '';
                 } else if (input.type === 'color') {
                     const useDefault = input.closest('div').querySelector('input[type=checkbox]').checked;
@@ -1570,7 +1576,7 @@ const bootLiveEdit = () => {
                 const move = document.createElement('button');
                 move.type = 'button';
                 move.className = 'le-chip-btn';
-                move.textContent = 'Move, hide or remove this section';
+                move.textContent = 'Move or delete this section';
                 move.addEventListener('click', () => editStyle(holder));
                 drawerFields.append(move);
             }
@@ -4871,7 +4877,7 @@ const bootLiveEdit = () => {
                     /*
                      * The design's own sections can be deleted too (owner, 7 Nov 2026: "there is no way to delete a
                      * section"). Every site builder people know offers Delete on any section (Wix, Squarespace,
-                     * Shopify); Hide stays for "not now". Deleting takes it out of the page's arrangement, as deleting
+                     * Shopify). Deleting takes it out of the page's arrangement, as deleting
                      * an item takes it out of its list, and "+ Add a section" offers the design's sections again later
                      * (Undo covers it only while it is unpublished). A page keeps at least one section.
                      */
@@ -4932,7 +4938,7 @@ const bootLiveEdit = () => {
                     open.type = 'button';
                     open.className = 'le-chip-btn';
                     open.textContent = `${index + 1}. ${sectionName(section)}`;
-                    open.title = 'Move, duplicate, hide or add a section below this one';
+                    open.title = 'Move, duplicate, delete or add a section below this one';
                     open.addEventListener('click', () => {
                         section.scrollIntoView({ block: 'start', behavior: 'smooth' });
                         switchToNode(section);
@@ -5140,7 +5146,14 @@ const bootLiveEdit = () => {
             // cards. Name the repeated item above the fields so they know
             // which product, project or section this drawer belongs to.
             const item = element.closest?.('[data-edit-item]');
-            const inTable = Boolean(element.closest?.('[data-kit-table]'));
+            /*
+             * A section of the page is a section, even when it is a table the owner added: that section's own
+             * element carries data-kit-table, so it was taken for a cell and offered only its style ("Hide this
+             * section"), never Move or Delete (owner, 8 Nov 2026: "it's the section holding table"; "that is not
+             * having delete section"). A cell, row or column inside it is still the table's.
+             */
+            const aSection = element.dataset?.editItem !== undefined && element.parentElement?.dataset?.editListKind === 'sections';
+            const inTable = !aSection && Boolean(element.closest?.('[data-kit-table]'));
             if (item && !inTable) {
                 const list = item.parentElement;
                 const items = list ? [...list.children].filter((child) => child.hasAttribute('data-edit-item')) : [item];
@@ -5645,7 +5658,7 @@ const bootLiveEdit = () => {
                 const open = document.createElement('button');
                 open.type = 'button';
                 open.className = 'le-chip-btn';
-                open.textContent = 'Move, hide or remove this section';
+                open.textContent = 'Move or delete this section';
                 open.addEventListener('click', () => editStyle(section));
                 drawerFields.append(open);
             }
@@ -5678,7 +5691,7 @@ const bootLiveEdit = () => {
                 const open = document.createElement('button');
                 open.type = 'button';
                 open.className = 'le-chip-btn';
-                open.textContent = 'Move, hide or remove this section';
+                open.textContent = 'Move or delete this section';
                 open.addEventListener('click', () => editStyle(section));
                 drawerFields.append(open);
             }
@@ -7623,8 +7636,8 @@ const bootLiveEdit = () => {
                     publishStep,
                 ],
                 sections: [
-                    { point: section, title: 'Your page is made of sections', copy: 'Click a section\'s edge or its handle to choose it. Its panel can move it up or down, copy it or hide it.' },
-                    { point: section, title: 'Hiding is not deleting', copy: 'A hidden section keeps its words and pictures. Show it again from the same panel whenever you want it back.' },
+                    { point: section, title: 'Your page is made of sections', copy: 'Click a section\'s edge or its handle to choose it. Its panel can move it up or down, copy it or delete it.' },
+                    { point: section, title: 'Deleted by mistake?', copy: 'Undo brings it straight back. Later, + Add a section offers the design\'s sections again.' },
                     publishStep,
                 ],
             };

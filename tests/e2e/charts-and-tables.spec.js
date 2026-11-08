@@ -279,3 +279,35 @@ test('a table can be put on the right of a chart added before', async ({ page })
     expect(order.indexOf(`s-${table}`)).toBe(order.indexOf(`s-${chart}`) + 1);
 });
 
+
+test('the section holding a table is deleted from its own panel, with no Hide (owner, 8 Nov 2026)', async ({ page }) => {
+    // Owner: "fix the idea of hiding a section, i want to be to delete it"; "it's the section holding table";
+    // "that is not having delete section".
+    await openAsEditor(page, 'shop');
+    const id = await addAtTheEnd(page, 'Table');
+    const block = page.locator(`[data-instance="shop.${id}"]`);
+    const cell = block.locator('tbody tr').first().locator('td').first();
+    await cell.evaluate((el) => el.scrollIntoView({ block: 'center' }));
+    await cell.click();
+    await expect(sheet(page)).toBeVisible();
+    // From the table's grid to the section that holds it.
+    await drawer(page).getByRole('button', { name: 'Move or delete this section' }).click();
+    await expect(drawer(page)).toContainText('This section');
+    await expect(drawer(page)).not.toContainText('Hide this');
+    const remove = drawer(page).getByRole('button', { name: /^(Remove|Delete) this section$/ });
+    await expect(remove).toBeVisible();
+    await remove.click();
+    await expect.poll(() => Object.keys(site.host.builderFor('shop', '').added ?? {}).includes(id)).toBe(false);
+    await expect.poll(() => site.host.draw('shop').querySelector(`[data-instance="shop.${id}"]`)).toBe(null);
+});
+
+test('no section of the design offers Hide; each offers Delete this section', async ({ page }) => {
+    await openAsEditor(page, 'shop');
+    const section = page.locator('[data-edit-list-kind="sections"] > [data-edit-item]').first();
+    await section.evaluate((el) => el.scrollIntoView({ block: 'center' }));
+    const box_ = await section.boundingBox();
+    await page.mouse.click(box_.x + 6, box_.y + 6);
+    const reach = drawer(page).getByRole('button', { name: 'Move or delete this section' });
+    if (await reach.isVisible().catch(() => false)) await reach.click();
+    await expect(drawer(page)).not.toContainText('Hide this');
+});
