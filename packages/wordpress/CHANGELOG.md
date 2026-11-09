@@ -1,5 +1,15 @@
 # ShipFast Live Edit for WordPress
 
+## 0.20.23 (9 Nov 2026)
+
+Found by the real-editor walk on Oyin Kids:
+- A product card that is not on sale (`data-sale-off`) is a card: its name, price and words open the card, not the
+  flash-sale grid. Only its sale parts open the sale.
+- A countdown's own words ("Ends in", "days", "Last day:") can be changed: pressed, the sale grid offers "Change the
+  words".
+- On a slow host the Publish button still appears: it waits for the page's content past the first five seconds
+  instead of giving up, so a shop whose product pages are being read no longer hides Publish on every reload.
+
 ## 0.20.22 (9 Nov 2026)
 
 - A worked-out price opens the flash sale only when it is on a product (its card or its page's buy box). Car Wash Auto

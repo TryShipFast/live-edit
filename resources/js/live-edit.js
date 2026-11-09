@@ -5774,7 +5774,12 @@ const bootLiveEdit = () => {
         const saleLineEditable = (line) => String(line?.querySelector?.('[data-kit-sale-price]')?.dataset?.edit ?? '').startsWith('setting:');
         /** A part of the page that shows a sale the owner sets as a whole, or null. */
         const saleBitOf = (node) => {
-            const bit = node?.closest?.(SALE_BITS);
+            let bit = node?.closest?.(SALE_BITS);
+            // A product card marked data-sale-off (not on sale, LIVE-EDIT-STRUCTURE "Flash sales") is a card, not a
+            // sale bit: its words open the card. Only a sale part inside it (its price, its "% off") opens the sale.
+            while (bit && bit.matches('[data-sale-off]') && (bit.matches('[data-kit-product]') || bit.querySelector('[data-kit-product]'))) {
+                bit = bit.parentElement?.closest?.(SALE_BITS) ?? null;
+            }
             if (bit) return bit;
             const computed = computedOf(node);
 
@@ -7810,7 +7815,8 @@ const bootLiveEdit = () => {
              */
             const sale = saleBitOf(node);
             if (sale && (!sale.closest('[data-kit-sale]') || saleLineEditable(sale.closest('[data-kit-sale]')))) {
-                const words = node.closest('[data-kit-sale] [data-edit]');
+                // Its own words (the sale line's, or a countdown's "Ends in", "days"): the grid offers "Change the words".
+                const words = node.closest('[data-kit-sale] [data-edit], [data-countdown-box] [data-edit^="text"]');
 
                 return {
                     element: words ?? sale,
@@ -9055,7 +9061,25 @@ const bootLiveEdit = () => {
                 return;
             }
 
-            pageSettled().then(() => window.liveEditPublishing && use(window.liveEditPublishing));
+            // On a slow host the content answers after pageSettled has stopped waiting (5s): keep looking, so the
+            // Publish button still appears when it arrives (9 Nov 2026: it stayed hidden on every reload of a shop
+            // whose product pages were being read).
+            let used = false;
+            const once = () => {
+                if (used || !window.liveEditPublishing) return false;
+                used = true;
+                use(window.liveEditPublishing);
+
+                return true;
+            };
+            pageSettled().then(() => {
+                if (once()) return;
+                document.addEventListener('live-edit:content', once, { once: true });
+                const started = Date.now();
+                const look = setInterval(() => {
+                    if (once() || Date.now() - started > 120000) clearInterval(look);
+                }, 1000);
+            });
         };
 
         whenPublishingKnown((publishing) => {
