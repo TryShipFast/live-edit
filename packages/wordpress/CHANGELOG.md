@@ -1,5 +1,14 @@
 # ShipFast Live Edit for WordPress
 
+## 0.20.22 (9 Nov 2026)
+
+- A worked-out price opens the flash sale only when it is on a product (its card or its page's buy box). Car Wash Auto
+  sells products and lists wash prices copied from its price list; before 1.13.2 those wash prices were marked as a
+  worked-out `price`, so pressing one opened the sale grid as if it were a product (owner, 9 Nov 2026: "live edit
+  cannot diff between prices and product"). Any other worked-out price now says it comes from the owner's prices
+  elsewhere. Proved in the real editor on a Car Wash with the old markers: a wash price explains itself, a product's
+  price opens its Price field.
+
 ## 0.20.21 (9 Nov 2026)
 
 - A new collection never starts like a page that shows only what is on sale (the host marks it `saleOnly`): on Oyin

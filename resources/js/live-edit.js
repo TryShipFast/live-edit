@@ -5778,7 +5778,12 @@ const bootLiveEdit = () => {
             if (bit) return bit;
             const computed = computedOf(node);
 
-            return computed && ['price', 'countdown'].includes(computedKind(computed)) ? computed : null;
+            if (!computed) return null;
+            const kind = computedKind(computed);
+            if (kind === 'countdown') return computed;
+            // A worked-out price is a sale's only on a product (its card or its page's buy box): Car Wash Auto before
+            // 1.13.2 marked its service prices, copied from the price list, as `price`, and they opened the flash sale.
+            return kind === 'price' && computed.closest('[data-kit-product]:not(button):not(a), [data-kit-sale]') ? computed : null;
         };
         const isCountdown = (node) => Boolean(node?.closest?.('[data-countdown-box], [data-cd], [data-cd-until]') || computedKind(computedOf(node)) === 'countdown');
         /** The product a card (or a product page's buy box) shows, by its shop id. */
@@ -7898,6 +7903,7 @@ const bootLiveEdit = () => {
             category: 'This shows the product’s category, taken from the page it sits in.',
             total: 'This total is worked out from what the shopper chose, so there is nothing to type here.',
             // Anything else a template works out: never a sentence about products where there are none.
+            price: 'This price is worked out from your prices elsewhere on your website, such as your price list. Change it there and it follows.',
             filled: 'This is filled in for you from elsewhere on your website, so there is nothing to type here.',
         };
         /*
