@@ -434,6 +434,16 @@ export function createHost({ makeDocument, serialise = (doc) => `<!doctype html>
     const asASale = (html, id) => {
         if (!sale) return html;
         const product = { 'products/aster-veil': 'aster', 'products/blue-hour': 'blue' }[id];
+        if (product && sale.products) {
+            // With sale: { products }: the Products grid's words too (its name, its SKU and each size's, LIVE-EDIT-STRUCTURE.md
+            // "Every product has an SKU").
+            const code = product === 'aster' ? 'VLM-1001' : 'VLM-1002';
+            html = html
+                .replace('<h1 data-edit="text" data-field="name">', '<h1 data-kit-name data-edit="text" data-field="name">')
+                .replace('<p data-edit="text" data-field="notes">', `<p class="kit-meta"><span data-edit="text" data-field="sku-word">SKU:</span> <span data-kit-sku data-edit="text" data-field="sku">${code}</span></p>\n      <p data-edit="text" data-field="notes">`)
+                .replace(/(data-kit-variant="(\d+)ml"><span data-edit="text" data-field="size">[^<]*<\/span> <span )data-edit="text" data-field="price">([^<]*)<\/span>/g,
+                    (all, start, ml, price) => `${start}data-kit-price data-edit="text" data-field="price">${price}</span> <span data-kit-sku hidden data-edit="text" data-field="option-sku">${code}-${ml}</span>`);
+        }
         if (product) {
             return html
                 .replace(/<section data-instance="([a-z-]+)\.detail"/, `<section data-kit-product="${product}" data-instance="$1.detail"`)
@@ -551,6 +561,15 @@ export function createHost({ makeDocument, serialise = (doc) => `<!doctype html>
             return { id: page, title, sections, own: sections };
         }) : [],
         ...(removable ? { removedKey: 'structure:removed', removed: removed() } : {}),
+        // With sale: { products }: the shop's collections and the home page's featured row (ThePagesTheOwnerArranged).
+        ...(sale?.products ? {
+            productsKey: 'structure:products:',
+            categories: [
+                { id: 'shop', title: 'Shop', href: `${editorBase}shop`, made: false, copies: [], products: 2, inMenu: true, productsKey: 'structure:products:shop', has: JSON.parse(settings['structure:products:shop'] ?? '["aster","blue"]') },
+                { id: 'gifts', title: 'Gifts', href: `${editorBase}gifts`, made: false, copies: [], products: 1, inMenu: true, productsKey: 'structure:products:gifts', has: JSON.parse(settings['structure:products:gifts'] ?? '["blue"]') },
+            ],
+            featured: { key: 'structure:products:home', has: JSON.parse(settings['structure:products:home'] ?? '["aster"]'), title: 'Featured', row: 'home.picks' },
+        } : {}),
     });
 
     return {

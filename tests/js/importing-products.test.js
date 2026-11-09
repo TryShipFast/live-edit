@@ -28,8 +28,8 @@ describe('importing products', () => {
     it('offers a sample file with the shop’s own columns, categories and products, which reads back clean', () => {
         const sample = sampleFile({ categories, likes, products });
         const rows = parseCsv(sample);
-        expect(rows[0]).toEqual(['name', 'price', 'photo', 'categories', 'looks like']);
-        expect(rows[1]).toEqual(['Arc (example)', '$189', '', 'Headphones', 'Arc']);
+        expect(rows[0]).toEqual(['name', 'price', 'sku', 'photo', 'categories', 'looks like']);
+        expect(rows[1]).toEqual(['Arc (example)', '$189', '', '', 'Headphones', 'Arc']);
         expect(readRows(rows, { categories, likes, products }).problems).toEqual([]);
     });
 

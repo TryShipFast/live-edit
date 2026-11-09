@@ -1272,19 +1272,19 @@ export const firstLike = (categories = []) => {
     return pool.reduce((best, category) => ((category.products ?? 0) > (best?.products ?? 0) ? category : best), pool[0] ?? null);
 };
 
-export function renderNewCategory({ ui, config, from = null, save, go, notify, products = [] }) {
+export function renderNewCategory({ ui, config, from = null, save, go, notify, products = [], including = null }) {
     const categories = (config.categories ?? []).filter((category) => (category.copies ?? []).length);
     const taken = config.taken ?? [];
     let like = from ?? firstLike(categories);
     if (!like) {
-        notify('This design has no category to start one like.');
+        notify('This design has no collection to start one like.');
         ui.close?.();
 
         return null;
     }
 
-    ui.title(from ? `Duplicate ${from.title}` : 'New category');
-    ui.subtitle(from ? 'A copy of this category, with its products, under a new name.' : 'A page for a group of your products, linked from your menu.');
+    ui.title(from ? `Duplicate ${from.title}` : 'New collection');
+    ui.subtitle(from ? 'A copy of this collection, with its products, under a new name.' : 'A page for a group of your products, linked from your menu.');
 
     const form = el('div', 'le-name-page le-new-category');
     const nameField = el('label', 'le-field', 'Name');
@@ -1315,9 +1315,10 @@ export function renderNewCategory({ ui, config, from = null, save, go, notify, p
         parts.push(likeField);
     }
 
-    // Which products it shows: those of the category it looks like, until the owner ticks otherwise.
-    let touched = false;
-    const picker = products.length && like.has ? productPicker({ products, ticked: like.has, onChange: () => { touched = true; refresh(); } }) : null;
+    // Which products it shows: those of the collection it looks like, until the owner ticks otherwise; made for one
+    // product (the Products grid's + New collection on its row), that product alone.
+    let touched = Boolean(including);
+    const picker = products.length && like.has ? productPicker({ products, ticked: including ? [including] : like.has, onChange: () => { touched = true; refresh(); } }) : null;
     const starts = el('p', 'le-hint le-category-starts');
     const menu = el('label', 'le-switch');
     const menuBox = el('input');
@@ -1332,7 +1333,7 @@ export function renderNewCategory({ ui, config, from = null, save, go, notify, p
     ui.body.replaceChildren(form);
 
     const waiting = el('span', 'le-modal-note le-create-waiting');
-    const create = el('button', 'le-btn-publish le-create-category', from ? 'Duplicate category' : 'Create category');
+    const create = el('button', 'le-btn-publish le-create-category', from ? 'Duplicate collection' : 'Create collection');
     create.type = 'button';
 
     function address() { return slugFor(name.value); }
@@ -1342,7 +1343,7 @@ export function renderNewCategory({ ui, config, from = null, save, go, notify, p
         where.textContent = problem ?? (id ? `Its address: /${id}` : 'Its address follows the name.');
         where.classList.toggle('le-hint--warn', Boolean(problem));
         starts.textContent = `It starts as a copy of ${like.title}, with its products: change or remove them on the new page.`;
-        const missing = !name.value.trim() ? 'Give the category a name.'
+        const missing = !name.value.trim() ? 'Give the collection a name.'
             : picker && !picker.chosen().length ? 'Choose at least one product.'
             : whyNotYet({ title: name.value, address: id, chosen: like.copies, taken });
         create.disabled = Boolean(missing);
@@ -1367,7 +1368,7 @@ export function renderNewCategory({ ui, config, from = null, save, go, notify, p
         } catch (error) {
             ui.allowDismiss?.(true);
             notify(error.message);
-            create.textContent = from ? 'Duplicate category' : 'Create category';
+            create.textContent = from ? 'Duplicate collection' : 'Create collection';
             refresh();
         }
     });
@@ -1455,7 +1456,7 @@ export function productPicker({ products = [], ticked = [], onChange = () => {} 
  */
 export function renderCategoryProducts({ ui, category, products = [], save, done, notify }) {
     ui.title(`Products in ${category.title}`);
-    ui.subtitle('Tick the products this category shows. A product left out stays in your shop.');
+    ui.subtitle('Tick the products this collection shows. A product left out stays in your shop.');
     const picker = productPicker({ products, ticked: category.has ?? [], onChange: () => refresh() });
     ui.body.replaceChildren(picker.node);
 

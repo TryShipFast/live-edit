@@ -37,6 +37,7 @@ import { LEAVE_QUESTION, guardLeaving } from './unsaved.js';
 import { insertionNear, sectionName, sectionUnder, shownSectionLists, shownSections } from './section-inserter.js';
 import { DETAIL_MODE, copiedItemSettings, copiedStyles, copyPageForCard, deletablePage, deletePage, detailAddress, keyMap, linksTo, linksWarning, showOnlyTheDetail } from './card-page.js';
 import { renderChoice } from './choice.js';
+import { COL, COLUMNS, SKU_TAKEN, choosableCollections, collectionsCell, collectionsOfCell, collectionsSaid, gridRows, keepSizesInStep, keptRead, priceAsWritten, productsPlan, readProduct, rowCells, sharedSkus, shownColumns, stockOfSize } from './products.js';
 import { SALE_HEADS, SALE_KINDS, STOCK_HEAD, dayOf, endSaid, flashSalePlan, keepRowInStep, keptProduct, ownPriceOf, ownPricesAmong, readSale, saleLabel, saleLineOf, saleRow, sizeKey, sizesSummary, stockFor, stockPlan, todayIs, withWrites } from './sale.js';
 import { TYPES as FORM_TYPES, seedForm } from './forms.js';
 import { renderFormBuilder } from './form-builder.js';
@@ -1411,14 +1412,15 @@ const bootLiveEdit = () => {
         };
 
         // New category (pages.js): a page made like one of the shop's categories, named once. `from` duplicates one.
-        const openNewCategory = (from = null) => {
+        const openNewCategory = (from = null, { including = null } = {}) => {
             if (!window.liveEditPages) return null;
             closeDrawer(true);
-            const handle = ui.modal({ title: 'New category', size: 'is-medium' });
+            const handle = ui.modal({ title: 'New collection', size: 'is-medium' });
             renderNewCategory({
                 ui: handle,
                 config: window.liveEditPages,
                 from,
+                including,
                 save: saveSetting,
                 go: (href) => {
                     sessionStorage.setItem('tb_editing', '1');
@@ -1430,10 +1432,33 @@ const bootLiveEdit = () => {
 
             return handle;
         };
+        /*
+         * Every SKU the shop already has, with whose it is: the host's stock rows (the published catalogue's) and the
+         * product pages the Products grid read (drafts included), so an import or a new product is checked against them.
+         */
+        const knownSkus = async () => {
+            let stock = null;
+            try { stock = await (stockAsked ??= loadStock()); } catch { stock = null; }
+            const known = (stock ?? []).filter((row) => row.sku).map((row) => ({ sku: row.sku, name: row.size ? `${row.name}, ${row.size}` : row.name }));
+            const names = new Map(everyProduct().map((product) => [product.path, product.name]));
+            for (const [path, read] of Object.entries(keptProductReads())) {
+                if (!read) continue;
+                const name = read.name?.words || names.get(path) || 'another product';
+                if (read.sku?.words) known.unshift({ sku: read.sku.words, name });
+                for (const size of read.sizes ?? []) if (size.sku?.words) known.unshift({ sku: size.sku.words, name: `${name}, ${size.label}` });
+            }
+
+            return known;
+        };
         // Every product the shop sells: the design's (the Shop tab's) and the owner's own catalogue.
         const shopProducts = () => [
-            ...(window.liveEditShop?.products ?? []).filter((product) => product.id),
-            ...(window.liveEditPages?.catalogue?.items ?? []).map((product) => ({ id: product.id, name: product.name, price: product.price })),
+            ...(window.liveEditShop?.products ?? []).filter((product) => product.id).map((product) => {
+                // its SKU where the Products grid has read its page (the import's sample file shows it)
+                const read = keptProductReads()[pathOf(product.href)];
+
+                return read?.sku?.words ? { ...product, sku: read.sku.words } : product;
+            }),
+            ...(window.liveEditPages?.catalogue?.items ?? []).map((product) => ({ id: product.id, name: product.name, price: product.price, ...(product.sku ? { sku: product.sku } : {}) })),
         ];
         // Import products (catalogue.js): a file of products, checked, then saved as the shop's catalogue.
         const openImport = () => {
@@ -1443,6 +1468,7 @@ const bootLiveEdit = () => {
                 ui: handle,
                 config: window.liveEditPages,
                 products: shopProducts(),
+                knownSkus,
                 save: (key, value) => saveSetting(key, value),
                 done: (message) => {
                     handle.close?.();
@@ -1610,6 +1636,8 @@ const bootLiveEdit = () => {
             catalogue: window.liveEditPages?.catalogue ?? null,
             taken: window.liveEditPages?.taken ?? [],
             flashSale: () => void editFlashSale(),
+            products: () => void editProducts(),
+            knownSkus,
             ask: askTo,
             upload: async (file) => {
                 const body = new FormData();
@@ -6217,6 +6245,443 @@ const bootLiveEdit = () => {
         };
 
         /*
+         * A shop's products, as a whole (products.js; owner, 8 Nov 2026: "live edit should be sufficient to setup their
+         * store"; customer case "do we have product categories, featured products, etc"). Shopify's Products list in the
+         * editor's one grid: a row for each product and each of its sizes, with Photo, Name, Price, SKU, Collections,
+         * Featured and Stock, and a Columns menu to show fewer. Opened from the Shop tab's Your products. Saved once,
+         * as the words each product page already holds and the lists each collection and the home page already keep, and
+         * taken back together by one Undo.
+         */
+        const PRODUCT_COLUMNS = 'live-edit:product-columns';
+        const PRODUCTS_KEPT = `live-edit:products:${api?.site ?? window.location.host}`;
+        const keptProductReads = () => {
+            try {
+                const kept = JSON.parse(sessionStorage.getItem(PRODUCTS_KEPT) ?? 'null');
+
+                return kept && Date.now() - kept.at < 600000 && kept.reads && typeof kept.reads === 'object' ? kept.reads : {};
+            } catch {
+                return {};
+            }
+        };
+        const keepProductReads = (reads) => {
+            try {
+                if (reads) sessionStorage.setItem(PRODUCTS_KEPT, JSON.stringify({ at: Date.now(), reads }));
+                else sessionStorage.removeItem(PRODUCTS_KEPT);
+            } catch { /* read again next time */ }
+        };
+        /** Every product the shop sells, each with its page in the editor: the design's and the owner's own. */
+        const everyProduct = () => {
+            const drawn = new Map((window.liveEditPages?.catalogue?.drawn ?? []).map((one) => [one.id, one.href]));
+
+            return [
+                ...(window.liveEditShop?.products ?? []).filter((product) => product.href),
+                ...(window.liveEditPages?.catalogue?.items ?? []).filter((item) => drawn.has(item.id)).map((item) => ({ id: item.id, name: item.name, href: drawn.get(item.id), own: true })),
+            ].map((product) => ({ ...product, path: pathOf(product.href) }));
+        };
+        /** Each product's page read (drafts included), a few at a time; `heard(done)` after each. */
+        const readProductPages = async (products, heard = () => {}) => {
+            const kept = keptProductReads();
+            const here = pathOf(window.location.href);
+            let saved;
+            let applyContent;
+            let done = 0;
+            const waiting = [];
+            products.forEach((product) => {
+                if (product.path === here && document.querySelector('main [data-kit-product]')) product.read = keptRead(readProduct(document, window.location.href));
+                else if (kept[product.path] !== undefined) product.read = kept[product.path];
+                else waiting.push(product);
+                if (product.read !== undefined) done += 1;
+            });
+            heard(done);
+            if (waiting.length) {
+                try { saved = (await readSavedContent())?.settings ?? null; } catch { saved = null; }
+                ({ applyContent } = await import('./content.js'));
+                let next = 0;
+                await Promise.all(Array.from({ length: Math.min(4, waiting.length) }, async () => {
+                    while (next < waiting.length) {
+                        const product = waiting[next];
+                        next += 1;
+                        try {
+                            const response = await fetch(product.href, { credentials: 'same-origin', headers: { Accept: 'text/html' } });
+                            const doc = response.ok ? new DOMParser().parseFromString(await response.text(), 'text/html') : null;
+                            if (doc && saved) {
+                                try { applyContent(doc, saved); } catch { /* the page's own words, then */ }
+                            }
+                            product.read = doc ? keptRead(readProduct(doc, product.href)) : null;
+                        } catch {
+                            product.read = null;
+                        }
+                        done += 1;
+                        heard(done);
+                    }
+                }));
+            }
+            keepProductReads(Object.fromEntries(products.filter((product) => product.read !== undefined).map((product) => [product.path, product.read])));
+
+            return products;
+        };
+        /** Kept reads with the words just saved written in, so the grid opens at once after the page reloads. */
+        const keepWithWrites = (products, writes) => {
+            const by = new Map(writes.map(({ key, value }) => [key, value]));
+            const put = (word) => (word?.key && by.has(word.key) ? { ...word, words: by.get(word.key) } : word);
+            keepProductReads(Object.fromEntries(products.filter((product) => product.read !== undefined).map((product) => [product.path, product.read && {
+                ...product.read,
+                name: put(product.read.name),
+                price: put(product.read.price),
+                sku: put(product.read.sku),
+                sizes: product.read.sizes.map((size) => ({ ...size, price: put(size.price), sku: put(size.sku) })),
+            }])));
+        };
+        /** A new collection, made like the shop's own (pages.js renderNewCategory), asked first if the grid holds changes. */
+        const newCollectionFrom = async (grid, including = null) => {
+            if (grid?.isChanged?.()) {
+                const first = await askTo({ title: 'Save your changes first?', subtitle: 'A new collection opens its own page. Your changes in this grid are saved first, so nothing is lost.', yes: 'Save and continue', no: 'Keep editing', danger: false });
+                if (!first) return;
+                try { sessionStorage.setItem('le-then-new-collection', including ?? ''); } catch { /* opened from the Shop tab instead */ }
+                await grid.saveNow();
+                if (grid.isChanged()) {
+                    try { sessionStorage.removeItem('le-then-new-collection'); } catch { /* nothing kept */ }
+                }
+
+                return;
+            }
+            if (current) current.dirty = false;
+            openNewCategory(null, { including });
+        };
+
+        const editProducts = async ({ pressed = null, productId = null } = {}) => {
+            current = { kind: 'products' };
+            const opened = current;
+            if (pressed) lastOpened = pressed;
+            drawerTitle.textContent = 'Products';
+            drawerDelete.classList.add('le-hidden');
+            const reading = el('p', 'le-hint le-sale-reading', 'Loading your products…');
+            reading.setAttribute('role', 'status');
+            drawerFields.replaceChildren(reading);
+            setTrail(pressed);
+            showTab('Edit');
+            ui.drawerFoot.classList.add('le-hidden');
+            openDrawer();
+            drawer.classList.add('is-grid');
+            ui.root.classList.add('le-grid-open');
+            const all = everyProduct();
+            if (!all.length) {
+                reading.textContent = 'Your shop has no products yet. Add one in the Shop tab.';
+
+                return;
+            }
+            stockAsked ??= loadStock();
+            await readProductPages(all, (done) => {
+                if (current === opened) reading.textContent = `Loading your products: ${done} of ${all.length}…`;
+            });
+            // The stock is the host's; a slow answer opens the grid without its Stock column.
+            const waited = await Promise.race([stockAsked, new Promise((resolve) => window.setTimeout(() => resolve(undefined), 2500))]);
+            if (current !== opened) return;
+            const stock = Array.isArray(waited) ? waited : null;
+            const products = all.filter((product) => product.read);
+            if (!products.length) {
+                reading.textContent = 'None of your product pages could be read. Reload the page and try again.';
+
+                return;
+            }
+            const collections = choosableCollections(window.liveEditPages?.categories ?? []);
+            const featured = window.liveEditPages?.featured?.key ? window.liveEditPages.featured : null;
+            const canMake = Boolean(window.liveEditPages && (window.liveEditPages.categories ?? []).some((c) => (c.copies ?? []).length));
+            const rows = gridRows(products);
+            const why = {
+                collections: collections.length || canMake ? null : 'Your shop has no collections.',
+                featured: featured ? null : 'Your home page has no row of products to feature them in. Add one from + Section on your home page.',
+                stock: stock ? null : 'Stock is counted once your shop is published.',
+            };
+            const offered = COLUMNS.map((column) => column.id).filter((id) => !why[id]);
+            let kept = null;
+            try { kept = JSON.parse(localStorage.getItem(PRODUCT_COLUMNS) ?? 'null'); } catch { kept = null; }
+            let shown = shownColumns(kept, offered);
+            const picked = productId ? rows.findIndex((row) => row.kind === 'product' && products[row.p].id === productId) : -1;
+            const opens = new Set();
+            const lastPrice = new Map();
+
+            const hint = el('p', 'le-hint', 'Every product and each of its sizes, one row each. Type in any cell, tick a product into a collection or Featured, then Save changes. Each product’s page, its cards and checkout follow.');
+            const tools = el('div', 'le-row le-products-tools');
+            const columnsButton = el('button', 'le-chip-btn le-products-columns-btn', 'Columns');
+            columnsButton.type = 'button';
+            columnsButton.setAttribute('aria-expanded', 'false');
+            const columnsMenu = el('fieldset', 'le-products-columns');
+            columnsMenu.hidden = true;
+            columnsMenu.append(el('legend', 'le-label', 'Show these columns'));
+            const applyColumns = (grid) => {
+                COLUMNS.forEach((column) => grid.classList.toggle(`is-hide-${column.id}`, !shown.includes(column.id)));
+            };
+            for (const column of COLUMNS.filter((one) => !one.always)) {
+                const line = el('label', `le-check${why[column.id] ? ' is-off' : ''}`);
+                const tick = el('input');
+                tick.type = 'checkbox';
+                tick.value = column.id;
+                tick.checked = shown.includes(column.id);
+                tick.disabled = Boolean(why[column.id]);
+                // a choice of how the grid looks, not a change to the shop: never "unsaved"
+                ['input', 'change'].forEach((type) => tick.addEventListener(type, (event) => event.stopPropagation()));
+                tick.addEventListener('change', () => {
+                    shown = offered.filter((id) => id === 'name' || (id === column.id ? tick.checked : shown.includes(id)));
+                    try { localStorage.setItem(PRODUCT_COLUMNS, JSON.stringify(shown)); } catch { /* shown as chosen until the page reloads */ }
+                    applyColumns(grid);
+                });
+                line.append(tick, document.createTextNode(` ${column.head}`));
+                if (why[column.id]) line.append(el('span', 'le-hint', why[column.id]));
+                columnsMenu.append(line);
+            }
+            columnsButton.addEventListener('click', () => {
+                columnsMenu.hidden = !columnsMenu.hidden;
+                columnsButton.setAttribute('aria-expanded', String(!columnsMenu.hidden));
+            });
+            tools.append(columnsButton);
+            if (canMake) {
+                const make = el('button', 'le-chip-btn le-products-new-collection', '+ New collection');
+                make.type = 'button';
+                make.addEventListener('click', () => void newCollectionFrom(grid));
+                tools.append(make);
+            }
+
+            const wordOf = (row, column) => {
+                const read = products[row.p].read;
+                const owner = row.kind === 'size' ? read.sizes[row.s] : read;
+
+                return owner?.[column] ?? null;
+            };
+            // An SKU another row has: red, said in the cell, never refused (Shopify lets one repeat).
+            const markShared = (table) => {
+                const body = table.tBodies[0];
+                if (!body) return;
+                const said = [...body.rows].map((tr) => {
+                    const cell = tr.cells[COL.sku];
+
+                    return (cell?.querySelector('input')?.value ?? cell?.querySelector('.le-figures-read')?.textContent ?? '').trim();
+                });
+                const shared = sharedSkus(said);
+                [...body.rows].forEach((tr, r) => {
+                    const cell = tr.cells[COL.sku];
+                    if (!cell) return;
+                    const taken = shared.has(r);
+                    cell.classList.toggle('is-taken', taken);
+                    const box = cell.querySelector('input');
+                    let note = cell.querySelector('.le-sku-taken');
+                    if (taken && !note) {
+                        note = el('span', 'le-sku-taken', SKU_TAKEN);
+                        note.id = `le-sku-taken-${r}`;
+                        cell.append(note);
+                    } else if (!taken) note?.remove();
+                    if (box) {
+                        box.toggleAttribute('aria-invalid', taken);
+                        if (taken) box.setAttribute('aria-describedby', note.id);
+                        else box.removeAttribute('aria-describedby');
+                    }
+                });
+            };
+
+            const grid = renderDataGrid({
+                heads: COLUMNS.map((column) => column.head),
+                rows: rows.map((row) => rowCells(row, products, { collections, featured, stock })),
+                fixedColumns: true,
+                fixedRows: true,
+                numbered: false,
+                kinds: COLUMNS.map((column) => column.kind),
+                nameColumn: COL.name,
+                kindOf: (r, c) => {
+                    const row = rows[r];
+                    const product = products[row.p];
+                    if (row.kind === 'size') {
+                        if ([COL.photo, COL.collections, COL.featured].includes(c)) return 'blank';
+                        if (c === COL.name) return 'read';
+                        if (c === COL.stock) return stock && stockOfSize(product, product.read.sizes[row.s], stock) ? null : 'blank';
+                    } else if (c === COL.stock) {
+                        return stock && stockFor(product, stock).own && !product.read.sizes.length ? null : 'blank';
+                    } else if (c === COL.featured && !featured) {
+                        return 'blank';
+                    }
+                    if ([COL.name, COL.price, COL.sku].includes(c)) {
+                        const word = wordOf(row, ['name', 'price', 'sku'][[COL.name, COL.price, COL.sku].indexOf(c)]);
+                        if (!word?.key) return word?.words ? 'read' : 'blank';
+                    }
+
+                    return null;
+                },
+                renderCell: (r, c, value) => {
+                    const row = rows[r];
+                    if (row.kind !== 'product') return null;
+                    const product = products[row.p];
+                    if (c === COL.photo) {
+                        if (!value) return null;
+                        // its photos are changed on its page, where they are: the photo opens it
+                        const open = el('a', 'le-product-photo');
+                        open.href = product.href;
+                        open.title = `Open ${product.name} to change its photos`;
+                        open.setAttribute('aria-label', `Open ${product.name} to change its photos`);
+                        const img = el('img');
+                        img.src = value;
+                        img.alt = '';
+                        img.loading = 'lazy';
+                        open.append(img);
+                        open.addEventListener('click', (event) => {
+                            if (!grid.isChanged()) return;
+                            event.preventDefault();
+                            void askTo({ title: 'Leave without saving?', subtitle: 'Your changes in this grid are not saved yet.', yes: 'Leave', no: 'Keep editing' }).then((go) => {
+                                if (go) { current = null; window.location.href = product.href; }
+                            });
+                        });
+
+                        return open;
+                    }
+                    if (c === COL.collections && (collections.length || canMake)) {
+                        const wrap = el('div', 'le-product-collections');
+                        const toggle = el('button', 'le-product-collections-toggle');
+                        toggle.type = 'button';
+                        toggle.dataset.collectionsRow = String(r);
+                        toggle.setAttribute('aria-expanded', opens.has(r) ? 'true' : 'false');
+                        const words = el('span', 'le-product-collections-said', collectionsSaid(value, collections));
+                        const sayToggle = () => toggle.setAttribute('aria-label', `${product.name}: collections, ${words.textContent}. ${opens.has(r) ? 'Hide' : 'Choose'}`);
+                        sayToggle();
+                        toggle.append(words, glyphIcon(opens.has(r) ? 'chevronDown' : 'chevronRight'));
+                        wrap.append(toggle);
+                        const list = el('div', 'le-product-collections-list');
+                        list.setAttribute('role', 'group');
+                        list.setAttribute('aria-label', `${product.name}: collections`);
+                        list.hidden = !opens.has(r);
+                        let ids = collectionsOfCell(value);
+                        for (const collection of collections) {
+                            const line = el('label', 'le-check');
+                            const tick = el('input');
+                            tick.type = 'checkbox';
+                            tick.value = collection.id;
+                            tick.checked = ids.includes(collection.id);
+                            tick.addEventListener('change', () => {
+                                ids = tick.checked ? [...ids, collection.id] : ids.filter((id) => id !== collection.id);
+                                const cell = collectionsCell(collections.map((one) => one.id).filter((id) => ids.includes(id)));
+                                grid.setCell(r, COL.collections, cell);
+                                words.textContent = collectionsSaid(cell, collections);
+                                sayToggle();
+                            });
+                            line.append(tick, document.createTextNode(` ${collection.title}`));
+                            list.append(line);
+                        }
+                        if (canMake) {
+                            const make = el('button', 'le-link-btn le-product-new-collection', '+ New collection');
+                            make.type = 'button';
+                            make.setAttribute('aria-label', `Make a new collection with ${product.name} in it`);
+                            make.addEventListener('click', () => void newCollectionFrom(grid, product.id));
+                            list.append(make);
+                        }
+                        toggle.addEventListener('click', () => {
+                            if (opens.has(r)) opens.delete(r);
+                            else opens.add(r);
+                            list.hidden = !opens.has(r);
+                            toggle.setAttribute('aria-expanded', String(opens.has(r)));
+                            sayToggle();
+                            toggle.lastChild?.replaceWith(glyphIcon(opens.has(r) ? 'chevronDown' : 'chevronRight'));
+                        });
+                        wrap.append(list);
+
+                        return wrap;
+                    }
+
+                    return null;
+                },
+                afterDraw: (table) => {
+                    const body = table.tBodies[0];
+                    [...(body?.rows ?? [])].forEach((tr, r) => tr.classList.toggle('is-size', rows[r]?.kind === 'size'));
+                    markShared(table);
+                },
+                mostRows: rows.length,
+                rowNoun: 'product',
+                picked: picked >= 0 ? picked : null,
+                focus: picked >= 0 ? { row: picked, col: COL.price } : null,
+                onCell: (r, c, cells, done) => {
+                    const row = rows[r];
+                    if (c !== COL.price || !done) return;
+                    const word = wordOf(row, 'price');
+                    const before = lastPrice.has(r) ? lastPrice.get(r) : word?.words ?? '';
+                    const written = priceAsWritten(cells[c], word?.words || products[row.p].read.price.words);
+                    if (written !== null) cells[c] = written;
+                    lastPrice.set(r, cells[c]);
+                    // a product's sizes priced as it was follow it, shown at once
+                    if (row.kind === 'product' && written !== null) {
+                        const now = grid.rowsNow();
+                        const moved = keepSizesInStep(rows, (i) => now[i], r, before, written);
+                        if (moved.length) {
+                            window.setTimeout(() => grid.update((sizeCells, i) => {
+                                if (moved.includes(i)) {
+                                    sizeCells[COL.price] = now[i][COL.price];
+                                    lastPrice.set(i, now[i][COL.price]);
+                                }
+                            }), 0);
+                        }
+                    }
+                },
+                onSave: async ({ rows: cells }) => {
+                    const plan = productsPlan(products, rows, cells, { collections, featured, stock });
+                    const counts = stockPlan(plan.stock);
+                    if (plan.refused.length || counts.refused.length) return [...plan.refused, ...counts.refused];
+                    if (current) current.dirty = false;
+                    if (!plan.writes.length && !plan.lists.length && !counts.changes.length) {
+                        closeDrawer(true);
+
+                        return [];
+                    }
+                    if (counts.changes.length) {
+                        await request('/live-edit/stock', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ changes: counts.changes }),
+                        });
+                    }
+                    const keys = [];
+                    const base = window.liveEditPages?.editorBase ?? '';
+                    for (const { key, value, name, what } of plan.writes) {
+                        const plain = parseEditKey(key).key;
+                        const product = products.find((one) => one.name === name);
+                        const pageId = String(product?.href ?? '').startsWith(base) ? String(product.href).slice(base.length).replace(/^\/+|\/+$/g, '') : '';
+                        const unit = pageId ? `section:${pageId.replace(/\//g, '-')}.product` : null;
+                        await patiently(() => request('/live-edit/setting', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                ...(unit ? { 'X-Live-Edit-Unit': encodeURIComponent(unit), 'X-Live-Edit-Unit-Label': encodeURIComponent(name) } : {}),
+                                ...(what ? { 'X-Live-Edit-What': encodeURIComponent(what) } : {}),
+                            },
+                            body: JSON.stringify({ key: plain, value, locale: window.liveEditLocale }),
+                        }));
+                        keys.push(plain);
+                    }
+                    for (const { key, value, title } of plan.lists) {
+                        await patiently(() => saveSetting(key, value, `the products in ${title}`));
+                        keys.push(key);
+                    }
+                    savedTogether(keys, 'Products');
+                    keepWithWrites(all, plan.writes);
+                    const changed = new Set(plan.writes.map((write) => write.name)).size;
+                    const said = [
+                        changed ? `${changed} product${changed === 1 ? '' : 's'} changed.` : '',
+                        plan.lists.length ? `${plan.lists.map((list) => list.title).join(', ')} updated.` : '',
+                        counts.changes.length ? `Stock set for ${counts.changes.length}.` : '',
+                    ].filter(Boolean).join(' ');
+                    sessionStorage.setItem('tb_editing', '1');
+                    reloadWithToast(`Saved ✓ ${said}`);
+
+                    return [];
+                },
+            });
+            grid.classList.add('le-products-grid');
+            applyColumns(grid);
+            grid.addEventListener('input', (event) => {
+                if (event.target?.dataset?.col === String(COL.sku)) markShared(grid.querySelector('table'));
+            });
+            const after = el('p', 'le-hint le-sale-after', stock
+                ? 'Changes are a draft until you press Publish, and Undo takes them all back. Stock is saved as soon as you press Save changes: it is not a draft, so Publish and Undo do not change it. Leave Stock empty if you do not count it.'
+                : 'Changes are a draft until you press Publish, and Undo takes them all back.');
+            drawerFields.replaceChildren(hint, tools, columnsMenu, grid, after);
+            if (picked >= 0) grid.querySelector('tr.is-picked')?.scrollIntoView?.({ block: 'nearest' });
+        };
+
+        /*
          * The editor's own label on every card (and product page) whose product is on sale: "On sale · ₦49,950 · ends
          * 31 Dec", "Sale starts 12 Nov", or "Sale ended", in the corner, never on the published page (owner, 8 Nov 2026:
          * "we should be able to know this is a card containing a sales product"). Pressing it opens the sale.
@@ -9470,6 +9935,10 @@ const bootLiveEdit = () => {
             let pagesAgain = false;
             try { pagesAgain = sessionStorage.getItem('le-open-pages') === '1'; sessionStorage.removeItem('le-open-pages'); } catch { /* a convenience */ }
             if (pagesAgain && window.liveEditPages) openPages();
+            // Back from saving the Products grid on the way to a new collection (newCollectionFrom): it opens now.
+            let thenCollection = null;
+            try { thenCollection = sessionStorage.getItem('le-then-new-collection'); sessionStorage.removeItem('le-then-new-collection'); } catch { /* a convenience */ }
+            if (thenCollection !== null && window.liveEditPages) openNewCategory(null, { including: thenCollection || null });
         }
         if (!detailMode && !directPanelOpen && document.body.classList.contains('editing')) startWalkthrough();
     }

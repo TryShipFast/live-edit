@@ -23,7 +23,7 @@ const el = (tag, className, text) => {
     return node;
 };
 
-export const COLUMNS = ['name', 'price', 'photo', 'categories', 'looks like'];
+export const COLUMNS = ['name', 'price', 'sku', 'photo', 'categories', 'looks like'];
 export const UNDO_KEY = 'le-last-import';
 
 /** A CSV cell, quoted where it must be. */
@@ -76,7 +76,7 @@ export function sampleFile({ categories = [], likes = [], products = [] }) {
     const lines = [COLUMNS.map(cell).join(',')];
     for (const { product, category } of examples) {
         const like = likes.find((l) => l.product === product.id);
-        lines.push([`${product.name} (example)`, like?.price || product.price || '', '', category.title, like?.title ?? ''].map(cell).join(','));
+        lines.push([`${product.name} (example)`, like?.price || product.price || '', String(like?.sku || product.sku || '').trim(), '', category.title, like?.title ?? ''].map(cell).join(','));
     }
 
     return `${lines.join('\r\n')}\r\n`;
@@ -87,7 +87,7 @@ export function sampleFile({ categories = [], likes = [], products = [] }) {
  *
  * @returns {{ ready: Array<object>, problems: Array<{ row: number, name: string, says: string }> }}
  */
-export function readRows(rows, { categories = [], likes = [], catalogue = [], taken = [], products = [] }) {
+export function readRows(rows, { categories = [], likes = [], catalogue = [], taken = [], products = [], known = [] }) {
     const header = (rows[0] ?? []).map((h) => h.trim().toLowerCase());
     const at = (name) => header.indexOf(name);
     const problems = [];
@@ -100,6 +100,12 @@ export function readRows(rows, { categories = [], likes = [], catalogue = [], ta
     const byName = new Map(categories.flatMap((c) => [[c.title.toLowerCase(), c], [String(c.id).toLowerCase(), c]]));
     const likeByName = new Map(likes.flatMap((l) => [[l.title.toLowerCase(), l], [String(l.product).toLowerCase(), l], [String(l.id).toLowerCase(), l]]));
     const used = new Set([...catalogue.map((p) => p.id), ...likes.map((l) => l.product), ...likes.map((l) => String(l.id).split('/').pop()), ...taken.map((t) => String(t).split('/').pop())]);
+    // Every SKU the shop already sells (its products' pages, the owner's own products), and those of the rows above.
+    const skus = new Map();
+    for (const { sku, name } of [...known, ...catalogue.filter((p) => p.sku).map((p) => ({ sku: p.sku, name: p.name }))]) {
+        const said = String(sku ?? '').trim().toUpperCase();
+        if (said && !skus.has(said)) skus.set(said, `${name}'s`);
+    }
 
     rows.slice(1).forEach((cells, index) => {
         const value = (column) => (at(column) >= 0 ? (cells[at(column)] ?? '').trim() : '');
@@ -111,6 +117,10 @@ export function readRows(rows, { categories = [], likes = [], catalogue = [], ta
         else if (name.length > 120) says.push('its name is longer than 120 characters');
         if (!/\d/.test(price)) says.push(price ? `its price "${price}" has no figure` : 'it has no price');
         if (photo && !/^https:\/\/\S+$/.test(photo)) says.push('its photo is not a web address starting https://');
+        const sku = value('sku');
+        if (sku.length > 64) says.push('its SKU is longer than 64 characters');
+        else if (/[<>\r\n]/.test(sku)) says.push('its SKU has a character it cannot have (< or >)');
+        else if (sku && skus.has(sku.toUpperCase())) says.push(`its SKU ${sku} is already ${skus.get(sku.toUpperCase())}`);
 
         const named = value('categories').split(/[|;\n]/).map((c) => c.trim()).filter(Boolean);
         const inCategories = [];
@@ -137,7 +147,8 @@ export function readRows(rows, { categories = [], likes = [], catalogue = [], ta
         let id = slug(name);
         for (let n = 2; used.has(id); n += 1) id = `${slug(name).slice(0, 56)}-${n}`;
         used.add(id);
-        ready.push({ id, name, price, photo, categories: [...new Set(inCategories)], like: like.id });
+        if (sku) skus.set(sku.toUpperCase(), `row ${index + 2}'s${name ? ` (${name})` : ''}`);
+        ready.push({ id, name, price, ...(sku ? { sku } : {}), photo, categories: [...new Set(inCategories)], like: like.id });
     });
 
     return { ready, problems };
@@ -160,7 +171,7 @@ export function whatAnImportSaves({ ready, catalogue = [], categories = [], prod
 }
 
 /** The Import products window. */
-export function renderImport({ ui, config, products = [], save, done, notify, storage = window.sessionStorage }) {
+export function renderImport({ ui, config, products = [], save, done, notify, storage = window.sessionStorage, knownSkus = async () => [] }) {
     const shop = config.catalogue;
     const categories = config.categories ?? [];
     ui.title('Import products');
@@ -178,6 +189,7 @@ export function renderImport({ ui, config, products = [], save, done, notify, st
     for (const [column, what] of [
         ['name', 'The product’s name. Needed.'],
         ['price', 'As customers read it, with its figure: ₦15,000. Needed.'],
+        ['sku', 'Your own code for it, like OXH-1020. Optional; each product’s must be different.'],
         ['photo', 'A web address of its photo, starting https://. You can change it later in the editor.'],
         ['categories', `Which categories it is in, by name, separated by |. This shop has: ${categories.map((c) => c.title).join(', ') || 'none'}.`],
         ['looks like', 'The name of one of the shop’s products whose page it copies (sizes, details). Leave it empty to use one from its first category.'],
@@ -211,7 +223,9 @@ export function renderImport({ ui, config, products = [], save, done, notify, st
         if (!chosen) return;
         const rows = parseCsv(await chosen.text());
         const room = 500 - (shop.items ?? []).length;
-        checked = readRows(rows, { categories, likes: shop.likes, catalogue: shop.items ?? [], taken: config.taken ?? [], products });
+        let known = [];
+        try { known = await knownSkus(); } catch { known = []; }
+        checked = readRows(rows, { categories, likes: shop.likes, catalogue: shop.items ?? [], taken: config.taken ?? [], products, known });
         if (checked.ready.length > room) {
             checked.problems.push({ row: 0, name: '', says: `A shop holds 500 imported products; ${checked.ready.length - room} of these are left out.` });
             checked.ready = checked.ready.slice(0, Math.max(0, room));
@@ -223,7 +237,7 @@ export function renderImport({ ui, config, products = [], save, done, notify, st
             const list = el('ul', 'le-import-ready');
             for (const product of checked.ready.slice(0, 50)) {
                 const row = el('li');
-                row.append(el('span', 'le-import-name', product.name), el('span', 'le-import-price', product.price),
+                row.append(el('span', 'le-import-name', product.name), el('span', 'le-import-price', product.price), ...(product.sku ? [el('span', 'le-hint le-import-sku', `SKU ${product.sku}`)] : []),
                     el('span', 'le-hint', product.categories.map((id) => categories.find((c) => c.id === id)?.title).filter(Boolean).join(', ') || 'All products'));
                 list.append(row);
             }

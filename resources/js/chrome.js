@@ -537,6 +537,59 @@ a.le-mark:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
 .le-sale-grid .le-figures-foot { position: sticky; bottom: -22px; z-index: 2; background: #fff; padding: 12px 0; margin-bottom: -12px; }
 /* A product not ticked: its sale price is kept, greyed, and not used until it is ticked again. */
 .le-figures tr:has(.le-figures-tick:not(:checked)) td.le-col-text .le-figures-cell { color: var(--le-muted); }
+/* The Products grid (products.js): Photo, Name, Price, SKU, Collections, Featured, Stock; a size's row under its product. */
+.le-products-tools { gap: 8px; flex-wrap: wrap; }
+.le-products-columns { display: grid; gap: 6px; margin: 0; padding: 10px 12px; border: 1px solid var(--le-line); border-radius: 10px; }
+.le-products-columns .le-check { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 6px; font-size: 13px; color: var(--le-body); }
+.le-products-columns .le-check.is-off { color: var(--le-muted); }
+.le-products-columns .le-check .le-hint { flex-basis: 100%; margin: 0 0 0 24px; }
+.le-products-grid .le-figures { table-layout: fixed; }
+.le-products-grid .le-figures thead th { min-width: 0; }
+.le-products-grid .le-figures .le-col-tick { position: static; }
+.le-products-grid .le-figures tr > .le-col-read:nth-child(2) { position: static; }
+.le-products-grid .le-figures tr > :nth-child(1) { width: 60px; }
+.le-products-grid .le-figures tr > :nth-child(3) { width: 112px; }
+.le-products-grid .le-figures tr > :nth-child(4) { width: 136px; }
+.le-products-grid .le-figures tr > :nth-child(5) { width: 168px; }
+.le-products-grid .le-figures tr > :nth-child(6) { width: 76px; }
+.le-products-grid .le-figures tr > :nth-child(7) { width: 84px; }
+.le-products-grid .le-figures-cell { min-width: 0; padding: 9px 8px; }
+.le-products-grid .le-figures-head { white-space: normal; padding: 9px 8px; }
+.le-products-grid .le-figures td.le-col-text .le-figures-cell { color: var(--le-ink); }
+.le-products-grid td.le-col-read .le-figures-read { white-space: normal; max-width: none; padding: 9px 8px; line-height: 1.35; }
+.le-products-grid tr.is-size > td:nth-child(2) .le-figures-read { padding-left: 22px; color: var(--le-body); font-size: 13px; }
+.le-products-grid tr.is-size > td { background: var(--le-tint); }
+.le-product-photo { display: block; padding: 6px; }
+.le-product-photo img { display: block; width: 44px; height: 44px; object-fit: cover; border-radius: 6px; }
+.le-product-collections-toggle { display: flex; align-items: center; justify-content: space-between; gap: 6px; width: 100%; min-height: 44px; border: 0; background: transparent; padding: 6px 8px; font: inherit; font-size: 13px; color: var(--le-ink); text-align: left; cursor: pointer; }
+.le-product-collections-toggle:hover { background: #f2f6ff; }
+.le-product-collections-said { min-width: 0; overflow-wrap: anywhere; }
+.le-product-collections-list { display: grid; gap: 6px; padding: 4px 8px 10px; }
+.le-product-collections-list .le-check { font-size: 13px; color: var(--le-body); }
+.le-products-grid td.is-taken .le-figures-cell { color: #b42318; border-color: #b42318; }
+.le-sku-taken { display: block; padding: 0 8px 8px; font-size: 12px; font-weight: 600; color: #b42318; line-height: 1.3; }
+.le-products-grid.is-hide-photo .le-figures tr > :nth-child(1),
+.le-products-grid.is-hide-price .le-figures tr > :nth-child(3),
+.le-products-grid.is-hide-sku .le-figures tr > :nth-child(4),
+.le-products-grid.is-hide-collections .le-figures tr > :nth-child(5),
+.le-products-grid.is-hide-featured .le-figures tr > :nth-child(6),
+.le-products-grid.is-hide-stock .le-figures tr > :nth-child(7) { display: none; }
+.le-products-grid .le-figures-foot { position: sticky; bottom: -22px; z-index: 2; background: #fff; padding: 12px 0; margin-bottom: -12px; }
+.le-products-grid input { scroll-margin: 12px 0 84px; }
+/* A phone: each row a small card, each value named above it. */
+@media (max-width: 600px) {
+  .le-products-grid .le-figures-scroll { overflow: visible; border: 0; background: transparent; border-radius: 0; }
+  .le-products-grid .le-figures, .le-products-grid .le-figures tbody { display: block; table-layout: auto; width: 100%; }
+  .le-products-grid .le-figures thead { display: none; }
+  .le-products-grid .le-figures tbody > tr { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px 8px; border: 1px solid var(--le-line); border-radius: 12px; margin: 0 0 10px; padding: 12px; background: #fff; box-sizing: border-box; }
+  .le-products-grid .le-figures tbody > tr.is-size { margin: -6px 0 10px 16px; background: var(--le-tint); }
+  .le-products-grid .le-figures tbody > tr > td { display: block; width: auto !important; padding: 0 !important; border: 0 !important; background: transparent !important; }
+  .le-products-grid .le-figures tbody > tr > td.is-blank { display: none; }
+  .le-products-grid .le-figures tr > td:nth-child(2), .le-products-grid .le-figures tr > td:nth-child(5) { grid-column: 1 / -1; }
+  .le-products-grid .le-figures tr > td .le-figures-th { display: block; font-size: 12px; font-weight: 600; color: var(--le-muted); margin: 0 0 4px; }
+  .le-products-grid .le-figures tr > td:nth-child(1) .le-figures-th { display: none; }
+  .le-products-grid .le-figures-cell { display: block; width: 100%; box-sizing: border-box; border: 1px solid var(--le-field); border-radius: 8px; height: 40px; background: #fff; }
+}
 .le-sale-labels { position: fixed; inset: 0; pointer-events: none; z-index: 2147482998; }
 .le-sale-labels[hidden] { display: none; }
 .le-sale-label { position: fixed; pointer-events: auto; border: 0; border-radius: 6px; padding: 4px 9px; background: #b42318; color: #fff; font: 600 11px/1.3 system-ui, -apple-system, 'Segoe UI', sans-serif; letter-spacing: .01em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; cursor: pointer; box-shadow: 0 1px 3px rgba(0,0,0,.25); }
@@ -917,6 +970,11 @@ a.le-mark:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
 .le-card-settings { display: grid; gap: 12px; }
 .le-shop-section { display: grid; gap: 10px; padding: 4px 0 18px; border-bottom: 1px solid var(--le-line); margin-bottom: 16px; }
 .le-shop-heading { margin: 0; font-size: 14px; font-weight: 600; color: var(--le-ink); }
+.le-shop-subheading { margin: 14px 0 6px; font-size: 13px; font-weight: 600; color: var(--le-ink); }
+.le-shop-codes { display: grid; gap: 8px; }
+.le-shop-code-list { display: grid; gap: 10px; }
+.le-shop-code-used { margin: 0; }
+.le-shop-pay-on-delivery { margin-top: 4px; }
 .le-shop-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
 .le-shop-row { display: grid; gap: 2px; font-size: 13px; color: var(--le-body); }
 .le-shop-category { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 8px 0; border-bottom: 1px solid var(--le-line); }

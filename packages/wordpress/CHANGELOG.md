@@ -1,5 +1,33 @@
 # ShipFast Live Edit for WordPress
 
+## 0.20.21 (unreleased)
+
+- A shop's products in one grid, as Shopify's Products list (owner, 8 Nov 2026: "live edit should be sufficient to setup
+  their store"; "they only go to the dashboard for orders"; the customer case "do we have product categories, featured
+  products, etc"). The Shop tab's Edit products opens every product and, under it, each of its sizes, one row each:
+  Photo, Name, Price, SKU, Collections, Featured and Stock. Type in a cell, tick a product into a collection (a product
+  can be in several) or Featured, then one Save changes; one Undo takes it all back. Each cell writes what the shop
+  already reads: the product page's name, price and SKU words (the same keys a click on them saves), a size's price and
+  SKU in its row, each collection's products (`structure:products:<page>`), the home page's featured row
+  (`structure:products:home`, handed over as `window.liveEditPages.featured`), and stock through the host's
+  `KeepsShopStock`. A price typed as a figure is written as the shop writes its prices, and a product's sizes priced as
+  it was follow it. An SKU another row has is red, with "Another product has this SKU" in the cell, and is never
+  refused. A Columns menu shows and hides columns, remembered in this browser; a column the shop cannot have says why
+  (a home page with no row of products, stock before the shop is published). The photo opens the product's page, where
+  its photos are changed.
+- + New collection, in the grid, on a product's collections and in the Shop tab, makes a collection page like the shop's
+  own, named by the owner; from a product's row it starts with that product in it. A grid with changes asks to save them
+  first. The Shop tab's Categories are called Collections, as Shopify calls them: one list for both.
+- The Shop tab's Delivery has "Customers can pay when it arrives" on each delivery choice (`shop.payOnDelivery`), and
+  Offers lists the shop's discount codes after the code the pages name (`shop.offers`): code, % off, an amount off or
+  free delivery, an optional last day and number of orders, how many orders used it (read only), and whether customers
+  can use it now; + Add a discount code. Checked as the host checks them before anything is saved.
+- An SKU in Import products (an optional `sku` column, in any case, the sample file showing the shop's own) and in + Add
+  a product (an optional SKU field): one another row, a product the shop sells, or one of the owner's own already has
+  is refused with whose it is ("its SKU OYK-1003 is already Kemi gingham dress's").
+- A product copied with Give it its own page starts with its own SKU: its source's with "-COPY" (or "-COPY-2"), and each
+  size's the same way, so two products never start out sharing one.
+
 ## 0.20.20 (9 Nov 2026)
 
 Released as 0.20.20: the v0.20.19 tag was made on the 0.20.18 code before this work reached main, so 0.20.19 is the same as 0.20.18.

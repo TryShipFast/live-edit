@@ -20,6 +20,7 @@
 
 import { linkedDetailComponents } from './linked-detail-scope.js';
 import { cardFacts, factTargets, freeAddress, newAddedId, pageOfLink } from './pages.js';
+import { freshSkuWrites } from './products.js';
 
 /** The value of `?live-edit=` that loads the editor showing only a page's detail. */
 export const DETAIL_MODE = 'detail';
@@ -405,6 +406,10 @@ export async function copyPageForCard({ page, title, card = null, builder, fetch
         await saveStyle(key, props);
         progress(`Copying its details (${++done} of ${total})…`);
     }
+
+    // A copied product starts with an SKU of its own, its source's with "-COPY" (LIVE-EDIT-STRUCTURE.md, "Every
+    // product has an SKU"): two products never start out sharing one.
+    for (const { key, value } of freshSkuWrites(original, copy, settings)) await save(key, value);
 
     if (card) {
         await sayWhatTheCardSays({ card, original, copy, settings, save });

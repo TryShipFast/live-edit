@@ -75,7 +75,7 @@ describe("a shop's categories", () => {
         let went = null;
         renderNewCategory({ ui, config, save: async (key, value) => saved.push([key, value]), go: (href) => (went = href), notify: () => {} });
 
-        expect(ui.said.title).toBe('New category');
+        expect(ui.said.title).toBe('New collection');
         const create = ui.foot.querySelector('.le-create-category');
         expect(create.disabled).toBe(true);
 

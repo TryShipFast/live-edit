@@ -1,14 +1,16 @@
 /**
  * The Shop tab: running a shop, in the order a shop owner sets one up.
  *
- *   1. Your products: each one with Edit (its page), the owner's own with Remove, and Add a product.
- *   2. Categories: each one with Choose products (which products it shows), Copy and Open.
+ *   1. Your products: Edit products (every product in one grid: products.js, live-edit.js editProducts), each one
+ *      with Edit (its page), the owner's own with Remove, and Add a product (its SKU checked like an import's).
+ *   2. Collections: each one with Choose products (which products it shows), Copy and Open, then + New collection.
+ *      (A shop's categories and its collections are one thing: pages that show some of its products.)
  *   Catalogue layout: the template's layouts as drawings (filters on top, at the side; more on paid plans).
  *   Currency: what every price is shown and charged in, Naira by default.
- *   3. Delivery: every delivery choice with the name and price customers see, both the owner's, and
- *      the free-delivery threshold.
+ *   3. Delivery: every delivery choice with the name and price customers see, both the owner's, whether customers
+ *      can pay when it arrives (`payOnDelivery`), and the free-delivery threshold.
  *   4. How customers pay: the checkout's ways, and the WhatsApp number orders go to.
- *   5. Offers: the code on offer and its discount.
+ *   5. Offers: the code on offer and its discount, then the shop's discount codes (`offers`).
  *
  * Owner, 2 Nov 2026: "this is a total confusing, are they editing product, add new category or removing
  * products from categories"; "it need to be explicit and correct so that it's easy to manage the shop by a
@@ -27,6 +29,8 @@
  *   pageSize: { key, value, options: [8, 12, ..] },     // products a shop page shows before Show more products
  *   delivery: { listKey, ids, max, copyOf, source: { nameKeys, priceKeys }, choices: [{ id, standard, name, nameKeys, price, priceKeys }] },
  *             // delivery choices the owner adds and removes, where the checkout's choices are a list
+ *   payOnDelivery: { key, ways: [..] },   // the delivery choices (by `way`) customers can pay for when it arrives
+ *   offers:   { key, list: [{ code, kind, value, ends, limit, on }], used: { CODE: n }, kinds: [{ value, label }] },
  *   fields:   [{ keys: [..], label, kind: 'rate' | 'text' | 'whatsapp', value, name?, nameKeys? }],
  *             // a term written on several pages (the bag's delivery price and the checkout's) is one field
  *             // saved to every copy; a delivery choice's name (`name`, saved under `nameKeys`) is the words
@@ -36,6 +40,7 @@
  * the shop can hold them. Adding and removing one is the same write Import products makes (catalogue.js).
  */
 import { readRows } from './catalogue.js';
+import { amountOf } from './sale.js';
 import { uploadWidget } from './upload.js';
 
 /** The number in a WhatsApp link, as digits ("https://wa.me/447700900123?text=Hi" gives "447700900123"). */
@@ -75,7 +80,7 @@ const kindOf = (field) => {
 export const renderShopPanel = ({
     container, config, save, done, notify = () => {}, doc = document,
     categories = [], newCategory = null, categoryProducts = null, importProducts = null, undoImport = null,
-    catalogue = null, upload = null, taken = [], flashSale = null, ask = null,
+    catalogue = null, upload = null, taken = [], flashSale = null, ask = null, products = null, knownSkus = async () => [],
 }) => {
     const el = (tag, className, text) => {
         const node = doc.createElement(tag);
@@ -133,6 +138,11 @@ export const renderShopPanel = ({
     if (designed.length || own.length || catalogue || importProducts) {
         const total = designed.length + own.length;
         const part = section(`Your products (${total})`, 'What your shop sells. Edit opens a product’s page: change its name, price, photos and description there by clicking them.', 'products');
+        if (products && total) {
+            const grid = button('le-btn le-wide le-shop-products-grid', 'Edit products');
+            grid.addEventListener('click', () => products());
+            part.append(grid, el('p', 'le-hint', 'Every product and size in one grid: price, SKU, collections, featured and stock.'));
+        }
         const ul = el('ul', 'le-shop-list le-shop-products');
         const row = (name, href, extra = []) => {
             const li = el('li', 'le-shop-row le-shop-product');
@@ -185,7 +195,7 @@ export const renderShopPanel = ({
     // 2. Categories.
     let groups = null;
     if (newCategory && categories.length) {
-        groups = section('Categories', 'Groups of products, each a page your customers can open. Choose products picks which products a category shows; nothing is deleted.', 'categories');
+        groups = section('Collections', 'Groups of products, each a page your customers can open. Choose products picks which products a collection shows; nothing is deleted.', 'categories');
         const rows = el('ul', 'le-shop-list le-shop-categories');
         for (const category of categories) {
             const li = el('li', 'le-shop-row le-shop-category');
@@ -199,7 +209,7 @@ export const renderShopPanel = ({
                 actions.append(choose);
             }
             if ((category.copies ?? []).length) {
-                const copy = button('le-link-btn le-category-duplicate', 'Copy', `Make a new category like ${category.title}`);
+                const copy = button('le-link-btn le-category-duplicate', 'Copy', `Make a new collection like ${category.title}`);
                 copy.addEventListener('click', () => newCategory(category));
                 actions.append(copy);
             }
@@ -210,7 +220,7 @@ export const renderShopPanel = ({
             li.append(actions);
             rows.append(li);
         }
-        const add = button('le-btn-outline le-wide le-new-category-btn', '+ New category');
+        const add = button('le-btn-outline le-wide le-new-category-btn', '+ New collection');
         add.addEventListener('click', () => newCategory(null));
         groups.append(rows, add);
         parts.push(groups);
@@ -302,11 +312,28 @@ export const renderShopPanel = ({
         // Choices the owner adds and removes (the host's TheShopTheyRun::deliveryChoices): a list on the checkout
         // page, saved as Live Edit's Duplicate and Delete save it, so the page and this tab never disagree.
         const part = section('Delivery', `The delivery choices customers pick at checkout. Name each the way your customers know it, with its price: “Lagos, 1 to 2 days” ${example(3000)}. The first is your standard delivery, the one free delivery is for.`, 'delivery');
+        // Pay on delivery (the host's TheShopsPayOnDelivery), ticked per choice and saved with the rest as one list.
+        const onDelivery = config?.payOnDelivery?.key ? new Set(config.payOnDelivery.ways ?? []) : null;
+        const waysInOrder = list.choices.map((choice) => choice.way).filter(Boolean);
+        if (onDelivery) {
+            const said = () => JSON.stringify(waysInOrder.filter((way) => onDelivery.has(way)));
+            inputs.push({ spec: { keys: [config.payOnDelivery.key], kind: 'pay-on-delivery' }, input: { get value() { return said(); }, focus() {} }, start: said() });
+        }
         list.choices.forEach((choice, i) => {
             const box = el('fieldset', 'le-shop-choice');
             box.append(el('legend', 'le-label', choice.standard ? 'Standard delivery' : `Delivery choice ${i + 1}`));
             if (choice.nameKeys?.length) box.append(input({ keys: choice.nameKeys }, { label: 'Name customers see', value: choice.name, keys: choice.nameKeys, kind: 'name', placeholder: 'Lagos, 1 to 2 days' }));
             box.append(input({ keys: choice.priceKeys }, { label: 'Price', value: choice.price, keys: choice.priceKeys, kind: 'rate', placeholder: example(3000) }));
+            if (onDelivery && choice.way) {
+                const line = el('label', 'le-check le-shop-pay-on-delivery');
+                const tick = el('input');
+                tick.type = 'checkbox';
+                tick.checked = onDelivery.has(choice.way);
+                tick.dataset.way = choice.way;
+                tick.addEventListener('change', () => { if (tick.checked) onDelivery.add(choice.way); else onDelivery.delete(choice.way); });
+                line.append(tick, doc.createTextNode(' Customers can pay when it arrives'));
+                box.append(line);
+            }
             if (!choice.standard) {
                 const remove = button('le-link-btn le-shop-remove le-shop-remove-choice', 'Remove this choice', `Remove ${choice.name || 'this delivery choice'}`);
                 remove.addEventListener('click', async () => {
@@ -414,11 +441,13 @@ export const renderShopPanel = ({
         parts.push(part);
     }
 
-    // 5. Offers.
+    // 5. Offers: the code the pages name, then the shop's discount codes (the host's TheShopsOffers).
     const offers = fields.filter((f) => f.part === 'offer');
-    if (offers.length) {
-        const part = section('Offers', 'A code customers type at checkout for money off.', 'offers');
+    const codes = config?.offers?.key ? config.offers : null;
+    if (offers.length || codes) {
+        const part = section('Offers', 'Codes customers type at checkout for money off or free delivery.', 'offers');
         offers.forEach((f) => part.append(input(f, { label: f.label, value: f.value, keys: f.keys, placeholder: f.label === 'Promo code' ? 'WELCOME10' : '10%' })));
+        if (codes) part.append(discountCodes(codes));
         parts.push(part);
     }
 
@@ -432,6 +461,14 @@ export const renderShopPanel = ({
         if (!changed.length) {
             notify('Nothing has changed.');
             return;
+        }
+        for (const { check } of changed) {
+            const problem = check?.();
+            if (problem) {
+                notify(problem[0]);
+                problem[1]?.();
+                return;
+            }
         }
         for (const { spec, input: box } of changed) {
             if (spec.kind === 'whatsapp' && box.value.replace(/\D+/g, '').length < 7) {
@@ -461,6 +498,142 @@ export const renderShopPanel = ({
         }
     });
 
+    /*
+     * The shop's discount codes, as Shopify and Paystack list them: each a code, what it gives (% off, an amount off or
+     * free delivery), an optional last day and number of uses, how many orders used it (counted by the host, read
+     * only), and whether customers can use it now. Saved with the rest as one list (`offers.key`).
+     */
+    function discountCodes(codes) {
+        const kinds = codes.kinds?.length ? codes.kinds : [{ value: 'percent', label: '% off' }, { value: 'amount', label: 'Amount off' }, { value: 'delivery', label: 'Free delivery' }];
+        const used = codes.used ?? {};
+        const wrap = el('div', 'le-shop-codes');
+        wrap.append(el('h4', 'le-shop-subheading', 'Discount codes'));
+        const list = el('div', 'le-shop-code-list');
+        const rows = [];
+        const tidy = (item) => ({
+            code: String(item.code ?? '').trim().toUpperCase(),
+            kind: item.kind,
+            value: item.kind === 'delivery' ? 0 : Number(item.value) || 0,
+            ends: item.ends || null,
+            limit: item.limit === null || item.limit === undefined || item.limit === '' ? null : Number(item.limit),
+            on: item.on !== false,
+        });
+        const listNow = () => rows.map((row) => row.read());
+        let made = 0;
+        const add = (item = { code: '', kind: 'percent', value: '', ends: null, limit: null, on: true }, saved = false) => {
+            made += 1;
+            const n = made;
+            const box = el('fieldset', 'le-shop-choice le-shop-code');
+            box.append(el('legend', 'le-label', item.code || 'New code'));
+            const field = (label, control, hint) => {
+                const wrapField = el('div', 'le-field');
+                const tag = el('label', 'le-label', label);
+                control.id = `le-shop-code-${n}-${label.toLowerCase().replace(/\W+/g, '-')}`;
+                tag.htmlFor = control.id;
+                wrapField.append(tag, control);
+                if (hint) wrapField.append(el('p', 'le-hint', hint));
+
+                return wrapField;
+            };
+            const code = el('input', 'le-input le-shop-code-name');
+            code.type = 'text';
+            code.value = item.code ?? '';
+            code.placeholder = 'WELCOME10';
+            code.autocapitalize = 'characters';
+            code.addEventListener('change', () => { code.value = code.value.trim().toUpperCase(); box.querySelector('legend').textContent = code.value || 'New code'; });
+            const kind = el('select', 'le-input le-shop-code-kind');
+            for (const option of kinds) {
+                const choice = el('option', null, option.label);
+                choice.value = option.value;
+                kind.append(choice);
+            }
+            kind.value = item.kind ?? 'percent';
+            const amount = el('input', 'le-input le-shop-code-value');
+            amount.type = 'text';
+            amount.inputMode = 'decimal';
+            const amountField = field('How much', amount);
+            const sayAmount = () => {
+                amountField.hidden = kind.value === 'delivery';
+                amount.placeholder = kind.value === 'amount' ? example(2000) : '10%';
+            };
+            amount.value = item.kind === 'delivery' || item.value === '' || item.value === undefined ? '' : item.kind === 'amount' ? example(Number(item.value)) : `${Number(item.value)}%`;
+            kind.addEventListener('change', sayAmount);
+            sayAmount();
+            const ends = el('input', 'le-input le-shop-code-ends');
+            ends.type = 'date';
+            ends.value = item.ends ?? '';
+            const limit = el('input', 'le-input le-shop-code-limit');
+            limit.type = 'text';
+            limit.inputMode = 'numeric';
+            limit.placeholder = '100';
+            limit.value = item.limit ?? '';
+            const times = Number(used[String(item.code ?? '').toUpperCase()] ?? 0);
+            const on = el('label', 'le-check le-shop-code-on');
+            const onBox = el('input');
+            onBox.type = 'checkbox';
+            onBox.checked = item.on !== false;
+            on.append(onBox, doc.createTextNode(' Customers can use it now'));
+            box.append(
+                field('Code', code),
+                field('Gives', kind),
+                amountField,
+                field('Last day (optional)', ends, 'Leave empty to keep it running.'),
+                field('How many orders can use it (optional)', limit, 'Leave empty for no limit.'),
+            );
+            if (saved) box.append(el('p', 'le-hint le-shop-code-used', times === 1 ? 'Used by 1 order.' : `Used by ${times} orders.`));
+            box.append(on);
+            const remove = button('le-link-btn le-shop-remove le-shop-remove-code', 'Remove this code', `Remove ${item.code || 'this code'}`);
+            const row = {
+                box,
+                code,
+                read: () => ({
+                    code: code.value.trim().toUpperCase(),
+                    kind: kind.value,
+                    value: kind.value === 'delivery' ? 0 : (kind.value === 'amount' ? (amountOf(amount.value) ?? 0) / 100 : Number(String(amount.value).replace(/[^\d.]/g, '')) || 0),
+                    ends: ends.value || null,
+                    limit: limit.value.trim() === '' ? null : Number(limit.value.trim()),
+                    on: onBox.checked,
+                    typedLimit: limit.value.trim(),
+                    typedValue: amount.value.trim(),
+                }),
+            };
+            remove.addEventListener('click', async () => {
+                const name = code.value.trim() || 'this code';
+                const win = doc.defaultView ?? window;
+                if (saved && !(ask ? await ask({ title: `Remove ${name}?`, subtitle: 'Customers can no longer use it once you save.', yes: 'Remove', no: 'Keep it' }) : win.confirm(`Remove ${name}?`))) return;
+                rows.splice(rows.indexOf(row), 1);
+                box.remove();
+            });
+            box.append(remove);
+            rows.push(row);
+            list.append(box);
+
+            return row;
+        };
+        for (const item of codes.list ?? []) add(item, true);
+        const more = button('le-btn-outline le-wide le-shop-add-code', '+ Add a discount code');
+        more.addEventListener('click', () => add().code.focus());
+        wrap.append(list, more);
+        const said = () => JSON.stringify(listNow().map(tidy));
+        inputs.push({ spec: { keys: [codes.key], kind: 'offers' }, input: { get value() { return said(); }, focus() { rows[0]?.code.focus(); } }, start: JSON.stringify((codes.list ?? []).map(tidy)), check: () => {
+            const seen = new Set();
+            for (const [i, item] of listNow().entries()) {
+                const name = item.code || `Code ${i + 1}`;
+                const focus = () => rows[i]?.code.focus();
+                if (!/^[A-Z0-9][A-Z0-9_-]{1,29}$/.test(item.code)) return [`${item.code ? `${item.code}: a` : 'A'} code uses 2 to 30 letters or numbers, like WELCOME10.`, focus];
+                if (seen.has(item.code)) return [`${item.code} is in the list twice. Give each code its own name.`, focus];
+                seen.add(item.code);
+                if (item.kind === 'percent' && !(item.value >= 1 && item.value <= 100)) return [`${name}: enter a percent from 1 to 100.`, focus];
+                if (item.kind === 'amount' && !(item.value > 0)) return [`${name}: enter the amount off, like ${example(2000)}.`, focus];
+                if (item.typedLimit && !(/^\d+$/.test(item.typedLimit) && Number(item.typedLimit) >= 1)) return [`${name}: enter how many orders can use it as a whole number, like 100, or leave it empty.`, focus];
+            }
+
+            return null;
+        } });
+
+        return wrap;
+    }
+
     /* Add a product: a name, a price, a photo and its categories. Checked and saved as one row of an import. */
     function addProductForm() {
         const form = el('form', 'le-shop-new-product');
@@ -480,7 +653,13 @@ export const renderShopPanel = ({
             if (hint) wrap.append(el('p', 'le-hint', hint));
             return wrap;
         };
-        form.append(labelled(name, 'Product name'), labelled(price, 'Price', `With its figure, as customers read it: ${example(15000)}.`));
+        const sku = el('input', 'le-input');
+        sku.id = 'le-shop-new-sku';
+        sku.type = 'text';
+        sku.placeholder = 'OYK-1020';
+        sku.autocapitalize = 'characters';
+        form.append(labelled(name, 'Product name'), labelled(price, 'Price', `With its figure, as customers read it: ${example(15000)}.`),
+            labelled(sku, 'SKU (optional)', 'Your own code for it. Each product’s must be different.'));
 
         // The editor's one upload box (upload.js), as for every picture.
         let photo = null;
@@ -497,7 +676,7 @@ export const renderShopPanel = ({
         const ticks = [];
         if (choosable.length) {
             const box = el('fieldset', 'le-shop-new-categories');
-            box.append(el('legend', 'le-label', 'Show it in these categories'));
+            box.append(el('legend', 'le-label', 'Show it in these collections'));
             for (const category of choosable) {
                 const tag = el('label', 'le-check');
                 const tick = el('input');
@@ -516,8 +695,10 @@ export const renderShopPanel = ({
         form.addEventListener('submit', async (event) => {
             event.preventDefault();
             const chosen = ticks.filter((t) => t.checked).map((t) => t.value);
-            const checked = readRows([['name', 'price', 'categories'], [name.value, price.value, chosen.join('|')]], {
-                categories, likes: catalogue.likes, catalogue: own, taken, products: designed,
+            let known = [];
+            try { known = await knownSkus(); } catch { known = []; }
+            const checked = readRows([['name', 'price', 'sku', 'categories'], [name.value, price.value, sku.value.trim(), chosen.join('|')]], {
+                categories, likes: catalogue.likes, catalogue: own, taken, products: designed, known,
             });
             if (checked.problems.length) {
                 notify(checked.problems[0].says.replace(/^Row 2(?: \([^)]*\))?: /, '').replace(/^./, (c) => c.toUpperCase()));

@@ -390,8 +390,10 @@ export const renderTableControls = ({ element, save, saveOrder, refresh, notify,
  * out". `renderCell(row, col, value)` draws a cell of its own (a product's stock across its sizes), `afterRow(row)` a row
  * of its own under it (those sizes, opened), `hiddenRow(row)` leaves one out; `wrap.setRow(row, cells)` fills a row that
  * arrived later (as it now stands, so Undo changes keeps it), and `wrap.redraw()` draws again, keeping the box typed in.
+ * `afterDraw(table)` runs each time the rows are drawn (the Products grid marks an SKU two rows share), and
+ * `wrap.setCell(row, col, value)` changes one cell a cell of its own holds (a product's collections), as typing would.
  */
-export const renderDataGrid = ({ heads = [], rows = [], fixedColumns = false, mostRows = 40, mostColumns = 8, figures = [], rowNoun = 'row', focus = null, onSave, fixedRows = false, kinds = [], onCell = null, picked = null, numbered = true, onUndo = null, kindOf = null, renderCell = null, afterRow = null, hiddenRow = null }) => {
+export const renderDataGrid = ({ heads = [], rows = [], fixedColumns = false, mostRows = 40, mostColumns = 8, figures = [], rowNoun = 'row', focus = null, onSave, fixedRows = false, kinds = [], onCell = null, picked = null, numbered = true, onUndo = null, kindOf = null, renderCell = null, afterRow = null, hiddenRow = null, afterDraw = null, nameColumn = null }) => {
     const state = {
         heads: [...heads],
         rows: rows.map((cells) => [...cells]),
@@ -510,7 +512,7 @@ export const renderDataGrid = ({ heads = [], rows = [], fixedColumns = false, mo
         return hit;
     };
     const cellFor = (value, r, c) => {
-        const label = `${state.rows[r][kinds.indexOf('read')] || `Row ${r + 1}`}, ${state.heads[c] || `column ${c + 1}`}`;
+        const label = `${state.rows[r][nameColumn ?? kinds.indexOf('read')] || `Row ${r + 1}`}, ${state.heads[c] || `column ${c + 1}`}`;
         const kind = kindOf?.(r, c) ?? kinds[c];
         if (kind === 'blank') return el('span', 'le-figures-blank');
         if (kind === 'tick') return tick(value, label, r, c);
@@ -611,6 +613,7 @@ export const renderDataGrid = ({ heads = [], rows = [], fixedColumns = false, mo
         thead.append(head);
         table.replaceChildren(thead, body);
 
+        afterDraw?.(table);
         if (fixedRows) {
             tools.hidden = true;
             if (focusOn) table.querySelector(`input[data-row="${focusOn.row}"][data-col="${focusOn.col}"]`)?.focus();
@@ -690,6 +693,12 @@ export const renderDataGrid = ({ heads = [], rows = [], fixedColumns = false, mo
         redraw();
     };
     wrap.rowsNow = () => state.rows.map((cells) => [...cells]);
+    wrap.setCell = (r, c, value) => {
+        if (!state.rows[r]) return;
+        state.rows[r][c] = value;
+        dirty();
+    };
+    wrap.isChanged = () => changed;
 
     return wrap;
 };

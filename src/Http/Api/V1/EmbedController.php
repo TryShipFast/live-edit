@@ -61,6 +61,7 @@ class EmbedController
         'card-page.js' => 'card-page.js',
         'choice.js' => 'choice.js',
         'sale.js' => 'sale.js',
+        'products.js' => 'products.js',
         'history.js' => 'history.js',
         'glyphs.js' => 'glyphs.js',
         'shop.js' => 'shop.js',
