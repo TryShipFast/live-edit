@@ -70,13 +70,16 @@ const PROFILES = {
         intro: 'Customers browse your products, add them to the bag and check out. Start in the Shop tab: it gathers how customers pay, your WhatsApp number, delivery prices, offers and every product in one place.',
         start: ['shop-setup', 'shop', 'lists', 'image', 'brand', 'preview'],
         questions: [
-            { q: 'How do I add a product?', a: 'Open the Shop tab and press Add a product: give it a name, a price, a photo and its categories. Or copy a product card, change its name, price and photo, and in its panel press Give it its own page: you get a copy of the product page, sizes and all, to change right there.' },
+            { q: 'How do I add a product?', a: 'Open the Shop tab and press Add a product: give it a name, a price, an SKU if you use them, a photo and its collections. Or copy a product card, change its name, price and photo, and in its panel press Give it its own page: you get a copy of the product page, sizes and all, to change right there.' },
             { q: 'How do I change a price?', a: 'Click the price on the product card or its page and type the new one. The bag and checkout read the price from your words, so they follow it.' },
             { q: 'Do I have to open each product page to change it?', a: 'No. Click a product card and press Edit all details. Its page opens over the shop: click its words, photos or sizes to change them, then press Done.' },
             { q: 'How do I replace the sample products with mine?', a: 'Change a sample into your own with Edit all details, or delete it: Delete this item offers to delete its page too, so nothing is left behind on your website.' },
             { q: 'How do I change delivery prices or the WhatsApp number?', a: 'Open the Shop tab. Each delivery price, the free delivery threshold, any offer code and the WhatsApp number are there, and saving changes every page that shows them.' },
             { q: 'Where do orders go?', a: 'Your checkout offers the ways to pay listed in the Shop tab. A WhatsApp order arrives in WhatsApp as a message listing what the customer chose.' },
-            { q: 'How do I put a product in a category?', a: 'Click the product card. Its panel has a setting for the category the shop filter reads, so the product appears under the right filter.' },
+            { q: 'How do I put a product in a collection?', a: 'Open the Shop tab and press Edit products. In the product’s Collections, tick each collection it belongs in (it can be in several), or press + New collection to make one with it in. Tick Featured to show it on your home page. Then press Save changes.' },
+            { q: 'How do I change many prices, SKUs or stock at once?', a: 'Open the Shop tab and press Edit products. Every product and each of its sizes is a row: type in any cell, then press Save changes once. Columns shows or hides columns. An SKU another product already has turns red, so you can give each its own.' },
+            { q: 'How do I let customers pay on delivery?', a: 'Open the Shop tab. Under Delivery, tick Customers can pay when it arrives on each delivery choice where you take payment at the door, then press Save shop details and publish.' },
+            { q: 'How do I add a discount code?', a: 'Open the Shop tab. Under Offers, press + Add a discount code: type the code, choose what it gives (% off, an amount off or free delivery), and if you like a last day and how many orders can use it. Press Save shop details and publish. Each code says how many orders used it.' },
         ],
     },
     school: {
@@ -227,8 +230,8 @@ const PROFILES = {
  */
 export const shopQuestions = () => [
     { q: 'How do I add a product?', a: 'Where your site has a Shop tab, press Add a product there. Otherwise click a product card and press Duplicate. Change the copy’s name, photo and price, then press Give it its own page: you get its own product page, sizes and all, ready to change.' },
-    { q: 'How do I create a category?', a: 'Open the Shop tab and press New category under Categories. Give it a name, choose which category it looks like, and tick the products it shows, then press Create category. Its page opens with that name in its heading and your menu, beside your other categories. To copy a category, press Duplicate beside it instead.' },
-    { q: 'How do I choose the products in a category?', a: 'Open the Shop tab and press Products beside the category. Tick the products it shows and press Save products. A product you leave out stays in your shop and in its other categories.' },
+    { q: 'How do I create a collection?', a: 'Open the Shop tab and press + New collection under Collections. Give it a name, choose which collection it looks like, and tick the products it shows, then press Create collection. Its page opens with that name in its heading and your menu, beside your other collections. To copy a collection, press Copy beside it instead.' },
+    { q: 'How do I choose the products in a collection?', a: 'Open the Shop tab and press Choose products beside the collection, or press Edit products and tick its name in each product’s Collections. A product you leave out stays in your shop and in its other collections.' },
     { q: 'How do I change a product’s sizes or colours?', a: 'Click the product card and press Edit all details. On its page, click the sizes: add one, rename one, delete one, and set each one’s price.' },
     { q: 'How do I change a price?', a: 'Click the price on the product card or its page and type the new one, with its currency sign. The bag and checkout use that amount.' },
     { q: 'How do I take a product away?', a: 'Click its card and press Delete this item. It offers to delete the product’s page too, so nothing is left behind.' },

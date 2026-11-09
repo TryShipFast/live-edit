@@ -1411,7 +1411,8 @@ const bootLiveEdit = () => {
             return handle;
         };
 
-        // New category (pages.js): a page made like one of the shop's categories, named once. `from` duplicates one.
+        // New collection (pages.js renderNewCategory): a page made like one of the shop's collections, named once. `from`
+        // duplicates one; `including` starts it with that product alone (the Products grid's + New collection on a row).
         const openNewCategory = (from = null, { including = null } = {}) => {
             if (!window.liveEditPages) return null;
             closeDrawer(true);
@@ -8730,17 +8731,17 @@ const bootLiveEdit = () => {
                     publishStep,
                 ],
                 shop: [
-                    { point: tab('Shop'), title: 'Your shop in one place', copy: 'Your products and categories, your delivery choices and prices, how customers pay and your offers. The same words as on your pages.' },
+                    { point: tab('Shop'), title: 'Your shop in one place', copy: 'Your products and collections, your delivery choices and prices, how customers pay and your discount codes. The same words as on your pages.' },
                     publishStep,
                 ],
                 'shop-setup': [
                     { point: shopPart('How customers pay'), title: 'First, how customers pay', copy: 'The Shop tab lists the ways your checkout takes payment. Customers fill in their details, then choose one of these.' },
                     { point: whatsappField, title: 'Your WhatsApp number', copy: 'Type it with the country code, digits only, then press Save shop details. WhatsApp orders arrive there as a message listing what the customer chose.' },
-                    { point: shopPart('Delivery'), title: 'Your delivery choices', copy: 'Give each delivery choice the name your customers know ("Lagos, 1 to 2 days") and its price ("₦3,000"). The bag reads the figures, so it adds delivery by itself.' },
+                    { point: shopPart('Delivery'), title: 'Your delivery choices', copy: 'Give each delivery choice the name your customers know ("Lagos, 1 to 2 days") and its price ("₦3,000"). The bag reads the figures, so it adds delivery by itself. Tick Customers can pay when it arrives on the choices where you take cash or transfer at the door.' },
                     { point: productCard, title: 'Make your first product yours', copy: 'Click a product card and change its name, price and photo. A price needs its figure ("₦15,000"): the bag and checkout read it.', elsewhere: onTheShopPage },
                     { point: productCard, title: 'Sizes, colours and the story', copy: 'In the product\'s panel, press Edit all details. Its own page opens over the shop: click a size, colour, photo or word there to change it, then press Done.', elsewhere: onTheShopPage },
-                    { point: shopPart('Your products'), title: 'Add more products', copy: 'In the Shop tab, press Add a product: give it a name, a price, a photo and its categories. Edit beside it opens its page for the rest. Or, on a product card, press Duplicate, then Give it its own page.' },
-                    { point: shopPart('Categories'), title: 'Your categories', copy: 'Each category is a page of products. Choose products ticks which products it shows (nothing is deleted). New category makes one: give it a name and tick its products, and it opens with that name in its heading and menu. Copy starts one like another.' },
+                    { point: shopPart('Your products'), title: 'Your products, all at once', copy: 'Edit products opens every product and size in one grid: prices, SKUs, collections, Featured and stock, saved once. Add a product adds one: a name, a price, an SKU if you use them, a photo and its collections.' },
+                    { point: shopPart('Collections'), title: 'Your collections', copy: 'Each collection is a page of products. Choose products ticks which products it shows (nothing is deleted). New collection makes one: give it a name and tick its products, and it opens with that name in its heading and menu. Copy starts one like another.' },
                     { point: bag, title: 'Try your bag as a customer', copy: 'Press Preview, add a product to the bag and go through checkout the way a customer would. Check the prices, delivery and offers add up.', elsewhere: 'Your bag opens from your site\'s header on the shop and product pages.' },
                     publishStep,
                     { point: dashboard, title: 'Where your orders arrive', copy: 'Orders paid online are listed in your dashboard under Orders. Press this mark to open your dashboard in a new tab.' },
@@ -8920,8 +8921,8 @@ const bootLiveEdit = () => {
                 ...(document.querySelector('[data-edit-list-kind="sections"]') ? { sections: { title: 'Move, copy or hide a section', detail: 'Rearrange the parts of a page.' } } : {}),
                 ...(document.querySelector('[data-edit-bg]') ? { background: { title: 'Change a background picture', detail: 'Replace the picture behind a section.' } } : {}),
                 ...(window.liveEditBrand?.tokens?.length ? { brand: { title: 'Your colours and fonts', detail: 'Restyle the whole site from one place.' } } : {}),
-                ...(drawerTabs.Shop || document.querySelector('[data-kit-product]') ? { 'shop-setup': { title: 'Set up your shop', detail: 'Step by step: payment, delivery, your products and their categories, then your first order.' } } : {}),
-                ...(drawerTabs.Shop ? { shop: { title: 'Run your shop', detail: 'Your products and categories, delivery choices, how customers pay and offers.' } } : {}),
+                ...(drawerTabs.Shop || document.querySelector('[data-kit-product]') ? { 'shop-setup': { title: 'Set up your shop', detail: 'Step by step: payment, delivery, your products and their collections, then your first order.' } } : {}),
+                ...(drawerTabs.Shop ? { shop: { title: 'Run your shop', detail: 'Your products and collections, delivery choices, how customers pay and discount codes.' } } : {}),
                 ...(drawerTabs.SEO ? { seo: { title: 'How you look in search', detail: 'A page\'s title, its search description and its sharing picture.' } } : {}),
                 ...(window.liveEditPages ? { pages: { title: 'Add a page', detail: 'Start from a page your site already has.' } } : {}),
                 ...(!ui.languagePicker.hidden ? { languages: { title: 'Edit another language', detail: 'Switch languages and write each one.' } } : {}),
