@@ -224,6 +224,7 @@ a.le-mark:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
 .le-drawer.is-left { right: auto; left: 12px; }
 /* A grid that wants its columns side by side (the flash sale and stock grid). */
 .le-drawer.is-grid { width: min(760px, calc(100vw - 24px)); }
+.le-drawer.is-grid.is-products { width: min(1000px, calc(100vw - 24px)); }
 .le-drawer-head {
   display: flex; align-items: center; justify-content: space-between; gap: 12px;
   padding: 0 12px 0 24px; border-bottom: 1px solid var(--le-line); background: #fff;
@@ -543,19 +544,22 @@ a.le-mark:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
 .le-products-columns .le-check { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 6px; font-size: 13px; color: var(--le-body); }
 .le-products-columns .le-check.is-off { color: var(--le-muted); }
 .le-products-columns .le-check .le-hint { flex-basis: 100%; margin: 0 0 0 24px; }
-.le-products-grid .le-figures { table-layout: fixed; }
+/* a spreadsheet's width: the product's name whole, the grid scrolling sideways in its own box where the drawer is narrower */
+.le-products-grid .le-figures { table-layout: fixed; min-width: 840px; }
 .le-products-grid .le-figures thead th { min-width: 0; }
 .le-products-grid .le-figures .le-col-tick { position: static; }
 .le-products-grid .le-figures tr > .le-col-read:nth-child(2) { position: static; }
 .le-products-grid .le-figures tr > :nth-child(1) { width: 60px; }
-.le-products-grid .le-figures tr > :nth-child(3) { width: 112px; }
-.le-products-grid .le-figures tr > :nth-child(4) { width: 136px; }
-.le-products-grid .le-figures tr > :nth-child(5) { width: 168px; }
+.le-products-grid .le-figures tr > :nth-child(2) { width: auto; min-width: 180px; }
+.le-products-grid .le-figures tr > :nth-child(3) { width: 104px; }
+.le-products-grid .le-figures tr > :nth-child(4) { width: 132px; }
+.le-products-grid .le-figures tr > :nth-child(5) { width: 160px; }
 .le-products-grid .le-figures tr > :nth-child(6) { width: 76px; }
-.le-products-grid .le-figures tr > :nth-child(7) { width: 84px; }
+.le-products-grid .le-figures tr > :nth-child(7) { width: 80px; }
 .le-products-grid .le-figures-cell { min-width: 0; padding: 9px 8px; }
 .le-products-grid .le-figures-head { white-space: normal; padding: 9px 8px; }
-.le-products-grid .le-figures td.le-col-text .le-figures-cell { color: var(--le-ink); }
+/* never greyed as an unticked sale's row is: Featured is not the sale's tick */
+.le-products-grid .le-figures tr td.le-col-text input.le-figures-cell:not(:disabled) { color: var(--le-ink); }
 .le-products-grid td.le-col-read .le-figures-read { white-space: normal; max-width: none; padding: 9px 8px; line-height: 1.35; }
 .le-products-grid tr.is-size > td:nth-child(2) .le-figures-read { padding-left: 22px; color: var(--le-body); font-size: 13px; }
 .le-products-grid tr.is-size > td { background: var(--le-tint); }
@@ -579,7 +583,7 @@ a.le-mark:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
 /* A phone: each row a small card, each value named above it. */
 @media (max-width: 600px) {
   .le-products-grid .le-figures-scroll { overflow: visible; border: 0; background: transparent; border-radius: 0; }
-  .le-products-grid .le-figures, .le-products-grid .le-figures tbody { display: block; table-layout: auto; width: 100%; }
+  .le-products-grid .le-figures, .le-products-grid .le-figures tbody { display: block; table-layout: auto; width: 100%; min-width: 0; }
   .le-products-grid .le-figures thead { display: none; }
   .le-products-grid .le-figures tbody > tr { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px 8px; border: 1px solid var(--le-line); border-radius: 12px; margin: 0 0 10px; padding: 12px; background: #fff; box-sizing: border-box; }
   .le-products-grid .le-figures tbody > tr.is-size { margin: -6px 0 10px 16px; background: var(--le-tint); }

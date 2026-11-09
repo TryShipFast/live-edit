@@ -2600,7 +2600,7 @@ const bootLiveEdit = () => {
             // showing sits on top of it and looks like a fault.
             hideHandle();
             hideBgHandle();
-            drawer.classList.remove('is-grid');
+            drawer.classList.remove('is-grid', 'is-products');
             ui.root.classList.remove('le-grid-open');
             drawer.classList.add('is-open');
             ui.root.classList.add('le-drawer-open');
@@ -2645,7 +2645,7 @@ const bootLiveEdit = () => {
 
             current?.restore?.();
             clearStylePreview();
-            drawer.classList.remove('is-open', 'is-left', 'is-grid');
+            drawer.classList.remove('is-open', 'is-left', 'is-grid', 'is-products');
             ui.root.classList.remove('le-grid-open');
             ui.root.classList.remove('le-drawer-open');
             ui.toolbar.classList.remove('is-compact');
@@ -6365,6 +6365,8 @@ const bootLiveEdit = () => {
             openDrawer();
             drawer.classList.add('is-grid');
             ui.root.classList.add('le-grid-open');
+            // wider than the sale's: seven columns, the product's name whole
+            drawer.classList.add('is-products');
             const all = everyProduct();
             if (!all.length) {
                 reading.textContent = 'Your shop has no products yet. Add one in the Shop tab.';
