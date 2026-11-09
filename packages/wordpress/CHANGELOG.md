@@ -1,6 +1,8 @@
 # ShipFast Live Edit for WordPress
 
-## 0.20.19 (unreleased)
+## 0.20.20 (9 Nov 2026)
+
+Released as 0.20.20: the v0.20.19 tag was made on the 0.20.18 code before this work reached main, so 0.20.19 is the same as 0.20.18.
 
 - A part the page works out says where it comes from, and a press takes the owner there (owner, 8 Nov 2026: Car Wash's
   service prices and "Hand washes from" said "This number counts itself from the products on this page"; "if it's
