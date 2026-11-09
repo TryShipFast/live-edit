@@ -1,5 +1,10 @@
 # ShipFast Live Edit for WordPress
 
+## 0.20.24 (9 Nov 2026)
+
+- A panel's first field sits right under the panel's title (the owner: "the space between the Heading and the text ...
+  not needed"): no empty band and no rule between them. A panel with no title keeps its full space under the tabs.
+
 ## 0.20.23 (9 Nov 2026)
 
 Found by the real-editor walk on Oyin Kids:

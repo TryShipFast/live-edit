@@ -1689,9 +1689,12 @@ textarea.le-input { border-radius: var(--le-r-control); }
 .le-fold { margin: 0; padding-top: 0; }
 .le-section-heading, summary.le-section-heading { padding-top: 8px; margin-top: 8px; }
 
-/* spacing: 24 around a panel's fields, 16 between them; 8 between rows of a list; 16 on a phone */
-.le-fields { padding: 24px; gap: 16px; }
-.le-subject { padding: 16px 24px; }
+/* spacing: 24 around a panel's fields, 16 between them; 8 between rows of a list; 16 on a phone. The first field sits
+   just under the panel's title, which names it (owner, 9 Nov 2026: "the space between the Heading and the text ...
+   not needed"): no band between them, no rule. A panel with no title (le-hidden) keeps the full inset under the tabs. */
+.le-fields { padding: 8px 24px 24px; gap: 16px; }
+.le-subject { padding: 16px 24px 0; border-bottom: 0; }
+.le-subject.le-hidden + .le-fields { padding-top: 24px; }
 .le-shop-list { display: grid; gap: 8px; }
 .le-shop-row { padding: 8px 12px; border-radius: var(--le-r-card); background: var(--le-tint); }
 .le-shop-section { padding: 0; margin: 0 0 24px; }
@@ -1701,8 +1704,9 @@ textarea.le-input { border-radius: var(--le-r-control); }
 .le-help-option { border-radius: var(--le-r-card); background: var(--le-tint); }
 .le-row-end { padding-top: 0; }
 @media (max-width: 760px) {
-  .le-fields { padding: 16px; }
-  .le-subject { padding: 12px 16px; }
+  .le-fields { padding: 8px 16px 16px; }
+  .le-subject { padding: 12px 16px 0; }
+  .le-subject.le-hidden + .le-fields { padding-top: 16px; }
   /* the bar gives way to an open panel: never two layers of buttons over each other */
   :host(.le-drawer-open) .le-toolbar { display: none; }
   .le-drawer { border: 0; box-shadow: 0 -12px 40px -12px rgba(11, 12, 15, .3); }
