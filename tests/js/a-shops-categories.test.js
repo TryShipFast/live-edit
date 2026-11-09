@@ -63,6 +63,12 @@ describe("a shop's categories", () => {
             { id: 'shop/picks', title: 'Our picks', copies: ['c'], products: 7, inMenu: false },
         ];
         expect(firstLike(carWash).title).toBe('Our picks');
+        // A flash-sale page lists only what is on sale: never the page a new collection starts like, however full.
+        const oyin = [
+            { id: 'shop/flash-sale', title: 'Flash sale', copies: ['a'], products: 22, inMenu: true, saleOnly: true },
+            { id: 'shop/girls', title: 'Girls', copies: ['b'], products: 8, inMenu: true, saleOnly: false },
+        ];
+        expect(firstLike(oyin).title).toBe('Girls');
         const ui = fakeModal();
         renderNewCategory({ ui, config: { ...config, categories: carWash }, save: async () => {}, go: () => {}, notify: () => {} });
         expect(ui.body.querySelector('.le-category-like').value).toBe('shop/picks');

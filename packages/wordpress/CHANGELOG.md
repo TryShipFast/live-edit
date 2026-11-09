@@ -1,7 +1,9 @@
 # ShipFast Live Edit for WordPress
 
-## 0.20.21 (unreleased)
+## 0.20.21 (9 Nov 2026)
 
+- A new collection never starts like a page that shows only what is on sale (the host marks it `saleOnly`): on Oyin
+  Kids, "Party wear" had copied the flash-sale page, its sale heading and its "only what is on sale" list.
 - A shop's products in one grid, as Shopify's Products list (owner, 8 Nov 2026: "live edit should be sufficient to setup
   their store"; "they only go to the dashboard for orders"; the customer case "do we have product categories, featured
   products, etc"). The Shop tab's Edit products opens every product and, under it, each of its sizes, one row each:

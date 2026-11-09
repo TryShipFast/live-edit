@@ -1265,9 +1265,11 @@ export const leafCategories = (categories = []) => categories.filter((one) => !c
  * not start as Car Wash Auto's two gift cards. `products` and `inMenu` come from the host.
  */
 export const firstLike = (categories = []) => {
-    const leaves = leafCategories(categories);
+    // Never a page that shows only what is on sale (the host says saleOnly): a new collection lists its products.
+    const plain = categories.filter((category) => !category.saleOnly);
+    const leaves = leafCategories(plain.length ? plain : categories);
     const linked = leaves.filter((category) => category.inMenu);
-    const pool = linked.length ? linked : leaves.length ? leaves : categories;
+    const pool = linked.length ? linked : leaves.length ? leaves : (plain.length ? plain : categories);
 
     return pool.reduce((best, category) => ((category.products ?? 0) > (best?.products ?? 0) ? category : best), pool[0] ?? null);
 };
