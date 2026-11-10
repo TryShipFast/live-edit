@@ -1,5 +1,12 @@
 # ShipFast Live Edit for WordPress
 
+## 0.20.25 (10 Nov 2026)
+
+- The outline and handles sit on the element you press on a website that zooms itself on wide screens (the owner,
+  on The Speaker: "it clicks a paragraph and shows the border elsewhere"). A page that scales `<html>` (1.25 from
+  1880px wide) scaled the editor's own layer a second time; the layer now takes the inverse of whatever zoom the page
+  has, read again when the window changes size, so nothing about any one website is assumed.
+
 ## 0.20.24 (9 Nov 2026)
 
 - A panel's first field sits right under the panel's title (the owner: "the space between the Heading and the text ...

@@ -50,4 +50,22 @@ describe('the editor is not part of the page', () => {
         expect(PAGE_CSS).toContain('html:has(#live-edit-ui) > body');
         expect(PAGE_CSS).not.toMatch(/(^|[^>\s])\s*body:has\(#live-edit-ui\)/m);
     });
+
+    it('takes the inverse of a zoom on <html>, so its outlines land on the element', () => {
+        /*
+         * Owner, 10 Nov 2026, on The Speaker at a wide screen: "it clicks a paragraph and shows the border
+         * elsewhere". Sixteen templates zoom <html> itself (1.25 from 1880px), which the root cannot escape.
+         */
+        document.documentElement.style.zoom = '1.25';
+        try {
+            chrome();
+            expect(parseFloat(document.querySelector('#live-edit-ui').style.zoom)).toBeCloseTo(0.8, 5);
+
+            document.documentElement.style.zoom = '';
+            window.dispatchEvent(new Event('resize'));
+            expect(document.querySelector('#live-edit-ui').style.zoom).toBe('');
+        } finally {
+            document.documentElement.style.zoom = '';
+        }
+    });
 });

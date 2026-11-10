@@ -1963,11 +1963,21 @@ export function createChrome() {
      * is not part of the page. It is our furniture, sitting on top, and the
      * page's own layout should not be able to move it, scale it, or clip it.
      *
-     * <html> can be zoomed too and nothing here would stop that. No template
-     * seen so far does it, and it is visible the moment anybody looks, which
-     * is the trade being made rather than one being hidden.
+     * <html> can be zoomed too, and templates now do (The Speaker and fifteen
+     * more scale <html> by 1.25, 1.6 and 2.4 on wide screens; owner, 10 Nov
+     * 2026: "it clicks a paragraph and shows the border elsewhere"). Then this
+     * layer is inside the zoom whatever it is mounted on, so it takes the
+     * inverse of it: zoom 0.8 under 1.25 is 1, and an outline told 334px
+     * paints at 334px again. Read again whenever the window changes size,
+     * because the template's zoom steps are media queries.
      */
     document.documentElement.append(root);
+    const unzoom = () => {
+        const z = parseFloat(getComputedStyle(document.documentElement).zoom) || 1;
+        root.style.zoom = Math.abs(z - 1) < 0.001 ? '' : String(1 / z);
+    };
+    unzoom();
+    window.addEventListener('resize', unzoom);
     const shadow = root.attachShadow({ mode: 'open' });
     const style = document.createElement('style');
     style.textContent = CHROME_CSS;
