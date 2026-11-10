@@ -31,7 +31,7 @@ import { renderSeoPanel } from './seo.js';
 import { renderShopPanel } from './shop.js';
 import { renderCsvImport, renderNewCollection, renderSearchPanel, renderTableEditor } from './collections-panel.js';
 import { renderImport, undoTheLastImport, UNDO_KEY } from './catalogue.js';
-import { AT_THE_TOP, aChartOrTable, addedWith, besidePlace, describeStructure, hrefTo, newAddedId, orderWith, pageBase, pageOfLink, renderCategoryProducts, renderNewCategory, renderNewPage, renderSectionBrowser } from './pages.js';
+import { AT_THE_TOP, aChartOrTable, addedWith, besidePlace, describeStructure, hrefTo, newAddedId, nounFor, orderWith, pageBase, pageOfLink, renderCategoryProducts, renderNewCategory, renderNewPage, renderSectionBrowser } from './pages.js';
 import { menuOrder, renderPagesList, startsOffered } from './pages-list.js';
 import { LEAVE_QUESTION, guardLeaving } from './unsaved.js';
 import { insertionNear, sectionName, sectionUnder, shownSectionLists, shownSections } from './section-inserter.js';
@@ -4697,6 +4697,16 @@ const bootLiveEdit = () => {
                 subtitle: aForm ? 'Choose a form and where it goes. You change its questions once it is on the page.' : 'Choose one to see it, and where it goes.',
                 size: 'is-wide',
             });
+            /*
+             * The title and the button say what is chosen (owner, 10 Nov 2026: opened from + Add a form, it still said
+             * "Add a form" with a table or a chart chosen): "Add a table", "Add this table".
+             */
+            const article = (noun) => (/^[aeiou]/.test(noun) ? 'an' : 'a');
+            const onLook = (section) => {
+                const noun = nounFor(section);
+                handle.title(`Add ${article(noun)} ${noun}`);
+                handle.subtitle(noun === 'form' ? 'Choose a form and where it goes. You change its questions once it is on the page.' : 'Choose one to see it, and where it goes.');
+            };
             const picker = renderSectionBrowser({
                 container: handle.body,
                 library: builder.library,
@@ -4704,7 +4714,8 @@ const bootLiveEdit = () => {
                 only,
                 places: shown.length ? places : [],
                 place: startAt,
-                actionLabel: aForm ? 'Add this form' : 'Add this section',
+                actionLabel: (section) => (section ? `Add this ${nounFor(section)}` : (aForm ? 'Add this form' : 'Add this section')),
+                onLook,
                 upgrade: window.liveEditEditor?.billing ?? null,
                 add: async (section, chosen) => {
                     if (chosen !== undefined) after = chosen;

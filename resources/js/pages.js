@@ -135,6 +135,20 @@ export function aChartOrTable(section) {
     return Boolean(section && (KINDS[section.kind] || section.kind === 'table'));
 }
 
+/**
+ * What a library entry is called in the add window's title and button: "Add a table", "Add this chart" (owner, 10 Nov
+ * 2026: the window opened from + Add a form said "Add a form" even with a table or a chart chosen in it).
+ */
+export function nounFor(section) {
+    if (!section) return 'section';
+    if (section.kind === 'form') return 'form';
+    if (section.kind === 'table') return 'table';
+    if (section.kind === 'search') return 'search';
+    if (KINDS[section.kind]) return 'chart';
+
+    return 'section';
+}
+
 /** Where the add window's "On the left of" / "On the right of" choices are said: `beside:left:s-add-…`. */
 export function besidePlace(value) {
     const found = /^beside:(left|right):(s-(add-[a-z0-9]+))$/.exec(String(value ?? ''));
@@ -866,7 +880,9 @@ export async function drawnOffScreen(markup, width, script) {
     }
 }
 
-export function renderSectionBrowser({ container, library, add, multiple = false, onChange = () => {}, fetchPage = (href) => fetch(href).then((r) => r.text()), actionLabel = 'Add this section', only = null, places = [], place = null, drawWith = null, upgrade = null }) {
+export function renderSectionBrowser({ container, library, add, multiple = false, onChange = () => {}, fetchPage = (href) => fetch(href).then((r) => r.text()), actionLabel = 'Add this section', only = null, places = [], place = null, drawWith = null, upgrade = null, onLook = null }) {
+    // A label may follow what is being looked at ("Add this table"), or be one for everything.
+    const labelFor = (section) => (typeof actionLabel === 'function' ? actionLabel(section) : actionLabel);
     const wrap = el('div', 'le-browser');
     const side = el('div', 'le-browser-list');
     const search = el('input', 'le-input le-library-search');
@@ -925,7 +941,7 @@ export function renderSectionBrowser({ container, library, add, multiple = false
     titleBox.append(stageName, stageFrom);
     stageHead.append(titleBox, sizes);
     const view = el('div', 'le-browser-view');
-    const action = el('button', 'le-btn-publish le-browser-add', actionLabel);
+    const action = el('button', 'le-btn-publish le-browser-add', labelFor(null));
     action.type = 'button';
     action.disabled = true;
 
@@ -1004,13 +1020,14 @@ export function renderSectionBrowser({ container, library, add, multiple = false
         const locked = lockedNow();
         action.disabled = locked && !upgrade;
         action.textContent = locked ? (upgrade ? 'Upgrade to add more' : 'None left on your plan')
-            : multiple ? (on.has(looking.from) ? 'Remove from the page' : 'Add to the page') : actionLabel;
+            : multiple ? (on.has(looking.from) ? 'Remove from the page' : 'Add to the page') : labelFor(looking);
         action.classList.toggle('is-added', multiple && on.has(looking.from));
         say(locked ? (looking.locked_reason || 'Your plan has none of these left on this website.') : '');
     };
 
     const show = async (section) => {
         looking = section;
+        onLook?.(section);
         if (whereTo) {
             const beside = aChartOrTable(section);
             whereTo.querySelectorAll('option[data-charts-and-tables]').forEach((o) => { o.hidden = o.disabled = !beside; });

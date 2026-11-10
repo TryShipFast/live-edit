@@ -1,5 +1,11 @@
 # ShipFast Live Edit for WordPress
 
+## 0.20.26 (10 Nov 2026)
+
+- The add window says what is chosen in it (the owner: "always add form, even when you click on table or chart"):
+  opened from + Add a form, choosing a table makes it "Add a table" with "Add this table", a chart "Add a chart" with
+  "Add this chart", and back to a form, "Add a form".
+
 ## 0.20.25 (10 Nov 2026)
 
 - The outline and handles sit on the element you press on a website that zooms itself on wide screens (the owner,
