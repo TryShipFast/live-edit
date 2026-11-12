@@ -505,7 +505,7 @@ export function createChat({ shadow, request, showSaved, openPhoto, openPublish,
             const response = await request('/live-edit/assistant/chat', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ message: text, history, page: pageForTheChat(document), tapped: about, busy: heldNow(), attachments: sending ? [{ id: sending.id, name: String(sending.file.name || 'photo').slice(0, 120) }] : [] }),
+                body: JSON.stringify({ message: text, history, page: pageForTheChat(document), tapped: about, busy: await heldNow(), attachments: sending ? [{ id: sending.id, name: String(sending.file.name || 'photo').slice(0, 120) }] : [] }),
             });
             let data = await response.json();
             // the host answers on its queue (no web worker waits on the model): collect the answer when it is ready

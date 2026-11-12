@@ -9191,8 +9191,12 @@ const bootLiveEdit = () => {
             const heldBySomeoneElse = (element) => {
                 const where = team?.available ? team.unitOf(element) : null;
                 const lock = where ? team.lockOn(where.unit) : null;
+                // who "you" are not known yet (the first answer not in, or turned away): a part is never said to be
+                // someone else's then (owner, 12 Nov 2026: Ask AI said the hero was being edited by someone else while
+                // the owner was alone); the server still refuses a part a teammate really holds
+                const you = team?.you?.id ?? null;
 
-                return lock && lock.holder !== (team.you?.id ?? team.you) ? { label: where.label ?? lock.label ?? 'that part', name: lock.name ?? 'A teammate' } : null;
+                return lock && you !== null && lock.holder !== you ? { label: where.label ?? lock.label ?? 'that part', name: lock.name ?? 'A teammate' } : null;
             };
             const refusedFor = (element) => {
                 const held = heldBySomeoneElse(element);
@@ -9394,8 +9398,11 @@ const bootLiveEdit = () => {
                 }
             };
             // the parts a teammate holds now, so the chat does not try them (team.js)
-            const chatBusy = () => {
+            const chatBusy = async () => {
                 if (!team?.available) return [];
+                // who "you" are, asked first when not known yet, so your own part is never listed as a teammate's
+                if (!team.you?.id) await team.refresh().catch(() => null);
+                if (!team.you?.id) return [];
                 const held = [];
                 for (const section of document.querySelectorAll('[data-edit-section], [data-style]')) {
                     const busy = heldBySomeoneElse(section);

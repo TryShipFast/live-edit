@@ -1,5 +1,12 @@
 # ShipFast Live Edit for WordPress
 
+## 0.21.6 (12 Nov 2026)
+
+- Ask AI never says your own part is being edited by someone else (the owner: "on my second edit, it said someone is
+  already doing the edit. and it's just me"). Before the chat lists the parts teammates hold, the editor makes sure it
+  knows who you are; while it does not, no part is called someone else's (the server still refuses a part a teammate
+  really holds).
+
 ## 0.21.5 (12 Nov 2026)
 
 - Ask AI for someone who has never built a website (the owner: "as a layman and novice scan through and tell me if i
