@@ -296,6 +296,7 @@ export const apiRequestFor = (url, options = {}, api) => {
         '/live-edit/imagine': `${base}/${api?.site}/imagine`,
         // Ask AI, the chat beside the page (chat.js): a message, and undoing what an answer changed.
         '/live-edit/assistant/chat': `${base}/${api?.site}/assistant/chat`,
+        '/live-edit/assistant/voice': `${base}/${api?.site}/assistant/voice`,
         '/live-edit/assistant/chat/undo': `${base}/${api?.site}/assistant/chat/undo`,
         // The shop's stock, beside its sale (sale.js): the host's, never a draft.
         '/live-edit/stock': `${base}/${api?.site}/stock`,

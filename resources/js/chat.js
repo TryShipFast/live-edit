@@ -61,6 +61,9 @@ export const CHAT_CSS = `
 .le-chat-tool[aria-disabled=true]:hover { border-color: var(--le-field, #DADCE0); }
 .le-chat-soon { position: absolute; bottom: 52px; right: -8px; white-space: nowrap; background: var(--le-ink, #0B0C0F); color: #fff; font-size: 12px; padding: 5px 9px; border-radius: 6px; pointer-events: none; }
 .le-chat-soon[hidden] { display: none; }
+.le-chat-mic.is-recording { background: #C0392B; border-color: #C0392B; color: #fff; }
+.le-chat-mic.is-recording:hover { border-color: #C0392B; }
+.le-chat-mic[aria-busy=true] { cursor: progress; opacity: .6; }
 .le-chat-photos { border: 1px solid var(--le-line, #E6E7EA); border-radius: 12px; padding: 12px; display: flex; flex-direction: column; gap: 8px; }
 .le-chat-photos h3 { margin: 0; font-size: 14px; font-weight: 600; }
 .le-chat-pack { display: flex; align-items: center; gap: 10px; min-height: 44px; padding: 0 10px; border: 1px solid var(--le-field, #DADCE0); border-radius: 10px; font-size: 14px; cursor: pointer; }
@@ -76,6 +79,7 @@ export const CHAT_CSS = `
 `;
 
 const PLUS_ICON = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M5 12h14"/><path d="M12 5v14"/></svg>';
+const STOP_ICON = '<svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false"><rect x="6" y="6" width="12" height="12" rx="2"/></svg>';
 const MIC_ICON = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><rect x="9" y="2" width="6" height="12" rx="3"/><path d="M19 10v1a7 7 0 0 1-14 0v-1"/><path d="M12 18v4"/></svg>';
 const SEND_ICON = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M12 19V5"/><path d="m5 12 7-7 7 7"/></svg>';
 
@@ -178,32 +182,21 @@ export function createChat({ shadow, request, showSaved, openPhoto, openPublish,
     send.setAttribute('aria-label', 'Send');
     /*
      * + opens the editor's own photo chooser (owner, 12 Nov 2026: "pop up widgets if need for things like uploads"):
-     * for the picture the owner has selected, or else the page's photos by name, one press each. The mic is shown
-     * and says it is coming ("mic clicks says coming soon"), never a dead button.
+     * for the picture the owner has selected, or else the page's photos by name, one press each. The mic turns what
+     * the owner says into the words of a message (voice, further down).
      */
     const attach = el('button', 'le-chat-tool');
     attach.type = 'button';
     attach.innerHTML = PLUS_ICON;
     attach.setAttribute('aria-label', 'Add a photo');
-    const mic = el('button', 'le-chat-tool');
+    const mic = el('button', 'le-chat-tool le-chat-mic');
     mic.type = 'button';
     mic.innerHTML = MIC_ICON;
-    mic.setAttribute('aria-label', 'Talk to Ask AI (coming soon)');
-    mic.setAttribute('aria-disabled', 'true');
-    const soon = el('span', 'le-chat-soon', 'Talking: coming soon');
-    soon.hidden = true;
-    mic.append(soon);
-    let soonTimer = null;
-    const showSoon = (forMoment) => {
-        soon.hidden = false;
-        clearTimeout(soonTimer);
-        if (forMoment) soonTimer = setTimeout(() => { soon.hidden = true; }, 2200);
-    };
-    mic.addEventListener('click', () => showSoon(true));
-    mic.addEventListener('mouseenter', () => showSoon(false));
-    mic.addEventListener('mouseleave', () => { soon.hidden = true; });
-    mic.addEventListener('focus', () => showSoon(false));
-    mic.addEventListener('blur', () => { soon.hidden = true; });
+    mic.setAttribute('aria-label', 'Talk instead of typing');
+    // a short note above the mic: how long it has been listening, or why it cannot
+    const micNote = el('span', 'le-chat-soon');
+    micNote.hidden = true;
+    mic.append(micNote);
     form.append(attach, input, mic, send);
 
     const foot = el('p', 'le-chat-foot');
@@ -473,12 +466,7 @@ export function createChat({ shadow, request, showSaved, openPhoto, openPublish,
             entry = { role: 'assistant', text: error.message || 'Something went wrong. Please try again.' };
             if (error.status === 402) {
                 waitingToSend = text;
-                // where to add credits: here, over the editor, when the host sells them so; else the host's own page
-                // (the photo tool sends people to the same one); neither is given to a teammate, who asks the owner
-                const billing = window.liveEditChat?.credits ?? window.liveEditEditor?.billing;
-                if (typeof window.liveEditChat?.buy?.pay === 'function') entry.buy = 'here';
-                else if (billing) entry.buy = String(billing).includes('#') ? billing : `${billing}#credits`;
-                else entry.text = 'There are no AI credits left on this website. Ask its owner to add some, and I will carry on from here.';
+                outOfCredits(entry);
             }
         }
 
@@ -491,6 +479,123 @@ export function createChat({ shadow, request, showSaved, openPhoto, openPublish,
     }
 
     form.addEventListener('submit', (event) => { event.preventDefault(); ask(); });
+
+    /** Out of credits: where to add some, on the answer that says so. */
+    function outOfCredits(entry) {
+        // here, over the editor, when the host sells them so; else the host's own page (the photo tool sends people to
+        // the same one); neither is given to a teammate, who asks the owner
+        const billing = window.liveEditChat?.credits ?? window.liveEditEditor?.billing;
+        if (typeof window.liveEditChat?.buy?.pay === 'function') entry.buy = 'here';
+        else if (billing) entry.buy = String(billing).includes('#') ? billing : `${billing}#credits`;
+        else entry.text = 'There are no AI credits left on this website. Ask its owner to add some, and I will carry on from here.';
+    }
+
+    /*
+     * Voice (owner, 12 Nov 2026: "it's almost same as text just that someone's voice is converted to text / So we don't
+     * do it two times"): tap the mic and speak, tap again to stop; the words appear in the box to read and correct,
+     * and Send sends them as typed words are sent, as ChatGPT does it. The browser's own recorder (MediaRecorder),
+     * Opus in WebM, or AAC in MP4 on older Safari; the words come from the host (POST /live-edit/assistant/voice).
+     * At most two minutes; Escape while listening throws the recording away.
+     */
+    const MOST_SECONDS = 120;
+    const FORMATS = ['audio/webm;codecs=opus', 'audio/webm', 'audio/mp4', 'audio/ogg;codecs=opus'];
+    let recorder = null;
+    let listening = null;
+    let noteTimer = null;
+    const noteOnMic = (text, forMoment = true) => {
+        micNote.textContent = text;
+        micNote.hidden = false;
+        clearTimeout(noteTimer);
+        if (forMoment) noteTimer = setTimeout(() => { micNote.hidden = true; }, 3500);
+    };
+    const micAs = (state) => {
+        mic.classList.toggle('is-recording', state === 'recording');
+        mic.toggleAttribute('aria-busy', state === 'reading');
+        if (state === 'reading') mic.setAttribute('aria-busy', 'true');
+        mic.innerHTML = state === 'recording' ? STOP_ICON : MIC_ICON;
+        mic.append(micNote);
+        mic.setAttribute('aria-label', state === 'recording' ? 'Stop, and use what I said' : 'Talk instead of typing');
+        input.placeholder = state === 'recording' ? 'Listening…' : state === 'reading' ? 'Writing down what you said…' : 'Ask for a change';
+    };
+    const heard = async (blob, type) => {
+        micAs('reading');
+        try {
+            const body = new FormData();
+            body.append('audio', blob, `voice.${type.includes('mp4') ? 'm4a' : type.includes('ogg') ? 'ogg' : 'webm'}`);
+            body.append('hint', [document.querySelector('meta[property="og:site_name"]')?.content, document.title].filter(Boolean).join(', ').slice(0, 600));
+            const response = await request('/live-edit/assistant/voice', { method: 'POST', body });
+            const data = await response.json();
+            const words = String(data.text ?? '').trim();
+            if (words) {
+                input.value = input.value.trim() ? `${input.value.trim()} ${words}` : words;
+                input.dispatchEvent(new Event('input'));
+                input.focus();
+            }
+        } catch (error) {
+            if (error.status === 402) {
+                const entry = { role: 'assistant', text: error.message || 'You have no AI credits left.' };
+                outOfCredits(entry);
+                say(entry);
+            } else {
+                noteOnMic(error.message || 'I could not hear that just now. Please try again, or type it.');
+            }
+        } finally {
+            micAs('idle');
+        }
+    };
+    const stopListening = (keep = true) => {
+        if (!recorder || recorder.state === 'inactive') return;
+        recorder.keep = keep;
+        recorder.stop();
+    };
+    mic.addEventListener('click', async () => {
+        if (mic.getAttribute('aria-busy') === 'true') return;
+        if (recorder && recorder.state === 'recording') {
+            stopListening(true);
+            return;
+        }
+        if (!navigator.mediaDevices?.getUserMedia || typeof window.MediaRecorder !== 'function') {
+            noteOnMic('Talking needs a newer browser. You can type instead.');
+            return;
+        }
+        let stream;
+        try {
+            stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        } catch {
+            noteOnMic('Allow the microphone for this website in your browser, then tap again.');
+            return;
+        }
+        const type = FORMATS.find((format) => window.MediaRecorder.isTypeSupported?.(format)) ?? '';
+        const parts = [];
+        recorder = new window.MediaRecorder(stream, type ? { mimeType: type } : undefined);
+        recorder.addEventListener('dataavailable', (event) => { if (event.data?.size) parts.push(event.data); });
+        recorder.addEventListener('stop', () => {
+            const keep = recorder.keep !== false;
+            const recorded = recorder.mimeType || type || 'audio/webm';
+            stream.getTracks().forEach((track) => track.stop());
+            clearInterval(listening);
+            recorder = null;
+            micNote.hidden = true;
+            if (keep && parts.length) heard(new Blob(parts, { type: recorded }), recorded);
+            else micAs('idle');
+        });
+        recorder.start();
+        micAs('recording');
+        const started = Date.now();
+        const tick = () => {
+            const seconds = Math.floor((Date.now() - started) / 1000);
+            noteOnMic(`${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}`, false);
+            if (seconds >= MOST_SECONDS) stopListening(true);
+        };
+        tick();
+        listening = setInterval(tick, 500);
+    });
+    panel.addEventListener('keydown', (event) => {
+        if (event.key === 'Escape' && recorder && recorder.state === 'recording') {
+            event.stopPropagation();
+            stopListening(false);
+        }
+    }, true);
 
     /** The message that ran out of credits, sent now that there are some. */
     function sendTheWaiting() {

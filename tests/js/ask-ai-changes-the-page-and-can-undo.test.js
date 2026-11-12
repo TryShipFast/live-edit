@@ -1,4 +1,4 @@
-import { describe, expect, it, beforeEach, vi } from 'vitest';
+import { afterEach, describe, expect, it, beforeEach, vi } from 'vitest';
 import { createChat, startersFor } from '../../resources/js/chat.js';
 
 /*
@@ -27,7 +27,7 @@ describe('Ask AI', () => {
         calls = [];
         deps = {
             request: vi.fn((url, options) => {
-                calls.push({ url, body: JSON.parse(options.body) });
+                calls.push({ url, body: typeof options.body === 'string' ? JSON.parse(options.body) : options.body });
                 return replies.shift()();
             }),
             showSaved: vi.fn(async () => {}),
@@ -257,16 +257,85 @@ describe('Ask AI', () => {
         expect(host.querySelector('.le-chat-photos')).toBeNull();
     });
 
-    it('shows the mic, which says talking is coming soon and does nothing else', () => {
-        chatWith([]);
-        const mic = host.querySelector('button[aria-label="Talk to Ask AI (coming soon)"]');
+    describe('talking instead of typing', () => {
+        let recorders;
+        let tracksStopped;
+        beforeEach(() => {
+            recorders = [];
+            tracksStopped = 0;
+            const stream = { getTracks: () => [{ stop: () => { tracksStopped += 1; } }] };
+            Object.defineProperty(navigator, 'mediaDevices', { configurable: true, value: { getUserMedia: vi.fn(async () => stream) } });
+            window.MediaRecorder = class {
+                static isTypeSupported(type) { return type === 'audio/webm;codecs=opus'; }
+                constructor(_stream, options) { this.mimeType = options?.mimeType ?? ''; this.state = 'inactive'; this.listeners = {}; recorders.push(this); }
+                addEventListener(name, fn) { this.listeners[name] = fn; }
+                start() { this.state = 'recording'; }
+                stop() {
+                    this.state = 'inactive';
+                    this.listeners.dataavailable?.({ data: new Blob(['opus'], { type: this.mimeType }) });
+                    this.listeners.stop?.();
+                }
+            };
+        });
+        afterEach(() => {
+            delete window.MediaRecorder;
+            delete navigator.mediaDevices;
+        });
+        const mic = () => host.querySelector('.le-chat-mic');
+        const settle = async () => { for (let i = 0; i < 6; i++) await flush(); };
 
-        expect(mic.getAttribute('aria-disabled')).toBe('true');
-        expect(host.querySelector('.le-chat-soon').hidden).toBe(true);
-        mic.click();
-        expect(host.querySelector('.le-chat-soon').hidden).toBe(false);
-        expect(host.querySelector('.le-chat-soon').textContent).toBe('Talking: coming soon');
-        expect(deps.request).not.toHaveBeenCalled();
+        it('records, then puts the words in the box to read and send, and sends nothing itself', async () => {
+            chatWith([() => answer({ text: 'Change the headline to Made in Lagos' })]);
+            const box = host.querySelector('textarea');
+
+            mic().click();
+            await settle();
+            expect(mic().classList.contains('is-recording')).toBe(true);
+            expect(mic().getAttribute('aria-label')).toBe('Stop, and use what I said');
+            expect(box.placeholder).toBe('Listening…');
+
+            mic().click();
+            await settle();
+            expect(calls[0].url).toBe('/live-edit/assistant/voice');
+            expect(box.value).toBe('Change the headline to Made in Lagos');
+            expect(tracksStopped).toBe(1);
+            expect(mic().classList.contains('is-recording')).toBe(false);
+            // read, corrected if need be, then sent by the owner: only the recording went
+            expect(calls).toHaveLength(1);
+            expect(host.querySelector('.le-chat-msg.is-owner')).toBeNull();
+        });
+
+        it('throws the recording away on Escape', async () => {
+            chatWith([]);
+            mic().click();
+            await settle();
+            host.querySelector('.le-chat').dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+            await settle();
+            expect(deps.request).not.toHaveBeenCalled();
+            expect(tracksStopped).toBe(1);
+        });
+
+        it('says what to do when the microphone is not allowed', async () => {
+            navigator.mediaDevices.getUserMedia = vi.fn(async () => { throw new DOMException('denied', 'NotAllowedError'); });
+            chatWith([]);
+            mic().click();
+            await settle();
+            expect(host.querySelector('.le-chat-soon').textContent).toBe('Allow the microphone for this website in your browser, then tap again.');
+        });
+
+        it('offers credits when there are none, as a typed message does', async () => {
+            window.liveEditChat = { buy: { packs: async () => ({ packs: [{ credits: 100, price: '₦5,000' }] }), pay: vi.fn() } };
+            try {
+                chatWith([() => answer({ message: 'You have no AI credits left. Add some, and I will carry on from here.' }, 402)]);
+                mic().click();
+                await settle();
+                mic().click();
+                await settle();
+                expect(host.querySelector('.le-chat-card h3').textContent).toBe('Add AI credits');
+            } finally {
+                delete window.liveEditChat;
+            }
+        });
     });
 
     it('suggests only what the page has, in words a person uses', () => {
