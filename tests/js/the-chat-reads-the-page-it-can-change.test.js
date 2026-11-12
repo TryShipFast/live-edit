@@ -15,6 +15,7 @@ describe('the page the chat sends', () => {
                 <a href="/women" data-edit-href="setting:tpl:cta">Shop women</a>
                 <img src="/a/jean-worn.jpg" alt="A woman laughing" data-edit-img="setting:tpl:photo">
                 <p data-edit="auto:abc123">A guessed key the chat does not offer</p>
+                <p data-edit="setting:tpl:lede">Free delivery over <strong data-edit="setting:tpl:over">₦50,000</strong> and 30-day returns.</p>
             </section>
             <section data-edit-section="faq" data-edit-section-label="Questions" data-style="sfaq">
                 <ul data-edit-list="tpl:faq" data-edit-list-label="Questions" data-edit-list-max="6">
@@ -37,6 +38,12 @@ describe('the page the chat sends', () => {
         expect(fields).toContainEqual({ key: 'tpl:h1', kind: 'text', value: 'Cut to fit. Made to last.', label: 'Heading', section: 'Hero' });
         expect(fields).toContainEqual({ key: 'tpl:cta', kind: 'link', value: '/women', label: 'Shop women', section: 'Hero' });
         expect(fields).toContainEqual({ key: 'tpl:photo', kind: 'image', value: 'alt: A woman laughing', label: 'Photo', section: 'Hero' });
+    });
+
+    it('gives words around a formatted part as the panel holds them, the part on its own', () => {
+        const { fields } = pageForTheChat(document);
+        expect(fields.find((field) => field.key === 'tpl:lede').value).toBe('Free delivery over and 30-day returns.');
+        expect(fields.find((field) => field.key === 'tpl:over').value).toBe('₦50,000');
     });
 
     it('calls the brand’s mark the logo, so the main photo is not mistaken for it', () => {

@@ -3136,6 +3136,8 @@ const bootLiveEdit = () => {
                 saveButton.disabled = false;
                 saveButton.textContent = 'Save changes';
             };
+            // what happened, for Ask AI (chat.js), which presses Save as a person does and has to know the answer
+            let outcome;
             try {
                 if (current.kind === 'setting') {
                     /*
@@ -3178,7 +3180,7 @@ const bootLiveEdit = () => {
                         restoreButton();
                         closeDrawer();
 
-                        return;
+                        return { ok: true, unchanged: true };
                     }
 
                     if (!wordsUnchanged) {
@@ -3363,9 +3365,11 @@ const bootLiveEdit = () => {
                 }
 
                 await settle('Saved \u2713', current.key ?? null, current.savedValue ?? null);
+                outcome = { ok: true };
             } catch (error) {
                 restoreButton();
                 notify(error.message);
+                outcome = { ok: false, error: error.message, locked: Boolean(error.sectionLocked), lock: error.lock ?? null };
             } finally {
                 /*
                  * Whatever happened. The timeout above covers the request, and
@@ -3378,6 +3382,8 @@ const bootLiveEdit = () => {
                  */
                 restoreButton();
             }
+
+            return outcome;
         };
 
         // Started here, below request(), and not where they are defined.
@@ -4781,8 +4787,12 @@ const bootLiveEdit = () => {
                 try {
                     await saveListOrder(list, ids);
                     await settle(message, list.dataset.editList, JSON.stringify(ids), true);
+
+                    return true;
                 } catch (error) {
                     notify(error.message);
+
+                    return false;
                 }
             };
 
@@ -4833,12 +4843,16 @@ const bootLiveEdit = () => {
                 add.className = 'le-chip-btn';
                 add.textContent = list.tagName === 'SELECT' ? '+ Add a choice' : galleryOf(list) ? '+ Add a photo' : '+ Add item';
                 add.disabled = full;
-                add.addEventListener('click', () => {
+                // named, and its action kept on it, so Ask AI (chat.js) runs exactly what a press runs
+                add.dataset.act = 'add';
+                add.leRun = () => {
                     const ids = currentOrder();
                     const at = item ? ids.indexOf(item.dataset.editItem) : ids.length - 1;
                     ids.splice(at + 1, 0, 'n' + Date.now().toString(36));
-                    saveOrder(ids, 'Added \u2713');
-                });
+
+                    return saveOrder(ids, 'Added \u2713');
+                };
+                add.addEventListener('click', add.leRun);
                 row.append(add);
             }
 
@@ -4883,10 +4897,14 @@ const bootLiveEdit = () => {
                     move.type = 'button';
                     move.className = 'le-chip-btn';
                     move.textContent = label;
-                    move.addEventListener('click', () => {
+                    move.dataset.act = 'move';
+                    move.dataset.to = target;
+                    move.leRun = () => {
                         const order = currentOrder();
-                        saveOrder(movedOrder(order, order.indexOf(item.dataset.editItem), order.indexOf(target)), sections ? 'Section moved \u2713' : 'Moved \u2713');
-                    });
+
+                        return saveOrder(movedOrder(order, order.indexOf(item.dataset.editItem), order.indexOf(target)), sections ? 'Section moved \u2713' : 'Moved \u2713');
+                    };
+                    move.addEventListener('click', move.leRun);
                     row.append(move);
                 }
 
@@ -4899,7 +4917,8 @@ const bootLiveEdit = () => {
                     duplicate.textContent = sections ? 'Duplicate section'
                         : itemNoun(list) ? `+ Add a${/^[aeiou]/.test(itemNoun(list)) ? 'n' : ''} ${itemNoun(list)}` : '+ Add another';
                     duplicate.disabled = !sections && full;
-                    duplicate.addEventListener('click', async () => {
+                    duplicate.dataset.act = 'duplicate';
+                    duplicate.addEventListener('click', duplicate.leRun = async () => {
                         const reordered = currentOrder();
                         const at = reordered.indexOf(item.dataset.editItem);
                         const id = copyId(item.dataset.editItem, sections);
@@ -4914,13 +4933,15 @@ const bootLiveEdit = () => {
                             return;
                         }
                         reordered.splice(at + 1, 0, id);
-                        await saveOrder(reordered, sections ? 'Section duplicated \u2713' : 'Added \u2713');
+                        const savedCopy = await saveOrder(reordered, sections ? 'Section duplicated \u2713' : 'Added \u2713');
                         // The new one, open with all its words, ready to type its own.
                         const added = !sections && list.querySelector(`:scope > [data-edit-item="${CSS.escape(id)}"]`);
                         if (added) {
                             added.scrollIntoView({ block: 'center', behavior: 'smooth' });
                             editItemWords(added, { fresh: true });
                         }
+
+                        return savedCopy;
                     });
                     row.append(duplicate);
                 }
@@ -4932,7 +4953,8 @@ const bootLiveEdit = () => {
                     remove.type = 'button';
                     remove.className = 'le-btn-danger';
                     remove.textContent = 'Remove this section';
-                    remove.addEventListener('click', async () => {
+                    remove.dataset.act = 'remove';
+                    remove.addEventListener('click', remove.leRun = async () => {
                         if (!arrangementIsFree()) return;
                         if (!await askTo({ title: 'Remove this section?', subtitle: 'What you wrote in it goes too. Undo brings it back.', yes: 'Remove section', no: 'Keep it' })) return;
                         try {
@@ -4956,7 +4978,8 @@ const bootLiveEdit = () => {
                     remove.className = 'le-btn-danger';
                     remove.textContent = 'Delete this section';
                     remove.disabled = lowest;
-                    remove.addEventListener('click', async () => {
+                    remove.dataset.act = 'remove';
+                    remove.addEventListener('click', remove.leRun = async () => {
                         if (!arrangementIsFree()) return;
                         if (!await askTo({ title: 'Delete this section?', subtitle: 'Undo brings it back, and you can add it again from + Section.', yes: 'Delete section', no: 'Keep it' })) return;
                         await saveOrder(currentOrder().filter((id) => id !== item.dataset.editItem), 'Section deleted ✓');
@@ -4971,7 +4994,8 @@ const bootLiveEdit = () => {
                     remove.textContent = `Delete this ${itemNoun(list) ?? 'card'}`;
                     remove.disabled = lowest;
                     const deleteCard = (message) => saveOrder(currentOrder().filter((id) => id !== item.dataset.editItem), message);
-                    remove.addEventListener('click', async () => {
+                    remove.dataset.act = 'remove';
+                    remove.addEventListener('click', remove.leRun = async () => {
                         // A card that opens a page of its own offers that page too; a page other
                         // cards still open is theirs as well, so it is never offered.
                         if (opens && !shared) {
@@ -9088,11 +9112,193 @@ const bootLiveEdit = () => {
             const chatStyle = document.createElement('style');
             chatStyle.textContent = CHAT_CSS;
             ui.shadow?.append(chatStyle);
+
+            /*
+             * What the chat does, done the way a person does it (owner, 12 Nov 2026: "the chat is built on the live
+             * edit"; "make no mistakes updating a wrong path"). Each change opens the same panel a press opens, fills
+             * the same field and presses the same Save, or runs the same list button; so the words around formatted
+             * parts, rich text, prices, a list drawn twice, a copy's own words, team locks, plan limits and History all
+             * behave as they do for a press. The server only says what to do.
+             */
+            const settled = () => new Promise((resolve) => setTimeout(resolve, 0));
+            const byKey = (attr, key) => {
+                const named = CSS.escape(`setting:${key}`);
+                const all = [...document.querySelectorAll(`[${attr}="${named}"]`)].filter((element) => !element.closest('#live-edit-ui'));
+
+                return all.find((element) => element.getClientRects().length > 0) ?? all[0] ?? null;
+            };
+            const heldBySomeoneElse = (element) => {
+                const where = team?.available ? team.unitOf(element) : null;
+                const lock = where ? team.lockOn(where.unit) : null;
+
+                return lock && lock.holder !== (team.you?.id ?? team.you) ? { label: where.label ?? lock.label ?? 'that part', name: lock.name ?? 'A teammate' } : null;
+            };
+            const refusedFor = (element) => {
+                const held = heldBySomeoneElse(element);
+
+                return held ? { ok: false, locked: held, error: `${held.name} is editing ${held.label} right now.` } : null;
+            };
+            const pressSave = async () => {
+                const result = await save();
+                closeDrawer(true);
+
+                return result ?? { ok: false, error: 'That could not be saved.' };
+            };
+            const chatAct = async (action) => {
+                if (!document.body.classList.contains('editing')) setEditing(true);
+                if (action.type === 'field' && action.kind === 'text') {
+                    const element = byKey('data-edit', action.key);
+                    if (!element) return { ok: false, error: 'That part is not on this page any more.' };
+                    const refused = refusedFor(element);
+                    if (refused) return refused;
+                    if (team && !team.beforeEdit(element, { onRefused: () => closeDrawer(true) })) return { ok: false, locked: heldBySomeoneElse(element) ?? { label: 'that part', name: 'A teammate' } };
+                    try { team?.setWhat(describeElement(element)); } catch { /* named later */ }
+                    editText(element, element, { asWords: true });
+                    await settled();
+                    const box = drawerFields.querySelector('textarea[name=value]');
+                    if (!box) { closeDrawer(true); return { ok: false, error: 'That part has no words to change.' }; }
+                    box.value = action.value;
+                    box.dispatchEvent(new Event('input', { bubbles: true }));
+
+                    return pressSave();
+                }
+                if (action.type === 'field' && action.kind === 'link') {
+                    const element = byKey('data-edit-href', action.key);
+                    if (!element) return { ok: false, error: 'That link is not on this page any more.' };
+                    const refused = refusedFor(element);
+                    if (refused) return refused;
+                    if (team && !team.beforeEdit(element, { onRefused: () => closeDrawer(true) })) return { ok: false, locked: heldBySomeoneElse(element) ?? { label: 'that part', name: 'A teammate' } };
+                    editLink(element);
+                    await settled();
+                    const field = drawerFields.querySelector('input[data-link-field=href]');
+                    if (!field) { closeDrawer(true); return { ok: false, error: 'That link cannot be changed here.' }; }
+                    field.value = action.value;
+                    field.dispatchEvent(new Event('input', { bubbles: true }));
+                    field.dispatchEvent(new Event('change', { bubbles: true }));
+
+                    return pressSave();
+                }
+                if (action.type === 'style') {
+                    const element = document.querySelector(`[data-style="${CSS.escape(action.key)}"]`);
+                    if (!element) return { ok: false, error: 'That section is not on this page any more.' };
+                    const refused = refusedFor(element);
+                    if (refused) return refused;
+                    if (team && !team.beforeEdit(element, { onRefused: () => closeDrawer(true) })) return { ok: false, locked: heldBySomeoneElse(element) ?? { label: 'that part', name: 'A teammate' } };
+                    openNode(element);
+                    await settled();
+                    const toggle = drawerFields.querySelector('input[data-style-prop=hidden]');
+                    if (!toggle) { closeDrawer(true); return { ok: false, error: 'That section cannot be hidden.' }; }
+                    // "Show this section to visitors": ticked shows it
+                    toggle.checked = toggle.dataset.styleShows ? Boolean(action.visible) : !action.visible;
+                    toggle.dispatchEvent(new Event('change', { bubbles: true }));
+                    if (current) current.dirty = true;
+
+                    return pressSave();
+                }
+                if (action.type === 'list') {
+                    const list = document.querySelector(`[data-edit-list="${CSS.escape(action.key)}"]`);
+                    if (!list) return { ok: false, error: 'That list is not on this page any more.' };
+                    const item = action.item_id ? list.querySelector(`:scope > [data-edit-item="${CSS.escape(action.item_id)}"]`) : null;
+                    const target = item ?? list;
+                    const refused = refusedFor(target);
+                    if (refused) return refused;
+                    if (team && !team.beforeEdit(target, { onRefused: () => closeDrawer(true) })) return { ok: false, locked: heldBySomeoneElse(target) ?? { label: 'that part', name: 'A teammate' } };
+                    openNode(target);
+                    await settled();
+                    const buttons = [...drawerFields.querySelectorAll('[data-act]')];
+                    let button = null;
+                    if (action.action === 'add') {
+                        // "add another" after an item is the item's own add (a copy to change); at the end, the list's
+                        button = buttons.find((b) => b.dataset.act === (item ? 'duplicate' : 'add')) ?? buttons.find((b) => b.dataset.act === 'add');
+                    } else if (action.action === 'duplicate' || action.action === 'remove') {
+                        button = buttons.find((b) => b.dataset.act === action.action);
+                    } else if (action.action === 'move_up' || action.action === 'move_down') {
+                        const order = [...list.children].filter((child) => child.dataset.editItem).map((child) => child.dataset.editItem);
+                        const want = order[order.indexOf(action.item_id) + (action.action === 'move_up' ? -1 : 1)];
+                        button = buttons.find((b) => b.dataset.act === 'move' && b.dataset.to === want);
+                    }
+                    if (!button || button.disabled || typeof button.leRun !== 'function') {
+                        closeDrawer(true);
+
+                        return { ok: false, error: button?.disabled ? 'That list is as long as its design allows.' : 'That cannot be done to this list.' };
+                    }
+                    const done = await button.leRun();
+                    closeDrawer(true);
+
+                    return done === false ? { ok: false, error: 'That could not be saved.' } : { ok: true };
+                }
+
+                return { ok: false, error: 'That cannot be done from the chat yet.' };
+            };
+
+            /*
+             * Undo, the editor's own way: before the chat acts, what is already waiting to publish is noted (the
+             * Changes list) with the site's words; after, every change the chat made first is taken back (as the
+             * Changes list's own Undo does) and any it changed again is put back as it was. A copy's own words and a
+             * list drawn twice go with it, because they are changes the chat made.
+             */
+            const chatSnapshot = async () => {
+                const [changes, content] = await Promise.all([
+                    request('/live-edit/changes', { method: 'GET' }).then((r) => r.json()).catch(() => ({ changes: [] })),
+                    readSavedContent().catch(() => ({})),
+                ]);
+
+                return {
+                    drafted: (changes?.changes ?? []).map((change) => ({ key: change.key, kind: change.kind })),
+                    settings: content?.settings ?? {},
+                    styles: content?.styles ?? {},
+                };
+            };
+            const chatUndoPlan = (before, after) => {
+                const was = new Set(before.drafted.map((change) => `${change.kind}:${change.key}`));
+                const revert = [];
+                const restore = [];
+                for (const change of after.drafted) {
+                    if (!was.has(`${change.kind}:${change.key}`)) {
+                        revert.push(change);
+                    } else if (change.kind === 'style' && JSON.stringify(before.styles[change.key] ?? {}) !== JSON.stringify(after.styles[change.key] ?? {})) {
+                        restore.push({ kind: 'style', key: change.key, value: before.styles[change.key] ?? {} });
+                    } else if (change.kind === 'setting' && (before.settings[change.key] ?? null) !== (after.settings[change.key] ?? null)) {
+                        restore.push({ kind: 'setting', key: change.key, value: before.settings[change.key] ?? '' });
+                    }
+                }
+
+                return { revert, restore };
+            };
+            const chatUndo = async ({ revert = [], restore = [] }) => {
+                for (const change of revert) {
+                    await request('/live-edit/changes', { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ key: change.key, kind: change.kind }) });
+                }
+                for (const change of restore) {
+                    if (change.kind === 'style') {
+                        await request('/live-edit/style', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ key: change.key, props: change.value }) });
+                    } else {
+                        await saveSetting(change.key, change.value);
+                    }
+                }
+            };
+            // the parts a teammate holds now, so the chat does not try them (team.js)
+            const chatBusy = () => {
+                if (!team?.available) return [];
+                const held = [];
+                for (const section of document.querySelectorAll('[data-edit-section], [data-style]')) {
+                    const busy = heldBySomeoneElse(section);
+                    if (busy && !held.some((one) => one.label === busy.label)) held.push(busy);
+                }
+
+                return held;
+            };
+
             const chat = createChat({
                 shadow: ui.shadow,
                 request,
                 site: window.liveEditApi?.site ?? '',
                 selected: () => current?.element ?? null,
+                act: chatAct,
+                snapshot: chatSnapshot,
+                undoPlan: chatUndoPlan,
+                undo: chatUndo,
+                busy: chatBusy,
                 showSaved: (message, { reload = false } = {}) => (reload ? reloadWithToast(message) : settle(message, null, null, true)),
                 openPhoto: (key) => {
                     const named = CSS.escape(`setting:${key}`);

@@ -56,6 +56,11 @@ const valueOf = (element, kind) => {
     if (kind === 'background image') return 'a background photo';
     if (kind === 'link') return cut(element.getAttribute('href') || '', 300);
     if (kind === 'icon') return cut(element.getAttribute('aria-label') || 'an icon', 80);
+    // words with formatted parts inside that have keys of their own: the panel holds only the words around them,
+    // and so does the chat, so it never writes a formatted part's words into its neighbour
+    if (element.querySelector('[data-edit]')) {
+        return cut([...element.childNodes].filter((node) => node.nodeType === 3).map((node) => node.textContent).join(' '));
+    }
 
     return cut(element.textContent);
 };

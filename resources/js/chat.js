@@ -43,6 +43,7 @@ export const CHAT_CSS = `
 .le-chat-btn.is-publish { background: var(--le-blue, #1B6EF3); color: #fff; border-color: var(--le-blue, #1B6EF3); }
 .le-chat-btn[disabled] { opacity: .5; cursor: default; }
 .le-chat-done { font-size: 13px; color: var(--le-muted, #6B6F78); }
+.le-chat-held { font-size: 13px; color: #7A4B00; background: #FFF8E8; border: 1px solid #F0C36D; border-radius: 8px; padding: 8px 10px; }
 .le-chat-tips { display: flex; flex-wrap: wrap; gap: 8px; }
 .le-chat-tip { min-height: 32px; padding: 0 12px; border-radius: 999px; border: 1px solid var(--le-field, #DADCE0); background: #fff; color: inherit; font: inherit; font-size: 13px; cursor: pointer; }
 .le-chat-tip:hover { border-color: var(--le-ink, #0B0C0F); }
@@ -101,10 +102,15 @@ export function startersFor(page) {
  *                                           { reload: true } draws the page again
  * @param {Function} deps.openPhoto          opens the photo panel for the picture with this key
  * @param {Function} deps.openPublish        opens the editor's own Publish window
+ * @param {Function} deps.act                carries out one planned change the way a press does (live-edit.js)
+ * @param {Function} deps.snapshot           what is waiting to publish now, for Undo
+ * @param {Function} deps.undoPlan           what Undo takes back, from a snapshot before and after
+ * @param {Function} deps.undo               takes it back, the Changes list's own way
+ * @param {Function} [deps.busy]             the parts teammates hold now
  * @param {Function} [deps.selected]         the element the owner has open in the editor, if any
  * @param {string}   [deps.site]             to keep the conversation for this website through a reload
  */
-export function createChat({ shadow, request, showSaved, openPhoto, openPublish, selected = () => null, site = '' }) {
+export function createChat({ shadow, request, showSaved, openPhoto, openPublish, act = async () => ({ ok: false }), snapshot = async () => null, undoPlan = () => ({ revert: [], restore: [] }), undo: takeBack = async () => {}, busy: heldNow = () => [], selected = () => null, site = '' }) {
     const memoryKey = `le-chat:${site}:${location.pathname}`;
     const remembered = (() => {
         try { return JSON.parse(sessionStorage.getItem(memoryKey) || 'null'); } catch { return null; }
@@ -173,7 +179,7 @@ export function createChat({ shadow, request, showSaved, openPhoto, openPublish,
 
     const changeCard = (entry) => {
         const card = el('div', 'le-chat-card');
-        card.append(el('h3', '', entry.changes.length === 1 ? 'Changed on your page' : `${entry.changes.length} changes on your page`));
+        card.append(el('h3', '', entry.changes.length === 0 ? 'Nothing changed' : entry.changes.length === 1 ? 'Changed on your page' : `${entry.changes.length} changes on your page`));
         const items = el('ul');
         for (const change of entry.changes) {
             const item = el('li');
@@ -188,8 +194,13 @@ export function createChat({ shadow, request, showSaved, openPhoto, openPublish,
             items.append(item);
         }
         card.append(items);
+        for (const missed of entry.missed ?? []) {
+            card.append(el('p', 'le-chat-held', missed.locked ? `Not changed: ${missed.label}. ${missed.locked.name} is editing ${missed.locked.label} right now.` : `Not changed: ${missed.label}. ${missed.error ?? ''}`.trim()));
+        }
 
-        if (entry.state === 'kept') {
+        if (!entry.changes.length) {
+            // nothing changed, nothing to keep or undo
+        } else if (entry.state === 'kept') {
             card.append(el('p', 'le-chat-done', 'Kept.'));
         } else if (entry.state === 'undone') {
             card.append(el('p', 'le-chat-done', 'Undone.'));
@@ -203,17 +214,12 @@ export function createChat({ shadow, request, showSaved, openPhoto, openPublish,
                 undo.disabled = true;
                 undo.textContent = 'Undoing…';
                 try {
-                    await request('/live-edit/assistant/chat/undo', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ undo: entry.undo }),
-                    });
+                    await takeBack(entry.undo);
                     entry.state = 'undone';
                     remember();
                     draw();
-                    // a part put back to how the design had it has no draft left to show: the page is drawn again,
-                    // as the editor's own Undo does, and the chat opens again where it was
-                    await showSaved('Undone', { reload: entry.undo.some((step) => step.discard) });
+                    // the page is drawn again, as the editor's own Undo does, and the chat opens again where it was
+                    await showSaved('Undone', { reload: true });
                 } catch (error) {
                     keep.disabled = false;
                     undo.disabled = false;
@@ -289,7 +295,7 @@ export function createChat({ shadow, request, showSaved, openPhoto, openPublish,
                 continue;
             }
             list.append(el('div', `le-chat-msg is-ai${entry.wait ? ' is-wait' : ''}`, entry.text));
-            if (entry.changes?.length) list.append(changeCard(entry));
+            if (entry.changes?.length || entry.missed?.length) list.append(changeCard(entry));
             for (const card of entry.cards ?? []) {
                 if (card.type === 'photo') list.append(photoCard(card));
                 if (card.type === 'publish') list.append(publishCard());
@@ -330,11 +336,28 @@ export function createChat({ shadow, request, showSaved, openPhoto, openPublish,
             const response = await request('/live-edit/assistant/chat', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ message: text, history, page: pageForTheChat(document), tapped: about }),
+                body: JSON.stringify({ message: text, history, page: pageForTheChat(document), tapped: about, busy: heldNow() }),
             });
             const data = await response.json();
             credits = data.credits ?? credits;
-            entry = { role: 'assistant', text: data.reply || 'Done.', changes: data.changes ?? [], cards: data.cards ?? [], undo: data.undo ?? [] };
+            entry = { role: 'assistant', text: data.reply || 'Done.', changes: [], missed: [], cards: data.cards ?? [], undo: { revert: [], restore: [] } };
+            const planned = data.actions ?? [];
+            if (planned.length) {
+                // each one done as a press does it (live-edit.js), one after another, then Undo worked out from
+                // what is waiting to publish before and after
+                waiting.text = planned.length === 1 ? 'Changing it on your page…' : `Making ${planned.length} changes on your page…`;
+                draw();
+                const before = await snapshot();
+                for (const action of planned) {
+                    const done = await act(action).catch((error) => ({ ok: false, error: error.message }));
+                    if (done?.ok && !done.unchanged) entry.changes.push(action);
+                    else if (!done?.ok) entry.missed.push({ label: action.label, locked: done?.locked ?? null, error: done?.error ?? null });
+                }
+                if (entry.changes.length && before) entry.undo = undoPlan(before, await snapshot());
+                if (!entry.changes.length) entry.text = entry.missed.some((missed) => missed.locked)
+                    ? 'I could not change that: someone else is working on that part right now.'
+                    : 'I could not make that change on this page.';
+            }
         } catch (error) {
             entry = { role: 'assistant', text: error.message || 'Something went wrong. Please try again.' };
             // where to add credits: the host's own page (the photo tool sends people to the same one), owner only
@@ -348,9 +371,6 @@ export function createChat({ shadow, request, showSaved, openPhoto, openPublish,
         send.disabled = false;
         input.focus();
 
-        if (entry.changes?.length) {
-            await showSaved(entry.changes.length === 1 ? 'Changed' : `${entry.changes.length} changes`);
-        }
     }
 
     form.addEventListener('submit', (event) => { event.preventDefault(); ask(); });

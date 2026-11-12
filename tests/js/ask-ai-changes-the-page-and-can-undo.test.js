@@ -33,6 +33,11 @@ describe('Ask AI', () => {
             showSaved: vi.fn(async () => {}),
             openPhoto: vi.fn(),
             openPublish: vi.fn(),
+            act: vi.fn(async (action) => (action.key === 'tpl:held' ? { ok: false, locked: { name: 'Ada', label: 'Hero' } } : { ok: true })),
+            snapshot: vi.fn(async () => ({ drafted: [], settings: {}, styles: {} })),
+            undoPlan: vi.fn(() => ({ revert: [{ key: 'tpl:h1', kind: 'setting' }], restore: [] })),
+            undo: vi.fn(async () => {}),
+            busy: vi.fn(() => [{ label: 'Hero', name: 'Ada' }]),
         };
         const chat = createChat({ shadow: host, site: 'oxbow', ...deps });
         chat.open();
@@ -74,28 +79,38 @@ describe('Ask AI', () => {
         expect(host.querySelector('.le-chat-foot').textContent).toBe('Each message uses 1 AI credit. 9 left.');
     });
 
-    it('shows a change at once, with Keep and Undo, and Undo puts it back', async () => {
-        const undo = [{ type: 'field', key: 'tpl:h1', value: 'Cut to fit. Made to last.', discard: true }];
-        chatWith([
-            () => answer({ reply: 'I changed the headline at the top.', changes: [{ type: 'field', label: 'Heading', kind: 'text', key: 'tpl:h1', value: 'Cut to fit. Made in Lagos.' }], cards: [], undo }),
-            () => answer({ undone: true }),
-        ]);
+    it('has the editor make each planned change, then offers Keep and Undo, and Undo takes it back the editor’s way', async () => {
+        const action = { type: 'field', kind: 'text', label: 'Heading', key: 'tpl:h1', value: 'Cut to fit. Made in Lagos.' };
+        chatWith([() => answer({ reply: 'I changed the headline at the top.', actions: [action], cards: [] })]);
 
         await type('Change the headline to Cut to fit. Made in Lagos.');
 
-        expect(deps.showSaved).toHaveBeenCalledWith('Changed');
+        // the editor made it, as a press does; the parts teammates hold were sent with the message
+        expect(deps.act).toHaveBeenCalledWith(action);
+        expect(calls[0].body.busy).toEqual([{ label: 'Hero', name: 'Ada' }]);
+        expect(deps.snapshot).toHaveBeenCalledTimes(2);
         expect(host.querySelector('.le-chat-card').textContent).toContain('Heading: “Cut to fit. Made in Lagos.”');
-        expect(buttonNamed('Keep')).toBeTruthy();
 
         buttonNamed('Undo').click();
         await flush();
         await flush();
 
-        expect(calls[1]).toEqual({ url: '/live-edit/assistant/chat/undo', body: { undo } });
-        // the draft was the first of that part, so it is gone: the page is drawn again, as the editor's own Undo does
+        expect(deps.undo).toHaveBeenCalledWith({ revert: [{ key: 'tpl:h1', kind: 'setting' }], restore: [] });
+        // the page is drawn again, as the editor's own Undo does
         expect(deps.showSaved).toHaveBeenLastCalledWith('Undone', { reload: true });
         expect(host.textContent).toContain('Undone.');
-        expect(buttonNamed('Undo')).toBeUndefined();
+    });
+
+    it('says what it could not change because a teammate is working there', async () => {
+        chatWith([() => answer({ reply: 'Done.', actions: [
+            { type: 'field', kind: 'text', label: 'Opening hours', key: 'tpl:hours', value: 'Mon to Sat, 9 to 7' },
+            { type: 'field', kind: 'text', label: 'Heading', key: 'tpl:held', value: 'New' },
+        ], cards: [] })]);
+
+        await type('Change the headline and the opening hours');
+
+        expect(host.querySelector('.le-chat-card').textContent).toContain('Opening hours');
+        expect(host.querySelector('.le-chat-held').textContent).toBe('Not changed: Heading. Ada is editing Hero right now.');
     });
 
     it('opens the picture’s own photo panel, and the editor’s own Publish window', async () => {
