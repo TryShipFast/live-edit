@@ -185,6 +185,53 @@ describe('Ask AI', () => {
         expect(shown).toEqual([true, false]);
     });
 
+    describe('photos, uploaded in the chat', () => {
+        let picked;
+        beforeEach(() => {
+            picked = new File(['jpeg'], 'shop-front.jpg', { type: 'image/jpeg' });
+            // the file picker, as the owner answers it
+            vi.spyOn(HTMLInputElement.prototype, 'click').mockImplementation(function () {
+                if (this.type !== 'file') return;
+                Object.defineProperty(this, 'files', { configurable: true, value: [picked] });
+                this.dispatchEvent(new Event('change'));
+            });
+        });
+        afterEach(() => vi.restoreAllMocks());
+
+        it('puts a photo uploaded from the photo card in place at once, with Undo', async () => {
+            chatWith([() => answer({ reply: 'Pick a photo below.', actions: [], cards: [{ type: 'photo', key: 'tpl:photo', label: 'Photo' }] })]);
+            await type('New main photo');
+            buttonNamed('Upload a photo').click();
+            await flush();
+            await flush();
+            await flush();
+
+            expect(deps.act).toHaveBeenCalledWith({ type: 'image', key: 'tpl:photo', label: 'Photo', file: picked, name: 'shop-front.jpg' });
+            expect(host.textContent).toContain('Photo: new photo');
+            expect(buttonNamed('Undo')).toBeTruthy();
+        });
+
+        it('attaches a photo to a message with +, and the chat puts it where the owner said', async () => {
+            chatWith([() => answer({ reply: 'It is the main photo now.', actions: [{ type: 'image', key: 'tpl:photo', attachment: 'ID', label: 'Photo' }], cards: [] })]);
+            host.querySelector('button[aria-label="Add a photo to your message"]').click();
+            expect(host.querySelector('.le-chat-attached').textContent).toContain('shop-front.jpg');
+            expect(host.querySelector('textarea').placeholder).toBe('Where does it go?');
+            const id = calls.length;
+            // the reply names the attachment it was sent with
+            deps.request.mockImplementationOnce((url, options) => {
+                const body = JSON.parse(options.body);
+                calls.push({ url, body });
+                return answer({ reply: 'It is the main photo now.', actions: [{ type: 'image', key: 'tpl:photo', attachment: body.attachments[0].id, label: 'Photo' }], cards: [] });
+            });
+            await type('Make this the main photo');
+
+            expect(calls[id].body.attachments).toEqual([{ id: expect.stringMatching(/^p/), name: 'shop-front.jpg' }]);
+            expect(deps.act).toHaveBeenCalledWith(expect.objectContaining({ type: 'image', key: 'tpl:photo', file: picked }));
+            expect(host.querySelector('.le-chat-attached').hidden).toBe(true);
+            expect(host.querySelector('.le-chat-msg.is-owner').textContent).toBe('Make this the main photo 📎 shop-front.jpg');
+        });
+    });
+
     it('says what it could not change because a teammate is working there', async () => {
         chatWith([() => answer({ reply: 'Done.', actions: [
             { type: 'field', kind: 'text', label: 'Opening hours', key: 'tpl:hours', value: 'Mon to Sat, 9 to 7' },
@@ -208,7 +255,7 @@ describe('Ask AI', () => {
         await type('New photo please, then put it live');
 
         expect(host.textContent).toContain('Idea: Your shop front');
-        buttonNamed('Choose a photo').click();
+        buttonNamed('Free photos').click();
         expect(deps.openPhoto).toHaveBeenCalledWith('tpl:photo');
         buttonNamed('Publish…').click();
         expect(deps.openPublish).toHaveBeenCalled();
@@ -327,24 +374,6 @@ describe('Ask AI', () => {
 
         expect(host.textContent).toContain('Hi');
         expect(host.textContent).toContain('Hello again.');
-    });
-
-    it('opens the photo chooser with +: for the picture selected, or the page’s photos by name', () => {
-        chatWith([]);
-        const plus = host.querySelector('button[aria-label="Add a photo"]');
-
-        plus.click();
-        expect(host.querySelector('.le-chat-photos h3').textContent).toBe('Which photo?');
-        buttonNamed('Photo, Hero').click();
-        expect(deps.openPhoto).toHaveBeenCalledWith('tpl:photo');
-        expect(host.querySelector('.le-chat-photos')).toBeNull();
-
-        deps.openPhoto.mockClear();
-        host.replaceChildren();
-        createChat({ shadow: host, site: 'oxbow', ...deps, selected: () => document.querySelector('img') }).open();
-        host.querySelector('button[aria-label="Add a photo"]').click();
-        expect(deps.openPhoto).toHaveBeenCalledWith('tpl:photo');
-        expect(host.querySelector('.le-chat-photos')).toBeNull();
     });
 
     describe('talking instead of typing', () => {

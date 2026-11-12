@@ -1,5 +1,14 @@
 # ShipFast Live Edit for WordPress
 
+## 0.21.4 (12 Nov 2026)
+
+- Photos inside Ask AI (the owner: "you're chatting with your website page / Not looking for what to click / Click
+  should only come up if it's uploading a file"). The + beside the box attaches a photo to the message, as in ChatGPT
+  and WhatsApp: the photo shows above the box, which asks "Where does it go?", and "Make this the main photo" puts it
+  there, with Keep and Undo. When the owner asks for a new photo without one, the chat's card offers Upload a photo
+  (the file picker, then it is on the page) and Free photos. The photo is saved the way the picture's own panel saves
+  it. Needs the app's use_photo answer (Go Live, and the adapters on the same chat service).
+
 ## 0.21.3 (12 Nov 2026)
 
 - Ask AI is a chat box that is always there (the owner: "I've seen even chatgpt sites just having a chatbox"; "Ask AI

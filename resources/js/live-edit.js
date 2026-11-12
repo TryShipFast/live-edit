@@ -9233,6 +9233,32 @@ const bootLiveEdit = () => {
 
                     return pressSave();
                 }
+                if (action.type === 'image') {
+                    /*
+                     * A photo the owner uploaded in the chat, put in place the way the picture's own panel does it:
+                     * the file goes into its upload box and its Save sends it (owner, 12 Nov 2026: "Click should only
+                     * come up if it's uploading a file"). Drafts, credits for free photos, Undo and History as a press.
+                     */
+                    const named = CSS.escape(`setting:${action.key}`);
+                    const all = [...document.querySelectorAll(`[data-edit-img="${named}"], [data-edit-bg="${named}"]`)].filter((element) => !element.closest('#live-edit-ui'));
+                    const picture = all.find((element) => element.getClientRects().length > 0) ?? all[0];
+                    if (!picture) return { ok: false, error: 'That photo is not on this page any more.' };
+                    if (!(action.file instanceof Blob)) return { ok: false, error: 'That photo did not come through. Please add it again.' };
+                    const refused = refusedFor(picture);
+                    if (refused) return refused;
+                    if (team && !team.beforeEdit(picture, { onRefused: () => closeDrawer(true) })) return { ok: false, locked: heldBySomeoneElse(picture) ?? { label: 'that part', name: 'A teammate' } };
+                    openNode(picture);
+                    await settled();
+                    const box = drawerFields.querySelector('input[type=file]');
+                    if (!box) { closeDrawer(true); return { ok: false, error: 'That photo cannot be changed here.' }; }
+                    const carried = new DataTransfer();
+                    carried.items.add(action.file instanceof File ? action.file : new File([action.file], action.name || 'photo.jpg', { type: action.file.type || 'image/jpeg' }));
+                    box.files = carried.files;
+                    box.dispatchEvent(new Event('change', { bubbles: true }));
+                    if (current) current.dirty = true;
+
+                    return pressSave();
+                }
                 if (action.type === 'style') {
                     /*
                      * How a part looks (colour, size, spacing), set with the part's own style controls in its panel and

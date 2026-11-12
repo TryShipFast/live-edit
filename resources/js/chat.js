@@ -65,8 +65,11 @@ export const CHAT_CSS = `
 .le-chat-mic.is-recording { background: #C0392B; border-color: #C0392B; color: #fff; }
 .le-chat-mic.is-recording:hover { border-color: #C0392B; }
 .le-chat-mic[aria-busy=true] { cursor: progress; opacity: .6; }
-.le-chat-photos { border: 1px solid var(--le-line, #E6E7EA); border-radius: 12px; padding: 12px; display: flex; flex-direction: column; gap: 8px; }
-.le-chat-photos h3 { margin: 0; font-size: 14px; font-weight: 600; }
+.le-chat-attached { display: flex; align-items: center; gap: 8px; margin: 0 16px; padding: 6px 8px; border: 1px solid var(--le-line, #E6E7EA); border-radius: 10px; font-size: 13px; }
+.le-chat-attached[hidden] { display: none; }
+.le-chat-attached img { width: 36px; height: 36px; object-fit: cover; border-radius: 6px; }
+.le-chat-attached span { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.le-chat-attached button { border: 0; background: none; font-size: 18px; cursor: pointer; color: var(--le-muted, #6B6F78); }
 .le-chat-pack { display: flex; align-items: center; gap: 10px; min-height: 44px; padding: 0 10px; border: 1px solid var(--le-field, #DADCE0); border-radius: 10px; font-size: 14px; cursor: pointer; }
 .le-chat-pack:has(input:checked) { border: 2px solid var(--le-accent, #1B6EF3); padding: 0 9px; }
 .le-chat-pack b { margin-left: auto; font-weight: 600; }
@@ -189,7 +192,7 @@ export function createChat({ shadow, request, showSaved, openPhoto, openPublish,
     const attach = el('button', 'le-chat-tool');
     attach.type = 'button';
     attach.innerHTML = PLUS_ICON;
-    attach.setAttribute('aria-label', 'Add a photo');
+    attach.setAttribute('aria-label', 'Add a photo to your message');
     const mic = el('button', 'le-chat-tool le-chat-mic');
     mic.type = 'button';
     mic.innerHTML = MIC_ICON;
@@ -223,6 +226,8 @@ export function createChat({ shadow, request, showSaved, openPhoto, openPublish,
             const item = el('li');
             if (change.type === 'field') {
                 item.append(el('b', '', `${change.label}: `), document.createTextNode(change.kind === 'link' ? `now goes to ${change.value}` : `“${change.value}”`));
+            } else if (change.type === 'image') {
+                item.append(el('b', '', `${change.label}: `), document.createTextNode('new photo'));
             } else if (change.type === 'style') {
                 // said in the panel's own words: "text size 24, colour #1B6EF3", "spacing as designed"
                 const named = { textColor: 'text colour', background: 'background', fontSize: 'text size', fontWeight: 'boldness', textAlign: 'alignment', lineHeight: 'line spacing', paddingY: 'space above and below', paddingX: 'space left and right', radius: 'rounded corners' };
@@ -275,18 +280,54 @@ export function createChat({ shadow, request, showSaved, openPhoto, openPublish,
         return card;
     };
 
+    /*
+     * A new photo, chosen and put in place in the chat (owner, 12 Nov 2026: "you're chatting with your website page /
+     * Not looking for what to click / Click should only come up if it's uploading a file"): Upload a photo opens the
+     * file picker and the photo goes in at once, with Keep and Undo. Free photos opens the picture's own chooser.
+     */
     const photoCard = (card) => {
         const box = el('div', 'le-chat-card');
         box.append(el('h3', '', `New photo for ${card.label.toLowerCase() === 'photo' ? 'this picture' : card.label}`));
         if (card.suggestion) box.append(el('p', '', `Idea: ${card.suggestion}`));
-        box.append(el('p', '', 'Upload your own, pick a free photo, or have one made.'));
         const acts = el('div', 'le-chat-acts');
-        const choose = button('Choose a photo', 'is-main');
-        choose.addEventListener('click', () => openPhoto(card.key));
-        acts.append(choose);
+        const upload = button('Upload a photo', 'is-main');
+        upload.addEventListener('click', () => pickAFile((file) => putPhoto({ type: 'image', key: card.key, label: card.label, file, name: file.name })));
+        const free = button('Free photos');
+        free.addEventListener('click', () => openPhoto(card.key));
+        acts.append(upload, free);
         box.append(acts);
 
         return box;
+    };
+
+    /** A file picker for one photo, as every upload button opens. */
+    const pickAFile = (then) => {
+        const picker = document.createElement('input');
+        picker.type = 'file';
+        picker.accept = 'image/*';
+        picker.addEventListener('change', () => { if (picker.files?.[0]) then(picker.files[0]); });
+        picker.click();
+    };
+
+    /** A photo uploaded from a card: put in place as the editor does, said like any change, with Undo. */
+    const putPhoto = async (action) => {
+        if (busy) return;
+        busy = true;
+        const waiting = { role: 'assistant', text: 'Putting your photo in…', wait: true };
+        log.push(waiting);
+        draw();
+        const entry = { role: 'assistant', text: 'Done. Your photo is on the page.', changes: [], missed: [], cards: [], undo: { revert: [], restore: [] } };
+        const before = await snapshot();
+        const done = await act(action).catch((error) => ({ ok: false, error: error.message }));
+        if (done?.ok) {
+            entry.changes.push({ type: 'image', key: action.key, label: action.label });
+            if (before) entry.undo = undoPlan(before, await snapshot());
+        } else {
+            entry.text = done?.locked ? `${done.locked.name} is editing ${done.locked.label} right now.` : (done?.error || 'That photo did not go in. Please try again.');
+        }
+        log.splice(log.indexOf(waiting), 1);
+        say(entry);
+        busy = false;
     };
 
     const publishCard = () => {
@@ -437,14 +478,17 @@ export function createChat({ shadow, request, showSaved, openPhoto, openPublish,
 
     // `again`: the message that ran out of credits, sent once they are in; it is already in the conversation
     async function ask(again = null) {
-        const text = typeof again === 'string' ? again : input.value.trim();
+        let text = typeof again === 'string' ? again : input.value.trim();
+        const sending = typeof again === 'string' ? null : attached;
+        if (!text && sending) text = 'Put this photo on my page';
         if (!text || busy) return;
+        if (sending) { attached = null; showAttached(); }
         busy = true;
         send.disabled = true;
         if (typeof again !== 'string') input.value = '';
         refreshAbout();
         const history = log.filter((entry) => !entry.wait && entry.text && !entry.buy).map((entry) => ({ role: entry.role, text: entry.text })).slice(-12);
-        if (typeof again !== 'string') say({ role: 'user', text });
+        if (typeof again !== 'string') say({ role: 'user', text: sending ? `${text} 📎 ${sending.file.name || 'photo'}` : text });
         const waiting = { role: 'assistant', text: 'Working on it…', wait: true };
         log.push(waiting);
         draw();
@@ -454,7 +498,7 @@ export function createChat({ shadow, request, showSaved, openPhoto, openPublish,
             const response = await request('/live-edit/assistant/chat', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ message: text, history, page: pageForTheChat(document), tapped: about, busy: heldNow() }),
+                body: JSON.stringify({ message: text, history, page: pageForTheChat(document), tapped: about, busy: heldNow(), attachments: sending ? [{ id: sending.id, name: String(sending.file.name || 'photo').slice(0, 120) }] : [] }),
             });
             let data = await response.json();
             // the host answers on its queue (no web worker waits on the model): collect the answer when it is ready
@@ -475,7 +519,9 @@ export function createChat({ shadow, request, showSaved, openPhoto, openPublish,
                 draw();
                 const before = await snapshot();
                 for (const action of planned) {
-                    const done = await act(action).catch((error) => ({ ok: false, error: error.message }));
+                    // a photo the owner attached goes with the change that asks for it
+                    const doing = action.type === 'image' ? { ...action, file: sending?.id === action.attachment ? sending.file : null, name: sending?.file?.name } : action;
+                    const done = await act(doing).catch((error) => ({ ok: false, error: error.message }));
                     if (done?.ok && !done.unchanged) entry.changes.push(action);
                     else if (!done?.ok) entry.missed.push({ label: action.label, locked: done?.locked ?? null, error: done?.error ?? null });
                 }
@@ -777,42 +823,34 @@ export function createChat({ shadow, request, showSaved, openPhoto, openPublish,
         setTimeout(sendTheWaiting, 0);
     }
 
-    const photoKeyOf = (element) => {
-        const holder = element?.closest?.('[data-edit-img], [data-edit-bg]');
-        const marker = holder?.getAttribute('data-edit-img') || holder?.getAttribute('data-edit-bg') || '';
-
-        return marker.startsWith('setting:') ? marker.slice('setting:'.length) : null;
+    /*
+     * + attaches a photo to the message, as ChatGPT and WhatsApp do: the owner says where it goes ("put this on my About
+     * page", "make this the main photo") and the chat puts it there. One photo a message; × takes it off.
+     */
+    let attached = null;
+    const attachedRow = el('div', 'le-chat-attached');
+    attachedRow.hidden = true;
+    panel.insertBefore(attachedRow, form);
+    const showAttached = () => {
+        attachedRow.replaceChildren();
+        attachedRow.hidden = !attached;
+        input.placeholder = attached ? 'Where does it go?' : 'Ask for a change';
+        if (!attached) return;
+        const thumb = el('img');
+        thumb.alt = '';
+        thumb.src = URL.createObjectURL(attached.file);
+        const name = el('span', '', attached.file.name || 'Photo');
+        const off = el('button', '', '×');
+        off.type = 'button';
+        off.setAttribute('aria-label', 'Take the photo off');
+        off.addEventListener('click', () => { attached = null; showAttached(); input.focus(); });
+        attachedRow.append(thumb, name, off);
     };
-    attach.addEventListener('click', () => {
-        const chosen = photoKeyOf(selected());
-        if (chosen) {
-            openPhoto(chosen);
-            return;
-        }
-        const photos = pageForTheChat(document).fields.filter((field) => field.kind === 'image' || field.kind === 'background image');
-        list.querySelector('.le-chat-photos')?.remove();
-        const box = el('div', 'le-chat-photos');
-        if (photos.length === 0) {
-            box.append(el('p', '', 'This page has no photos to change.'));
-        } else {
-            box.append(el('h3', '', 'Which photo?'));
-            const tips = el('div', 'le-chat-tips');
-            const named = new Map();
-            for (const photo of photos.slice(0, 12)) {
-                // two photos called "Photo" in one section read as one: number them
-                const base = [photo.label, photo.section].filter(Boolean).join(', ') || 'Photo';
-                const count = (named.get(base) ?? 0) + 1;
-                named.set(base, count);
-                const chip = el('button', 'le-chat-tip', count > 1 ? `${base} (${count})` : base);
-                chip.type = 'button';
-                chip.addEventListener('click', () => { box.remove(); openPhoto(photo.key); });
-                tips.append(chip);
-            }
-            box.append(tips);
-        }
-        list.append(box);
-        scrollDown();
-    });
+    attach.addEventListener('click', () => pickAFile((file) => {
+        attached = { id: `p${Date.now().toString(36)}`, file };
+        showAttached();
+        input.focus();
+    }));
     input.addEventListener('keydown', (event) => {
         // Enter sends, Shift+Enter makes a new line: as in every chat people use
         if (event.key === 'Enter' && !event.shiftKey && !event.isComposing) {
