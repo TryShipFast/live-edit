@@ -9068,7 +9068,7 @@ const bootLiveEdit = () => {
                 request,
                 site: window.liveEditApi?.site ?? '',
                 selected: () => current?.element ?? null,
-                showSaved: (message) => settle(message, null, null, true),
+                showSaved: (message, { reload = false } = {}) => (reload ? reloadWithToast(message) : settle(message, null, null, true)),
                 openPhoto: (key) => {
                     const named = CSS.escape(`setting:${key}`);
                     const picture = document.querySelector(`[data-edit-img="${named}"], [data-edit-bg="${named}"]`);
@@ -9092,6 +9092,8 @@ const bootLiveEdit = () => {
                 if (!document.body.classList.contains('editing')) setEditing(true);
                 chat.toggle();
             });
+            // open again after the page was drawn again (an Undo, a reload): the conversation is where it was
+            if (chat.wasOpen) chat.open();
         }
 
         /*

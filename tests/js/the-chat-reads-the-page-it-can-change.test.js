@@ -9,6 +9,7 @@ describe('the page the chat sends', () => {
     beforeEach(() => {
         document.title = 'Oxbow & Hem';
         document.body.innerHTML = `
+            <header><a href="/"><img src="/a/oxbow.svg" alt="Oxbow & Hem" data-edit-img="setting:tpl:logo"></a></header>
             <section data-edit-section="hero" data-edit-section-label="Hero" data-style="shero">
                 <h1 data-edit="setting:tpl:h1">Cut to fit.   Made to last.</h1>
                 <a href="/women" data-edit-href="setting:tpl:cta">Shop women</a>
@@ -36,6 +37,12 @@ describe('the page the chat sends', () => {
         expect(fields).toContainEqual({ key: 'tpl:h1', kind: 'text', value: 'Cut to fit. Made to last.', label: 'Heading', section: 'Hero' });
         expect(fields).toContainEqual({ key: 'tpl:cta', kind: 'link', value: '/women', label: 'Shop women', section: 'Hero' });
         expect(fields).toContainEqual({ key: 'tpl:photo', kind: 'image', value: 'alt: A woman laughing', label: 'Photo', section: 'Hero' });
+    });
+
+    it('calls the brand’s mark the logo, so the main photo is not mistaken for it', () => {
+        const { fields } = pageForTheChat(document);
+        expect(fields.find((field) => field.key === 'tpl:logo').label).toBe('Logo');
+        expect(fields.find((field) => field.key === 'tpl:photo').label).toBe('Photo');
     });
 
     it('leaves out locked parts, the editor itself and keys the engine guessed', () => {

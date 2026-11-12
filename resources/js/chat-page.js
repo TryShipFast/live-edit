@@ -66,7 +66,11 @@ const labelOf = (element, kind) => {
     // a link's words say what it is ("Shop women"); a heading says it is the heading
     if (kind === 'link') return cut(element.textContent, 80) || 'Link';
     if (/^H[1-6]$/.test(element.tagName)) return 'Heading';
-    if (kind === 'image' || kind === 'background image') return 'Photo';
+    // the brand's mark is not "the photo": a picture in the header or the menu, or one named a logo, is the logo
+    if (kind === 'image' || kind === 'background image') {
+        const named = `${element.getAttribute('class') || ''} ${element.getAttribute('src') || ''} ${element.closest('a')?.getAttribute('class') || ''}`;
+        return element.closest('header, nav') || /logo|brand-mark/i.test(named) ? 'Logo' : 'Photo';
+    }
 
     return '';
 };

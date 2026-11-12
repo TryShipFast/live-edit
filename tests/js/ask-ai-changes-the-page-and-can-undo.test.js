@@ -75,7 +75,7 @@ describe('Ask AI', () => {
     });
 
     it('shows a change at once, with Keep and Undo, and Undo puts it back', async () => {
-        const undo = [{ type: 'field', key: 'tpl:h1', value: 'Cut to fit. Made to last.' }];
+        const undo = [{ type: 'field', key: 'tpl:h1', value: 'Cut to fit. Made to last.', discard: true }];
         chatWith([
             () => answer({ reply: 'I changed the headline at the top.', changes: [{ type: 'field', label: 'Heading', kind: 'text', key: 'tpl:h1', value: 'Cut to fit. Made in Lagos.' }], cards: [], undo }),
             () => answer({ undone: true }),
@@ -92,7 +92,8 @@ describe('Ask AI', () => {
         await flush();
 
         expect(calls[1]).toEqual({ url: '/live-edit/assistant/chat/undo', body: { undo } });
-        expect(deps.showSaved).toHaveBeenLastCalledWith('Undone');
+        // the draft was the first of that part, so it is gone: the page is drawn again, as the editor's own Undo does
+        expect(deps.showSaved).toHaveBeenLastCalledWith('Undone', { reload: true });
         expect(host.textContent).toContain('Undone.');
         expect(buttonNamed('Undo')).toBeUndefined();
     });
@@ -148,7 +149,9 @@ describe('Ask AI', () => {
         expect(host.textContent).toContain('Hello again.');
     });
 
-    it('suggests only what the page has', () => {
+    it('suggests only what the page has, in words a person uses', () => {
         expect(startersFor({ fields: [], lists: [] })).toEqual(['What can I change on this page?']);
+        expect(startersFor({ fields: [], lists: [{ label: 'Media' }, { label: 'Questions' }] })).toContain('Add another to questions');
+        expect(startersFor({ fields: [], lists: [{ label: 'Media' }] })).toEqual(['What can I change on this page?']);
     });
 });

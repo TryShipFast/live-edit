@@ -55,6 +55,10 @@ export const CHAT_CSS = `
 .le-chat-send { width: 44px; height: 44px; flex: none; border: 0; border-radius: 12px; background: var(--le-ink, #0B0C0F); color: #fff; cursor: pointer; display: grid; place-items: center; }
 .le-chat-send[disabled] { opacity: .4; cursor: default; }
 .le-chat-foot { padding: 0 16px 12px; margin-top: -6px; font-size: 12px; color: var(--le-muted, #6B6F78); }
+/* An editor panel open (the photo the chat asked for, or anything tapped): the chat moves to the left of it, so both
+   stay in view; where there is no room beside it, the chat steps aside until the panel closes. */
+:host(.le-drawer-open) .le-chat { right: 416px; }
+@media (max-width: 900px) { :host(.le-drawer-open) .le-chat { display: none; } }
 @media (max-width: 600px) { .le-chat { right: 8px; left: 8px; width: auto; bottom: 76px; max-height: calc(100vh - 96px); } }
 `;
 
@@ -81,7 +85,8 @@ export function startersFor(page) {
     const heading = page.fields.find((field) => field.kind === 'text' && field.label === 'Heading');
     if (heading) tips.push('Make the headline shorter and punchier');
     if (page.fields.some((field) => field.kind === 'image' || field.kind === 'background image')) tips.push('Replace the main photo');
-    const list = page.lists[0];
+    // a list with a name a person would use ("Questions", "Team"), never the editor's own words for one
+    const list = page.lists.find((candidate) => !['media', 'items', 'list', 'page sections', 'section'].includes(candidate.label.trim().toLowerCase()));
     if (list) tips.push(`Add another to ${list.label.toLowerCase()}`);
     tips.push('What can I change on this page?');
 
@@ -92,7 +97,8 @@ export function startersFor(page) {
  * @param {object} deps
  * @param {ShadowRoot} deps.shadow           where the panel goes
  * @param {Function} deps.request            the editor's request(url, options): the session's API
- * @param {Function} deps.showSaved          shows what was just saved on the page (re-reads the drafts)
+ * @param {Function} deps.showSaved          shows what was just saved on the page (re-reads the drafts); with
+ *                                           { reload: true } draws the page again
  * @param {Function} deps.openPhoto          opens the photo panel for the picture with this key
  * @param {Function} deps.openPublish        opens the editor's own Publish window
  * @param {Function} [deps.selected]         the element the owner has open in the editor, if any
@@ -110,7 +116,9 @@ export function createChat({ shadow, request, showSaved, openPhoto, openPublish,
     let about = null;
 
     const remember = () => {
-        try { sessionStorage.setItem(memoryKey, JSON.stringify({ log: log.slice(-40), credits })); } catch { /* private mode: the chat still works */ }
+        try {
+            sessionStorage.setItem(memoryKey, JSON.stringify({ log: log.slice(-40), credits, open: !panel.hidden }));
+        } catch { /* private mode: the chat still works */ }
     };
 
     const panel = el('section', 'le-chat');
@@ -203,7 +211,9 @@ export function createChat({ shadow, request, showSaved, openPhoto, openPublish,
                     entry.state = 'undone';
                     remember();
                     draw();
-                    await showSaved('Undone');
+                    // a part put back to how the design had it has no draft left to show: the page is drawn again,
+                    // as the editor's own Undo does, and the chat opens again where it was
+                    await showSaved('Undone', { reload: entry.undo.some((step) => step.discard) });
                 } catch (error) {
                     keep.disabled = false;
                     undo.disabled = false;
@@ -362,9 +372,10 @@ export function createChat({ shadow, request, showSaved, openPhoto, openPublish,
         showAbout();
         draw();
         panel.hidden = false;
+        remember();
         input.focus();
     };
-    const shut = () => { panel.hidden = true; };
+    const shut = () => { panel.hidden = true; remember(); };
     close.addEventListener('click', shut);
     panel.addEventListener('keydown', (event) => { if (event.key === 'Escape') shut(); });
 
@@ -373,6 +384,7 @@ export function createChat({ shadow, request, showSaved, openPhoto, openPublish,
         close: shut,
         toggle: () => (panel.hidden ? open() : shut()),
         get isOpen() { return !panel.hidden; },
+        wasOpen: remembered?.open === true,
         panel,
     };
 }

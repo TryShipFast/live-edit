@@ -1,5 +1,17 @@
 # ShipFast Live Edit for WordPress
 
+## 0.21.0 (12 Nov 2026)
+
+- Ask AI, a chat beside the page (the owner: "a simple chat box that understand live edit and you can change things
+  via chats and pop up widgets if need for things like uploads"). Ask AI on the bar opens it, with a few suggestions
+  from the page. Ask for a change in plain words and it shows on the page at once as a draft, with Keep and Undo
+  under the answer; Undo puts it back exactly. A new photo opens that picture's own photo panel (upload, free photos,
+  generate) with the chat beside it; Publish opens the editor's own Publish window, never publishing by itself. Each
+  message uses one AI credit; with none left it says so and offers Add AI credits. The conversation stays through a
+  reload. It reads what the editor marks on the page, so a locked part is never offered, and every change is checked
+  and saved by the server with the editor's own session. Shown where the content API answers the chat (Go Live
+  websites and the cloud adapters); a host can turn it off with `window.liveEditChat = false`.
+
 ## 0.20.26 (10 Nov 2026)
 
 - The add window says what is chosen in it (the owner: "always add form, even when you click on table or chart"):
