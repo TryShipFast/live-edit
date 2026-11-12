@@ -331,6 +331,8 @@ export const apiRequestFor = (url, options = {}, api) => {
     const generationMatch = path.match(/^\/live-edit\/imagine\/([0-9a-f-]{36})$/i);
     const mediaOperation = path.match(/^\/live-edit\/media\/([0-9a-f-]{36})$/i);
     const undoMatch = path.match(/^\/live-edit\/versions\/(\d+)\/undo$/);
+    // the answer to an Ask AI message, collected once the host's queue has it
+    const chatAnswer = path.match(/^\/live-edit\/assistant\/chat\/([0-9a-f-]{36})$/i);
     const claimed = api?.routes?.[path] ?? (path === '/live-edit/publish' ? api?.publishUrl : null);
 
     if (claimed) {
@@ -347,7 +349,8 @@ export const apiRequestFor = (url, options = {}, api) => {
     const target = routes[path]
         ?? (generationMatch ? `${base}/${api?.site}/imagine/${generationMatch[1]}` : null)
         ?? (mediaOperation ? `${base}/${api?.site}/media/${mediaOperation[1]}` : null)
-        ?? (undoMatch ? `${base}/${api?.site}/versions/${undoMatch[1]}/undo` : null);
+        ?? (undoMatch ? `${base}/${api?.site}/versions/${undoMatch[1]}/undo` : null)
+        ?? (chatAnswer ? `${base}/${api?.site}/assistant/chat/${chatAnswer[1]}` : null);
 
     if (!base || !api?.site || !api?.token) {
         throw new Error('The content API is not configured on this page.');

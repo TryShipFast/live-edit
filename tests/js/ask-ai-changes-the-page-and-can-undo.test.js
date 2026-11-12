@@ -101,6 +101,30 @@ describe('Ask AI', () => {
         expect(host.textContent).toContain('Undone.');
     });
 
+    it('collects the answer when the host answers on its queue', async () => {
+        const action = { type: 'field', kind: 'text', label: 'Heading', key: 'tpl:h1', value: 'Made in Lagos.' };
+        chatWith([
+            () => answer({ id: '0b6f2a8e-1c1d-4a55-9a51-2f6d8b1c0a11', waiting: true }, 202),
+            () => answer({ id: '0b6f2a8e-1c1d-4a55-9a51-2f6d8b1c0a11', waiting: true }, 202),
+            () => answer({ reply: 'I changed the headline.', actions: [action], cards: [] }),
+        ]);
+        host.querySelector('textarea').value = 'Change the headline';
+        host.querySelector('form').dispatchEvent(new Event('submit', { cancelable: true }));
+        await new Promise((resolve) => setTimeout(resolve, 1500));
+        await flush();
+        await flush();
+
+        expect(calls.map((call) => call.url)).toEqual(['/live-edit/assistant/chat', '/live-edit/assistant/chat/0b6f2a8e-1c1d-4a55-9a51-2f6d8b1c0a11', '/live-edit/assistant/chat/0b6f2a8e-1c1d-4a55-9a51-2f6d8b1c0a11']);
+        expect(deps.act).toHaveBeenCalledWith(action);
+        expect(host.textContent).toContain('I changed the headline.');
+    });
+
+    it('says when a message did not use a credit', async () => {
+        chatWith([() => answer({ reply: 'Sorry, I could not make that change on this page.', actions: [], cards: [], credits: { balance: 5, cost: 1, refunded: true } })]);
+        await type('Change the thing');
+        expect(host.textContent).toContain('This one did not use a credit.');
+    });
+
     it('says what it could not change because a teammate is working there', async () => {
         chatWith([() => answer({ reply: 'Done.', actions: [
             { type: 'field', kind: 'text', label: 'Opening hours', key: 'tpl:hours', value: 'Mon to Sat, 9 to 7' },

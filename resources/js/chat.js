@@ -443,9 +443,17 @@ export function createChat({ shadow, request, showSaved, openPhoto, openPublish,
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ message: text, history, page: pageForTheChat(document), tapped: about, busy: heldNow() }),
             });
-            const data = await response.json();
+            let data = await response.json();
+            // the host answers on its queue (no web worker waits on the model): collect the answer when it is ready
+            for (let tries = 0; response.status === 202 && data?.waiting && data.id && tries < 90; tries++) {
+                await new Promise((resolve) => setTimeout(resolve, tries < 3 ? 600 : 1000));
+                const answered = await request(`/live-edit/assistant/chat/${data.id}`, { method: 'GET' });
+                const next = await answered.json();
+                if (answered.status !== 202) { data = next; break; }
+            }
+            if (data?.waiting) throw new Error('The assistant is taking too long. Please try again in a moment.');
             credits = data.credits ?? credits;
-            entry = { role: 'assistant', text: data.reply || 'Done.', changes: [], missed: [], cards: data.cards ?? [], undo: { revert: [], restore: [] } };
+            entry = { role: 'assistant', text: `${data.reply || 'Done.'}${data.credits?.refunded ? ' This one did not use a credit.' : ''}`, changes: [], missed: [], cards: data.cards ?? [], undo: { revert: [], restore: [] } };
             const planned = data.actions ?? [];
             if (planned.length) {
                 // each one done as a press does it (live-edit.js), one after another, then Undo worked out from
