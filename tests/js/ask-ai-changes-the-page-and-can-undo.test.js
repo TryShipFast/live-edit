@@ -10,6 +10,7 @@ const answer = (body, status = 200) => {
     if (status >= 400) {
         const refused = new Error(body.message);
         refused.status = status;
+        refused.buy = body.credits?.buy ?? null;
         return Promise.reject(refused);
     }
 
@@ -250,6 +251,12 @@ describe('Ask AI', () => {
         } finally {
             history.replaceState(null, '', location.pathname);
         }
+    });
+
+    it('gives an adapter’s owner the billing page the service names, where there is no window to buy in', async () => {
+        chatWith([() => answer({ message: 'You have no AI credits left.', credits: { balance: 0, cost: 1, buy: 'https://live.example.test/billing?site=oxbow#credits' } }, 402)]);
+        await type('Change the headline');
+        expect(buttonNamed('Add AI credits').getAttribute('href')).toBe('https://live.example.test/billing?site=oxbow#credits');
     });
 
     it('keeps the conversation through a reload of the page', async () => {

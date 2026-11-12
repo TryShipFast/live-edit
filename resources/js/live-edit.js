@@ -2969,6 +2969,8 @@ const bootLiveEdit = () => {
                 // page copied, key by key), which waits out a "too many" rather than stopping halfway.
                 refused.status = response.status;
                 refused.retryAfter = Number(data.error?.retry_after ?? response.headers?.get?.('Retry-After')) || null;
+                // where to add credits, when the host says (Ask AI on an adapter: the owner's billing page)
+                refused.buy = typeof (data.credits?.buy ?? data.error?.credits?.buy) === 'string' ? (data.credits?.buy ?? data.error.credits.buy) : null;
                 // "Too many requests" for a few seconds: wait as asked and send it again, as a person would, rather
                 // than failing a copy or a save halfway through its writes (an add, a copy and Ask AI are several in
                 // a row). Twice at most, and never for longer than a short wait.
@@ -9275,10 +9277,14 @@ const bootLiveEdit = () => {
                 for (const change of after.drafted) {
                     if (!was.has(`${change.kind}:${change.key}`)) {
                         revert.push(change);
-                    } else if (change.kind === 'style' && JSON.stringify(before.styles[change.key] ?? {}) !== JSON.stringify(after.styles[change.key] ?? {})) {
-                        restore.push({ kind: 'style', key: change.key, value: before.styles[change.key] ?? {} });
-                    } else if (change.kind === 'setting' && (before.settings[change.key] ?? null) !== (after.settings[change.key] ?? null)) {
-                        restore.push({ kind: 'setting', key: change.key, value: before.settings[change.key] ?? '' });
+                    } else if (change.kind === 'style' && Object.hasOwn(before.styles, change.key)
+                        && JSON.stringify(before.styles[change.key]) !== JSON.stringify(after.styles[change.key] ?? {})) {
+                        restore.push({ kind: 'style', key: change.key, value: before.styles[change.key] });
+                    } else if (change.kind === 'setting' && Object.hasOwn(before.settings, change.key)
+                        && before.settings[change.key] !== (after.settings[change.key] ?? null)) {
+                        // put back only what is known to have been there: a host that keeps its own words (WordPress)
+                        // does not give them here, and writing back an empty value would wipe the owner's earlier edit
+                        restore.push({ kind: 'setting', key: change.key, value: before.settings[change.key] });
                     }
                 }
 

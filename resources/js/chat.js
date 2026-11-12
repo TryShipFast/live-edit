@@ -475,7 +475,7 @@ export function createChat({ shadow, request, showSaved, openPhoto, openPublish,
             entry = { role: 'assistant', text: error.message || 'Something went wrong. Please try again.' };
             if (error.status === 402) {
                 waitingToSend = text;
-                outOfCredits(entry);
+                outOfCredits(entry, error);
             }
         }
 
@@ -490,10 +490,11 @@ export function createChat({ shadow, request, showSaved, openPhoto, openPublish,
     form.addEventListener('submit', (event) => { event.preventDefault(); ask(); });
 
     /** Out of credits: where to add some, on the answer that says so. */
-    function outOfCredits(entry) {
+    function outOfCredits(entry, error = null) {
         // here, over the editor, when the host sells them so; else the host's own page (the photo tool sends people to
-        // the same one); neither is given to a teammate, who asks the owner
-        const billing = window.liveEditChat?.credits ?? window.liveEditEditor?.billing;
+        // the same one), or the billing page the service names (an adapter: WordPress, HTML, React, Next.js); none is
+        // given to a teammate on Go Live, who asks the owner
+        const billing = window.liveEditChat?.credits ?? window.liveEditEditor?.billing ?? error?.buy ?? null;
         if (typeof window.liveEditChat?.buy?.pay === 'function') entry.buy = 'here';
         else if (billing) entry.buy = String(billing).includes('#') ? billing : `${billing}#credits`;
         else entry.text = 'There are no AI credits left on this website. Ask its owner to add some, and I will carry on from here.';
@@ -716,7 +717,7 @@ export function createChat({ shadow, request, showSaved, openPhoto, openPublish,
             if (error.status === 402) {
                 stopTalking();
                 const entry = { role: 'assistant', text: error.message || 'You have no AI credits left.' };
-                outOfCredits(entry);
+                outOfCredits(entry, error);
                 say(entry);
                 return;
             }

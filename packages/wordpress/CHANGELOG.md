@@ -22,8 +22,10 @@
   so a copy or a save never fails halfway. A host can answer the chat on its queue (202 with an id); the editor
   collects the answer.
 - The Products grid keeps each product it read and reads it again only when it changed.
-- Shown where the content API answers the chat (Go Live websites and the cloud adapters); a host turns it off with
-  `window.liveEditChat = false`.
+- Shown where the content API answers the chat (Go Live websites, WordPress and the cloud adapters: HTML, React,
+  Next.js); a host turns it off with `window.liveEditChat = false`. On WordPress, Undo puts back only what it knows was
+  there, so an earlier unpublished edit is never wiped. An adapter's owner who runs out of credits gets Add AI credits,
+  to their billing page.
 
 ## 0.20.26 (10 Nov 2026)
 
