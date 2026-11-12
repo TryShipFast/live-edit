@@ -3,14 +3,27 @@
 ## 0.21.0 (12 Nov 2026)
 
 - Ask AI, a chat beside the page (the owner: "a simple chat box that understand live edit and you can change things
-  via chats and pop up widgets if need for things like uploads"). Ask AI on the bar opens it, with a few suggestions
-  from the page. Ask for a change in plain words and it shows on the page at once as a draft, with Keep and Undo
-  under the answer; Undo puts it back exactly. A new photo opens that picture's own photo panel (upload, free photos,
-  generate) with the chat beside it; Publish opens the editor's own Publish window, never publishing by itself. Each
-  message uses one AI credit; with none left it says so and offers Add AI credits. The conversation stays through a
-  reload. It reads what the editor marks on the page, so a locked part is never offered, and every change is checked
-  and saved by the server with the editor's own session. Shown where the content API answers the chat (Go Live
-  websites and the cloud adapters); a host can turn it off with `window.liveEditChat = false`.
+  via chats and pop up widgets if need for things like uploads"; "the chat is built on the live edit"). Ask AI on the
+  bar opens it, with a few suggestions from the page. Ask in plain words and the change shows on the page at once,
+  with Keep and Undo under the answer. Every change is made the way a press makes it: the same panel, field and Save,
+  or the list's own button, so team locks, plan limits, rich text, a link's words and address, list copies and
+  History behave as for a click. Removing a section or an item asks first in the editor's own window. Proved on every
+  template, page by page (the app's `chat-parity` walk).
+- Talking: tap the mic and speak; the words appear as they are said and are sent when you stop talking, as Siri and
+  Google Assistant do. The microphone streams straight to the speech service with a short-lived pass from the host
+  (OpenAI's live transcription), or the browser's own speech recognition where the host has none; no mic is shown
+  where neither can hear.
+- + opens the photo chooser for the picture selected, or the page's photos by name.
+- AI credits: one a message, given back when nothing could be done ("This one did not use a credit."). With none
+  left, the owner buys a pack in the chat (a card window over the editor where the host offers it) and the waiting
+  message is sent once the credits are in; a teammate is told to ask the owner.
+- Fast to load: the chat's code is fetched on the first press of Ask AI (17 KB, 6 KB gzipped), so the editor loads
+  nothing more until then. A request refused with "Too many requests" for a few seconds is waited out and sent again,
+  so a copy or a save never fails halfway. A host can answer the chat on its queue (202 with an id); the editor
+  collects the answer.
+- The Products grid keeps each product it read and reads it again only when it changed.
+- Shown where the content API answers the chat (Go Live websites and the cloud adapters); a host turns it off with
+  `window.liveEditChat = false`.
 
 ## 0.20.26 (10 Nov 2026)
 
