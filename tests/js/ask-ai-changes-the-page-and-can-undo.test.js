@@ -583,7 +583,12 @@ describe('Ask AI', () => {
 
     it('suggests only what the page has, in words a person uses', () => {
         expect(startersFor({ fields: [], lists: [] })).toEqual(['What can I change on this page?']);
-        expect(startersFor({ fields: [], lists: [{ label: 'Media' }, { label: 'Questions' }] })).toContain('Add another to questions');
+        expect(startersFor({ fields: [], lists: [{ label: 'Media' }, { label: 'Questions' }] })).toContain('Add another question');
         expect(startersFor({ fields: [], lists: [{ label: 'Media' }] })).toEqual(['What can I change on this page?']);
+        // the page's furniture is never offered (the novice walk: "Add another to buttons" read as jargon)
+        expect(startersFor({ fields: [], lists: [{ label: 'Buttons' }, { label: 'Menu' }] })).toEqual(['What can I change on this page?']);
+        expect(startersFor({ fields: [], lists: [{ label: 'Team' }] })).toContain('Add to team');
+        // a heading named with its section still offers the headline idea
+        expect(startersFor({ fields: [{ kind: 'text', label: 'Heading in Talks' }], lists: [] })).toContain('Make the headline shorter and punchier');
     });
 });

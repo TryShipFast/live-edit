@@ -79,7 +79,8 @@ export const CHAT_CSS = `
    stay in view; where there is no room beside it, the chat steps aside until the panel closes. */
 :host(.le-drawer-open) .le-chat { right: 416px; }
 @media (max-width: 900px) { :host(.le-drawer-open) .le-chat { display: none; } }
-@media (max-width: 600px) { .le-chat { right: 8px; left: 8px; width: auto; bottom: 76px; max-height: calc(100vh - 96px); } }
+/* a phone: a sheet over the lower half, so the page and what changed on it stay in view above (Google Maps, Canva) */
+@media (max-width: 600px) { .le-chat { right: 8px; left: 8px; width: auto; bottom: 76px; max-height: min(calc(100vh - 96px), 56vh); } }
 `;
 
 const PLUS_ICON = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M5 12h14"/><path d="M12 5v14"/></svg>';
@@ -105,12 +106,18 @@ const button = (text, className = '') => {
 /** Suggestions to start with, from what this page has: the way people are shown what to type in Notion AI and Canva. */
 export function startersFor(page) {
     const tips = [];
-    const heading = page.fields.find((field) => field.kind === 'text' && field.label === 'Heading');
+    const heading = page.fields.find((field) => field.kind === 'text' && /^(Main heading|Heading)\b/.test(field.label ?? ''));
     if (heading) tips.push('Make the headline shorter and punchier');
     if (page.fields.some((field) => field.kind === 'image' || field.kind === 'background image')) tips.push('Replace the main photo');
-    // a list with a name a person would use ("Questions", "Team"), never the editor's own words for one
-    const list = page.lists.find((candidate) => !['media', 'items', 'list', 'page sections', 'section'].includes(candidate.label.trim().toLowerCase()));
-    if (list) tips.push(`Add another to ${list.label.toLowerCase()}`);
+    // a list of things the page shows ("Talks", "Questions"), said as a person would ("Add another talk"); never the
+    // editor's own words for one, nor the page's furniture (buttons, links, menus), which no one starts with
+    // (owner, 12 Nov 2026, the novice walk: "Add another to buttons" read as jargon)
+    const furniture = /^(media|items?|list|page sections|sections?|buttons?|links?|menu|menus|nav|navigation|icons?|logos?|social|socials|columns?|rows?|tiles?|footer|header)$/;
+    const list = page.lists.find((candidate) => !furniture.test(candidate.label.trim().toLowerCase()));
+    if (list) {
+        const name = list.label.trim().toLowerCase();
+        tips.push(/[^s]s$/.test(name) ? `Add another ${name.slice(0, -1)}` : `Add to ${name}`);
+    }
     tips.push('What can I change on this page?');
 
     return tips.slice(0, 4);

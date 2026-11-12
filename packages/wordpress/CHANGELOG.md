@@ -1,5 +1,19 @@
 # ShipFast Live Edit for WordPress
 
+## 0.21.5 (12 Nov 2026)
+
+- Ask AI for someone who has never built a website (the owner: "as a layman and novice scan through and tell me if i
+  would be able to use the chat without any guide or support"; then "please fix"):
+  - The change is shown where they are looking: the page scrolls the part into view (above the chat on a phone) and
+    rings it in blue once, so "Done" is never about something below the screen.
+  - On a phone the chat is a sheet over the lower half, so the page stays in view above it.
+  - The card names which part changed: "Heading in Talks", "Photo at the top" (a section called Hero is "at the top").
+  - The first-time guide starts with the chat ("Tell Ask AI what to change", pointing at the box); clicking words is
+    the next step. While the chat is open the guide folds to its pill, without taking the cursor from the chat.
+  - The guide's card sits above the chat box where the two would meet (a phone, a narrow window); before, the box hid
+    the guide's Next.
+  - Starter ideas in plain words ("Add another talk"), never a list of buttons, links or menus.
+
 ## 0.21.4 (12 Nov 2026)
 
 - Photos inside Ask AI (the owner: "you're chatting with your website page / Not looking for what to click / Click

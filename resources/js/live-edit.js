@@ -8821,7 +8821,12 @@ const bootLiveEdit = () => {
 
             const guides = {
                 'getting-started': [
-                    { point: find.words, waitFor: 'editor', title: 'Click any words to change them', copy: 'Try it now: click the words ringed in blue. Their editor opens on the right.', done: 'That is the editor. Change the words, then press Save changes. Pictures and links work the same way.' },
+                    /*
+                     * The chat first (owner, 12 Nov 2026: "you're chatting with your website page / Not looking for
+                     * what to click"); clicking stays the next step, for those who like to do it themselves.
+                     */
+                    { point: Object.assign(() => inBar('chatDock'), { available: () => Boolean(inBar('chatDock')) }), title: 'Tell Ask AI what to change', copy: 'Type or say what you want here, like: change the heading to Fresh bread every morning. It changes your page at once, and Undo takes it back.' },
+                    { point: find.words, waitFor: 'editor', title: 'Or click any words to change them', copy: 'Try it now: click the words ringed in blue. Their editor opens on the right.', done: 'That is the editor. Change the words, then press Save changes. Pictures and links work the same way.' },
                     { point: find.card, title: 'Cards can be moved and copied', copy: 'Click a card and the top of its panel offers Move up, Move down, Duplicate and Delete. A copy is filtered and sold like the others.' },
                     { point: tab('Brand'), title: 'Your colours and fonts, once', copy: 'The Brand tab restyles the whole site from one place. Your logo is on the page: click it to replace it.' },
                     publishStep,
@@ -8956,11 +8961,11 @@ const bootLiveEdit = () => {
                 }
             };
             document.addEventListener('keydown', onKey, true);
-            const fold = (folded) => {
+            const fold = (folded, focus = true) => {
                 card.hidden = folded;
                 pill.hidden = !folded;
                 pill.textContent = `Guide · ${index + 1} of ${steps.length}`;
-                (folded ? pill : next).focus();
+                if (focus) (folded ? pill : next).focus();
             };
             const show = () => {
                 const step = steps[index];
@@ -8996,6 +9001,8 @@ const bootLiveEdit = () => {
             });
             finish.addEventListener('click', end);
             hide.addEventListener('click', () => fold(true));
+            // the chat opening folds the guide without taking the cursor out of the chat's box
+            card.addEventListener('le-fold', () => { if (!card.hidden) fold(true, false); });
             pill.addEventListener('click', () => fold(false));
             show();
         };
@@ -9419,14 +9426,73 @@ const bootLiveEdit = () => {
                     },
                 };
             }
+            /*
+             * What the chat just changed, shown where the owner is looking (owner, 12 Nov 2026: "how see how easy is
+             * it for a novice"; the walk found "Done" said about a part below the screen, so the change looked like it
+             * had not happened). The page scrolls the part into the space the chat leaves free (above it on a phone)
+             * and rings it in blue once, as Google Docs takes you to a comment.
+             */
+            let changeShownAt = 0;
+            const showChanged = (action) => {
+                const pictureFor = (key) => {
+                    const named = CSS.escape(`setting:${key}`);
+                    const all = [...document.querySelectorAll(`[data-edit-img="${named}"], [data-edit-bg="${named}"]`)].filter((node) => !node.closest('#live-edit-ui'));
+                    return all.find((node) => node.getClientRects().length > 0) ?? all[0] ?? null;
+                };
+                let element = null;
+                if (action.type === 'field') element = byKey(action.kind === 'link' ? 'data-edit-href' : 'data-edit', action.key);
+                else if (action.type === 'image') element = pictureFor(action.key);
+                else if (action.type === 'style') {
+                    element = (action.field && (byKey('data-edit', action.field) || pictureFor(action.field)))
+                        || document.querySelector(`[data-style="${CSS.escape(action.key)}"]`);
+                } else if (action.type === 'list') {
+                    const list = document.querySelector(`[data-edit-list="${CSS.escape(action.key)}"]`);
+                    const item = action.item_id ? list?.querySelector(`:scope > [data-edit-item="${CSS.escape(action.item_id)}"]`) : null;
+                    const items = list ? [...list.children].filter((child) => child.hasAttribute('data-edit-item')) : [];
+                    if (action.action === 'add' || action.action === 'duplicate') element = item?.nextElementSibling ?? items.at(-1) ?? list;
+                    else if (action.action === 'remove') element = list;
+                    else element = item ?? list;
+                }
+                if (!element?.isConnected || !element.getClientRects().length) return;
+                const calm = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+                // one change at a time is scrolled to (the first of several); each is ringed
+                if (Date.now() - changeShownAt > 1500) {
+                    const panel = ui.shadow.querySelector('.le-chat:not([hidden])')?.getBoundingClientRect();
+                    // the chat across the screen (a phone): the space above it; beside the page (wider): the window
+                    const across = panel && panel.width > window.innerWidth * 0.7;
+                    const top = 72;
+                    const bottom = across ? Math.max(top + 80, panel.top - 12) : window.innerHeight - 104;
+                    const rect = element.getBoundingClientRect();
+                    if (rect.top < top || rect.bottom > bottom) {
+                        const room = bottom - top;
+                        const want = rect.height >= room ? top : top + (room - rect.height) / 2;
+                        window.scrollBy({ top: rect.top - want, behavior: calm ? 'auto' : 'smooth' });
+                    }
+                }
+                changeShownAt = Date.now();
+                element.setAttribute('data-live-edit-chat-changed', '');
+                setTimeout(() => element.removeAttribute('data-live-edit-chat-changed'), 2600);
+            };
+            const chatActAndShow = async (action) => {
+                const done = await chatAct(action);
+                if (done?.ok && !done.unchanged) {
+                    try { showChanged(action); } catch { /* showing it is a help, never a failure */ }
+                }
+
+                return done;
+            };
             const chatWith = (module) => module.createChat({
                 shadow: ui.shadow,
                 // the always-there chat box steps aside while the conversation is open, and comes back when it closes
-                shown: (open) => { if (ui.chatDock) ui.chatDock.hidden = open; },
+                shown: (open) => {
+                    if (ui.chatDock) ui.chatDock.hidden = open;
+                    // one teacher at a time: the guide folds to its pill while the owner is chatting
+                    if (open) ui.shadow.querySelector('.le-walkthrough')?.dispatchEvent(new CustomEvent('le-fold'));
+                },
                 request,
                 site: window.liveEditApi?.site ?? '',
                 selected: () => current?.element ?? null,
-                act: chatAct,
+                act: chatActAndShow,
                 snapshot: chatSnapshot,
                 undoPlan: chatUndoPlan,
                 undo: chatUndo,

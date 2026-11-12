@@ -1538,6 +1538,11 @@ select.le-input {
   .le-walkthrough { bottom: 84px; }
 }
 @keyframes le-rise { from { transform: translateY(24px); opacity: 0; } to { transform: none; opacity: 1; } }
+/* The guide's card above the Ask AI box where the two would meet (a phone, a narrow window): the card is bottom
+   left, the box bottom right, and below about 780px they overlap, which hid the guide's Next behind the box. */
+@media (max-width: 780px) {
+  .le-ask-dock:not([hidden]) ~ .le-walkthrough { bottom: 152px; }
+}
 
 .le-foot .le-btn, .le-foot .le-btn-outline { white-space: nowrap; }
 .le-page-pick { margin-bottom: 2px; }
@@ -1870,6 +1875,20 @@ body.editing [data-live-edit-tour-focus] {
   outline-offset: 5px !important;
   border-radius: 4px;
   scroll-margin: 24px;
+}
+/* What Ask AI just changed: ringed in blue once, then the ring fades (live-edit.js showChanged). */
+[data-live-edit-chat-changed] {
+  outline: 3px solid #1B6EF3 !important;
+  outline-offset: 5px !important;
+  border-radius: 4px;
+  animation: le-chat-changed 2.5s ease-out forwards;
+}
+@keyframes le-chat-changed {
+  0%, 60% { outline-color: rgba(27, 110, 243, 1); }
+  100% { outline-color: rgba(27, 110, 243, 0); }
+}
+@media (prefers-reduced-motion: reduce) {
+  [data-live-edit-chat-changed] { animation: none; }
 }
 /* Sticky footers and cookie bars sit at the bottom too, and two things
    claiming the same corner is how a client ends up unable to reach either.

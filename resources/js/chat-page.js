@@ -124,7 +124,11 @@ export function pageForTheChat(root = document) {
             const field = { key, kind, value };
             const label = labelOf(element, kind);
             const where = sectionOf(element);
-            if (label) field.label = label;
+            // a plain name says which one ("Heading in Talks"), so the change card tells the owner what changed where
+            // (owner, 12 Nov 2026, the novice walk: "Heading" alone named any of a page's headings)
+            // a section a designer calls the hero is "at the top" to everyone else
+            const said = /^(hero|top|intro|introduction|banner|masthead)$/i.test(where) ? 'at the top' : `in ${where}`;
+            if (label) field.label = where && ['Heading', 'Photo'].includes(label) ? `${label} ${said}` : label;
             if (where) field.section = where;
             // how it looks, where the design lets it be changed (colour, size, spacing): the same choices its panel
             // offers, so Ask AI can do what the panel's style controls do and no more

@@ -36,9 +36,10 @@ describe('the page the chat sends', () => {
         const { page, fields } = pageForTheChat(document);
 
         expect(page.title).toBe('Oxbow & Hem');
-        expect(fields).toContainEqual({ key: 'tpl:h1', kind: 'text', value: 'Cut to fit. Made to last.', label: 'Heading', section: 'Hero' });
+        // named with where it is, as an owner would say it ("Hero" is the designer's word for the top)
+        expect(fields).toContainEqual({ key: 'tpl:h1', kind: 'text', value: 'Cut to fit. Made to last.', label: 'Heading at the top', section: 'Hero' });
         expect(fields).toContainEqual({ key: 'tpl:cta', kind: 'link', value: '/women', label: 'Shop women', section: 'Hero' });
-        expect(fields).toContainEqual({ key: 'tpl:photo', kind: 'image', value: 'alt: A woman laughing', label: 'Photo', section: 'Hero' });
+        expect(fields).toContainEqual({ key: 'tpl:photo', kind: 'image', value: 'alt: A woman laughing', label: 'Photo at the top', section: 'Hero' });
     });
 
     it('gives a button its words and where it goes as two fields, each under its own key', () => {
@@ -84,7 +85,7 @@ describe('the page the chat sends', () => {
     it('calls the brand’s mark the logo, so the main photo is not mistaken for it', () => {
         const { fields } = pageForTheChat(document);
         expect(fields.find((field) => field.key === 'tpl:logo').label).toBe('Logo');
-        expect(fields.find((field) => field.key === 'tpl:photo').label).toBe('Photo');
+        expect(fields.find((field) => field.key === 'tpl:photo').label).toBe('Photo at the top');
     });
 
     it('leaves out locked parts, the editor itself and keys the engine guessed', () => {
