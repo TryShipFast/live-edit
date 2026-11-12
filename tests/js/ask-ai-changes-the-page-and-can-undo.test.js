@@ -169,6 +169,22 @@ describe('Ask AI', () => {
         expect(host.querySelector('.le-chat-card').textContent).toContain('Heading: text size 40, text colour #1b6ef3, alignment as designed');
     });
 
+    it('opens from the always-there chat box with what was typed there, sending it on Enter, and says when it shows', async () => {
+        chatWith([() => answer({ reply: 'Done.', actions: [], cards: [] })]);
+        const shown = [];
+        host.replaceChildren();
+        const chat = createChat({ shadow: host, site: 'oxbow', ...deps, shown: (open) => shown.push(open) });
+
+        chat.openWith('Make the headline shorter', { send: true });
+        await flush();
+        await flush();
+        expect(calls[0].body.message).toBe('Make the headline shorter');
+        expect(host.querySelector('.le-chat').hidden).toBe(false);
+
+        host.querySelector('button[aria-label="Close Ask AI"]').click();
+        expect(shown).toEqual([true, false]);
+    });
+
     it('says what it could not change because a teammate is working there', async () => {
         chatWith([() => answer({ reply: 'Done.', actions: [
             { type: 'field', kind: 'text', label: 'Opening hours', key: 'tpl:hours', value: 'Mon to Sat, 9 to 7' },

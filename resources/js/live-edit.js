@@ -9395,6 +9395,8 @@ const bootLiveEdit = () => {
             }
             const chatWith = (module) => module.createChat({
                 shadow: ui.shadow,
+                // the always-there chat box steps aside while the conversation is open, and comes back when it closes
+                shown: (open) => { if (ui.chatDock) ui.chatDock.hidden = open; },
                 request,
                 site: window.liveEditApi?.site ?? '',
                 selected: () => current?.element ?? null,
@@ -9464,7 +9466,36 @@ const bootLiveEdit = () => {
                     return false;
                 }
             })();
-            if (wasOpen) theChat().then((it) => it.open()).catch(() => {});
+            if (wasOpen) {
+                if (ui.chatDock) ui.chatDock.hidden = true;
+                theChat().then((it) => it.open()).catch(() => { if (ui.chatDock) ui.chatDock.hidden = false; });
+            }
+
+            /*
+             * The always-there chat box (chrome.js .le-ask-dock), the way into Ask AI (owner, 12 Nov 2026: "I've seen
+             * even chatgpt sites just having a chatbox"): clicking into it opens the conversation in its place with the
+             * cursor in its box, so typing carries on there; Enter sends what was typed; the mic opens it listening.
+             */
+            if (ui.chatDock) {
+                // its mic only where something can hear (the chat's own rule: OpenAI over WebRTC, or the browser's own)
+                ui.chatDockMic.hidden = !((window.liveEditChat?.voice !== false && navigator.mediaDevices?.getUserMedia && typeof window.RTCPeerConnection === 'function')
+                    || window.SpeechRecognition || window.webkitSpeechRecognition);
+                const fromTheBox = async (how = {}) => {
+                    const typed = ui.chatDockInput.value;
+                    ui.chatDockInput.value = '';
+                    if (!document.body.classList.contains('editing')) setEditing(true);
+                    try {
+                        const it = await theChat();
+                        it.openWith(typed, how);
+                    } catch {
+                        ui.chatDockInput.value = typed;
+                        ui.toast('Ask AI could not load. Check your connection and try again.');
+                    }
+                };
+                ui.chatDock.addEventListener('submit', (event) => { event.preventDefault(); fromTheBox({ send: true }); });
+                ui.chatDockInput.addEventListener('focus', () => fromTheBox());
+                ui.chatDockMic.addEventListener('click', () => fromTheBox({ talk: true }));
+            }
         }
 
         /*

@@ -1,5 +1,13 @@
 # ShipFast Live Edit for WordPress
 
+## 0.21.3 (12 Nov 2026)
+
+- Ask AI is a chat box that is always there (the owner: "I've seen even chatgpt sites just having a chatbox"; "Ask AI
+  about this on the edit tab is valid but shouldn't be the entry point"): "Ask AI to change anything on this page" at
+  the bottom right, above the bar on a phone, as ChatGPT, Claude and Gemini show theirs. Clicking into it opens the
+  conversation in its place with the cursor in its box; Enter sends; the mic opens it listening. It steps left of an
+  open editor panel and comes back when the conversation closes. The chat's code still loads only when it is used.
+
 ## 0.21.2 (12 Nov 2026)
 
 - Ask AI right where the owner clicks (the owner: "if i click an element, the toolbar is shorten"; "no where to

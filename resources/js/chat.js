@@ -129,7 +129,7 @@ export function startersFor(page) {
  * @param {Function} [deps.selected]         the element the owner has open in the editor, if any
  * @param {string}   [deps.site]             to keep the conversation for this website through a reload
  */
-export function createChat({ shadow, request, showSaved, openPhoto, openPublish, act = async () => ({ ok: false }), snapshot = async () => null, undoPlan = () => ({ revert: [], restore: [] }), undo: takeBack = async () => {}, busy: heldNow = () => [], selected = () => null, site = '' }) {
+export function createChat({ shadow, request, showSaved, openPhoto, openPublish, shown = () => {}, act = async () => ({ ok: false }), snapshot = async () => null, undoPlan = () => ({ revert: [], restore: [] }), undo: takeBack = async () => {}, busy: heldNow = () => [], selected = () => null, site = '' }) {
     const memoryKey = `le-chat:${site}:${location.pathname}`;
     const remembered = (() => {
         try { return JSON.parse(sessionStorage.getItem(memoryKey) || 'null'); } catch { return null; }
@@ -849,8 +849,9 @@ export function createChat({ shadow, request, showSaved, openPhoto, openPublish,
         panel.hidden = false;
         remember();
         input.focus();
+        shown(true);
     };
-    const shut = () => { panel.hidden = true; remember(); };
+    const shut = () => { panel.hidden = true; remember(); shown(false); };
     close.addEventListener('click', shut);
     panel.addEventListener('keydown', (event) => { if (event.key === 'Escape') shut(); });
 
@@ -871,9 +872,22 @@ export function createChat({ shadow, request, showSaved, openPhoto, openPublish,
         }
     };
 
+    /** From the always-there chat box: open with what was typed there, sent at once on Enter, or listening at once. */
+    const openWith = (text = '', { send = false, talk: listen = false } = {}) => {
+        open();
+        const typed = String(text ?? '').trim();
+        if (typed) {
+            input.value = input.value.trim() ? `${input.value.trim()} ${typed}` : typed;
+            input.dispatchEvent(new Event('input'));
+        }
+        if (send && input.value.trim()) ask();
+        else if (listen && !talk) startTalking();
+    };
+
     return {
         open,
         openAbout,
+        openWith,
         close: shut,
         toggle: () => (panel.hidden ? open() : shut()),
         get isOpen() { return !panel.hidden; },

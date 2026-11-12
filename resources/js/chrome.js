@@ -80,6 +80,24 @@ button, input, select, textarea { font: inherit; color: inherit; margin: 0; }
 /* One dark pill, bottom-centre. Solid rather than translucent: over a
    photograph a blurred bar takes on whatever is behind it, so the same control
    looked different on every page and washed out entirely on a pale hero. */
+/* Ask AI's chat box, always there at the bottom right, where its conversation opens (chat.js .le-chat) */
+.le-ask-dock {
+  position: fixed; right: 16px; bottom: 84px; z-index: 2147483500; width: min(400px, calc(100vw - 32px));
+  display: flex; align-items: center; gap: 8px; padding: 6px 6px 6px 14px; box-sizing: border-box;
+  background: #fff; color: #0B0C0F; border: 1px solid #E6E7EA; border-radius: 16px;
+  box-shadow: 0 12px 32px rgba(11,12,15,.16), 0 2px 6px rgba(11,12,15,.08); font: 14px/1.4 system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+.le-ask-dock[hidden] { display: none; }
+.le-ask-dock-icon { display: grid; place-items: center; color: #0B0C0F; flex: none; }
+.le-ask-dock-input { flex: 1; min-width: 0; min-height: 40px; border: 0; outline: 0; background: transparent; font: inherit; color: inherit; }
+.le-ask-dock-input::placeholder { color: #6B6F78; }
+.le-ask-dock:focus-within { border-color: #0B0C0F; }
+.le-ask-dock-mic { width: 40px; height: 40px; flex: none; display: grid; place-items: center; border: 1px solid #DADCE0; border-radius: 12px; background: #fff; color: #0B0C0F; cursor: pointer; }
+.le-ask-dock-mic:hover { border-color: #0B0C0F; }
+.le-ask-dock-mic[hidden] { display: none; }
+:host(.le-drawer-open) .le-ask-dock { right: 416px; }
+@media (max-width: 900px) { :host(.le-drawer-open) .le-ask-dock { display: none; } }
+@media (max-width: 600px) { .le-ask-dock { right: 8px; left: 8px; width: auto; bottom: 76px; } }
 .le-toolbar {
   position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%);
   z-index: 2147483000; display: flex; align-items: center; gap: 6px;
@@ -2155,6 +2173,29 @@ export function createChrome() {
     chatButton.title = 'Ask AI to change this page for you';
     chatButton.hidden = window.liveEditChat === false || !(window.liveEditChat || window.liveEditApi);
 
+    /*
+     * Ask AI's chat box, always there (owner, 12 Nov 2026: "I've seen even chatgpt sites just having a chatbox"; "Ask AI
+     * about this on the edit tab is valid but shouldn't be the entry point"): a message box at the bottom right, as
+     * ChatGPT, Claude and Gemini put theirs, so nothing has to be found first. Typing, clicking into it or the mic opens
+     * the conversation in its place (live-edit.js); closing the conversation brings the box back. The chat's code still
+     * loads only then: this is a box and a button.
+     */
+    const chatDock = el('form', 'le-ask-dock');
+    chatDock.hidden = chatButton.hidden;
+    chatDock.setAttribute('role', 'search');
+    chatDock.setAttribute('aria-label', 'Ask AI');
+    chatDock.innerHTML = `<span class="le-ask-dock-icon" aria-hidden="true">${toolbarIcon('sparkles', 18)}</span>`;
+    const chatDockInput = el('input', 'le-ask-dock-input');
+    chatDockInput.type = 'text';
+    chatDockInput.placeholder = 'Ask AI to change anything on this page';
+    chatDockInput.setAttribute('aria-label', 'Ask AI to change anything on this page');
+    chatDockInput.autocomplete = 'off';
+    const chatDockMic = el('button', 'le-ask-dock-mic');
+    chatDockMic.type = 'button';
+    chatDockMic.innerHTML = toolbarIcon('mic', 18);
+    chatDockMic.setAttribute('aria-label', 'Talk instead of typing');
+    chatDock.append(chatDockInput, chatDockMic);
+
     const helpButton = el('button', 'le-round le-when-roomy', '?');
     helpButton.type = 'button';
     helpButton.title = 'Help with Live Edit';
@@ -2646,7 +2687,7 @@ export function createChrome() {
     const sectionInsert = inserter('');
     const sectionInsertEnd = inserter('le-insert-end');
 
-    shadow.append(toolbar, sheetScrim, sheet, tip, drawer, linkHandle, bgHandle, hoverBox, sectionInsert.line, sectionInsertEnd.line);
+    shadow.append(toolbar, chatDock, sheetScrim, sheet, tip, drawer, linkHandle, bgHandle, hoverBox, sectionInsert.line, sectionInsertEnd.line);
     /*
      * "+ Add a section" never sits under the editor's bar: placed by the page's sections, its buttons slide along
      * their line to the left of the bar, or rise above it when there is no room (owner, 8 Nov 2026: "nothing is
@@ -2824,6 +2865,9 @@ export function createChrome() {
         sectionInsertEnd,
         changesButton,
         chatButton,
+        chatDock,
+        chatDockInput,
+        chatDockMic,
         helpButton,
         closeButton,
         cancelButton,
