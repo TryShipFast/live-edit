@@ -492,15 +492,13 @@ export function createChat({ shadow, request, showSaved, openPhoto, openPublish,
 
     /*
      * Voice (owner, 12 Nov 2026: "it's almost same as text just that someone's voice is converted to text / So we don't
-     * do it two times"): tap the mic and speak, tap again to stop; the words appear in the box to read and correct,
-     * and Send sends them as typed words are sent, as ChatGPT does it. The browser's own recorder (MediaRecorder),
-     * Opus in WebM, or AAC in MP4 on older Safari; the words come from the host (POST /live-edit/assistant/voice).
-     * At most two minutes; Escape while listening throws the recording away.
+     * do it two times"; "Use the open transcribe"; "It's speak to mic, no audio upload"): tap the mic and speak; the
+     * words appear in the box as they are said; tap again to stop, read them, and Send sends them as typed words are
+     * sent (ChatGPT's way; never sent on their own). The host gives a short-lived pass (POST /live-edit/assistant/voice)
+     * and the microphone streams straight to the speech service over WebRTC (OpenAI's Realtime transcription): no audio
+     * goes through the host. At most two minutes at a time; Escape stops and keeps what was heard.
      */
-    const MOST_SECONDS = 120;
-    const FORMATS = ['audio/webm;codecs=opus', 'audio/webm', 'audio/mp4', 'audio/ogg;codecs=opus'];
-    let recorder = null;
-    let listening = null;
+    let talk = null;
     let noteTimer = null;
     const noteOnMic = (text, forMoment = true) => {
         micNote.textContent = text;
@@ -509,93 +507,121 @@ export function createChat({ shadow, request, showSaved, openPhoto, openPublish,
         if (forMoment) noteTimer = setTimeout(() => { micNote.hidden = true; }, 3500);
     };
     const micAs = (state) => {
-        mic.classList.toggle('is-recording', state === 'recording');
-        mic.toggleAttribute('aria-busy', state === 'reading');
-        if (state === 'reading') mic.setAttribute('aria-busy', 'true');
-        mic.innerHTML = state === 'recording' ? STOP_ICON : MIC_ICON;
+        mic.classList.toggle('is-recording', state === 'listening');
+        if (state === 'starting') mic.setAttribute('aria-busy', 'true'); else mic.removeAttribute('aria-busy');
+        mic.innerHTML = state === 'listening' ? STOP_ICON : MIC_ICON;
         mic.append(micNote);
-        mic.setAttribute('aria-label', state === 'recording' ? 'Stop, and use what I said' : 'Talk instead of typing');
-        input.placeholder = state === 'recording' ? 'Listening…' : state === 'reading' ? 'Writing down what you said…' : 'Ask for a change';
+        mic.setAttribute('aria-label', state === 'listening' ? 'Stop talking' : 'Talk instead of typing');
+        input.placeholder = state === 'listening' ? 'Listening… speak, and your words appear here' : state === 'starting' ? 'Starting…' : 'Ask for a change';
     };
-    const heard = async (blob, type) => {
-        micAs('reading');
+    const stopTalking = () => {
+        if (!talk) return;
+        const ending = talk;
+        talk = null;
+        clearInterval(ending.clock);
+        try { ending.channel?.close(); } catch { /* already closed */ }
+        try { ending.peer?.close(); } catch { /* already closed */ }
+        ending.stream?.getTracks().forEach((track) => track.stop());
+        micNote.hidden = true;
+        micAs('idle');
+        input.focus();
+    };
+    const startTalking = async () => {
+        if (!navigator.mediaDevices?.getUserMedia || typeof window.RTCPeerConnection !== 'function') {
+            noteOnMic('Talking needs a newer browser. You can type instead.');
+            return;
+        }
+        micAs('starting');
+        const session = { heard: new Map(), before: input.value.trim() };
+        talk = session;
         try {
-            const body = new FormData();
-            body.append('audio', blob, `voice.${type.includes('mp4') ? 'm4a' : type.includes('ogg') ? 'ogg' : 'webm'}`);
-            body.append('hint', [document.querySelector('meta[property="og:site_name"]')?.content, document.title].filter(Boolean).join(', ').slice(0, 600));
-            const response = await request('/live-edit/assistant/voice', { method: 'POST', body });
-            const data = await response.json();
-            const words = String(data.text ?? '').trim();
-            if (words) {
-                input.value = input.value.trim() ? `${input.value.trim()} ${words}` : words;
-                input.dispatchEvent(new Event('input'));
-                input.focus();
+            const response = await request('/live-edit/assistant/voice', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ hint: [...new Set([document.querySelector('meta[property="og:site_name"]')?.content, document.title].filter(Boolean))].join(', ').slice(0, 600) }),
+            });
+            const pass = await response.json();
+            if (talk !== session) return;
+            try {
+                session.stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true } });
+            } catch {
+                talk = null;
+                micAs('idle');
+                noteOnMic('Allow the microphone for this website in your browser, then tap again.');
+                return;
             }
+            const peer = new window.RTCPeerConnection();
+            session.peer = peer;
+            session.stream.getTracks().forEach((track) => peer.addTrack(track, session.stream));
+            const channel = peer.createDataChannel('oai-events');
+            session.channel = channel;
+            // the words as they come: a sentence grows (delta) and is then settled (completed); shown in order after
+            // whatever the owner had already typed
+            const show = () => {
+                const said = [...session.heard.values()].join(' ').replace(/\s+/g, ' ').trim();
+                input.value = [session.before, said].filter(Boolean).join(' ');
+                input.dispatchEvent(new Event('input'));
+            };
+            channel.addEventListener('message', (event) => {
+                let said;
+                try { said = JSON.parse(event.data); } catch { return; }
+                const id = said.item_id ?? 'now';
+                if (said.type === 'conversation.item.input_audio_transcription.delta') {
+                    session.heard.set(id, `${session.heard.get(id) ?? ''}${said.delta ?? ''}`);
+                    show();
+                } else if (said.type === 'conversation.item.input_audio_transcription.completed') {
+                    session.heard.set(id, String(said.transcript ?? session.heard.get(id) ?? '').trim());
+                    show();
+                } else if (said.type === 'error') {
+                    noteOnMic('I could not hear that just now. Please try again, or type it.');
+                    stopTalking();
+                }
+            });
+            const offer = await peer.createOffer();
+            await peer.setLocalDescription(offer);
+            const answer = await fetch(pass.url, {
+                method: 'POST',
+                body: offer.sdp,
+                headers: { Authorization: `Bearer ${pass.secret}`, 'Content-Type': 'application/sdp' },
+            });
+            if (!answer.ok) throw new Error('I could not hear that just now. Please try again, or type it.');
+            await peer.setRemoteDescription({ type: 'answer', sdp: await answer.text() });
+            if (talk !== session) return;
+            micAs('listening');
+            const started = Date.now();
+            const most = Number(pass.seconds) || 120;
+            const tick = () => {
+                const seconds = Math.floor((Date.now() - started) / 1000);
+                noteOnMic(`${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}`, false);
+                if (seconds >= most) stopTalking();
+            };
+            tick();
+            session.clock = setInterval(tick, 500);
         } catch (error) {
+            const wasTalking = talk === session;
+            stopTalking();
+            if (!wasTalking) return;
             if (error.status === 402) {
                 const entry = { role: 'assistant', text: error.message || 'You have no AI credits left.' };
                 outOfCredits(entry);
                 say(entry);
             } else {
-                noteOnMic(error.message || 'I could not hear that just now. Please try again, or type it.');
+                noteOnMic(error.message || 'Talking is not available just now. Please type instead, or try again in a moment.');
             }
-        } finally {
-            micAs('idle');
         }
     };
-    const stopListening = (keep = true) => {
-        if (!recorder || recorder.state === 'inactive') return;
-        recorder.keep = keep;
-        recorder.stop();
-    };
-    mic.addEventListener('click', async () => {
+    mic.addEventListener('click', () => {
         if (mic.getAttribute('aria-busy') === 'true') return;
-        if (recorder && recorder.state === 'recording') {
-            stopListening(true);
-            return;
-        }
-        if (!navigator.mediaDevices?.getUserMedia || typeof window.MediaRecorder !== 'function') {
-            noteOnMic('Talking needs a newer browser. You can type instead.');
-            return;
-        }
-        let stream;
-        try {
-            stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-        } catch {
-            noteOnMic('Allow the microphone for this website in your browser, then tap again.');
-            return;
-        }
-        const type = FORMATS.find((format) => window.MediaRecorder.isTypeSupported?.(format)) ?? '';
-        const parts = [];
-        recorder = new window.MediaRecorder(stream, type ? { mimeType: type } : undefined);
-        recorder.addEventListener('dataavailable', (event) => { if (event.data?.size) parts.push(event.data); });
-        recorder.addEventListener('stop', () => {
-            const keep = recorder.keep !== false;
-            const recorded = recorder.mimeType || type || 'audio/webm';
-            stream.getTracks().forEach((track) => track.stop());
-            clearInterval(listening);
-            recorder = null;
-            micNote.hidden = true;
-            if (keep && parts.length) heard(new Blob(parts, { type: recorded }), recorded);
-            else micAs('idle');
-        });
-        recorder.start();
-        micAs('recording');
-        const started = Date.now();
-        const tick = () => {
-            const seconds = Math.floor((Date.now() - started) / 1000);
-            noteOnMic(`${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}`, false);
-            if (seconds >= MOST_SECONDS) stopListening(true);
-        };
-        tick();
-        listening = setInterval(tick, 500);
+        if (talk) stopTalking(); else startTalking();
     });
     panel.addEventListener('keydown', (event) => {
-        if (event.key === 'Escape' && recorder && recorder.state === 'recording') {
+        if (event.key === 'Escape' && talk) {
             event.stopPropagation();
-            stopListening(false);
+            stopTalking();
         }
     }, true);
+    // Send while talking: stop listening first, and send what was heard
+    form.addEventListener('submit', () => { if (talk) stopTalking(); }, true);
 
     /** The message that ran out of credits, sent now that there are some. */
     function sendTheWaiting() {

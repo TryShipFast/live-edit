@@ -258,79 +258,97 @@ describe('Ask AI', () => {
     });
 
     describe('talking instead of typing', () => {
-        let recorders;
+        let peers;
         let tracksStopped;
+        let sdpSent;
         beforeEach(() => {
-            recorders = [];
+            peers = [];
             tracksStopped = 0;
+            sdpSent = [];
             const stream = { getTracks: () => [{ stop: () => { tracksStopped += 1; } }] };
             Object.defineProperty(navigator, 'mediaDevices', { configurable: true, value: { getUserMedia: vi.fn(async () => stream) } });
-            window.MediaRecorder = class {
-                static isTypeSupported(type) { return type === 'audio/webm;codecs=opus'; }
-                constructor(_stream, options) { this.mimeType = options?.mimeType ?? ''; this.state = 'inactive'; this.listeners = {}; recorders.push(this); }
-                addEventListener(name, fn) { this.listeners[name] = fn; }
-                start() { this.state = 'recording'; }
-                stop() {
-                    this.state = 'inactive';
-                    this.listeners.dataavailable?.({ data: new Blob(['opus'], { type: this.mimeType }) });
-                    this.listeners.stop?.();
-                }
+            window.RTCPeerConnection = class {
+                constructor() { this.closed = false; peers.push(this); }
+                addTrack() {}
+                createDataChannel(name) { this.channel = { name, listeners: {}, addEventListener: (type, fn) => { this.channel.listeners[type] = fn; }, close: () => {} }; return this.channel; }
+                async createOffer() { return { type: 'offer', sdp: 'v=0 offer' }; }
+                async setLocalDescription() {}
+                async setRemoteDescription(answer) { this.answer = answer; }
+                close() { this.closed = true; }
+                // what the speech service sends while the owner talks
+                hear(event) { this.channel.listeners.message({ data: JSON.stringify(event) }); }
             };
+            vi.stubGlobal('fetch', vi.fn(async (url, options) => { sdpSent.push({ url, options }); return new Response('v=0 answer', { status: 201 }); }));
         });
         afterEach(() => {
-            delete window.MediaRecorder;
+            delete window.RTCPeerConnection;
             delete navigator.mediaDevices;
+            vi.unstubAllGlobals();
         });
         const mic = () => host.querySelector('.le-chat-mic');
-        const settle = async () => { for (let i = 0; i < 6; i++) await flush(); };
+        const settle = async () => { for (let i = 0; i < 8; i++) await flush(); };
+        const pass = () => answer({ secret: 'ek_pass', url: 'https://speech.test/realtime/calls', seconds: 120 });
 
-        it('records, then puts the words in the box to read and send, and sends nothing itself', async () => {
-            chatWith([() => answer({ text: 'Change the headline to Made in Lagos' })]);
+        it('shows the words in the box as they are spoken, and sends nothing itself', async () => {
+            chatWith([pass]);
             const box = host.querySelector('textarea');
-
-            mic().click();
-            await settle();
-            expect(mic().classList.contains('is-recording')).toBe(true);
-            expect(mic().getAttribute('aria-label')).toBe('Stop, and use what I said');
-            expect(box.placeholder).toBe('Listening…');
+            box.value = 'Please';
 
             mic().click();
             await settle();
             expect(calls[0].url).toBe('/live-edit/assistant/voice');
-            expect(box.value).toBe('Change the headline to Made in Lagos');
+            // the microphone goes straight to the speech service with the short-lived pass; no audio to the host
+            expect(sdpSent[0].url).toBe('https://speech.test/realtime/calls');
+            expect(sdpSent[0].options.headers.Authorization).toBe('Bearer ek_pass');
+            expect(peers[0].channel.name).toBe('oai-events');
+            expect(mic().classList.contains('is-recording')).toBe(true);
+            expect(mic().getAttribute('aria-label')).toBe('Stop talking');
+
+            peers[0].hear({ type: 'conversation.item.input_audio_transcription.delta', item_id: 'a', delta: 'make the head' });
+            expect(box.value).toBe('Please make the head');
+            peers[0].hear({ type: 'conversation.item.input_audio_transcription.delta', item_id: 'a', delta: 'line shorter' });
+            peers[0].hear({ type: 'conversation.item.input_audio_transcription.completed', item_id: 'a', transcript: 'make the headline shorter.' });
+            peers[0].hear({ type: 'conversation.item.input_audio_transcription.delta', item_id: 'b', delta: 'And add a photo' });
+            expect(box.value).toBe('Please make the headline shorter. And add a photo');
+
+            mic().click();
+            await settle();
+            expect(peers[0].closed).toBe(true);
             expect(tracksStopped).toBe(1);
             expect(mic().classList.contains('is-recording')).toBe(false);
-            // read, corrected if need be, then sent by the owner: only the recording went
+            expect(box.value).toBe('Please make the headline shorter. And add a photo');
+            // read, corrected if need be, then sent by the owner
             expect(calls).toHaveLength(1);
             expect(host.querySelector('.le-chat-msg.is-owner')).toBeNull();
         });
 
-        it('throws the recording away on Escape', async () => {
-            chatWith([]);
+        it('stops listening on Escape and keeps what was heard', async () => {
+            chatWith([pass]);
             mic().click();
             await settle();
+            peers[0].hear({ type: 'conversation.item.input_audio_transcription.completed', item_id: 'a', transcript: 'Change the hours' });
             host.querySelector('.le-chat').dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
             await settle();
-            expect(deps.request).not.toHaveBeenCalled();
-            expect(tracksStopped).toBe(1);
+            expect(peers[0].closed).toBe(true);
+            expect(host.querySelector('textarea').value).toBe('Change the hours');
         });
 
         it('says what to do when the microphone is not allowed', async () => {
             navigator.mediaDevices.getUserMedia = vi.fn(async () => { throw new DOMException('denied', 'NotAllowedError'); });
-            chatWith([]);
+            chatWith([pass]);
             mic().click();
             await settle();
             expect(host.querySelector('.le-chat-soon').textContent).toBe('Allow the microphone for this website in your browser, then tap again.');
+            expect(mic().classList.contains('is-recording')).toBe(false);
         });
 
-        it('offers credits when there are none, as a typed message does', async () => {
+        it('offers credits when there are none, as a typed message does, before listening', async () => {
             window.liveEditChat = { buy: { packs: async () => ({ packs: [{ credits: 100, price: '₦5,000' }] }), pay: vi.fn() } };
             try {
                 chatWith([() => answer({ message: 'You have no AI credits left. Add some, and I will carry on from here.' }, 402)]);
                 mic().click();
                 await settle();
-                mic().click();
-                await settle();
+                expect(navigator.mediaDevices.getUserMedia).not.toHaveBeenCalled();
                 expect(host.querySelector('.le-chat-card h3').textContent).toBe('Add AI credits');
             } finally {
                 delete window.liveEditChat;
