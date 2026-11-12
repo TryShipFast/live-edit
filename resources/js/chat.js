@@ -57,6 +57,7 @@ export const CHAT_CSS = `
 .le-chat-send[disabled] { opacity: .4; cursor: default; }
 .le-chat-tool { width: 44px; height: 44px; flex: none; border: 1px solid var(--le-field, #DADCE0); border-radius: 12px; background: #fff; color: inherit; cursor: pointer; display: grid; place-items: center; position: relative; }
 .le-chat-tool:hover { border-color: var(--le-ink, #0B0C0F); }
+.le-chat-tool[hidden] { display: none; }
 .le-chat-tool[aria-disabled=true] { color: #8A8E96; cursor: default; }
 .le-chat-tool[aria-disabled=true]:hover { border-color: var(--le-field, #DADCE0); }
 .le-chat-soon { position: absolute; bottom: 52px; right: -8px; white-space: nowrap; background: var(--le-ink, #0B0C0F); color: #fff; font-size: 12px; padding: 5px 9px; border-radius: 6px; pointer-events: none; }
@@ -492,16 +493,27 @@ export function createChat({ shadow, request, showSaved, openPhoto, openPublish,
 
     /*
      * Voice (owner, 12 Nov 2026: "it's almost same as text just that someone's voice is converted to text / So we don't
-     * do it two times"; "Use the open transcribe"; "It's speak to mic, no audio upload"): tap the mic and speak; the
-     * words appear in the box as they are said, and when the owner stops talking they are sent, as Siri, Google
-     * Assistant and ChatGPT's voice mode do ("Use what other popular platforms are using"): a pause of about a second
-     * after a finished sentence, or a tap on the mic, sends; Escape, or typing in the box, keeps the words to finish by
-     * hand; a cough or one word is not sent. One request a tap, as those assistants do. The host gives a short-lived pass (POST /live-edit/assistant/voice)
-     * and the microphone streams straight to the speech service over WebRTC (OpenAI's Realtime transcription): no audio
-     * goes through the host. At most two minutes at a time.
+     * do it two times"; "Use the open transcribe"; "It's speak to mic, no audio upload"; "Use what other popular
+     * platforms are using"): tap the mic and speak; the words appear in the box as they are said, and when the owner
+     * stops talking they are sent, as Siri, Google Assistant and ChatGPT's voice mode do: a pause of about a second after
+     * a finished sentence, or a tap on the mic, sends; Escape, or typing in the box, keeps the words to finish by hand;
+     * a cough or one word is not sent. One request a tap.
+     *
+     * Two ways to hear, the same from there on:
+     *   1. OpenAI's Realtime transcription: the host gives a short-lived pass (POST /live-edit/assistant/voice) and the
+     *      microphone streams straight to it over WebRTC; no audio goes through the host. Every browser; the site's
+     *      name as a hint.
+     *   2. The browser's own speech recognition, when the host has no OpenAI set up (liveEditChat.voice === false) or
+     *      it cannot be reached: free, in Chrome, Edge, Android and Safari (owner: "Yes please" to the backup).
+     * Where neither can work the mic is not shown: never a dead button. At most two minutes at a time.
      */
     const PAUSE_SENDS_AFTER = 1200;
     const LAST_WORDS_WAIT = 1500;
+    const BrowserSpeech = window.SpeechRecognition || window.webkitSpeechRecognition || null;
+    const canStream = () => Boolean(navigator.mediaDevices?.getUserMedia) && typeof window.RTCPeerConnection === 'function';
+    const hostHears = () => window.liveEditChat?.voice !== false;
+    // never a dead button: shown only where one of the two ways can hear
+    mic.hidden = !((hostHears() && canStream()) || BrowserSpeech);
     let talk = null;
     let noteTimer = null;
     const noteOnMic = (text, forMoment = true) => {
@@ -524,9 +536,7 @@ export function createChat({ shadow, request, showSaved, openPhoto, openPublish,
         talk = null;
         clearInterval(ending.clock);
         clearTimeout(ending.pause);
-        try { ending.channel?.close(); } catch { /* already closed */ }
-        try { ending.peer?.close(); } catch { /* already closed */ }
-        ending.stream?.getTracks().forEach((track) => track.stop());
+        try { ending.close?.(); } catch { /* already closed */ }
         micNote.hidden = true;
         micAs('idle');
         input.focus();
@@ -540,108 +550,177 @@ export function createChat({ shadow, request, showSaved, openPhoto, openPublish,
         if (said.split(/\s+/).filter((word) => /\w/.test(word)).length < 2) return;
         ask();
     };
-    /** The mic tapped while talking: the microphone goes off at once, the last words settle, then it is sent. */
+    /** The mic tapped while talking: listening ends at once, the last words settle, then it is sent. */
     const doneSpeaking = (session) => {
         if (talk !== session) return;
-        session.stream?.getTracks().forEach((track) => { track.enabled = false; });
+        session.quiet?.();
         micAs('starting');
         input.placeholder = 'Sending what you said…';
         session.finishing = true;
         clearTimeout(session.pause);
         session.pause = setTimeout(() => finishTalking(session), session.speaking ? LAST_WORDS_WAIT : 0);
     };
-    const startTalking = async () => {
-        if (!navigator.mediaDevices?.getUserMedia || typeof window.RTCPeerConnection !== 'function') {
-            noteOnMic('Talking needs a newer browser. You can type instead.');
-            return;
-        }
-        micAs('starting');
-        const session = { heard: new Map(), before: input.value.trim() };
-        talk = session;
-        try {
-            const response = await request('/live-edit/assistant/voice', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ hint: [...new Set([document.querySelector('meta[property="og:site_name"]')?.content, document.title].filter(Boolean))].join(', ').slice(0, 600) }),
-            });
-            const pass = await response.json();
-            if (talk !== session) return;
-            try {
-                session.stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true } });
-            } catch {
-                talk = null;
-                micAs('idle');
-                noteOnMic('Allow the microphone for this website in your browser, then tap again.');
-                return;
-            }
-            const peer = new window.RTCPeerConnection();
-            session.peer = peer;
-            session.stream.getTracks().forEach((track) => peer.addTrack(track, session.stream));
-            const channel = peer.createDataChannel('oai-events');
-            session.channel = channel;
-            // the words as they come: a sentence grows (delta) and is then settled (completed); shown in order after
-            // whatever the owner had already typed
-            const show = () => {
-                const said = [...session.heard.values()].join(' ').replace(/\s+/g, ' ').trim();
-                input.value = [session.before, said].filter(Boolean).join(' ');
-                input.dispatchEvent(new Event('input'));
-            };
-            channel.addEventListener('message', (event) => {
-                let said;
-                try { said = JSON.parse(event.data); } catch { return; }
-                const id = said.item_id ?? 'now';
-                if (said.type === 'input_audio_buffer.speech_started') {
-                    // talking again: not done yet
-                    session.speaking = true;
-                    if (!session.finishing) clearTimeout(session.pause);
-                } else if (said.type === 'conversation.item.input_audio_transcription.delta') {
-                    session.speaking = true;
-                    if (!session.finishing) clearTimeout(session.pause);
-                    session.heard.set(id, `${session.heard.get(id) ?? ''}${said.delta ?? ''}`);
-                    show();
-                } else if (said.type === 'conversation.item.input_audio_transcription.completed') {
-                    session.speaking = false;
-                    session.heard.set(id, String(said.transcript ?? session.heard.get(id) ?? '').trim());
-                    show();
-                    // a finished sentence and then a pause: the owner is done, so it is sent
-                    clearTimeout(session.pause);
-                    session.pause = setTimeout(() => finishTalking(session), session.finishing ? 0 : PAUSE_SENDS_AFTER);
-                } else if (said.type === 'error') {
-                    noteOnMic('I could not hear that just now. Please try again, or type it.');
-                    stopTalking();
-                }
-            });
-            const offer = await peer.createOffer();
-            await peer.setLocalDescription(offer);
-            const answer = await fetch(pass.url, {
-                method: 'POST',
-                body: offer.sdp,
-                headers: { Authorization: `Bearer ${pass.secret}`, 'Content-Type': 'application/sdp' },
-            });
-            if (!answer.ok) throw new Error('I could not hear that just now. Please try again, or type it.');
-            await peer.setRemoteDescription({ type: 'answer', sdp: await answer.text() });
-            if (talk !== session) return;
+    /** What both ways share: the words shown as they come, a finished sentence and a pause sending them, the clock. */
+    const newSession = () => {
+        const session = { heard: new Map(), before: input.value.trim(), speaking: false, finishing: false };
+        session.show = () => {
+            const said = [...session.heard.values()].join(' ').replace(/\s+/g, ' ').trim();
+            input.value = [session.before, said].filter(Boolean).join(' ');
+            input.dispatchEvent(new Event('input'));
+        };
+        session.growing = (id, words, replace = false) => {
+            session.speaking = true;
+            if (!session.finishing) clearTimeout(session.pause);
+            session.heard.set(id, replace ? words : `${session.heard.get(id) ?? ''}${words}`);
+            session.show();
+        };
+        session.settled = (id, words) => {
+            session.speaking = false;
+            session.heard.set(id, String(words ?? session.heard.get(id) ?? '').trim());
+            session.show();
+            // a finished sentence and then a pause: the owner is done, so it is sent
+            clearTimeout(session.pause);
+            session.pause = setTimeout(() => finishTalking(session), session.finishing ? 0 : PAUSE_SENDS_AFTER);
+        };
+        session.listening = (most = 120) => {
             micAs('listening');
             const started = Date.now();
-            const most = Number(pass.seconds) || 120;
             const tick = () => {
                 const seconds = Math.floor((Date.now() - started) / 1000);
                 noteOnMic(`${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}`, false);
-                if (seconds >= most) stopTalking();
+                if (seconds >= most) doneSpeaking(session);
             };
             tick();
             session.clock = setInterval(tick, 500);
+        };
+        return session;
+    };
+
+    /** 1. OpenAI's Realtime transcription, over WebRTC with the host's short-lived pass. Throws to fall back. */
+    const hearWithTheService = async (session) => {
+        const response = await request('/live-edit/assistant/voice', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ hint: [...new Set([document.querySelector('meta[property="og:site_name"]')?.content, document.title].filter(Boolean))].join(', ').slice(0, 600) }),
+        });
+        const pass = await response.json();
+        if (talk !== session) return;
+        try {
+            session.stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true } });
+        } catch {
+            const refused = new Error('Allow the microphone for this website in your browser, then tap again.');
+            refused.microphone = true;
+            throw refused;
+        }
+        const peer = new window.RTCPeerConnection();
+        session.stream.getTracks().forEach((track) => peer.addTrack(track, session.stream));
+        const channel = peer.createDataChannel('oai-events');
+        session.quiet = () => session.stream?.getTracks().forEach((track) => { track.enabled = false; });
+        session.close = () => {
+            try { channel.close(); } catch { /* closed */ }
+            try { peer.close(); } catch { /* closed */ }
+            session.stream?.getTracks().forEach((track) => track.stop());
+        };
+        channel.addEventListener('message', (event) => {
+            let said;
+            try { said = JSON.parse(event.data); } catch { return; }
+            const id = said.item_id ?? 'now';
+            if (said.type === 'input_audio_buffer.speech_started') {
+                session.speaking = true;
+                if (!session.finishing) clearTimeout(session.pause);
+            } else if (said.type === 'conversation.item.input_audio_transcription.delta') {
+                session.growing(id, said.delta ?? '');
+            } else if (said.type === 'conversation.item.input_audio_transcription.completed') {
+                session.settled(id, said.transcript);
+            } else if (said.type === 'error') {
+                noteOnMic('I could not hear that just now. Please try again, or type it.');
+                stopTalking();
+            }
+        });
+        const offer = await peer.createOffer();
+        await peer.setLocalDescription(offer);
+        const answer = await fetch(pass.url, {
+            method: 'POST',
+            body: offer.sdp,
+            headers: { Authorization: `Bearer ${pass.secret}`, 'Content-Type': 'application/sdp' },
+        });
+        if (!answer.ok) throw new Error('The speech service did not answer.');
+        await peer.setRemoteDescription({ type: 'answer', sdp: await answer.text() });
+        if (talk !== session) return;
+        session.listening(Number(pass.seconds) || 120);
+    };
+
+    /** 2. The browser's own speech recognition: words as they are said, settled at each pause. */
+    const hearWithTheBrowser = (session) => {
+        const recognition = new BrowserSpeech();
+        recognition.lang = document.documentElement.lang || navigator.language || 'en-NG';
+        recognition.continuous = true;
+        recognition.interimResults = true;
+        session.quiet = () => { try { recognition.stop(); } catch { /* stopped */ } };
+        session.close = () => { session.closing = true; try { recognition.abort(); } catch { /* stopped */ } };
+        recognition.addEventListener('result', (event) => {
+            for (let i = event.resultIndex; i < event.results.length; i++) {
+                const result = event.results[i];
+                const words = result[0]?.transcript ?? '';
+                if (result.isFinal) session.settled(i, words); else session.growing(i, words, true);
+            }
+        });
+        recognition.addEventListener('error', (event) => {
+            if (talk !== session) return;
+            if (event.error === 'not-allowed' || event.error === 'service-not-allowed') {
+                stopTalking();
+                noteOnMic('Allow the microphone for this website in your browser, then tap again.');
+            } else if (event.error === 'audio-capture') {
+                stopTalking();
+                noteOnMic('No microphone was found. Check it is connected, or type instead.');
+            } else if (event.error !== 'no-speech' && event.error !== 'aborted') {
+                stopTalking();
+                noteOnMic('I could not hear that just now. Please try again, or type it.');
+            }
+        });
+        // the browser ends listening on its own after a long silence: what was heard is sent
+        recognition.addEventListener('end', () => { if (talk === session && !session.closing) finishTalking(session); });
+        recognition.start();
+        session.listening(120);
+    };
+
+    const startTalking = async () => {
+        micAs('starting');
+        const session = newSession();
+        talk = session;
+        const fallBack = () => {
+            if (talk !== session || !BrowserSpeech) return false;
+            try { session.close?.(); } catch { /* closed */ }
+            hearWithTheBrowser(session);
+            return true;
+        };
+        if (!hostHears() || !canStream()) {
+            if (!fallBack()) {
+                stopTalking();
+                noteOnMic('Talking needs a newer browser. You can type instead.');
+            }
+            return;
+        }
+        try {
+            await hearWithTheService(session);
         } catch (error) {
-            const wasTalking = talk === session;
-            stopTalking();
-            if (!wasTalking) return;
+            if (talk !== session) return;
             if (error.status === 402) {
+                stopTalking();
                 const entry = { role: 'assistant', text: error.message || 'You have no AI credits left.' };
                 outOfCredits(entry);
                 say(entry);
-            } else {
-                noteOnMic(error.message || 'Talking is not available just now. Please type instead, or try again in a moment.');
+                return;
             }
+            if (error.microphone) {
+                stopTalking();
+                noteOnMic(error.message);
+                return;
+            }
+            // the service could not be reached: the browser hears instead, where it can
+            if (fallBack()) return;
+            stopTalking();
+            noteOnMic('Talking is not available just now. Please type instead, or try again in a moment.');
         }
     };
     mic.addEventListener('click', () => {

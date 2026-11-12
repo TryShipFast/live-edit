@@ -368,6 +368,77 @@ describe('Ask AI', () => {
             expect(host.querySelector('textarea').value).toBe('Change the hours');
         });
 
+        describe('the browser’s own speech recognition, as the backup', () => {
+            let recognitions;
+            beforeEach(() => {
+                recognitions = [];
+                window.webkitSpeechRecognition = class {
+                    constructor() { this.listeners = {}; this.started = false; recognitions.push(this); }
+                    addEventListener(name, fn) { this.listeners[name] = fn; }
+                    start() { this.started = true; }
+                    stop() { this.listeners.end?.(); }
+                    abort() { this.aborted = true; this.listeners.end?.(); }
+                    // what the browser hears: words growing, then settled at a pause
+                    hear(index, transcript, isFinal) {
+                        const results = [];
+                        results[index] = Object.assign([{ transcript }], { isFinal });
+                        this.listeners.result({ resultIndex: index, results });
+                    }
+                };
+            });
+            afterEach(() => { delete window.webkitSpeechRecognition; delete window.liveEditChat; });
+
+            it('hears with the browser when the host has no OpenAI, and sends when the owner stops talking', async () => {
+                window.liveEditChat = { voice: false };
+                chatWith([changed]);
+                const box = host.querySelector('textarea');
+                mic().click();
+                await settle();
+                // nothing asked of the host or the speech service: the browser hears
+                expect(calls).toHaveLength(0);
+                expect(peers).toHaveLength(0);
+                expect(recognitions[0].started).toBe(true);
+                expect(mic().classList.contains('is-recording')).toBe(true);
+
+                recognitions[0].hear(0, 'make the head', false);
+                expect(box.value).toBe('make the head');
+                recognitions[0].hear(0, 'make the headline shorter', true);
+                await pause();
+                await settle();
+                expect(calls[0].url).toBe('/live-edit/assistant/chat');
+                expect(calls[0].body.message).toBe('make the headline shorter');
+                expect(recognitions[0].aborted).toBe(true);
+            });
+
+            it('hears with the browser when the speech service cannot be reached', async () => {
+                chatWith([() => answer({ message: 'Talking is not available just now.' }, 503)]);
+                mic().click();
+                await settle();
+                expect(calls[0].url).toBe('/live-edit/assistant/voice');
+                expect(recognitions).toHaveLength(1);
+                expect(mic().classList.contains('is-recording')).toBe(true);
+            });
+        });
+
+        it('shows no mic where nothing can hear: never a dead button', () => {
+            window.liveEditChat = { voice: false };
+            try {
+                chatWith([]);
+                expect(mic().hidden).toBe(true);
+            } finally {
+                delete window.liveEditChat;
+            }
+            host.replaceChildren();
+            delete window.RTCPeerConnection;
+            chatWith([]);
+            expect(mic().hidden).toBe(true);
+        });
+
+        it('shows the mic where OpenAI can hear, even in a browser that cannot hear by itself', () => {
+            chatWith([]);
+            expect(mic().hidden).toBe(false);
+        });
+
         it('says what to do when the microphone is not allowed', async () => {
             navigator.mediaDevices.getUserMedia = vi.fn(async () => { throw new DOMException('denied', 'NotAllowedError'); });
             chatWith([pass]);
