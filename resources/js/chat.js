@@ -493,11 +493,15 @@ export function createChat({ shadow, request, showSaved, openPhoto, openPublish,
     /*
      * Voice (owner, 12 Nov 2026: "it's almost same as text just that someone's voice is converted to text / So we don't
      * do it two times"; "Use the open transcribe"; "It's speak to mic, no audio upload"): tap the mic and speak; the
-     * words appear in the box as they are said; tap again to stop, read them, and Send sends them as typed words are
-     * sent (ChatGPT's way; never sent on their own). The host gives a short-lived pass (POST /live-edit/assistant/voice)
+     * words appear in the box as they are said, and when the owner stops talking they are sent, as Siri, Google
+     * Assistant and ChatGPT's voice mode do ("Use what other popular platforms are using"): a pause of about a second
+     * after a finished sentence, or a tap on the mic, sends; Escape, or typing in the box, keeps the words to finish by
+     * hand; a cough or one word is not sent. One request a tap, as those assistants do. The host gives a short-lived pass (POST /live-edit/assistant/voice)
      * and the microphone streams straight to the speech service over WebRTC (OpenAI's Realtime transcription): no audio
-     * goes through the host. At most two minutes at a time; Escape stops and keeps what was heard.
+     * goes through the host. At most two minutes at a time.
      */
+    const PAUSE_SENDS_AFTER = 1200;
+    const LAST_WORDS_WAIT = 1500;
     let talk = null;
     let noteTimer = null;
     const noteOnMic = (text, forMoment = true) => {
@@ -512,19 +516,39 @@ export function createChat({ shadow, request, showSaved, openPhoto, openPublish,
         mic.innerHTML = state === 'listening' ? STOP_ICON : MIC_ICON;
         mic.append(micNote);
         mic.setAttribute('aria-label', state === 'listening' ? 'Stop talking' : 'Talk instead of typing');
-        input.placeholder = state === 'listening' ? 'Listening… speak, and your words appear here' : state === 'starting' ? 'Starting…' : 'Ask for a change';
+        input.placeholder = state === 'listening' ? 'Listening… I send it when you stop talking' : state === 'starting' ? 'Starting…' : 'Ask for a change';
     };
     const stopTalking = () => {
         if (!talk) return;
         const ending = talk;
         talk = null;
         clearInterval(ending.clock);
+        clearTimeout(ending.pause);
         try { ending.channel?.close(); } catch { /* already closed */ }
         try { ending.peer?.close(); } catch { /* already closed */ }
         ending.stream?.getTracks().forEach((track) => track.stop());
         micNote.hidden = true;
         micAs('idle');
         input.focus();
+    };
+    /** Done talking: what was heard is sent, as an assistant acts when you stop speaking. */
+    const finishTalking = (session) => {
+        if (talk !== session) return;
+        const said = [...session.heard.values()].join(' ').trim();
+        stopTalking();
+        // a cough, a click or one word is not a request: kept in the box, nothing spent
+        if (said.split(/\s+/).filter((word) => /\w/.test(word)).length < 2) return;
+        ask();
+    };
+    /** The mic tapped while talking: the microphone goes off at once, the last words settle, then it is sent. */
+    const doneSpeaking = (session) => {
+        if (talk !== session) return;
+        session.stream?.getTracks().forEach((track) => { track.enabled = false; });
+        micAs('starting');
+        input.placeholder = 'Sending what you said…';
+        session.finishing = true;
+        clearTimeout(session.pause);
+        session.pause = setTimeout(() => finishTalking(session), session.speaking ? LAST_WORDS_WAIT : 0);
     };
     const startTalking = async () => {
         if (!navigator.mediaDevices?.getUserMedia || typeof window.RTCPeerConnection !== 'function') {
@@ -566,12 +590,22 @@ export function createChat({ shadow, request, showSaved, openPhoto, openPublish,
                 let said;
                 try { said = JSON.parse(event.data); } catch { return; }
                 const id = said.item_id ?? 'now';
-                if (said.type === 'conversation.item.input_audio_transcription.delta') {
+                if (said.type === 'input_audio_buffer.speech_started') {
+                    // talking again: not done yet
+                    session.speaking = true;
+                    if (!session.finishing) clearTimeout(session.pause);
+                } else if (said.type === 'conversation.item.input_audio_transcription.delta') {
+                    session.speaking = true;
+                    if (!session.finishing) clearTimeout(session.pause);
                     session.heard.set(id, `${session.heard.get(id) ?? ''}${said.delta ?? ''}`);
                     show();
                 } else if (said.type === 'conversation.item.input_audio_transcription.completed') {
+                    session.speaking = false;
                     session.heard.set(id, String(said.transcript ?? session.heard.get(id) ?? '').trim());
                     show();
+                    // a finished sentence and then a pause: the owner is done, so it is sent
+                    clearTimeout(session.pause);
+                    session.pause = setTimeout(() => finishTalking(session), session.finishing ? 0 : PAUSE_SENDS_AFTER);
                 } else if (said.type === 'error') {
                     noteOnMic('I could not hear that just now. Please try again, or type it.');
                     stopTalking();
@@ -612,15 +646,17 @@ export function createChat({ shadow, request, showSaved, openPhoto, openPublish,
     };
     mic.addEventListener('click', () => {
         if (mic.getAttribute('aria-busy') === 'true') return;
-        if (talk) stopTalking(); else startTalking();
+        if (talk) doneSpeaking(talk); else startTalking();
     });
+    // typing while it listens: the owner is finishing it by hand, so it stops listening and waits for Send
+    input.addEventListener('input', (event) => { if (talk && event.isTrusted) stopTalking(); });
     panel.addEventListener('keydown', (event) => {
         if (event.key === 'Escape' && talk) {
             event.stopPropagation();
             stopTalking();
         }
     }, true);
-    // Send while talking: stop listening first, and send what was heard
+    // Send pressed while talking: stop listening first, and send what was heard
     form.addEventListener('submit', () => { if (talk) stopTalking(); }, true);
 
     /** The message that ran out of credits, sent now that there are some. */
