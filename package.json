@@ -4,7 +4,7 @@
   "type": "module",
   "description": "Runtime for the ShipFast Live Edit in-place editor.",
   "scripts": {
-    "build": "esbuild resources/js/live-edit.js --bundle --minify --format=esm --target=es2020 --outfile=resources/dist/live-edit.js && npm run build:kits",
+    "build": "esbuild resources/js/live-edit.js --bundle --minify --format=esm --target=es2020 --external:./ask-ai.js --outfile=resources/dist/live-edit.js && esbuild resources/js/ask-ai.js --bundle --minify --format=esm --target=es2020 --outfile=resources/dist/ask-ai.js && npm run build:kits",
     "test": "vitest run",
     "test:e2e": "playwright test",
     "test:journey": "playwright test tests/e2e/drawer-journey.spec.js tests/e2e/content-is-yours.spec.js",

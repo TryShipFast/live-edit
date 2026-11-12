@@ -7,6 +7,8 @@
  * told about what this person may not change (and the server refuses it anyway, by its key).
  */
 
+import { displayedValue, ownTextOf, shownWords } from './support.js';
+
 const MOST_FIELDS = 400;
 const LONGEST_VALUE = 600;
 
@@ -30,6 +32,15 @@ const sectionOf = (element) => {
 
     return section ? cut(section.getAttribute('data-edit-section-label') || '', 80) : '';
 };
+
+/** Each marker the editor reads, and what the chat calls the thing it marks. */
+const MARKERS = [
+    ['data-edit', 'text'],
+    ['data-edit-href', 'link'],
+    ['data-edit-img', 'image'],
+    ['data-edit-bg', 'background image'],
+    ['data-edit-icon', 'icon'],
+];
 
 const kindOf = (element) => {
     if (element.hasAttribute('data-edit-img')) return 'image';
@@ -56,13 +67,15 @@ const valueOf = (element, kind) => {
     if (kind === 'background image') return 'a background photo';
     if (kind === 'link') return cut(element.getAttribute('href') || '', 300);
     if (kind === 'icon') return cut(element.getAttribute('aria-label') || 'an icon', 80);
-    // words with formatted parts inside that have keys of their own: the panel holds only the words around them,
-    // and so does the chat, so it never writes a formatted part's words into its neighbour
-    if (element.querySelector('[data-edit]')) {
-        return cut([...element.childNodes].filter((node) => node.nodeType === 3).map((node) => node.textContent).join(' '));
-    }
 
-    return cut(element.textContent);
+    // the words exactly as the editor's own words panel holds them (live-edit.js editText): what it shows, the words
+    // around formatted parts that have keys of their own, a rich setting as it is; so the chat never writes words the
+    // panel would not have held
+    const key = keyOf(element.getAttribute('data-edit'));
+    const raw = displayedValue({ editValue: element.dataset.editValue, ownText: ownTextOf(element), fullText: element.textContent });
+    const rich = key !== null && (window.liveEditRich?.settings ?? []).includes(key);
+
+    return cut(rich ? raw.trim() : shownWords(element, raw));
 };
 
 const labelOf = (element, kind) => {
@@ -93,18 +106,22 @@ export function pageForTheChat(root = document) {
     for (const element of marked) {
         if (fields.length >= MOST_FIELDS) break;
         if (element.closest('#live-edit-ui') || locked(element)) continue;
-        const key = keyOf(markerOf(element));
-        if (key === null || seen.has(key)) continue;
-        const kind = kindOf(element);
-        const value = valueOf(element, kind);
-        if (value === '' && kind === 'text') continue;
-        seen.add(key);
-        const field = { key, kind, value };
-        const label = labelOf(element, kind);
-        const where = sectionOf(element);
-        if (label) field.label = label;
-        if (where) field.section = where;
-        fields.push(field);
+        // one part can hold more than one thing to change (a button's words and where it goes): each is its own
+        // field, under its own marker, so a change to the address never lands on the words' key
+        for (const [attribute, kind] of MARKERS) {
+            if (!element.hasAttribute(attribute)) continue;
+            const key = keyOf(element.getAttribute(attribute));
+            if (key === null || seen.has(key)) continue;
+            const value = valueOf(element, kind);
+            if (value === '' && kind === 'text') continue;
+            seen.add(key);
+            const field = { key, kind, value };
+            const label = labelOf(element, kind);
+            const where = sectionOf(element);
+            if (label) field.label = label;
+            if (where) field.section = where;
+            fields.push(field);
+        }
     }
 
     const sections = [];
@@ -112,29 +129,31 @@ export function pageForTheChat(root = document) {
         if (locked(element) || element.closest('[data-edit-item]')) continue;
         const id = element.getAttribute('data-edit-section');
         if (!id || sections.length >= 80) continue;
-        sections.push({
-            id,
-            label: cut(element.getAttribute('data-edit-section-label') || 'Section', 80),
-            style_key: element.getAttribute('data-style') || null,
-        });
+        // named, so the owner's words ("the reviews") find it; taken away with the sections list's Delete, as a press does
+        sections.push({ id, label: cut(element.getAttribute('data-edit-section-label') || 'Section', 80) });
     }
 
     const lists = [];
+    let sectionsList = null;
     for (const element of root.querySelectorAll('[data-edit-list]')) {
         const key = element.getAttribute('data-edit-list');
         // the engine's guesses at a list are not offered on a page that names its own (the Kit)
         if (!key || locked(element) || lists.length >= 80) continue;
         if (key.startsWith('auto:') && root.querySelector('[data-instance]')) continue;
-        if (element.getAttribute('data-edit-list-kind') === 'sections') continue;
+        // the page's own sections are a list too: a section is taken away with its Delete, as in the panel
+        const ofSections = element.getAttribute('data-edit-list-kind') === 'sections';
+        if (ofSections && sectionsList) continue;
         const items = [...element.querySelectorAll(':scope > [data-edit-item]')].slice(0, 200).map((item) => ({
             id: item.getAttribute('data-edit-item'),
-            label: cut(item.getAttribute('data-edit-item-label') || item.textContent, 80),
+            label: cut((ofSections && (item.getAttribute('data-edit-section-label') || item.querySelector('[data-edit-section-label]')?.getAttribute('data-edit-section-label')))
+                || item.getAttribute('data-edit-item-label') || item.textContent, 80),
         })).filter((item) => item.id);
         if (items.length === 0) continue;
+        if (ofSections) sectionsList = key;
         const max = Number.parseInt(element.getAttribute('data-edit-list-max') || '', 10);
         lists.push({
             key,
-            label: cut(element.getAttribute('data-edit-list-label') || 'List', 80),
+            label: ofSections ? 'Page sections' : cut(element.getAttribute('data-edit-list-label') || 'List', 80),
             max: Number.isInteger(max) && max > 0 ? max : null,
             items,
         });
@@ -145,6 +164,7 @@ export function pageForTheChat(root = document) {
         fields,
         sections,
         lists,
+        sectionsList,
     };
 }
 

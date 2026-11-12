@@ -1,4 +1,3 @@
-import { CHAT_CSS, createChat } from './chat.js';
 import { createChrome } from './chrome.js';
 import { createTeam, splitChanges, TEAM_CSS } from './team.js';
 import { describeVersion, versionsWorthShowing } from './history.js';
@@ -2911,7 +2910,7 @@ const bootLiveEdit = () => {
             throw new Error('The image is still processing. Leave this page open and check again shortly.');
         };
 
-        const request = async (url, rawOptions) => {
+        const request = async (url, rawOptions, waited = 0) => {
             // Team editing: a change says which part of the page it is in, so
             // the server can keep one person per section (team.js).
             const writes = rawOptions?.method && rawOptions.method !== 'GET';
@@ -2970,6 +2969,14 @@ const bootLiveEdit = () => {
                 // page copied, key by key), which waits out a "too many" rather than stopping halfway.
                 refused.status = response.status;
                 refused.retryAfter = Number(data.error?.retry_after ?? response.headers?.get?.('Retry-After')) || null;
+                // "Too many requests" for a few seconds: wait as asked and send it again, as a person would, rather
+                // than failing a copy or a save halfway through its writes (an add, a copy and Ask AI are several in
+                // a row). Twice at most, and never for longer than a short wait.
+                if (response.status === 429 && waited < 2 && (refused.retryAfter ?? 2) <= 15) {
+                    await new Promise((resolve) => window.setTimeout(resolve, Math.max(1, refused.retryAfter ?? 2) * 1000));
+
+                    return request(url, rawOptions, waited + 1);
+                }
                 // Somebody else is working on this part of the page: show who,
                 // rather than "Could not save".
                 if (response.status === 409 && data.error?.type === 'section_locked') {
@@ -3369,7 +3376,7 @@ const bootLiveEdit = () => {
             } catch (error) {
                 restoreButton();
                 notify(error.message);
-                outcome = { ok: false, error: error.message, locked: Boolean(error.sectionLocked), lock: error.lock ?? null };
+                outcome = { ok: false, error: error.message, status: error.status ?? null, retryAfter: error.retryAfter ?? null, locked: Boolean(error.sectionLocked), lock: error.lock ?? null };
             } finally {
                 /*
                  * Whatever happened. The timeout above covers the request, and
@@ -4613,6 +4620,8 @@ const bootLiveEdit = () => {
         };
 
         /** A list's order saved as its value (and its partner's, for tabs and their panels). */
+        // why the last list change was refused, for Ask AI to say in its own words what the toast said
+        let listRefusal = null;
         const saveListOrder = async (list, ids) => {
             await request('/live-edit/setting', {
                 method: 'POST',
@@ -4791,6 +4800,7 @@ const bootLiveEdit = () => {
                     return true;
                 } catch (error) {
                     notify(error.message);
+                    listRefusal = error;
 
                     return false;
                 }
@@ -4955,13 +4965,18 @@ const bootLiveEdit = () => {
                     remove.textContent = 'Remove this section';
                     remove.dataset.act = 'remove';
                     remove.addEventListener('click', remove.leRun = async () => {
-                        if (!arrangementIsFree()) return;
-                        if (!await askTo({ title: 'Remove this section?', subtitle: 'What you wrote in it goes too. Undo brings it back.', yes: 'Remove section', no: 'Keep it' })) return;
+                        // what happened is returned for Ask AI, which reports it: 'held' (a teammate has the page's
+                        // layout), 'kept' (the owner pressed Keep it), or whether the save went through
+                        if (!arrangementIsFree()) return 'held';
+                        if (!await askTo({ title: 'Remove this section?', subtitle: 'What you wrote in it goes too. Undo brings it back.', yes: 'Remove section', no: 'Keep it' })) return 'kept';
                         try {
                             await saveSetting(builder.structureKey, addedWith(builder.added, addedId, null, builder.beside));
-                            await saveOrder(currentOrder().filter((id) => id !== item.dataset.editItem), 'Section removed ✓');
+
+                            return await saveOrder(currentOrder().filter((id) => id !== item.dataset.editItem), 'Section removed ✓');
                         } catch (error) {
                             notify(error.message);
+
+                            return false;
                         }
                     });
                     row.append(remove);
@@ -4980,9 +4995,10 @@ const bootLiveEdit = () => {
                     remove.disabled = lowest;
                     remove.dataset.act = 'remove';
                     remove.addEventListener('click', remove.leRun = async () => {
-                        if (!arrangementIsFree()) return;
-                        if (!await askTo({ title: 'Delete this section?', subtitle: 'Undo brings it back, and you can add it again from + Section.', yes: 'Delete section', no: 'Keep it' })) return;
-                        await saveOrder(currentOrder().filter((id) => id !== item.dataset.editItem), 'Section deleted ✓');
+                        if (!arrangementIsFree()) return 'held';
+                        if (!await askTo({ title: 'Delete this section?', subtitle: 'Undo brings it back, and you can add it again from + Section.', yes: 'Delete section', no: 'Keep it' })) return 'kept';
+
+                        return saveOrder(currentOrder().filter((id) => id !== item.dataset.editItem), 'Section deleted ✓');
                     });
                     row.append(remove);
                 }
@@ -5003,8 +5019,9 @@ const bootLiveEdit = () => {
 
                             return;
                         }
-                        if (!await askTo({ title: `Delete this ${itemNoun(list) ?? 'card'}?`, subtitle: 'Undo brings it back.', yes: 'Delete', no: 'Keep it' })) return;
-                        deleteCard('Deleted \u2713');
+                        if (!await askTo({ title: `Delete this ${itemNoun(list) ?? 'card'}?`, subtitle: 'Undo brings it back.', yes: 'Delete', no: 'Keep it' })) return 'kept';
+
+                        return deleteCard('Deleted \u2713');
                     });
                     row.append(remove);
                 }
@@ -9109,9 +9126,22 @@ const bootLiveEdit = () => {
          * and Publish the editor's own window, so the chat has no second way of doing either.
          */
         if (ui.chatButton && !ui.chatButton.hidden) {
-            const chatStyle = document.createElement('style');
-            chatStyle.textContent = CHAT_CSS;
-            ui.shadow?.append(chatStyle);
+            /*
+             * The chat's code is not in the editor's bundle: it is fetched on the first press of Ask AI (ask-ai.js,
+             * built on its own), so an editor that never asks loads nothing more (owner, 12 Nov 2026: "lightweight,
+             * stupidly fast"). Once fetched it is the browser's, under the runtime's versioned address.
+             */
+            let askAi = null;
+            const loadAskAi = () => (askAi ??= import('./ask-ai.js').then((module) => {
+                const chatStyle = document.createElement('style');
+                chatStyle.textContent = module.CHAT_CSS;
+                ui.shadow?.append(chatStyle);
+
+                return module;
+            }).catch((error) => {
+                askAi = null;
+                throw error;
+            }));
 
             /*
              * What the chat does, done the way a person does it (owner, 12 Nov 2026: "the chat is built on the live
@@ -9139,6 +9169,7 @@ const bootLiveEdit = () => {
                 return held ? { ok: false, locked: held, error: `${held.name} is editing ${held.label} right now.` } : null;
             };
             const pressSave = async () => {
+                // a "Too many requests" is waited out by request() itself, as for a press
                 const result = await save();
                 closeDrawer(true);
 
@@ -9178,23 +9209,6 @@ const bootLiveEdit = () => {
 
                     return pressSave();
                 }
-                if (action.type === 'style') {
-                    const element = document.querySelector(`[data-style="${CSS.escape(action.key)}"]`);
-                    if (!element) return { ok: false, error: 'That section is not on this page any more.' };
-                    const refused = refusedFor(element);
-                    if (refused) return refused;
-                    if (team && !team.beforeEdit(element, { onRefused: () => closeDrawer(true) })) return { ok: false, locked: heldBySomeoneElse(element) ?? { label: 'that part', name: 'A teammate' } };
-                    openNode(element);
-                    await settled();
-                    const toggle = drawerFields.querySelector('input[data-style-prop=hidden]');
-                    if (!toggle) { closeDrawer(true); return { ok: false, error: 'That section cannot be hidden.' }; }
-                    // "Show this section to visitors": ticked shows it
-                    toggle.checked = toggle.dataset.styleShows ? Boolean(action.visible) : !action.visible;
-                    toggle.dispatchEvent(new Event('change', { bubbles: true }));
-                    if (current) current.dirty = true;
-
-                    return pressSave();
-                }
                 if (action.type === 'list') {
                     const list = document.querySelector(`[data-edit-list="${CSS.escape(action.key)}"]`);
                     if (!list) return { ok: false, error: 'That list is not on this page any more.' };
@@ -9222,8 +9236,13 @@ const bootLiveEdit = () => {
 
                         return { ok: false, error: button?.disabled ? 'That list is as long as its design allows.' : 'That cannot be done to this list.' };
                     }
+                    listRefusal = null;
                     const done = await button.leRun();
                     closeDrawer(true);
+                    if (done === false && listRefusal?.sectionLocked) return { ok: false, locked: heldBySomeoneElse(target) ?? { label: 'that part', name: 'A teammate' } };
+                    if (done === false && listRefusal?.message) return { ok: false, error: listRefusal.message, status: listRefusal.status ?? null };
+                    if (done === 'kept') return { ok: false, kept: true, error: 'Kept as it was.' };
+                    if (done === 'held') return { ok: false, locked: heldBySomeoneElse(target) ?? { label: 'the page layout', name: 'A teammate' }, error: 'A teammate is changing this page\'s layout right now.' };
 
                     return done === false ? { ok: false, error: 'That could not be saved.' } : { ok: true };
                 }
@@ -9289,7 +9308,28 @@ const bootLiveEdit = () => {
                 return held;
             };
 
-            const chat = createChat({
+            // for the editor walk only (bin/templates/editor-walk/chat-parity.mjs): the chat's own reader, actions and
+            // Undo, so every template can be checked to save what a press saves. Never set on a real page.
+            if (window.__liveEditWalk) {
+                window.__liveEditChat = {
+                    page: async () => (await loadAskAi()).pageForTheChat(document),
+                    act: chatAct,
+                    snapshot: chatSnapshot,
+                    undoPlan: chatUndoPlan,
+                    undo: chatUndo,
+                    panelHolds: async (key) => {
+                        const element = byKey('data-edit', key);
+                        if (!element) return null;
+                        editText(element, element, { asWords: true });
+                        await settled();
+                        const held = drawerFields.querySelector('textarea[name=value]')?.value ?? null;
+                        closeDrawer(true);
+
+                        return held;
+                    },
+                };
+            }
+            const chatWith = (module) => module.createChat({
                 shadow: ui.shadow,
                 request,
                 site: window.liveEditApi?.site ?? '',
@@ -9319,12 +9359,39 @@ const bootLiveEdit = () => {
                     ui.publishButton?.click();
                 },
             });
-            ui.chatButton.addEventListener('click', () => {
+            let chat = null;
+            const theChat = async () => {
+                if (chat) return chat;
+                ui.chatButton.setAttribute('aria-busy', 'true');
+                try {
+                    chat = chatWith(await loadAskAi());
+                } finally {
+                    ui.chatButton.removeAttribute('aria-busy');
+                }
+
+                return chat;
+            };
+            ui.chatButton.addEventListener('click', async () => {
                 if (!document.body.classList.contains('editing')) setEditing(true);
-                chat.toggle();
+                try {
+                    const opened = !chat;
+                    const it = await theChat();
+                    // the first press opens it; later presses open or close it
+                    if (opened) it.open(); else it.toggle();
+                } catch {
+                    ui.toast('Ask AI could not load. Check your connection and try again.');
+                }
             });
-            // open again after the page was drawn again (an Undo, a reload): the conversation is where it was
-            if (chat.wasOpen) chat.open();
+            // open again after the page was drawn again (an Undo, a reload): the conversation is where it was. Read
+            // from the chat's own note in this tab, so a chat that was not open costs nothing on load.
+            const wasOpen = (() => {
+                try {
+                    return JSON.parse(sessionStorage.getItem(`le-chat:${window.liveEditApi?.site ?? ''}:${location.pathname}`) || 'null')?.open === true;
+                } catch {
+                    return false;
+                }
+            })();
+            if (wasOpen) theChat().then((it) => it.open()).catch(() => {});
         }
 
         /*

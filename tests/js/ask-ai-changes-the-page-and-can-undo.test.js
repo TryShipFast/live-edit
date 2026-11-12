@@ -153,6 +153,81 @@ describe('Ask AI', () => {
         }
     });
 
+    it('sells credits over the editor when they run out, then sends the waiting message', async () => {
+        window.liveEditChat = { buy: {
+            packs: vi.fn(async () => ({ packs: [{ credits: 50, price: '₦2,500' }, { credits: 200, price: '₦8,000', featured: true }, { credits: 500, price: '₦18,000' }] })),
+            pay: vi.fn(async () => ({ paid: true, balance: 200 })),
+        } };
+        try {
+            chatWith([
+                () => answer({ message: 'You have no AI credits left. Add some, and I will carry on from here.' }, 402),
+                () => answer({ reply: 'I changed the headline.', actions: [], cards: [], credits: { balance: 199, cost: 1 } }),
+            ]);
+            await type('Change the headline');
+            await flush();
+
+            expect(host.querySelector('.le-chat-card h3').textContent).toBe('Add AI credits');
+            expect([...host.querySelectorAll('.le-chat-pack')].map((row) => row.textContent.trim())).toEqual(['50 credits₦2,500', '200 credits₦8,000', '500 credits₦18,000']);
+            // the usual pack chosen
+            expect(host.querySelector('.le-chat-pack input:checked').value).toBe('200');
+            buttonNamed('Pay with card').click();
+            await flush();
+            await flush();
+            await flush();
+
+            expect(window.liveEditChat.buy.pay).toHaveBeenCalledWith(200);
+            expect(calls.map((call) => call.body.message)).toEqual(['Change the headline', 'Change the headline']);
+            // said once in the conversation, sent twice
+            expect([...host.querySelectorAll('.le-chat-msg.is-owner')].map((m) => m.textContent)).toEqual(['Change the headline']);
+            expect(host.textContent).toContain('I changed the headline.');
+            expect(host.querySelector('.le-chat-pack')).toBeNull();
+        } finally {
+            delete window.liveEditChat;
+        }
+    });
+
+    it('says a closed card window charged nothing, and keeps the packs', async () => {
+        window.liveEditChat = { buy: { packs: async () => ({ packs: [{ credits: 50, price: '₦2,500' }] }), pay: async () => ({ cancelled: true }) } };
+        try {
+            chatWith([() => answer({ message: 'You have no AI credits left.' }, 402)]);
+            await type('Change the headline');
+            await flush();
+            buttonNamed('Pay with card').click();
+            await flush();
+            await flush();
+            expect(host.querySelector('.le-chat-note').textContent).toBe('Payment closed. Nothing was charged.');
+            expect(buttonNamed('Pay with card').disabled).toBe(false);
+        } finally {
+            delete window.liveEditChat;
+        }
+    });
+
+    it('tells a teammate to ask the owner, who pays', async () => {
+        chatWith([() => answer({ message: 'You have no AI credits left.' }, 402)]);
+        await type('Change the headline');
+        expect(host.textContent).toContain('Ask its owner to add some');
+        expect(buttonNamed('Add AI credits')).toBeUndefined();
+    });
+
+    it('sends the waiting message when the owner comes back from a card page', async () => {
+        sessionStorage.setItem(`le-chat:oxbow:${location.pathname}`, JSON.stringify({ log: [{ role: 'user', text: 'Change the headline' }], open: true, waiting: 'Change the headline' }));
+        history.replaceState(null, '', `${location.pathname}?ai-credits=back`);
+        try {
+            const replies = [() => answer({ reply: 'Done, the headline is new.', actions: [], cards: [] })];
+            calls = [];
+            const request = vi.fn((url, options) => { calls.push({ url, body: JSON.parse(options.body) }); return replies.shift()(); });
+            createChat({ shadow: host, site: 'oxbow', request, showSaved: vi.fn(), openPhoto: vi.fn(), openPublish: vi.fn() }).open();
+            await new Promise((resolve) => setTimeout(resolve, 5));
+            await flush();
+            await flush();
+            expect(calls[0].body.message).toBe('Change the headline');
+            expect(location.search).toBe('');
+            expect(host.textContent).toContain('Done, the headline is new.');
+        } finally {
+            history.replaceState(null, '', location.pathname);
+        }
+    });
+
     it('keeps the conversation through a reload of the page', async () => {
         chatWith([() => answer({ reply: 'Hello again.', changes: [], cards: [], undo: [] })]);
         await type('Hi');
@@ -162,6 +237,36 @@ describe('Ask AI', () => {
 
         expect(host.textContent).toContain('Hi');
         expect(host.textContent).toContain('Hello again.');
+    });
+
+    it('opens the photo chooser with +: for the picture selected, or the page’s photos by name', () => {
+        chatWith([]);
+        const plus = host.querySelector('button[aria-label="Add a photo"]');
+
+        plus.click();
+        expect(host.querySelector('.le-chat-photos h3').textContent).toBe('Which photo?');
+        buttonNamed('Photo, Hero').click();
+        expect(deps.openPhoto).toHaveBeenCalledWith('tpl:photo');
+        expect(host.querySelector('.le-chat-photos')).toBeNull();
+
+        deps.openPhoto.mockClear();
+        host.replaceChildren();
+        createChat({ shadow: host, site: 'oxbow', ...deps, selected: () => document.querySelector('img') }).open();
+        host.querySelector('button[aria-label="Add a photo"]').click();
+        expect(deps.openPhoto).toHaveBeenCalledWith('tpl:photo');
+        expect(host.querySelector('.le-chat-photos')).toBeNull();
+    });
+
+    it('shows the mic, which says talking is coming soon and does nothing else', () => {
+        chatWith([]);
+        const mic = host.querySelector('button[aria-label="Talk to Ask AI (coming soon)"]');
+
+        expect(mic.getAttribute('aria-disabled')).toBe('true');
+        expect(host.querySelector('.le-chat-soon').hidden).toBe(true);
+        mic.click();
+        expect(host.querySelector('.le-chat-soon').hidden).toBe(false);
+        expect(host.querySelector('.le-chat-soon').textContent).toBe('Talking: coming soon');
+        expect(deps.request).not.toHaveBeenCalled();
     });
 
     it('suggests only what the page has, in words a person uses', () => {

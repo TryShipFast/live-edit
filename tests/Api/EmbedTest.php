@@ -217,6 +217,8 @@ class EmbedTest extends TestCase
         // from the sources alone can stand still while the thing being served
         // changes underneath it.
         $paths[] = __DIR__.'/../../resources/dist/live-edit.js';
+        // Ask AI, built on its own and fetched on its button's first press
+        $paths[] = __DIR__.'/../../resources/dist/ask-ai.js';
         $paths[] = (new \ReflectionClass(EmbedController::class))->getFileName();
         sort($paths);
 

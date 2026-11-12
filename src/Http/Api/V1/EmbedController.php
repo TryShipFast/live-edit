@@ -53,6 +53,8 @@ class EmbedController
         'team.js' => 'team.js',
         'chat.js' => 'chat.js',
         'chat-page.js' => 'chat-page.js',
+        // Ask AI, fetched on its button's first press: built on its own beside the bundle (see path())
+        'ask-ai.js' => 'ask-ai.js',
         'pages.js' => 'pages.js',
         'pages-list.js' => 'pages-list.js',
         'unsaved.js' => 'unsaved.js',
@@ -178,6 +180,7 @@ class EmbedController
     {
         $files = glob(self::path('*.js')) ?: [];
         $files[] = self::path('bundle.js');
+        $files[] = __DIR__.'/../../../../resources/dist/ask-ai.js';
         $files[] = __FILE__;
         sort($files);
 
@@ -188,6 +191,12 @@ class EmbedController
     {
         if ($name === 'bundle.js') {
             return __DIR__.'/../../../../resources/dist/live-edit.js';
+        }
+
+        // Ask AI built and minified on its own while the bundle is current; its source (which imports the chat's
+        // modules) while somebody is editing the runtime, the same rule as the bundle
+        if ($name === 'ask-ai.js' && is_file(__DIR__.'/../../../../resources/dist/ask-ai.js') && self::bundleIsCurrent()) {
+            return __DIR__.'/../../../../resources/dist/ask-ai.js';
         }
 
         return __DIR__.'/../../../../resources/js/'.$name;

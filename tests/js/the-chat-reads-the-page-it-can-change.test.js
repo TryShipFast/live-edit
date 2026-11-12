@@ -13,6 +13,7 @@ describe('the page the chat sends', () => {
             <section data-edit-section="hero" data-edit-section-label="Hero" data-style="shero">
                 <h1 data-edit="setting:tpl:h1">Cut to fit.   Made to last.</h1>
                 <a href="/women" data-edit-href="setting:tpl:cta">Shop women</a>
+                <a href="/sale" data-edit="setting:tpl:sale.text" data-edit-href="setting:tpl:sale.href">See the sale</a>
                 <img src="/a/jean-worn.jpg" alt="A woman laughing" data-edit-img="setting:tpl:photo">
                 <p data-edit="auto:abc123">A guessed key the chat does not offer</p>
                 <p data-edit="setting:tpl:lede">Free delivery over <strong data-edit="setting:tpl:over">₦50,000</strong> and 30-day returns.</p>
@@ -40,6 +41,12 @@ describe('the page the chat sends', () => {
         expect(fields).toContainEqual({ key: 'tpl:photo', kind: 'image', value: 'alt: A woman laughing', label: 'Photo', section: 'Hero' });
     });
 
+    it('gives a button its words and where it goes as two fields, each under its own key', () => {
+        const { fields } = pageForTheChat(document);
+        expect(fields).toContainEqual({ key: 'tpl:sale.text', kind: 'text', value: 'See the sale', section: 'Hero' });
+        expect(fields).toContainEqual({ key: 'tpl:sale.href', kind: 'link', value: '/sale', label: 'See the sale', section: 'Hero' });
+    });
+
     it('gives words around a formatted part as the panel holds them, the part on its own', () => {
         const { fields } = pageForTheChat(document);
         expect(fields.find((field) => field.key === 'tpl:lede').value).toBe('Free delivery over and 30-day returns.');
@@ -59,6 +66,20 @@ describe('the page the chat sends', () => {
         expect(keys).not.toContain('tpl:ui');
         expect(keys.some((key) => key.startsWith('auto:'))).toBe(false);
         expect(pageForTheChat(document).sections.map((section) => section.id)).toEqual(['hero', 'faq']);
+    });
+
+    it('offers the page’s sections as a list, so a section is taken away with Delete as in the panel', () => {
+        document.body.insertAdjacentHTML('beforeend', `
+            <main data-edit-list="structure:page:home" data-edit-list-kind="sections">
+                <div data-edit-item="s1" data-edit-section-label="Reviews"><p>Loved it</p></div>
+                <div data-edit-item="s2"><section data-edit-section-label="Visit us"><p>Lagos</p></section></div>
+            </main>`);
+        const read = pageForTheChat(document);
+        expect(read.sectionsList).toBe('structure:page:home');
+        expect(read.lists.find((list) => list.key === 'structure:page:home')).toEqual({
+            key: 'structure:page:home', label: 'Page sections', max: null,
+            items: [{ id: 's1', label: 'Reviews' }, { id: 's2', label: 'Visit us' }],
+        });
     });
 
     it('gives each list its items and the most its design holds', () => {

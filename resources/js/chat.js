@@ -55,6 +55,18 @@ export const CHAT_CSS = `
 .le-chat-form textarea:focus { outline: 2px solid var(--le-ink, #0B0C0F); outline-offset: 1px; }
 .le-chat-send { width: 44px; height: 44px; flex: none; border: 0; border-radius: 12px; background: var(--le-ink, #0B0C0F); color: #fff; cursor: pointer; display: grid; place-items: center; }
 .le-chat-send[disabled] { opacity: .4; cursor: default; }
+.le-chat-tool { width: 44px; height: 44px; flex: none; border: 1px solid var(--le-field, #DADCE0); border-radius: 12px; background: #fff; color: inherit; cursor: pointer; display: grid; place-items: center; position: relative; }
+.le-chat-tool:hover { border-color: var(--le-ink, #0B0C0F); }
+.le-chat-tool[aria-disabled=true] { color: #8A8E96; cursor: default; }
+.le-chat-tool[aria-disabled=true]:hover { border-color: var(--le-field, #DADCE0); }
+.le-chat-soon { position: absolute; bottom: 52px; right: -8px; white-space: nowrap; background: var(--le-ink, #0B0C0F); color: #fff; font-size: 12px; padding: 5px 9px; border-radius: 6px; pointer-events: none; }
+.le-chat-soon[hidden] { display: none; }
+.le-chat-photos { border: 1px solid var(--le-line, #E6E7EA); border-radius: 12px; padding: 12px; display: flex; flex-direction: column; gap: 8px; }
+.le-chat-photos h3 { margin: 0; font-size: 14px; font-weight: 600; }
+.le-chat-pack { display: flex; align-items: center; gap: 10px; min-height: 44px; padding: 0 10px; border: 1px solid var(--le-field, #DADCE0); border-radius: 10px; font-size: 14px; cursor: pointer; }
+.le-chat-pack:has(input:checked) { border: 2px solid var(--le-accent, #1B6EF3); padding: 0 9px; }
+.le-chat-pack b { margin-left: auto; font-weight: 600; }
+.le-chat-note { margin: 0; font-size: 12px; line-height: 1.5; color: var(--le-muted, #6B6F78); }
 .le-chat-foot { padding: 0 16px 12px; margin-top: -6px; font-size: 12px; color: var(--le-muted, #6B6F78); }
 /* An editor panel open (the photo the chat asked for, or anything tapped): the chat moves to the left of it, so both
    stay in view; where there is no room beside it, the chat steps aside until the panel closes. */
@@ -63,6 +75,8 @@ export const CHAT_CSS = `
 @media (max-width: 600px) { .le-chat { right: 8px; left: 8px; width: auto; bottom: 76px; max-height: calc(100vh - 96px); } }
 `;
 
+const PLUS_ICON = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M5 12h14"/><path d="M12 5v14"/></svg>';
+const MIC_ICON = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><rect x="9" y="2" width="6" height="12" rx="3"/><path d="M19 10v1a7 7 0 0 1-14 0v-1"/><path d="M12 18v4"/></svg>';
 const SEND_ICON = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M12 19V5"/><path d="m5 12 7-7 7 7"/></svg>';
 
 const el = (tag, className, text) => {
@@ -118,12 +132,14 @@ export function createChat({ shadow, request, showSaved, openPhoto, openPublish,
     /** What was said, and what each answer did, so the conversation is still there after the page reloads. */
     const log = Array.isArray(remembered?.log) ? remembered.log : [];
     let credits = remembered?.credits ?? null;
+    /** The message that ran out of credits, sent again once credits are added (here, or back from a card page). */
+    let waitingToSend = typeof remembered?.waiting === 'string' ? remembered.waiting : null;
     let busy = false;
     let about = null;
 
     const remember = () => {
         try {
-            sessionStorage.setItem(memoryKey, JSON.stringify({ log: log.slice(-40), credits, open: !panel.hidden }));
+            sessionStorage.setItem(memoryKey, JSON.stringify({ log: log.slice(-40), credits, open: !panel.hidden, waiting: waitingToSend }));
         } catch { /* private mode: the chat still works */ }
     };
 
@@ -154,13 +170,41 @@ export function createChat({ shadow, request, showSaved, openPhoto, openPublish,
     const form = el('form', 'le-chat-form');
     const input = el('textarea');
     input.rows = 1;
-    input.placeholder = 'Ask for a change, or ask a question';
+    input.placeholder = 'Ask for a change';
     input.setAttribute('aria-label', 'Message');
     const send = el('button', 'le-chat-send');
     send.type = 'submit';
     send.innerHTML = SEND_ICON;
     send.setAttribute('aria-label', 'Send');
-    form.append(input, send);
+    /*
+     * + opens the editor's own photo chooser (owner, 12 Nov 2026: "pop up widgets if need for things like uploads"):
+     * for the picture the owner has selected, or else the page's photos by name, one press each. The mic is shown
+     * and says it is coming ("mic clicks says coming soon"), never a dead button.
+     */
+    const attach = el('button', 'le-chat-tool');
+    attach.type = 'button';
+    attach.innerHTML = PLUS_ICON;
+    attach.setAttribute('aria-label', 'Add a photo');
+    const mic = el('button', 'le-chat-tool');
+    mic.type = 'button';
+    mic.innerHTML = MIC_ICON;
+    mic.setAttribute('aria-label', 'Talk to Ask AI (coming soon)');
+    mic.setAttribute('aria-disabled', 'true');
+    const soon = el('span', 'le-chat-soon', 'Talking: coming soon');
+    soon.hidden = true;
+    mic.append(soon);
+    let soonTimer = null;
+    const showSoon = (forMoment) => {
+        soon.hidden = false;
+        clearTimeout(soonTimer);
+        if (forMoment) soonTimer = setTimeout(() => { soon.hidden = true; }, 2200);
+    };
+    mic.addEventListener('click', () => showSoon(true));
+    mic.addEventListener('mouseenter', () => showSoon(false));
+    mic.addEventListener('mouseleave', () => { soon.hidden = true; });
+    mic.addEventListener('focus', () => showSoon(false));
+    mic.addEventListener('blur', () => { soon.hidden = true; });
+    form.append(attach, input, mic, send);
 
     const foot = el('p', 'le-chat-foot');
 
@@ -185,8 +229,6 @@ export function createChat({ shadow, request, showSaved, openPhoto, openPublish,
             const item = el('li');
             if (change.type === 'field') {
                 item.append(el('b', '', `${change.label}: `), document.createTextNode(change.kind === 'link' ? `now goes to ${change.value}` : `“${change.value}”`));
-            } else if (change.type === 'style') {
-                item.append(el('b', '', change.label), document.createTextNode(change.visible ? ' is shown again' : ' is hidden from visitors'));
             } else {
                 const did = { add: 'one added', duplicate: 'one copied', remove: 'one removed', move_up: 'one moved up', move_down: 'one moved down' }[change.action] ?? 'changed';
                 item.append(el('b', '', `${change.label}: `), document.createTextNode(did));
@@ -260,15 +302,83 @@ export function createChat({ shadow, request, showSaved, openPhoto, openPublish,
         return box;
     };
 
-    const creditsCard = (buy) => {
+    /*
+     * Out of credits. The owner adds some here, in a window over the editor (owner, 12 Nov 2026: "After they pay with
+     * card. Are they redirected back to their last page / And last edit"): the packs and prices the host sells, Pay
+     * with card, and the message they sent goes again once the credits are in. A host without that (another
+     * adapter) gives its billing page instead; a teammate is told to ask the owner, who pays.
+     */
+    const creditsCard = (entry) => {
         const box = el('div', 'le-chat-card');
-        const acts = el('div', 'le-chat-acts');
-        const link = el('a', 'le-chat-btn is-main', 'Add AI credits');
-        link.href = buy;
-        link.target = '_blank';
-        link.rel = 'noopener';
-        acts.append(link);
-        box.append(acts);
+        const buy = window.liveEditChat?.buy;
+        if (entry.buy !== 'here' || typeof buy?.pay !== 'function') {
+            const acts = el('div', 'le-chat-acts');
+            const link = el('a', 'le-chat-btn is-main', 'Add AI credits');
+            link.href = entry.buy;
+            link.target = '_blank';
+            link.rel = 'noopener';
+            acts.append(link);
+            box.append(acts);
+
+            return box;
+        }
+        box.append(el('h3', '', 'Add AI credits'));
+        const choices = el('div', 'le-chat-tips');
+        choices.style.display = 'grid';
+        const pay = el('button', 'le-chat-btn is-main', 'Pay with card');
+        pay.type = 'button';
+        pay.disabled = true;
+        const note = el('p', 'le-chat-note', 'Loading the packs…');
+        box.append(choices, pay, note);
+        const name = `le-pack-${Math.random().toString(36).slice(2, 7)}`;
+        Promise.resolve(buy.packs()).then((offer) => {
+            const packs = Array.isArray(offer?.packs) ? offer.packs : [];
+            if (packs.length === 0) {
+                note.textContent = 'AI credits are not on sale just now.';
+                return;
+            }
+            const usual = Math.max(0, packs.findIndex((pack) => pack.featured));
+            const chosenFirst = packs.some((pack) => pack.featured) ? usual : Math.min(1, packs.length - 1);
+            packs.forEach((pack, index) => {
+                const row = el('label', 'le-chat-pack');
+                const radio = el('input');
+                radio.type = 'radio';
+                radio.name = name;
+                radio.value = String(pack.credits);
+                // the pack the price list puts forward chosen first (else the middle one), as a price list does
+                radio.checked = index === chosenFirst;
+                row.append(radio, document.createTextNode(` ${pack.credits} credits`), el('b', '', pack.price ?? ''));
+                choices.append(row);
+            });
+            pay.disabled = false;
+            note.textContent = 'Your message is kept and sent as soon as the credits are in.';
+        }).catch(() => { note.textContent = 'The packs could not be loaded. Check your connection and try again.'; });
+
+        pay.addEventListener('click', async () => {
+            const chosen = box.querySelector(`input[name="${name}"]:checked`);
+            if (!chosen) return;
+            pay.disabled = true;
+            pay.textContent = 'Opening…';
+            remember();
+            try {
+                const result = await buy.pay(Number(chosen.value));
+                if (result?.left) return; // off to the card page; this page comes back with the message waiting
+                if (result?.paid) {
+                    credits = { ...(credits ?? {}), balance: result.balance };
+                    entry.buy = null;
+                    entry.text = 'Thank you. Your credits are in.';
+                    showCredits();
+                    draw();
+                    sendTheWaiting();
+                    return;
+                }
+                note.textContent = result?.cancelled ? 'Payment closed. Nothing was charged.' : (result?.message ?? 'That payment did not go through. Nothing was charged.');
+            } catch (error) {
+                note.textContent = error?.message || 'That payment did not go through. Nothing was charged.';
+            }
+            pay.disabled = false;
+            pay.textContent = 'Pay with card';
+        });
 
         return box;
     };
@@ -300,7 +410,7 @@ export function createChat({ shadow, request, showSaved, openPhoto, openPublish,
                 if (card.type === 'photo') list.append(photoCard(card));
                 if (card.type === 'publish') list.append(publishCard());
             }
-            if (entry.buy) list.append(creditsCard(entry.buy));
+            if (entry.buy) list.append(creditsCard(entry));
         }
         showCredits();
         scrollDown();
@@ -319,14 +429,15 @@ export function createChat({ shadow, request, showSaved, openPhoto, openPublish,
 
     /* ── sending ──────────────────────────────────────────────── */
 
-    async function ask() {
-        const text = input.value.trim();
+    // `again`: the message that ran out of credits, sent once they are in; it is already in the conversation
+    async function ask(again = null) {
+        const text = typeof again === 'string' ? again : input.value.trim();
         if (!text || busy) return;
         busy = true;
         send.disabled = true;
-        input.value = '';
-        const history = log.filter((entry) => !entry.wait && entry.text).map((entry) => ({ role: entry.role, text: entry.text })).slice(-12);
-        say({ role: 'user', text });
+        if (typeof again !== 'string') input.value = '';
+        const history = log.filter((entry) => !entry.wait && entry.text && !entry.buy).map((entry) => ({ role: entry.role, text: entry.text })).slice(-12);
+        if (typeof again !== 'string') say({ role: 'user', text });
         const waiting = { role: 'assistant', text: 'Working on it…', wait: true };
         log.push(waiting);
         draw();
@@ -360,9 +471,15 @@ export function createChat({ shadow, request, showSaved, openPhoto, openPublish,
             }
         } catch (error) {
             entry = { role: 'assistant', text: error.message || 'Something went wrong. Please try again.' };
-            // where to add credits: the host's own page (the photo tool sends people to the same one), owner only
-            const billing = window.liveEditChat?.credits ?? window.liveEditEditor?.billing;
-            if (error.status === 402 && billing) entry.buy = String(billing).includes('#') ? billing : `${billing}#credits`;
+            if (error.status === 402) {
+                waitingToSend = text;
+                // where to add credits: here, over the editor, when the host sells them so; else the host's own page
+                // (the photo tool sends people to the same one); neither is given to a teammate, who asks the owner
+                const billing = window.liveEditChat?.credits ?? window.liveEditEditor?.billing;
+                if (typeof window.liveEditChat?.buy?.pay === 'function') entry.buy = 'here';
+                else if (billing) entry.buy = String(billing).includes('#') ? billing : `${billing}#credits`;
+                else entry.text = 'There are no AI credits left on this website. Ask its owner to add some, and I will carry on from here.';
+            }
         }
 
         log.splice(log.indexOf(waiting), 1);
@@ -374,6 +491,60 @@ export function createChat({ shadow, request, showSaved, openPhoto, openPublish,
     }
 
     form.addEventListener('submit', (event) => { event.preventDefault(); ask(); });
+
+    /** The message that ran out of credits, sent now that there are some. */
+    function sendTheWaiting() {
+        const text = waitingToSend;
+        waitingToSend = null;
+        // the packs are not offered again: the credits are in
+        for (const entry of log) if (entry.buy === 'here') entry.buy = null;
+        draw();
+        remember();
+        if (!text || busy) return;
+        ask(text);
+    }
+    // back from a card page (the billing callback sends the owner to this editor page): carry on where they were
+    if (waitingToSend && /[?&]ai-credits=back\b/.test(location.search)) {
+        try { history.replaceState(history.state, '', location.pathname + location.search.replace(/[?&]ai-credits=back\b/, '').replace(/^&/, '?') + location.hash); } catch { /* the address keeps it */ }
+        setTimeout(sendTheWaiting, 0);
+    }
+
+    const photoKeyOf = (element) => {
+        const holder = element?.closest?.('[data-edit-img], [data-edit-bg]');
+        const marker = holder?.getAttribute('data-edit-img') || holder?.getAttribute('data-edit-bg') || '';
+
+        return marker.startsWith('setting:') ? marker.slice('setting:'.length) : null;
+    };
+    attach.addEventListener('click', () => {
+        const chosen = photoKeyOf(selected());
+        if (chosen) {
+            openPhoto(chosen);
+            return;
+        }
+        const photos = pageForTheChat(document).fields.filter((field) => field.kind === 'image' || field.kind === 'background image');
+        list.querySelector('.le-chat-photos')?.remove();
+        const box = el('div', 'le-chat-photos');
+        if (photos.length === 0) {
+            box.append(el('p', '', 'This page has no photos to change.'));
+        } else {
+            box.append(el('h3', '', 'Which photo?'));
+            const tips = el('div', 'le-chat-tips');
+            const named = new Map();
+            for (const photo of photos.slice(0, 12)) {
+                // two photos called "Photo" in one section read as one: number them
+                const base = [photo.label, photo.section].filter(Boolean).join(', ') || 'Photo';
+                const count = (named.get(base) ?? 0) + 1;
+                named.set(base, count);
+                const chip = el('button', 'le-chat-tip', count > 1 ? `${base} (${count})` : base);
+                chip.type = 'button';
+                chip.addEventListener('click', () => { box.remove(); openPhoto(photo.key); });
+                tips.append(chip);
+            }
+            box.append(tips);
+        }
+        list.append(box);
+        scrollDown();
+    });
     input.addEventListener('keydown', (event) => {
         // Enter sends, Shift+Enter makes a new line: as in every chat people use
         if (event.key === 'Enter' && !event.shiftKey && !event.isComposing) {
