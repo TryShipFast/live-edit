@@ -51,6 +51,8 @@ class EmbedController
         'upload.js' => 'upload.js',
         'seo.js' => 'seo.js',
         'team.js' => 'team.js',
+        'chat.js' => 'chat.js',
+        'chat-page.js' => 'chat-page.js',
         'pages.js' => 'pages.js',
         'pages-list.js' => 'pages-list.js',
         'unsaved.js' => 'unsaved.js',

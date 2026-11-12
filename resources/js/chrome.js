@@ -114,6 +114,7 @@ a.le-mark:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
 }
 .le-round:hover { background: #2A2C31; }
 .le-round:disabled { opacity: .3; cursor: default; background: none; }
+.le-chat-open { display: inline-flex; align-items: center; gap: 6px; }
 .le-bar-btn {
   cursor: pointer; border: 0; border-radius: 999px; padding: 8px 14px;
   background: none; color: #fff; font-size: 13px; font-weight: 400;
@@ -2142,6 +2143,13 @@ export function createChrome() {
     changesButton.type = 'button';
     changesButton.title = 'Everything you have changed and not published';
 
+    /* Ask AI (chat.js): shown where the content API answers the chat, a host may turn it off (liveEditChat: false). */
+    const chatButton = el('button', 'le-bar-btn le-when-roomy le-chat-open');
+    chatButton.type = 'button';
+    chatButton.innerHTML = `${toolbarIcon('sparkles', 16)}<span>Ask AI</span>`;
+    chatButton.title = 'Ask AI to change this page for you';
+    chatButton.hidden = window.liveEditChat === false || !(window.liveEditChat || window.liveEditApi);
+
     const helpButton = el('button', 'le-round le-when-roomy', '?');
     helpButton.type = 'button';
     helpButton.title = 'Help with Live Edit';
@@ -2207,6 +2215,7 @@ export function createChrome() {
         brandButton,
         searchButton,
         changesButton,
+        chatButton,
         helpButton,
         previewButton,
         publishButton,
@@ -2268,7 +2277,7 @@ export function createChrome() {
     const foldOrder = [
         logout?.node,
         ...hostLinks.map(({ anchor }) => anchor).reverse(),
-        helpButton, searchButton, brandButton, formButton, sectionsButton, previewButton, pagesButton,
+        helpButton, searchButton, brandButton, formButton, sectionsButton, previewButton, pagesButton, chatButton,
         localeSelect, languagePicker, changesButton, redoButton,
     ].filter(Boolean);
     const isOut = (node) => Boolean(node?.classList.contains('le-out'));
@@ -2331,6 +2340,7 @@ export function createChrome() {
         { control: brandButton, label: 'Brand', icon: 'brand' },
         { control: searchButton, label: 'Search', icon: 'search' },
         { control: changesButton, label: 'Changes', icon: 'changes' },
+        { control: chatButton, label: 'Ask AI', icon: 'sparkles' },
         { control: helpButton, label: 'Help', icon: 'help' },
         { control: previewButton, label: 'Preview', icon: 'preview' },
     ]);
@@ -2808,6 +2818,7 @@ export function createChrome() {
         sectionInsert,
         sectionInsertEnd,
         changesButton,
+        chatButton,
         helpButton,
         closeButton,
         cancelButton,

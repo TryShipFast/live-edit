@@ -1,3 +1,4 @@
+import { CHAT_CSS, createChat } from './chat.js';
 import { createChrome } from './chrome.js';
 import { createTeam, splitChanges, TEAM_CSS } from './team.js';
 import { describeVersion, versionsWorthShowing } from './history.js';
@@ -9052,6 +9053,46 @@ const bootLiveEdit = () => {
             card.querySelector('.le-help-option')?.focus();
         };
         ui.helpButton?.addEventListener('click', showHelpMenu);
+
+        /*
+         * Ask AI (chat.js; LIVE-EDIT-STRUCTURE.md section 13): the chat beside the page. Its changes are saved by the
+         * server as drafts and shown here the way any saved draft is (settle); a photo opens that picture's own panel
+         * and Publish the editor's own window, so the chat has no second way of doing either.
+         */
+        if (ui.chatButton && !ui.chatButton.hidden) {
+            const chatStyle = document.createElement('style');
+            chatStyle.textContent = CHAT_CSS;
+            ui.shadow?.append(chatStyle);
+            const chat = createChat({
+                shadow: ui.shadow,
+                request,
+                site: window.liveEditApi?.site ?? '',
+                selected: () => current?.element ?? null,
+                showSaved: (message) => settle(message, null, null, true),
+                openPhoto: (key) => {
+                    const named = CSS.escape(`setting:${key}`);
+                    const picture = document.querySelector(`[data-edit-img="${named}"], [data-edit-bg="${named}"]`);
+                    if (!picture) {
+                        ui.toast('That photo is not on this page any more.');
+                        return;
+                    }
+                    if (!document.body.classList.contains('editing')) setEditing(true);
+                    picture.scrollIntoView({ block: 'center', behavior: 'smooth' });
+                    openNode(picture);
+                },
+                openPublish: () => {
+                    if (ui.publishButton?.disabled) {
+                        ui.toast('Nothing is waiting to publish.');
+                        return;
+                    }
+                    ui.publishButton?.click();
+                },
+            });
+            ui.chatButton.addEventListener('click', () => {
+                if (!document.body.classList.contains('editing')) setEditing(true);
+                chat.toggle();
+            });
+        }
 
         /*
          * Publishing, where the site holds edits back. The host says so by

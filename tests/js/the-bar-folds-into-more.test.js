@@ -117,7 +117,21 @@ describe('the links on the bar', () => {
         [ui.toggleButton, ui.undoButton, ui.publishButton, ui.moreButton].forEach((node) => expect(ui.foldOrder).not.toContain(node));
         const dashboard = ui.toolbar.querySelector('a[href="/dashboard"]');
         const logout = ui.toolbar.querySelector('a[href="/logout"]');
-        expect(ui.foldOrder).toEqual([logout, dashboard, ui.helpButton, ui.searchButton, ui.brandButton, ui.formButton, ui.sectionsButton, ui.previewButton, ui.pagesButton, ui.languagePicker, ui.changesButton, ui.redoButton]);
+        expect(ui.foldOrder).toEqual([logout, dashboard, ui.helpButton, ui.searchButton, ui.brandButton, ui.formButton, ui.sectionsButton, ui.previewButton, ui.pagesButton, ui.chatButton, ui.languagePicker, ui.changesButton, ui.redoButton]);
+    });
+
+    it('shows Ask AI only where the content API answers the chat, and not when the host turns it off', () => {
+        // a site keeping its own content (WordPress, Laravel) has no chat to answer
+        expect(chrome({ links: [] }).chatButton.hidden).toBe(true);
+        window.liveEditApi = { base: 'https://api.example.test', site: 'shop', token: null };
+        try {
+            expect(chrome({ links: [] }).chatButton.hidden).toBe(false);
+            window.liveEditChat = false;
+            expect(chrome({ links: [] }).chatButton.hidden).toBe(true);
+        } finally {
+            delete window.liveEditApi;
+            delete window.liveEditChat;
+        }
     });
 });
 
