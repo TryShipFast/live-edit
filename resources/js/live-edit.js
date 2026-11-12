@@ -38,7 +38,7 @@ import { LEAVE_QUESTION, guardLeaving } from './unsaved.js';
 import { insertionNear, sectionName, sectionUnder, shownSectionLists, shownSections } from './section-inserter.js';
 import { DETAIL_MODE, copiedItemSettings, copiedStyles, copyPageForCard, deletablePage, deletePage, detailAddress, keyMap, linksTo, linksWarning, showOnlyTheDetail } from './card-page.js';
 import { renderChoice } from './choice.js';
-import { COL, COLUMNS, SKU_TAKEN, choosableCollections, collectionsCell, collectionsOfCell, collectionsSaid, gridRows, keepSizesInStep, keptRead, priceAsWritten, productsPlan, readProduct, rowCells, sharedSkus, shownColumns, stockOfSize } from './products.js';
+import { COL, COLUMNS, SKU_TAKEN, choosableCollections, collectionsCell, collectionsOfCell, collectionsSaid, gridRows, keepSizesInStep, keptRead, priceAsWritten, productsPlan, readProduct, rowCells, sharedSkus, shownColumns, stockOfSize, watchedBy, stillHolds } from './products.js';
 import { SALE_HEADS, SALE_KINDS, STOCK_HEAD, dayOf, endSaid, flashSalePlan, keepRowInStep, keptProduct, ownPriceOf, ownPricesAmong, readSale, saleLabel, saleLineOf, saleRow, sizeKey, sizesSummary, stockFor, stockPlan, todayIs, withWrites } from './sale.js';
 import { TYPES as FORM_TYPES, seedForm } from './forms.js';
 import { renderFormBuilder } from './form-builder.js';
@@ -6276,20 +6276,36 @@ const bootLiveEdit = () => {
          * taken back together by one Undo.
          */
         const PRODUCT_COLUMNS = 'live-edit:product-columns';
+        /*
+         * Product reads kept in this browser between visits (owner, 12 Nov 2026: "It should only make round trip if new
+         * products are added"), so the grid opens without reading every product page again. A kept read is used while
+         * everything it was read from is unchanged; what makes it read again (LIVE-EDIT-STRUCTURE.md, "The Products
+         * grid", Kept reads):
+         *   - the build: a new version of the design or a republish (`build` from the host's Shop tab, which also
+         *     changes when the editor reads pages differently);
+         *   - the words: any change, by anyone, on any device, to its name, price, SKU, sizes, photo or list of sizes
+         *     (watchedBy, against the saved content read when the grid opens);
+         *   - the product: a new one is read, one gone is dropped;
+         *   - age: thirty days at most; anything that cannot be read is read again.
+         * Kept per website; saves made in the grid are written into it (keepWithWrites), so they cost no read.
+         */
         const PRODUCTS_KEPT = `live-edit:products:${api?.site ?? window.location.host}`;
-        const keptProductReads = () => {
+        const PRODUCTS_KEPT_FOR = 30 * 24 * 3600 * 1000;
+        const productsBuild = () => String(window.liveEditShop?.build ?? '');
+        const keptProductEntries = () => {
             try {
-                const kept = JSON.parse(sessionStorage.getItem(PRODUCTS_KEPT) ?? 'null');
+                const kept = JSON.parse(localStorage.getItem(PRODUCTS_KEPT) ?? 'null');
 
-                return kept && Date.now() - kept.at < 600000 && kept.reads && typeof kept.reads === 'object' ? kept.reads : {};
+                return kept && kept.v === 2 && kept.build === productsBuild() && Date.now() - kept.at < PRODUCTS_KEPT_FOR && kept.entries && typeof kept.entries === 'object' ? kept.entries : {};
             } catch {
                 return {};
             }
         };
-        const keepProductReads = (reads) => {
+        const keptProductReads = () => Object.fromEntries(Object.entries(keptProductEntries()).map(([path, entry]) => [path, entry?.read ?? null]));
+        const keepProductEntries = (entries) => {
             try {
-                if (reads) sessionStorage.setItem(PRODUCTS_KEPT, JSON.stringify({ at: Date.now(), reads }));
-                else sessionStorage.removeItem(PRODUCTS_KEPT);
+                if (entries) localStorage.setItem(PRODUCTS_KEPT, JSON.stringify({ v: 2, at: Date.now(), build: productsBuild(), entries }));
+                else localStorage.removeItem(PRODUCTS_KEPT);
             } catch { /* read again next time */ }
         };
         /** Every product the shop sells, each with its page in the editor: the design's and the owner's own. */
@@ -6303,21 +6319,28 @@ const bootLiveEdit = () => {
         };
         /** Each product's page read (drafts included), a few at a time; `heard(done)` after each. */
         const readProductPages = async (products, heard = () => {}) => {
-            const kept = keptProductReads();
+            const kept = keptProductEntries();
             const here = pathOf(window.location.href);
             let saved;
             let applyContent;
             let done = 0;
             const waiting = [];
+            // the site's words now (one request), to tell a kept read that still holds from one that does not
+            try { saved = (await readSavedContent())?.settings ?? null; } catch { saved = null; }
             products.forEach((product) => {
-                if (product.path === here && document.querySelector('main [data-kit-product]')) product.read = keptRead(readProduct(document, window.location.href));
-                else if (kept[product.path] !== undefined) product.read = kept[product.path];
-                else waiting.push(product);
+                if (product.path === here && document.querySelector('main [data-kit-product]')) {
+                    product.read = keptRead(readProduct(document, window.location.href));
+                    product.watch = watchedBy(document, product.read, saved ?? {});
+                } else if (saved && kept[product.path] !== undefined && stillHolds(kept[product.path].watch, saved)) {
+                    product.read = kept[product.path].read;
+                    product.watch = kept[product.path].watch;
+                } else {
+                    waiting.push(product);
+                }
                 if (product.read !== undefined) done += 1;
             });
             heard(done);
             if (waiting.length) {
-                try { saved = (await readSavedContent())?.settings ?? null; } catch { saved = null; }
                 ({ applyContent } = await import('./content.js'));
                 let next = 0;
                 await Promise.all(Array.from({ length: Math.min(4, waiting.length) }, async () => {
@@ -6331,6 +6354,7 @@ const bootLiveEdit = () => {
                                 try { applyContent(doc, saved); } catch { /* the page's own words, then */ }
                             }
                             product.read = doc ? keptRead(readProduct(doc, product.href)) : null;
+                            product.watch = doc ? watchedBy(doc, product.read, saved ?? {}) : {};
                         } catch {
                             product.read = null;
                         }
@@ -6339,7 +6363,7 @@ const bootLiveEdit = () => {
                     }
                 }));
             }
-            keepProductReads(Object.fromEntries(products.filter((product) => product.read !== undefined).map((product) => [product.path, product.read])));
+            keepProductEntries(Object.fromEntries(products.filter((product) => product.read !== undefined).map((product) => [product.path, { read: product.read, watch: product.watch ?? {} }])));
 
             return products;
         };
@@ -6347,13 +6371,14 @@ const bootLiveEdit = () => {
         const keepWithWrites = (products, writes) => {
             const by = new Map(writes.map(({ key, value }) => [key, value]));
             const put = (word) => (word?.key && by.has(word.key) ? { ...word, words: by.get(word.key) } : word);
-            keepProductReads(Object.fromEntries(products.filter((product) => product.read !== undefined).map((product) => [product.path, product.read && {
+            const watchNow = (watch) => Object.fromEntries(Object.entries(watch ?? {}).map(([key, was]) => [key, by.has(`setting:${key}`) ? String(by.get(`setting:${key}`)) : (by.has(key) ? String(by.get(key)) : was)]));
+            keepProductEntries(Object.fromEntries(products.filter((product) => product.read !== undefined).map((product) => [product.path, { watch: watchNow(product.watch), read: product.read && {
                 ...product.read,
                 name: put(product.read.name),
                 price: put(product.read.price),
                 sku: put(product.read.sku),
                 sizes: product.read.sizes.map((size) => ({ ...size, price: put(size.price), sku: put(size.sku) })),
-            }])));
+            } }])));
         };
         /** A new collection, made like the shop's own (pages.js renderNewCategory), asked first if the grid holds changes. */
         const newCollectionFrom = async (grid, including = null) => {

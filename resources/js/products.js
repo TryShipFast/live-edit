@@ -99,6 +99,36 @@ export const readProduct = (doc, href = '') => {
     };
 };
 
+/**
+ * What a kept product read depends on, so it is read again only when one of them changed (owner, 12 Nov 2026: "It
+ * should only make round trip if new products are added"; "don't forget the invalidating strategies"): the keys of its
+ * name, price, SKU and each size's price and SKU, its photo's, and the list its sizes are in (a size added or removed).
+ * Each with the value the site held for it when it was read, from the saved content (drafts included), so a change by
+ * anyone, on any device, shows as a different value.
+ *
+ * @returns {Record<string, string|null>}
+ */
+export const watchedBy = (doc, read, settings = {}) => {
+    if (!read) return {};
+    const bare = (key) => String(key ?? '').replace(/^setting:/, '');
+    const keys = [read.name?.key, read.price?.key, read.sku?.key, ...(read.sizes ?? []).flatMap((size) => [size.price?.key, size.sku?.key])];
+    const box = doc ? buyBoxIn(doc) : null;
+    if (box) {
+        const main = doc.querySelector('main') ?? doc.body;
+        const img = box.querySelector('img') ?? box.closest('section')?.querySelector('img') ?? main?.querySelector('img');
+        keys.push(img?.getAttribute('data-edit-img'));
+        const sized = box.querySelector('[data-kit-variant]')?.closest('[data-edit-list]');
+        keys.push(sized?.getAttribute('data-edit-list'));
+    }
+    const watch = {};
+    for (const key of keys.map(bare).filter(Boolean)) watch[key] = Object.prototype.hasOwnProperty.call(settings, key) ? String(settings[key]) : null;
+
+    return watch;
+};
+
+/** Whether a kept read still holds: every value it was read with is the site's value now. */
+export const stillHolds = (watch, settings = {}) => Object.entries(watch ?? {}).every(([key, was]) => (Object.prototype.hasOwnProperty.call(settings, key) ? String(settings[key]) : null) === was);
+
 /** A product as it can be kept between page loads: its words and keys, without the page's elements. */
 export const keptRead = (read) => {
     if (!read) return read;
