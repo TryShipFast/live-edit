@@ -223,6 +223,11 @@ export function createChat({ shadow, request, showSaved, openPhoto, openPublish,
             const item = el('li');
             if (change.type === 'field') {
                 item.append(el('b', '', `${change.label}: `), document.createTextNode(change.kind === 'link' ? `now goes to ${change.value}` : `“${change.value}”`));
+            } else if (change.type === 'style') {
+                // said in the panel's own words: "text size 24, colour #1B6EF3", "spacing as designed"
+                const named = { textColor: 'text colour', background: 'background', fontSize: 'text size', fontWeight: 'boldness', textAlign: 'alignment', lineHeight: 'line spacing', paddingY: 'space above and below', paddingX: 'space left and right', radius: 'rounded corners' };
+                const said = Object.entries(change.props ?? {}).map(([prop, value]) => `${named[prop] ?? prop} ${value === '' ? 'as designed' : value}`).join(', ');
+                item.append(el('b', '', `${change.label}: `), document.createTextNode(said || 'look changed'));
             } else {
                 const did = { add: 'one added', duplicate: 'one copied', remove: 'one removed', move_up: 'one moved up', move_down: 'one moved down' }[change.action] ?? 'changed';
                 item.append(el('b', '', `${change.label}: `), document.createTextNode(did));
@@ -380,7 +385,14 @@ export function createChat({ shadow, request, showSaved, openPhoto, openPublish,
     const greeting = () => {
         const box = el('div', 'le-chat-msg is-ai', 'Hi! Tell me what to change on this page: the words, a photo, a list. I show it on the page straight away, and you can undo it.');
         const tips = el('div', 'le-chat-tips');
-        for (const tip of startersFor(pageForTheChat(document))) {
+        // about a part the owner clicked: what owners ask of that kind of part; else ideas from the page
+        const forThePart = about ? ({
+            text: ['Rewrite this', 'Make this shorter', 'Make this sound more friendly'],
+            image: ['Replace this photo'],
+            'background image': ['Replace this photo'],
+            link: ['Change where this goes'],
+        }[about.kind] ?? null) : null;
+        for (const tip of forThePart ?? startersFor(pageForTheChat(document))) {
             const chip = el('button', 'le-chat-tip', tip);
             chip.type = 'button';
             chip.addEventListener('click', () => { input.value = tip; ask(); });
@@ -430,6 +442,7 @@ export function createChat({ shadow, request, showSaved, openPhoto, openPublish,
         busy = true;
         send.disabled = true;
         if (typeof again !== 'string') input.value = '';
+        refreshAbout();
         const history = log.filter((entry) => !entry.wait && entry.text && !entry.buy).map((entry) => ({ role: entry.role, text: entry.text })).slice(-12);
         if (typeof again !== 'string') say({ role: 'user', text });
         const waiting = { role: 'assistant', text: 'Working on it…', wait: true };
@@ -812,9 +825,25 @@ export function createChat({ shadow, request, showSaved, openPhoto, openPublish,
         input.style.height = `${Math.min(input.scrollHeight, 140)}px`;
     });
     aboutClear.addEventListener('click', () => { about = null; showAbout(); });
+    /*
+     * The part the owner clicked, read again when they come back to the box and when they send (owner, 12 Nov 2026:
+     * "if they click, is the AI chat aware of where they clicked"): a click on the page while the chat is open makes
+     * "this" mean that part. Clearing it (×) stays cleared until another part is clicked.
+     */
+    let lastClicked = null;
+    const refreshAbout = () => {
+        const now = tappedForTheChat(selected());
+        if (now && now.key !== lastClicked) {
+            about = now;
+            lastClicked = now.key;
+            showAbout();
+        }
+    };
+    input.addEventListener('focus', refreshAbout);
 
     const open = () => {
         about = tappedForTheChat(selected());
+        lastClicked = about?.key ?? null;
         showAbout();
         draw();
         panel.hidden = false;
@@ -825,8 +854,26 @@ export function createChat({ shadow, request, showSaved, openPhoto, openPublish,
     close.addEventListener('click', shut);
     panel.addEventListener('keydown', (event) => { if (event.key === 'Escape') shut(); });
 
+    /** Opened from a part's own panel ("Ask AI about this"): pointed at that part, with what owners ask of it. */
+    const openAbout = (element, say = null) => {
+        const part = tappedForTheChat(element);
+        open();
+        if (part) {
+            about = part;
+            lastClicked = part.key;
+            showAbout();
+            draw();
+        }
+        // a one-press request from the part's panel (Rewrite, Shorten): sent at once, as if typed
+        if (say && part) {
+            input.value = say;
+            ask();
+        }
+    };
+
     return {
         open,
+        openAbout,
         close: shut,
         toggle: () => (panel.hidden ? open() : shut()),
         get isOpen() { return !panel.hidden; },

@@ -7,7 +7,7 @@
  * told about what this person may not change (and the server refuses it anyway, by its key).
  */
 
-import { displayedValue, ownTextOf, shownWords } from './support.js';
+import { declaredStyleProps, displayedValue, ownTextOf, shownWords } from './support.js';
 
 const MOST_FIELDS = 400;
 const LONGEST_VALUE = 600;
@@ -83,6 +83,12 @@ const labelOf = (element, kind) => {
     if (given) return cut(given, 80);
     // a link's words say what it is ("Shop women"); a heading says it is the heading
     if (kind === 'link') return cut(element.textContent, 80) || 'Link';
+    // the parts at the top of a page, named as owners say them ("the introduction on the hero"): the templates mark them
+    const hero = element.getAttribute('data-hero');
+    if (kind === 'text' && hero === 'headline') return 'Main heading at the top';
+    if (kind === 'text' && hero === 'intro' && !element.closest('a, button')) {
+        return /lead|intro|sub|summary|text/i.test(element.getAttribute('data-field') || '') ? 'Introduction at the top' : 'Line under the introduction';
+    }
     if (/^H[1-6]$/.test(element.tagName)) return 'Heading';
     // the brand's mark is not "the photo": a picture in the header or the menu, or one named a logo, is the logo
     if (kind === 'image' || kind === 'background image') {
@@ -120,6 +126,16 @@ export function pageForTheChat(root = document) {
             const where = sectionOf(element);
             if (label) field.label = label;
             if (where) field.section = where;
+            // how it looks, where the design lets it be changed (colour, size, spacing): the same choices its panel
+            // offers, so Ask AI can do what the panel's style controls do and no more
+            const styleKey = element.getAttribute('data-style');
+            if (styleKey && attribute !== 'data-edit-href') {
+                const props = declaredStyleProps(element.getAttribute('data-style-props'), doc.defaultView?.liveEditStyleProps);
+                if (props.length) {
+                    field.style_key = styleKey;
+                    field.style = props.filter((prop) => prop !== 'backgroundImage' && prop !== 'hidden').slice(0, 12);
+                }
+            }
             fields.push(field);
         }
     }
@@ -173,9 +189,11 @@ export function tappedForTheChat(element) {
     if (!element || !(element instanceof Element)) return null;
     const holder = element.closest('[data-edit], [data-edit-img], [data-edit-bg], [data-edit-href], [data-edit-icon]');
     if (!holder || locked(holder)) return null;
-    const key = keyOf(markerOf(holder));
+    // the clicked part as one thing: the first of its markers, with that marker's own key and kind (a button's words,
+    // not its words' key called a link)
+    const [attribute, kind] = MARKERS.find(([name]) => holder.hasAttribute(name)) ?? [];
+    const key = attribute ? keyOf(holder.getAttribute(attribute)) : null;
     if (key === null) return null;
-    const kind = kindOf(holder);
 
     return { key, kind, label: labelOf(holder, kind) || cut(holder.textContent, 80) || 'This part' };
 }

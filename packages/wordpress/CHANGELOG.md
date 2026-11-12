@@ -1,5 +1,18 @@
 # ShipFast Live Edit for WordPress
 
+## 0.21.2 (12 Nov 2026)
+
+- Ask AI right where the owner clicks (the owner: "if i click an element, the toolbar is shorten"; "no where to
+  trigger the ask AI"). Ask AI stays on the bar when a part is open, and the part's panel leads with Ask AI about this,
+  which opens the chat pointed at that part with ideas for it (Rewrite this, Make this shorter). It replaces the
+  panel's separate AI assist: one AI, not two (Rewrite and Shorten stay only where there is no chat).
+- Ask AI changes how a part looks: colours, text size, boldness, alignment, line spacing, spacing and corners, with
+  the part's own style controls and only what its design allows ("Make this bigger").
+- The chat knows the part clicked while it is open, and names the parts at the top as owners say them (Main heading,
+  Introduction at the top), so asking without clicking finds them too.
+- The getting-started guide stops marking its example once the owner has clicked a part of their own, so what they
+  clicked is plainly the part being changed.
+
 ## 0.21.1 (12 Nov 2026)
 
 - Ask AI on the adapters (WordPress, HTML, React, Next.js), the same as on Go Live websites. On WordPress, Undo puts

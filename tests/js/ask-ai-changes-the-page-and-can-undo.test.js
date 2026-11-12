@@ -126,6 +126,49 @@ describe('Ask AI', () => {
         expect(host.textContent).toContain('This one did not use a credit.');
     });
 
+    it('knows the part the owner clicked while the chat was open', async () => {
+        let clicked = null;
+        chatWith([() => answer({ reply: 'Done.', actions: [], cards: [] })]);
+        host.replaceChildren();
+        createChat({ shadow: host, site: 'oxbow', ...deps, selected: () => clicked }).open();
+        expect(host.querySelector('.le-chat-about').hidden).toBe(true);
+
+        clicked = document.querySelector('h1');
+        host.querySelector('textarea').dispatchEvent(new Event('focus'));
+        expect(host.querySelector('.le-chat-about').textContent).toContain('About: Heading');
+
+        await type('Make this shorter');
+        expect(calls[0].body.tapped).toEqual({ key: 'tpl:h1', kind: 'text', label: 'Heading' });
+    });
+
+    it('opens about a part from its own panel, with what owners ask of that part', () => {
+        chatWith([]);
+        host.replaceChildren();
+        const chat = createChat({ shadow: host, site: 'oxbow', ...deps });
+        chat.openAbout(document.querySelector('h1'));
+
+        expect(host.querySelector('.le-chat-about').textContent).toContain('About: Heading');
+        expect([...host.querySelectorAll('.le-chat-tip')].map((tip) => tip.textContent)).toEqual(['Rewrite this', 'Make this shorter', 'Make this sound more friendly']);
+    });
+
+    it('sends a one-press Rewrite or Shorten from a part\'s panel at once, about that part', async () => {
+        chatWith([() => answer({ reply: 'I made it shorter.', actions: [], cards: [] })]);
+        host.replaceChildren();
+        createChat({ shadow: host, site: 'oxbow', ...deps }).openAbout(document.querySelector('h1'), 'Make this shorter');
+        await flush();
+        await flush();
+
+        expect(calls[0].body.message).toBe('Make this shorter');
+        expect(calls[0].body.tapped).toEqual({ key: 'tpl:h1', kind: 'text', label: 'Heading' });
+        expect(host.textContent).toContain('I made it shorter.');
+    });
+
+    it('says a change of look in the panel\'s own words', async () => {
+        chatWith([() => answer({ reply: 'Bigger and blue.', actions: [{ type: 'style', key: 'sh1', field: 'tpl:h1', props: { fontSize: '40', textColor: '#1b6ef3', textAlign: '' }, label: 'Heading' }], cards: [] })]);
+        await type('Make the headline bigger and blue');
+        expect(host.querySelector('.le-chat-card').textContent).toContain('Heading: text size 40, text colour #1b6ef3, alignment as designed');
+    });
+
     it('says what it could not change because a teammate is working there', async () => {
         chatWith([() => answer({ reply: 'Done.', actions: [
             { type: 'field', kind: 'text', label: 'Opening hours', key: 'tpl:hours', value: 'Mon to Sat, 9 to 7' },

@@ -47,6 +47,34 @@ describe('the page the chat sends', () => {
         expect(fields).toContainEqual({ key: 'tpl:sale.href', kind: 'link', value: '/sale', label: 'See the sale', section: 'Hero' });
     });
 
+    it('names the parts at the top as owners say them, and a clicked button as one part', () => {
+        document.body.insertAdjacentHTML('afterbegin', `
+            <section data-edit-section="top" data-edit-section-label="Jordan Reese">
+                <h1 data-hero="headline" data-edit="setting:tpl:name">Jordan Reese</h1>
+                <p data-hero="intro" data-field="lead" data-edit="setting:tpl:intro">Keynotes for sales kick-offs.</p>
+                <p data-hero="intro" data-field="avail" data-edit="setting:tpl:avail">Booking January to September 2027</p>
+            </section>`);
+        const fields = pageForTheChat(document).fields;
+        expect(fields.find((f) => f.key === 'tpl:name').label).toBe('Main heading at the top');
+        expect(fields.find((f) => f.key === 'tpl:intro').label).toBe('Introduction at the top');
+        expect(fields.find((f) => f.key === 'tpl:avail').label).toBe('Line under the introduction');
+        expect(tappedForTheChat(document.querySelector('[data-edit="setting:tpl:intro"]'))).toEqual({ key: 'tpl:intro', kind: 'text', label: 'Introduction at the top' });
+        expect(tappedForTheChat(document.querySelector('[data-edit="setting:tpl:sale.text"]'))).toEqual({ key: 'tpl:sale.text', kind: 'text', label: 'See the sale' });
+    });
+
+    it('tells the chat how each part may look, from the same list its panel offers', () => {
+        window.liveEditStyleProps = { textColor: 'color', fontSize: 'px', paddingY: 'px', backgroundImage: 'url', hidden: 'toggle' };
+        try {
+            document.body.insertAdjacentHTML('beforeend', '<p data-edit="setting:tpl:styled" data-style="sstyled" data-style-props="textColor,fontSize,backgroundImage,radius">Big words</p>');
+            const field = pageForTheChat(document).fields.find((f) => f.key === 'tpl:styled');
+            // narrowed to what the site offers (radius is not), and never a picture or hiding
+            expect(field.style_key).toBe('sstyled');
+            expect(field.style).toEqual(['textColor', 'fontSize']);
+        } finally {
+            delete window.liveEditStyleProps;
+        }
+    });
+
     it('gives words around a formatted part as the panel holds them, the part on its own', () => {
         const { fields } = pageForTheChat(document);
         expect(fields.find((field) => field.key === 'tpl:lede').value).toBe('Free delivery over and 30-day returns.');

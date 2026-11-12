@@ -1,4 +1,5 @@
 import { createChrome } from './chrome.js';
+import { toolbarIcon } from './toolbar-icons.js';
 import { createTeam, splitChanges, TEAM_CSS } from './team.js';
 import { describeVersion, versionsWorthShowing } from './history.js';
 import { glyphIcon } from './glyphs.js';
@@ -1855,7 +1856,25 @@ const bootLiveEdit = () => {
             }
         };
 
+        // Ask AI, opened about one part (set once the chat is ready, below)
+        let askAiAbout = null;
         const appendAssist = (element, box) => {
+            /*
+             * Ask AI about this part, in place of AI assist (owner, 12 Nov 2026: "no where to trigger the ask AI" once a
+             * part is clicked; "replace the AI assistant on the edit tab since we now have ask AI"): the way Notion,
+             * Canva and Wix put their AI next to what is selected. One AI, not two: Rewrite and Shorten are what the
+             * chat offers first for words. They stay only where the host has no chat (a self-hosted Laravel site).
+             */
+            if (askAiAbout && box) {
+                const ask = document.createElement('button');
+                ask.type = 'button';
+                ask.className = 'le-assist le-assist-ask';
+                ask.innerHTML = `${toolbarIcon('sparkles', 16)}<span>Ask AI about this</span>`;
+                ask.addEventListener('click', () => askAiAbout(element));
+                drawerFields.append(ask);
+
+                return;
+            }
             // Only where a model is configured and only for words. A row of
             // buttons that answer "not available" is worse than no row.
             if (!credits?.available || !box) return;
@@ -8916,6 +8935,9 @@ const bootLiveEdit = () => {
                 if (step?.waitFor === 'editor' && drawer.classList.contains('is-open') && drawerTab === 'Edit' && current && current.kind !== 'list') {
                     copy.textContent = step.done;
                     next.classList.add('is-ready');
+                    // done: the example it pointed at stops being marked, so what the owner clicked is plainly the
+                    // part being changed (owner, 12 Nov 2026: the box stayed round the name while the introduction was open)
+                    clearTarget();
                 }
             });
             watcher.observe(drawer, { attributes: true, attributeFilter: ['class'] });
@@ -9211,6 +9233,42 @@ const bootLiveEdit = () => {
 
                     return pressSave();
                 }
+                if (action.type === 'style') {
+                    /*
+                     * How a part looks (colour, size, spacing), set with the part's own style controls in its panel and
+                     * saved with its Save, as a person would (owner, 12 Nov 2026: Ask AI should do style, size and
+                     * spacing too). "" ticks "Use default" / chooses "As designed".
+                     */
+                    const element = (action.field && (byKey('data-edit', action.field) || byKey('data-edit-img', action.field) || byKey('data-edit-bg', action.field)))
+                        || document.querySelector(`[data-style="${CSS.escape(action.key)}"]`);
+                    if (!element) return { ok: false, error: 'That part is not on this page any more.' };
+                    const refused = refusedFor(element);
+                    if (refused) return refused;
+                    if (team && !team.beforeEdit(element, { onRefused: () => closeDrawer(true) })) return { ok: false, locked: heldBySomeoneElse(element) ?? { label: 'that part', name: 'A teammate' } };
+                    if (element.hasAttribute('data-edit') && !element.hasAttribute('data-edit-img')) editText(element, element, { asWords: true });
+                    else openNode(element);
+                    await settled();
+                    for (const [prop, value] of Object.entries(action.props ?? {})) {
+                        const control = drawerFields.querySelector(`[data-style-prop="${CSS.escape(prop)}"]`);
+                        if (!control) { closeDrawer(true); return { ok: false, error: 'That part cannot change that here.' }; }
+                        if (control.type === 'color') {
+                            const asDesigned = control.parentElement?.querySelector('.le-default input[type=checkbox]');
+                            if (value === '') {
+                                if (asDesigned) asDesigned.checked = true;
+                            } else {
+                                control.value = value;
+                                if (asDesigned) asDesigned.checked = false;
+                            }
+                        } else {
+                            control.value = value;
+                        }
+                        control.dispatchEvent(new Event('input', { bubbles: true }));
+                        control.dispatchEvent(new Event('change', { bubbles: true }));
+                    }
+                    if (current) current.dirty = true;
+
+                    return pressSave();
+                }
                 if (action.type === 'list') {
                     const list = document.querySelector(`[data-edit-list="${CSS.escape(action.key)}"]`);
                     if (!list) return { ok: false, error: 'That list is not on this page any more.' };
@@ -9376,6 +9434,15 @@ const bootLiveEdit = () => {
                 }
 
                 return chat;
+            };
+            // the panel's "Ask AI about this": the chat opens, pointed at the part whose panel it is
+            askAiAbout = async (element, say = null) => {
+                try {
+                    const it = await theChat();
+                    it.openAbout(element, say);
+                } catch {
+                    ui.toast('Ask AI could not load. Check your connection and try again.');
+                }
             };
             ui.chatButton.addEventListener('click', async () => {
                 if (!document.body.classList.contains('editing')) setEditing(true);

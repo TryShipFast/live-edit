@@ -265,6 +265,9 @@ a.le-mark:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
   transition: background .15s ease, opacity .15s ease;
 }
 .le-assist:hover { background: var(--le-line); }
+/* Ask AI about this part: the one AI in the panel, so it leads, with its sparkle as on the bar */
+.le-assist-ask { justify-content: flex-start; gap: 8px; font-weight: 500; background: #0B0C0F; color: #fff; margin-bottom: 4px; }
+.le-assist-ask:hover { background: #2A2C31; }
 .le-assist:disabled { opacity: .5; cursor: default; background: #F4F5F7; }
 /* The price, next to the thing it buys. Somebody about to spend a credit
    should not have to remember what it costs. */
@@ -2144,7 +2147,9 @@ export function createChrome() {
     changesButton.title = 'Everything you have changed and not published';
 
     /* Ask AI (chat.js): shown where the content API answers the chat, a host may turn it off (liveEditChat: false). */
-    const chatButton = el('button', 'le-bar-btn le-when-roomy le-chat-open');
+    // never folded away when a part is open (owner, 12 Nov 2026: "if i click an element, the toolbar is shorten"; "no
+    // where to trigger the ask AI"): asking about the part just clicked is the moment it is wanted most
+    const chatButton = el('button', 'le-bar-btn le-chat-open');
     chatButton.type = 'button';
     chatButton.innerHTML = `${toolbarIcon('sparkles', 16)}<span>Ask AI</span>`;
     chatButton.title = 'Ask AI to change this page for you';
