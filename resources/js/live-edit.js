@@ -1517,7 +1517,7 @@ const bootLiveEdit = () => {
         };
         // Every product the shop sells: the design's (the Shop tab's) and the owner's own catalogue.
         const shopProducts = () => [
-            ...(window.liveEditShop?.products ?? []).filter((product) => product.id).map((product) => {
+            ...(window.liveEditShop?.products ?? []).filter((product) => product.id && product.href).map((product) => {
                 // its SKU where the Products grid has read its page (the import's sample file shows it)
                 const read = keptProductReads()[pathOf(product.href)];
 
@@ -5988,7 +5988,8 @@ const bootLiveEdit = () => {
             const kept = keptSale();
             const keptBy = new Map((kept ?? []).map((product) => [product.path, product]));
             // a gift card is neither put on sale nor counted (the host marks it, or its page does: data-gift)
-            saleSlots = listed.filter((product) => !product.gift).map((product) => {
+            // one product per page: a card on a shared page (`shown`, The Speaker's books) has no page of its own to read
+            saleSlots = listed.filter((product) => !product.gift && product.href).map((product) => {
                 const path = pathOf(product.href);
                 if (path === here && lineHere) return { ...product, path, here: true, read: readSale(lineHere) };
                 if (keptBy.has(path)) return { ...keptBy.get(path), here: false };

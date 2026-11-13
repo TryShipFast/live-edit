@@ -228,6 +228,18 @@ describe('the Shop tab: products, collections, pay on delivery and discount code
         expect(container.querySelector('.le-new-category-btn').textContent).toBe('+ New collection');
     });
 
+    it('lists products sold as cards on a shared page, each Edit opening that page, with no grid that cannot read them', () => {
+        // The Speaker's three books are cards on The book page (owner, 13 Nov 2026: they were missing from the Shop tab)
+        const container = document.createElement('div');
+        const shown = '/sites/demo/edit/the-book';
+        renderShopPanel({ container, config: { products: [{ id: 'hardback', name: 'Hardback', shown }, { id: 'signed-hardback', name: 'Signed hardback', shown }], fields: [] }, save: async () => {}, products: () => {} });
+        const rows = [...container.querySelectorAll('.le-shop-product')];
+        expect(rows.map((row) => row.querySelector('.le-shop-name').textContent)).toEqual(['Hardback', 'Signed hardback']);
+        expect(rows.map((row) => row.querySelector('.le-shop-edit').getAttribute('href'))).toEqual([shown, shown]);
+        expect(container.querySelector('[data-shop-part="products"] h3').textContent).toBe('Your products (2)');
+        expect(container.querySelector('.le-shop-products-grid')).toBeNull();
+    });
+
     it('ticks pay on delivery per delivery choice, saved as one list of ways', async () => {
         const container = document.body.appendChild(document.createElement('div'));
         const saved = [];

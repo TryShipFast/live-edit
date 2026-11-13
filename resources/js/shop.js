@@ -137,8 +137,9 @@ export const renderShopPanel = ({
     const drawn = new Map((catalogue?.drawn ?? []).map((d) => [d.id, d.href]));
     if (designed.length || own.length || catalogue || importProducts) {
         const total = designed.length + own.length;
-        const part = section(`Your products (${total})`, 'What your shop sells. Edit opens a product’s page: change its name, price, photos and description there by clicking them.', 'products');
-        if (products && total) {
+        const part = section(`Your products (${total})`, 'What your shop sells. Edit opens the page a product is on: change its name, price, photos and description there by clicking them.', 'products');
+        // the grid reads one product per page: a product sold as a card on a shared page (`shown`) is edited there
+        if (products && (designed.some((product) => product.href) || own.length)) {
             const grid = button('le-btn le-wide le-shop-products-grid', 'Edit products');
             grid.addEventListener('click', () => products());
             part.append(grid, el('p', 'le-hint', 'Every product and size in one grid: price, SKU, collections, featured and stock.'));
@@ -156,7 +157,7 @@ export const renderShopPanel = ({
             li.append(...extra);
             ul.append(li);
         };
-        for (const product of designed) row(product.name, product.href);
+        for (const product of designed) row(product.name, product.href ?? product.shown);
         for (const product of own) {
             const remove = button('le-link-btn le-shop-remove', 'Remove', `Remove ${product.name} from your shop`);
             remove.addEventListener('click', () => removeProduct(product));

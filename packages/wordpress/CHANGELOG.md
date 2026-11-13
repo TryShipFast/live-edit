@@ -1,5 +1,12 @@
 # ShipFast Live Edit for WordPress
 
+## 0.21.13 (13 Nov 2026)
+
+- The Shop tab lists every product, including those sold as cards on a page that shows several (The Speaker's three
+  books on The book page, Arch Lash's treatments, Vellumair's gift card): each by its name, its Edit opening the page
+  it is on. The Products grid and the sale stay one product per page, so they leave those out, and Edit products is
+  offered only when there is a product it can read.
+
 ## 0.21.12 (13 Nov 2026)
 
 From the owner trying 0.21.11:
