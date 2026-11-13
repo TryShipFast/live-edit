@@ -908,6 +908,8 @@ a.le-mark:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
 }
 .le-btn-danger:hover { background: rgba(225,29,72,.12); }
 .le-btn-danger.le-start { margin-right: auto; }
+/* Delete for one part, last in its panel and set apart, as a section's Delete is */
+.le-part-delete { display: flex; border-top: 1px solid var(--le-line); padding-top: 16px; }
 .le-hidden { display: none !important; }
 
 /* ---- fields ---- */

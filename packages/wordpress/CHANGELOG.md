@@ -1,5 +1,13 @@
 # ShipFast Live Edit for WordPress
 
+## 0.21.7 (13 Nov 2026)
+
+- Delete for one part: a paragraph, a heading, a button or a picture (the owner: "still not possible to delete a
+  paragraph"). Its panel has "Delete this ...", asked first; the part goes from the page with no gap, while editing
+  too, and Undo or History brings it back. A section hidden from the Pages list still shows faded while editing, so
+  it can be shown again.
+- Ask AI deletes a part the same way, with the same question first: "remove the paragraph at the top" now works.
+
 ## 0.21.6 (12 Nov 2026)
 
 - Ask AI never says your own part is being edited by someone else (the owner: "on my second edit, it said someone is

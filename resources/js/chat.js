@@ -240,6 +240,8 @@ export function createChat({ shadow, request, showSaved, openPhoto, openPublish,
                 const named = { textColor: 'text colour', background: 'background', fontSize: 'text size', fontWeight: 'boldness', textAlign: 'alignment', lineHeight: 'line spacing', paddingY: 'space above and below', paddingX: 'space left and right', radius: 'rounded corners' };
                 const said = Object.entries(change.props ?? {}).map(([prop, value]) => `${named[prop] ?? prop} ${value === '' ? 'as designed' : value}`).join(', ');
                 item.append(el('b', '', `${change.label}: `), document.createTextNode(said || 'look changed'));
+            } else if (change.type === 'delete') {
+                item.append(el('b', '', `${change.label}: `), document.createTextNode('deleted'));
             } else {
                 const did = { add: 'one added', duplicate: 'one copied', remove: 'one removed', move_up: 'one moved up', move_down: 'one moved down' }[change.action] ?? 'changed';
                 item.append(el('b', '', `${change.label}: `), document.createTextNode(did));

@@ -1239,6 +1239,8 @@ export const styleRules = (key, props) => {
         if (prop === 'hidden') {
             css += `body:not(.editing) ${selector}{display:none !important}`;
             css += `body.editing ${selector}{opacity:.45}`;
+            // a part deleted from its panel is gone while editing too; a hidden section stays in sight, faded
+            css += `body.editing ${selector}:not([data-edit-section]):not([data-edit-item]){display:none !important}`;
             continue;
         }
 

@@ -128,6 +128,17 @@ class StyleTest extends TestCase
         $this->assertStringNotContainsString('Jeremy', $css);
     }
 
+    public function test_a_deleted_part_is_gone_while_editing_but_a_hidden_section_stays_in_sight(): void
+    {
+        // owner, 13 Nov 2026: "still not possible to delete a paragraph". A part deleted from its panel leaves no
+        // faded ghost behind; a section hidden from the Pages list stays faded so it can be shown again.
+        $css = StyleCss::render([], ['intro' => ['hidden' => '1']]);
+
+        $this->assertStringContainsString('body:not(.editing) [data-style="intro"]{display:none !important}', $css);
+        $this->assertStringContainsString('body.editing [data-style="intro"]{opacity:.45}', $css);
+        $this->assertStringContainsString('body.editing [data-style="intro"]:not([data-edit-section]):not([data-edit-item]){display:none !important}', $css);
+    }
+
     public function test_a_section_can_be_restyled_from_a_static_site(): void
     {
         $this->postJson($this->url(), [

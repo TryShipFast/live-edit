@@ -38,8 +38,12 @@ class StyleCss
                 }
 
                 if ($prop === 'hidden') {
+                    // gone for visitors. While editing, a section hidden from the Pages list stays in sight, faded, so
+                    // it can be shown again; a part deleted from its panel (owner, 13 Nov 2026: "still not possible
+                    // to delete a paragraph") is gone there too, and Undo or History brings it back
                     $css .= "body:not(.editing) {$selector}{display:none !important}";
                     $css .= "body.editing {$selector}{opacity:.45}";
+                    $css .= "body.editing {$selector}:not([data-edit-section]):not([data-edit-item]){display:none !important}";
 
                     continue;
                 }

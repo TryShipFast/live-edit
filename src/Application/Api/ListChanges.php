@@ -209,7 +209,7 @@ class ListChanges
             'paddingY' => 'Space above and below',
             'paddingX' => 'Space left and right',
             'radius' => 'Corner rounding',
-            'hidden' => 'Hidden',
+            'hidden' => 'Taken off the page',
         ];
 
         return collect($props)

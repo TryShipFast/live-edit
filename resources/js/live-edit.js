@@ -934,6 +934,41 @@ const bootLiveEdit = () => {
                 none.textContent = 'Nothing on this element can be restyled.';
                 group.append(none);
             }
+
+            /*
+             * Delete for one part (a paragraph, a heading, a button), where its design lets it go (owner, 13 Nov 2026:
+             * "still not possible to delete a paragraph"; chose Delete for any text). The way a section or a card goes,
+             * asked first, and Undo or History brings it back. It is gone from the page while editing too, not faded:
+             * the owner's own word for this is delete, not hide (8 Nov 2026). Sections and cards keep their own Delete.
+             */
+            const mayGo = element && stylePropsFor(element, propNames).includes('hidden') && values.hidden !== '1' && !element.matches('[data-edit-section], [data-edit-item], [data-edit-list]');
+            if (mayGo) {
+                const thing = describeElement(element).toLowerCase();
+                const row = document.createElement('div');
+                row.className = 'le-part-delete';
+                const remove = document.createElement('button');
+                remove.type = 'button';
+                remove.className = 'le-btn-danger';
+                remove.textContent = `Delete this ${thing}`;
+                remove.dataset.act = 'delete-part';
+                // what happened is returned for Ask AI, which presses this as a person does: 'kept' when they said
+                // Keep it, else whether the save went through
+                remove.addEventListener('click', remove.leRun = async () => {
+                    if (!await askTo({ title: `Delete this ${thing}?`, subtitle: 'It goes from the page. Undo brings it back.', yes: `Delete ${thing}`, no: 'Keep it' })) return 'kept';
+                    const mark = document.createElement('input');
+                    mark.type = 'hidden';
+                    mark.dataset.styleProp = 'hidden';
+                    mark.value = '1';
+                    group.append(mark);
+                    if (current) current.dirty = true;
+                    const outcome = await save();
+                    if (outcome?.ok !== false) closeDrawer(true);
+
+                    return outcome?.ok !== false;
+                });
+                row.append(remove);
+                drawerFields.append(row);
+            }
         };
 
         // Live preview: mirror the server's CSS emission for the key being edited.
@@ -9305,6 +9340,27 @@ const bootLiveEdit = () => {
                     if (current) current.dirty = true;
 
                     return pressSave();
+                }
+                if (action.type === 'delete') {
+                    /*
+                     * A paragraph, heading or button taken off the page, with the Delete in its own panel (owner,
+                     * 13 Nov 2026: "still not possible to delete a paragraph"): asked first, as a person is, and Undo
+                     * or History brings it back.
+                     */
+                    const element = byKey('data-edit', action.key) || byKey('data-edit-img', action.key) || byKey('data-edit-bg', action.key);
+                    if (!element) return { ok: false, error: 'That part is not on this page any more.' };
+                    const refused = refusedFor(element);
+                    if (refused) return refused;
+                    if (team && !team.beforeEdit(element, { onRefused: () => closeDrawer(true) })) return { ok: false, locked: heldBySomeoneElse(element) ?? { label: 'that part', name: 'A teammate' } };
+                    if (element.hasAttribute('data-edit') && !element.hasAttribute('data-edit-img')) editText(element, element, { asWords: true });
+                    else openNode(element);
+                    await settled();
+                    const button = drawerFields.querySelector('[data-act="delete-part"]');
+                    if (!button?.leRun) { closeDrawer(true); return { ok: false, error: 'That part cannot be deleted here.' }; }
+                    const done = await button.leRun();
+                    if (done === 'kept') { closeDrawer(true); return { ok: false, kept: true, error: 'Kept as it was.' }; }
+
+                    return done ? { ok: true } : { ok: false, error: 'That could not be deleted just now. Please try again.' };
                 }
                 if (action.type === 'list') {
                     const list = document.querySelector(`[data-edit-list="${CSS.escape(action.key)}"]`);

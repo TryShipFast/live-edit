@@ -275,6 +275,12 @@ describe('rendering saved styles on a page nobody server-renders', () => {
         expect(css).toContain('body.editing [data-style="s1"]{opacity:.45}');
     });
 
+    it('takes a deleted part off the page while editing too, but keeps a hidden section in sight', () => {
+        const css = styleRules('s1', { hidden: '1' });
+
+        expect(css).toContain('body.editing [data-style="s1"]:not([data-edit-section]):not([data-edit-item]){display:none !important}');
+    });
+
     it('skips properties that were cleared', () => {
         expect(styleRules('s1', { background: '', textColor: null })).toBe('');
     });

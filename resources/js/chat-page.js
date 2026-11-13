@@ -7,7 +7,7 @@
  * told about what this person may not change (and the server refuses it anyway, by its key).
  */
 
-import { declaredStyleProps, displayedValue, ownTextOf, shownWords } from './support.js';
+import { declaredStyleProps, displayedValue, ownTextOf, shownWords, stylePropsFor } from './support.js';
 
 const MOST_FIELDS = 400;
 const LONGEST_VALUE = 600;
@@ -138,6 +138,8 @@ export function pageForTheChat(root = document) {
                 if (props.length) {
                     field.style_key = styleKey;
                     field.style = props.filter((prop) => prop !== 'backgroundImage' && prop !== 'hidden').slice(0, 12);
+                    // the panel's Delete for one part (a paragraph, a heading, a button): Ask AI may press it too
+                    if (stylePropsFor(element, props).includes('hidden') && !element.matches('[data-edit-section], [data-edit-item], [data-edit-list]')) field.can_delete = true;
                 }
             }
             fields.push(field);
