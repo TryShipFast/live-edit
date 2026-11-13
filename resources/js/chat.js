@@ -242,6 +242,10 @@ export function createChat({ shadow, request, showSaved, openPhoto, openPublish,
                 const named = { textColor: 'text colour', background: 'background', fontSize: 'text size', fontWeight: 'boldness', textAlign: 'alignment', lineHeight: 'line spacing', paddingY: 'space above and below', paddingX: 'space left and right', radius: 'rounded corners' };
                 const said = Object.entries(change.props ?? {}).map(([prop, value]) => `${named[prop] ?? prop} ${value === '' ? 'as designed' : value}`).join(', ');
                 item.append(el('b', '', `${change.label}: `), document.createTextNode(said || 'look changed'));
+            } else if (change.type === 'open') {
+                item.append(document.createTextNode(change.label));
+            } else if (change.type === 'undo') {
+                item.append(document.createTextNode(change.which === 'redo' ? 'Your last undone change is back' : 'Your last change is taken back'));
             } else if (change.type === 'picture') {
                 const what = change.make ? 'a picture made by AI' : change.find ? `a free photo of “${change.find}”` : null;
                 item.append(el('b', '', `${change.label}: `), document.createTextNode([what, change.description ? 'description changed' : null].filter(Boolean).join(', ')));
@@ -547,16 +551,20 @@ export function createChat({ shadow, request, showSaved, openPhoto, openPublish,
                 const before = await snapshot();
                 // a business detail shows on every page: the page is drawn again once the answer is kept
                 let drawAgain = false;
+                // another page, gone to once the answer is shown
+                let goTo = null;
                 for (const action of planned) {
                     // a photo the owner attached goes with the change that asks for it
                     const doing = action.type === 'image' ? { ...action, file: sending?.id === action.attachment ? sending.file : null, name: sending?.file?.name } : action;
                     const done = await act(doing).catch((error) => ({ ok: false, error: error.message }));
                     if (done?.ok && !done.unchanged) entry.changes.push(action);
                     if (done?.ok && done.reload) drawAgain = true;
+                    if (done?.ok && done.goTo) goTo = done.goTo;
                     else if (!done?.ok) entry.missed.push({ label: action.label, locked: done?.locked ?? null, error: done?.error ?? null });
                 }
                 if (entry.changes.length && before) entry.undo = undoPlan(before, await snapshot());
                 entry.drawAgain = drawAgain;
+                entry.goTo = goTo;
                 if (!entry.changes.length) entry.text = entry.missed.some((missed) => missed.locked)
                     ? 'I could not change that: someone else is working on that part right now.'
                     : 'I could not make that change on this page.';
@@ -575,7 +583,12 @@ export function createChat({ shadow, request, showSaved, openPhoto, openPublish,
         send.disabled = false;
         input.focus();
         // the conversation is kept (sessionStorage), so the page can be drawn again to show every copy
-        if (entry?.drawAgain) {
+        if (entry?.goTo) {
+            const where = entry.goTo;
+            entry.goTo = null;
+            remember();
+            setTimeout(() => { window.location.href = where; }, 900);
+        } else if (entry?.drawAgain) {
             entry.drawAgain = false;
             remember();
             showSaved('Saved \u2713', { reload: true });

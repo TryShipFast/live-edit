@@ -9396,6 +9396,41 @@ const bootLiveEdit = () => {
 
                     return pressSave();
                 }
+                if (action.type === 'open') {
+                    /*
+                     * A tab, a panel or another page, opened by pressing the editor's own button for it (owner,
+                     * 13 Nov 2026: "even open branding tab"; "or open shop catalog"). Another page is gone to once the
+                     * answer is shown (chat.js), the way the Pages list goes there.
+                     */
+                    const bar = { brand: ui.brandButton, pages: ui.pagesButton, preview: ui.previewButton, add_section: ui.sectionsButton, add_form: ui.formButton, search: ui.searchButton };
+                    const tabs = { brand: 'Brand', seo: 'SEO', shop: 'Shop', search: 'Search', changes: 'Changes', history: 'Changes' };
+                    if (action.what === 'page') {
+                        const page = (window.liveEditPages?.pages ?? []).find((p) => String(p.id ?? '') === String(action.page_id ?? ''));
+                        if (!page || !window.liveEditPages?.editorBase) return { ok: false, error: 'That page is not on this website.' };
+
+                        return { ok: true, goTo: `${window.liveEditPages.editorBase}${page.id}` };
+                    }
+                    const button = bar[action.what];
+                    if (button && !button.hidden) {
+                        button.click();
+                        return { ok: true };
+                    }
+                    const tab = ui.drawerTabs?.[tabs[action.what]];
+                    if (!tab) return { ok: false, error: 'This website has no such tab.' };
+                    openDrawer();
+                    tab.click();
+                    if (action.what === 'history') ui.drawerSubtabs?.History?.click();
+
+                    return { ok: true };
+                }
+                if (action.type === 'undo') {
+                    // the bar's own Undo and Redo: the latest change taken back, or put back
+                    const button = action.which === 'redo' ? ui.redoButton : ui.undoButton;
+                    if (!button || button.disabled) return { ok: false, error: action.which === 'redo' ? 'There is nothing to redo.' : 'There is nothing to undo.' };
+                    await (action.which === 'redo' ? redoLast() : undoLast());
+
+                    return { ok: true };
+                }
                 if (action.type === 'picture') {
                     /*
                      * A picture changed as a person changes it (owner, 13 Nov 2026: chat does what a click does; the
