@@ -1,5 +1,10 @@
 # ShipFast Live Edit for WordPress
 
+## 0.21.20 (13 Nov 2026)
+
+- The Delete window names the part as everything else does (part-name.js): "Delete this sample note?" where it had
+  asked "Delete this text?" of a Sample note; paragraph, heading, button, photo and a field's own name ("price") alike.
+
 ## 0.21.19 (13 Nov 2026)
 
 - Every part has a name in the panel, on the page's label and for Ask AI: the template's sample marks are "Sample

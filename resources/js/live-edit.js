@@ -933,10 +933,14 @@ const bootLiveEdit = () => {
                  * gave it (owner, 13 Nov 2026: "is introduction generic"), and its content shown in the window.
                  */
                 const picture = element.tagName === 'IMG' ? element : element.querySelector?.('img');
+                // the kind of part, from its one name (part-name.js): "paragraph", "sample note", "price", "button"; the
+                // window had its own list and asked "Delete this text?" of a Sample note (owner, 13 Nov 2026)
+                const named = partName(element).replace(/ (at the top|in .*)$/, '');
                 const thing = element.tagName === 'IMG' ? 'photo'
-                    : /^H[1-6]$/.test(element.tagName) ? 'heading'
-                        : ['A', 'BUTTON'].includes(element.tagName) ? 'button'
-                            : element.tagName === 'P' ? 'paragraph' : 'text';
+                    : /^Logo$/.test(named) ? 'logo'
+                        : /button$/.test(named) || ['A', 'BUTTON'].includes(element.tagName) ? 'button'
+                            : named && !named.startsWith('\u201C') ? named.toLowerCase()
+                                : /^H[1-6]$/.test(element.tagName) ? 'heading' : element.tagName === 'P' ? 'paragraph' : 'text';
                 const whatGoes = () => {
                     const box = document.createElement('div');
                     box.className = 'le-ask-shows';
