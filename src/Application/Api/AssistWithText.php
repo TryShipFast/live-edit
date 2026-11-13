@@ -5,6 +5,7 @@ namespace ShipFast\LiveEdit\Application\Api;
 use Illuminate\Support\Facades\Http;
 use ShipFast\LiveEdit\Domain\Credits\Credits;
 use ShipFast\LiveEdit\Domain\Site\Site;
+use ShipFast\LiveEdit\Models\AiCost;
 
 /**
  * Rewriting a sentence somebody already has.
@@ -59,6 +60,7 @@ class AssistWithText
             return ['text' => null, 'balance' => $this->credits->balance($site), 'reason' => 'not_enough_credits'];
         }
 
+        $this->costFor = (int) $site->id;
         $written = $this->ask($action, $text, $context);
 
         if ($written === null || trim($written) === '' || trim($written) === trim($text)) {
@@ -77,6 +79,9 @@ class AssistWithText
     /**
      * @param  array<string, mixed>  $context
      */
+    /** The site whose words are being rewritten, for what it cost (AiCost). */
+    protected ?int $costFor = null;
+
     protected function ask(string $action, string $text, array $context): ?string
     {
         $instruction = $action === 'shorten'
@@ -142,6 +147,8 @@ class AssistWithText
         if (! $response->successful()) {
             return null;
         }
+
+        AiCost::record($this->costFor, $action, (string) config('live-edit.ai.model'), (array) ($response->json('usage') ?? []), AiCost::ofTokens((string) config('live-edit.ai.model'), (array) ($response->json('usage') ?? [])));
 
         $written = $response->json('choices.0.message.content');
 

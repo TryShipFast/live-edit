@@ -246,6 +246,17 @@ return [
         // and model, because they are a different thing on every provider and
         // somebody may well want a cheap model for words and a good one for
         // images.
+        /*
+         * What the providers charge, in dollars (per million tokens; dall-e-3 a picture), to keep what each call
+         * really cost (AiCost). Checked against the provider's price page when a model changes.
+         */
+        'prices' => [
+            'gpt-4o-mini' => ['input' => 0.15, 'cached' => 0.075, 'output' => 0.60],
+            'gpt-5-mini' => ['input' => 0.25, 'cached' => 0.025, 'output' => 2.00],
+            'gpt-image-1' => ['text_input' => 5.00, 'image_input' => 10.00, 'image_output' => 40.00],
+            'dall-e-3' => ['picture' => 0.04],
+        ],
+
         'image_endpoint' => env('LIVE_EDIT_AI_IMAGE_ENDPOINT', 'https://api.openai.com/v1/images/generations'),
         'image_model' => env('LIVE_EDIT_AI_IMAGE_MODEL', 'gpt-image-1'),
         // Asked when the model above is refused (OpenAI refuses gpt-image-1 until the organisation

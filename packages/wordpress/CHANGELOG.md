@@ -1,5 +1,14 @@
 # ShipFast Live Edit for WordPress
 
+## 0.21.9 (13 Nov 2026)
+
+- What every AI call really cost is kept (the owner: "we need to be sure of the prices since image is not same as
+  text"): a new `live_edit_ai_costs` table, one row a paid call (pictures, rewrites; the host adds chat and voice),
+  with the provider's own usage and dollars from `live-edit.ai.prices`. Calls refunded to the customer are kept too.
+  Ask AI's voice sends how long it listened, for the host to keep.
+- Ask AI knows what sits above, below, left and right of each part on the screen ("the paragraph under the Book me
+  button", "the one beside the photo"; the owner: "the moat is chatting to replace mouse control").
+
 ## 0.21.8 (13 Nov 2026)
 
 - The delete window shows what goes: "Delete this paragraph?" with the paragraph's own words (or the picture) in it

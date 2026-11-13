@@ -4,6 +4,7 @@ namespace ShipFast\LiveEdit\Application\Api;
 
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
+use ShipFast\LiveEdit\Models\AiCost;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 use ShipFast\LiveEdit\Domain\Content\ImageStore;
@@ -70,6 +71,7 @@ class ImagineAPicture
             return ['images' => [], 'balance' => $this->credits->balance($site), 'reason' => 'not_enough_credits'];
         }
 
+        $this->costFor = (int) $site->id;
         $images = $this->keep($site, $this->ask($prompt, $count));
 
         if ($images === []) {
@@ -230,6 +232,8 @@ class ImagineAPicture
     /** @return array<int, string> */
     public function generate(Site $site, string $prompt, int $count = 2): array
     {
+        $this->costFor = (int) $site->id;
+
         return $this->keep($site, $this->ask($prompt, $count));
     }
 
@@ -313,6 +317,9 @@ class ImagineAPicture
      *
      * @return array<int, string>
      */
+    /** The site whose picture is being made, for what it cost (AiCost). */
+    protected ?int $costFor = null;
+
     protected function ask(string $prompt, int $count): array
     {
         $this->whyNothing = 'no_suggestion';
@@ -367,6 +374,10 @@ class ImagineAPicture
 
                 return [];
             }
+
+            // what this call really cost: paid even when nothing usable comes back and the credits are given back
+            $made = count((array) ($response->json('data') ?? []));
+            AiCost::record($this->costFor, 'picture', $tryModel, ['pictures' => $made, 'size' => '1024x1024'] + (array) ($response->json('usage') ?? []), AiCost::ofPictures($tryModel, (array) ($response->json('usage') ?? []), $made));
 
             $images = collect($response->json('data') ?? [])
                 ->map(fn (array $image) => $image['url']

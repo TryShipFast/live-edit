@@ -507,7 +507,7 @@ export function createChat({ shadow, request, showSaved, openPhoto, openPublish,
             const response = await request('/live-edit/assistant/chat', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ message: text, history, page: pageForTheChat(document), tapped: about, busy: await heldNow(), attachments: sending ? [{ id: sending.id, name: String(sending.file.name || 'photo').slice(0, 120) }] : [] }),
+                body: JSON.stringify({ message: text, history, page: pageForTheChat(document), tapped: about, busy: await heldNow(), attachments: sending ? [{ id: sending.id, name: String(sending.file.name || 'photo').slice(0, 120) }] : [], voice_seconds: Math.min(voiceSeconds, 600) }),
             });
             let data = await response.json();
             // the host answers on its queue (no web worker waits on the model): collect the answer when it is ready
@@ -592,6 +592,8 @@ export function createChat({ shadow, request, showSaved, openPhoto, openPublish,
     // never a dead button: shown only where one of the two ways can hear
     mic.hidden = !((hostHears() && canStream()) || BrowserSpeech);
     let talk = null;
+    // seconds a paid transcription listened since the last message (sent with it, then zero)
+    let voiceSeconds = 0;
     let noteTimer = null;
     const noteOnMic = (text, forMoment = true) => {
         micNote.textContent = text;
@@ -611,6 +613,9 @@ export function createChat({ shadow, request, showSaved, openPhoto, openPublish,
         if (!talk) return;
         const ending = talk;
         talk = null;
+        // how long a paid transcription listened, sent with the next message so its real cost is kept (owner,
+        // 13 Nov 2026: "we need to be sure of the prices"); the browser's own recognition costs nothing
+        if (ending.paid && ending.started) voiceSeconds += Math.ceil((Date.now() - ending.started) / 1000);
         clearInterval(ending.clock);
         clearTimeout(ending.pause);
         try { ending.close?.(); } catch { /* already closed */ }
@@ -662,6 +667,7 @@ export function createChat({ shadow, request, showSaved, openPhoto, openPublish,
         session.listening = (most = 120) => {
             micAs('listening');
             const started = Date.now();
+            session.started = started;
             const tick = () => {
                 const seconds = Math.floor((Date.now() - started) / 1000);
                 noteOnMic(`${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}`, false);
@@ -724,6 +730,7 @@ export function createChat({ shadow, request, showSaved, openPhoto, openPublish,
         if (!answer.ok) throw new Error('The speech service did not answer.');
         await peer.setRemoteDescription({ type: 'answer', sdp: await answer.text() });
         if (talk !== session) return;
+        session.paid = true;
         session.listening(Number(pass.seconds) || 120);
     };
 
