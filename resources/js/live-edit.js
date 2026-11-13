@@ -9301,9 +9301,26 @@ const bootLiveEdit = () => {
                     await settled();
                     const field = drawerFields.querySelector('input[data-link-field=href]');
                     if (!field) { closeDrawer(true); return { ok: false, error: 'That link cannot be changed here.' }; }
-                    field.value = action.value;
-                    field.dispatchEvent(new Event('input', { bubbles: true }));
-                    field.dispatchEvent(new Event('change', { bubbles: true }));
+                    if (typeof action.page_id === 'string') {
+                        // one of the site's own pages, chosen by name in Goes to, as a person does (it writes the
+                        // address the right way for where this page sits)
+                        const picker = drawerFields.querySelector('select.le-page-pick');
+                        if (!picker || ![...picker.options].some((option) => option.value === action.page_id)) { closeDrawer(true); return { ok: false, error: 'That page is not on this website.' }; }
+                        picker.value = action.page_id;
+                        picker.dispatchEvent(new Event('change', { bubbles: true }));
+                    } else if (typeof action.value === 'string' && action.value !== '') {
+                        field.value = action.value;
+                        field.dispatchEvent(new Event('input', { bubbles: true }));
+                        field.dispatchEvent(new Event('change', { bubbles: true }));
+                    }
+                    if (typeof action.new_tab === 'boolean') {
+                        const tab = drawerFields.querySelector('input[data-link-field=target]');
+                        if (tab && tab.checked !== action.new_tab) {
+                            tab.checked = action.new_tab;
+                            tab.dispatchEvent(new Event('change', { bubbles: true }));
+                        }
+                    }
+                    if (current) current.dirty = true;
 
                     return pressSave();
                 }

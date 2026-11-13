@@ -143,7 +143,7 @@ describe('business details', () => {
     it('offers the business name and contacts as Brand has them, never one copy on the page', () => {
         // owner, 13 Nov 2026, the coverage walk: 181 business details on The Speaker would have changed one copy only
         window.liveEditBrand = { identity: { nameKey: 'brand.name', name: 'Jordan Reese', contacts: [
-            { key: 'brand.phone', label: 'Phone', marker: 'data-brand-phone', value: '+234 803 000 0137' },
+            { key: 'brand.phone', label: 'Phone', marker: 'data-brand-phone', value: '' },
             { key: 'brand.whatsapp', label: 'WhatsApp', marker: 'data-brand-whatsapp', value: '' },
         ] } };
         document.body.innerHTML = `

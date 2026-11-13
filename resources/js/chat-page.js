@@ -277,6 +277,8 @@ export function pageForTheChat(root = document) {
         lists,
         sectionsList,
         business: businessOf(doc, root),
+        // the site's pages, by name, so "link it to the Booking page" picks one as the link panel's Goes to does
+        pages: (doc.defaultView?.liveEditPages?.pages ?? []).slice(0, 80).map((page) => ({ id: String(page.id ?? ''), title: cut(page.title || page.id || 'Home', 80) })),
     };
 }
 
@@ -306,7 +308,9 @@ const businessOf = (doc, root) => {
     }
     for (const contact of identity.contacts ?? []) {
         if (!contact?.key || !contact.marker || !root.querySelector(`[${contact.marker}]`)) continue;
-        details.push({ key: contact.key, label: cut(contact.label || 'Contact', 60), value: cut(contact.value || '', 240) });
+        // what the page shows when Brand holds nothing yet (the design's own), as the Brand tab fills its box
+        const shown = clean(root.querySelector(`[${contact.marker}]:not([${contact.marker}="link"])`)?.textContent ?? '');
+        details.push({ key: contact.key, label: cut(contact.label || 'Contact', 60), value: cut(contact.value || shown, 240) });
     }
 
     return details;

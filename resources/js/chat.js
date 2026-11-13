@@ -232,7 +232,9 @@ export function createChat({ shadow, request, showSaved, openPhoto, openPublish,
         for (const change of entry.changes) {
             const item = el('li');
             if (change.type === 'field') {
-                item.append(el('b', '', `${change.label}: `), document.createTextNode(change.kind === 'link' ? `now goes to ${change.value}` : `“${change.value}”`));
+                const goesTo = change.to ?? change.value;
+                const tab = change.new_tab === true ? ', opens in a new tab' : change.new_tab === false ? ', opens in the same tab' : '';
+                item.append(el('b', '', `${change.label}: `), document.createTextNode(change.kind === 'link' ? `${goesTo ? `now goes to ${goesTo}` : 'link changed'}${tab}` : `“${change.value}”`));
             } else if (change.type === 'image') {
                 item.append(el('b', '', `${change.label}: `), document.createTextNode('new photo'));
             } else if (change.type === 'style') {
