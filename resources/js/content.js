@@ -706,6 +706,10 @@ export const applyOrder = (root, settings) => {
                 container.removeChild(child);
             }
         }
+        // the design's own items, kept on the list: one deleted to the last can be added back (the section's panel)
+        if (items.size && !container.hasAttribute('data-edit-list-designed')) {
+            container.setAttribute('data-edit-list-designed', [...items.keys()].filter((id) => !/^n[0-9a-z]+_/.test(id)).join(' '));
+        }
 
         if (items.size === 0) {
             continue;

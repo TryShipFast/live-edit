@@ -113,7 +113,7 @@ describe('the page the chat sends', () => {
 
     it('gives each list its items and the most its design holds', () => {
         expect(pageForTheChat(document).lists).toEqual([{
-            key: 'tpl:faq', label: 'Questions', max: 6,
+            key: 'tpl:faq', label: 'Questions', max: 6, section: 'Questions',
             items: [{ id: 'q1', label: 'Do you deliver?' }, { id: 'q2', label: 'Can I return?' }],
         }]);
     });

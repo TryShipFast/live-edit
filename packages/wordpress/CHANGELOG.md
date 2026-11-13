@@ -1,5 +1,19 @@
 # ShipFast Live Edit for WordPress
 
+## 0.21.17 (13 Nov 2026)
+
+From the owner trying Ask AI and voice on The Speaker:
+- Voice: spoken words stay in the box until the mic is tapped again, to check and correct, and Send sends them, as
+  dictation does on a phone; a pause never sends a half-said request ("the mic takes pause and send it"; "due to
+  accent and noise ... add edit"). No hint is sent to the transcriber, which had written the site's name and the
+  page's title into what it heard ("the mic is always appending ...").
+- Which part: every list says which section it is in (a page can have six lists called Buttons), a button in a row of
+  buttons says which list it is in, the hero is said to be at the top whatever its heading, and parts of the page's
+  hidden layouts are not sent ("struggling to delete a check a date button on the hero section").
+- The last button can be deleted, by click and by Ask AI, where its section's panel offers + Add a button to bring
+  the design's own back ("can't delete the second button"). A list keeps a minimum only where its design says so.
+- Ask AI says why a list change was refused as the panel would (full, its fewest, or the end of a move).
+
 ## 0.21.16 (13 Nov 2026)
 
 - The Delete window's box of what goes has no stripe down its left: a thin outline on a light tint, as our templates'

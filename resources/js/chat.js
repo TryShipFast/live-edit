@@ -629,10 +629,11 @@ export function createChat({ shadow, request, showSaved, openPhoto, openPublish,
     /*
      * Voice (owner, 12 Nov 2026: "it's almost same as text just that someone's voice is converted to text / So we don't
      * do it two times"; "Use the open transcribe"; "It's speak to mic, no audio upload"; "Use what other popular
-     * platforms are using"): tap the mic and speak; the words appear in the box as they are said, and when the owner
-     * stops talking they are sent, as Siri, Google Assistant and ChatGPT's voice mode do: a pause of about a second after
-     * a finished sentence, or a tap on the mic, sends; Escape, or typing in the box, keeps the words to finish by hand;
-     * a cough or one word is not sent. One request a tap.
+     * platforms are using"): tap the mic and speak; the words appear in the box as they are said. Tap the mic again when
+     * done: the words stay in the box to check and correct, and Send sends them, as dictation does on a phone's keyboard
+     * and in WhatsApp. Never sent on a pause (owner, 13 Nov 2026: "due to accent and noise, the mic might not be
+     * interpreting that quite good, add edit"; "the mic takes pause and send it"; "so it sends incomplete command most
+     * times"). Send while listening stops and sends what is in the box. One request a tap.
      *
      * Two ways to hear, the same from there on:
      *   1. OpenAI's Realtime transcription: the host gives a short-lived pass (POST /live-edit/assistant/voice) and the
@@ -642,7 +643,6 @@ export function createChat({ shadow, request, showSaved, openPhoto, openPublish,
      *      it cannot be reached: free, in Chrome, Edge, Android and Safari (owner: "Yes please" to the backup).
      * Where neither can work the mic is not shown: never a dead button. At most two minutes at a time.
      */
-    const PAUSE_SENDS_AFTER = 1200;
     const LAST_WORDS_WAIT = 1500;
     const BrowserSpeech = window.SpeechRecognition || window.webkitSpeechRecognition || null;
     const canStream = () => Boolean(navigator.mediaDevices?.getUserMedia) && typeof window.RTCPeerConnection === 'function';
@@ -665,7 +665,7 @@ export function createChat({ shadow, request, showSaved, openPhoto, openPublish,
         mic.innerHTML = state === 'listening' ? STOP_ICON : MIC_ICON;
         mic.append(micNote);
         mic.setAttribute('aria-label', state === 'listening' ? 'Stop talking' : 'Talk instead of typing');
-        input.placeholder = state === 'listening' ? 'Listening… I send it when you stop talking' : state === 'starting' ? 'Starting…' : 'Ask for a change';
+        input.placeholder = state === 'listening' ? 'Listening… tap the mic when you finish' : state === 'starting' ? 'Starting…' : 'Ask for a change';
     };
     const stopTalking = () => {
         if (!talk) return;
@@ -681,21 +681,20 @@ export function createChat({ shadow, request, showSaved, openPhoto, openPublish,
         micAs('idle');
         input.focus();
     };
-    /** Done talking: what was heard is sent, as an assistant acts when you stop speaking. */
+    /** Done talking: what was heard stays in the box, to check, correct and Send. */
     const finishTalking = (session) => {
         if (talk !== session) return;
         const said = [...session.heard.values()].join(' ').trim();
         stopTalking();
-        // a cough, a click or one word is not a request: kept in the box, nothing spent
-        if (said.split(/\s+/).filter((word) => /\w/.test(word)).length < 2) return;
-        ask();
+        input.setSelectionRange?.(input.value.length, input.value.length);
+        if (said) noteOnMic('Check the words, then press Send');
     };
     /** The mic tapped while talking: listening ends at once, the last words settle, then it is sent. */
     const doneSpeaking = (session) => {
         if (talk !== session) return;
         session.quiet?.();
         micAs('starting');
-        input.placeholder = 'Sending what you said…';
+        input.placeholder = 'Writing down what you said…';
         session.finishing = true;
         clearTimeout(session.pause);
         session.pause = setTimeout(() => finishTalking(session), session.speaking ? LAST_WORDS_WAIT : 0);
@@ -718,9 +717,9 @@ export function createChat({ shadow, request, showSaved, openPhoto, openPublish,
             session.speaking = false;
             session.heard.set(id, String(words ?? session.heard.get(id) ?? '').trim());
             session.show();
-            // a finished sentence and then a pause: the owner is done, so it is sent
+            // a pause is only a pause: listening goes on until the owner taps the mic (never sent half said)
             clearTimeout(session.pause);
-            session.pause = setTimeout(() => finishTalking(session), session.finishing ? 0 : PAUSE_SENDS_AFTER);
+            if (session.finishing) session.pause = setTimeout(() => finishTalking(session), 0);
         };
         session.listening = (most = 120) => {
             micAs('listening');
@@ -742,7 +741,9 @@ export function createChat({ shadow, request, showSaved, openPhoto, openPublish,
         const response = await request('/live-edit/assistant/voice', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ hint: [...new Set([document.querySelector('meta[property="og:site_name"]')?.content, document.title].filter(Boolean))].join(', ').slice(0, 600) }),
+            // no hint: a transcriber given the site's name and title wrote them into what it heard in a pause (owner,
+            // 13 Nov 2026: "the mic is always appending Temitope Olotin The heading at the top")
+            body: JSON.stringify({}),
         });
         const pass = await response.json();
         if (talk !== session) return;
@@ -820,7 +821,7 @@ export function createChat({ shadow, request, showSaved, openPhoto, openPublish,
                 noteOnMic('I could not hear that just now. Please try again, or type it.');
             }
         });
-        // the browser ends listening on its own after a long silence: what was heard is sent
+        // the browser ends listening on its own after a long silence: what was heard stays in the box to Send
         recognition.addEventListener('end', () => { if (talk === session && !session.closing) finishTalking(session); });
         recognition.start();
         session.listening(120);

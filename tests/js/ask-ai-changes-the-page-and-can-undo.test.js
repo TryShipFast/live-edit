@@ -456,19 +456,26 @@ describe('Ask AI', () => {
         const pause = () => new Promise((resolve) => setTimeout(resolve, 1300));
         const changed = () => answer({ reply: 'I made the headline shorter.', actions: [], cards: [] });
 
-        it('shows the words as they are spoken, and sends them when the owner stops talking', async () => {
+        /*
+         * Owner, 13 Nov 2026: "due to accent and noise, the mic might not be interpreting that quite good, add edit";
+         * "the mic takes pause and send it"; "so it sends incomplete command most times". A pause sends nothing: the
+         * words stay in the box until the owner taps the mic, then they check and correct them, and Send sends.
+         */
+        it('shows the words as they are spoken, keeps listening through pauses, and sends only on Send', async () => {
             chatWith([pass, changed]);
             const box = host.querySelector('textarea');
 
             mic().click();
             await settle();
             expect(calls[0].url).toBe('/live-edit/assistant/voice');
+            // no hint: the site's name and title were written into what was heard in a pause
+            expect(calls[0].body).toEqual({});
             // the microphone goes straight to the speech service with the short-lived pass; no audio to the host
             expect(sdpSent[0].url).toBe('https://speech.test/realtime/calls');
             expect(sdpSent[0].options.headers.Authorization).toBe('Bearer ek_pass');
             expect(peers[0].channel.name).toBe('oai-events');
             expect(mic().classList.contains('is-recording')).toBe(true);
-            expect(box.placeholder).toBe('Listening… I send it when you stop talking');
+            expect(box.placeholder).toBe('Listening… tap the mic when you finish');
 
             peers[0].hear({ type: 'input_audio_buffer.speech_started' });
             peers[0].hear({ type: 'conversation.item.input_audio_transcription.delta', item_id: 'a', delta: 'make the head' });
@@ -476,23 +483,35 @@ describe('Ask AI', () => {
             peers[0].hear({ type: 'conversation.item.input_audio_transcription.delta', item_id: 'a', delta: 'line shorter' });
             peers[0].hear({ type: 'conversation.item.input_audio_transcription.completed', item_id: 'a', transcript: 'Make the headline shorter.' });
             expect(box.value).toBe('Make the headline shorter.');
-            // still talking: a new sentence starts within the pause, so nothing is sent yet
-            peers[0].hear({ type: 'input_audio_buffer.speech_started' });
-            peers[0].hear({ type: 'conversation.item.input_audio_transcription.delta', item_id: 'b', delta: 'and say we deliver' });
-            peers[0].hear({ type: 'conversation.item.input_audio_transcription.completed', item_id: 'b', transcript: 'And say we deliver.' });
-            expect(calls).toHaveLength(1);
 
+            // a pause sends nothing and listening goes on
             await pause();
+            await settle();
+            expect(calls).toHaveLength(1);
+            expect(mic().classList.contains('is-recording')).toBe(true);
+            peers[0].hear({ type: 'conversation.item.input_audio_transcription.completed', item_id: 'b', transcript: 'And say we deliver.' });
+
+            // done: the mic tapped, the words stay to check
+            mic().click();
+            await settle();
+            await new Promise((resolve) => setTimeout(resolve, 20));
             await settle();
             expect(peers[0].closed).toBe(true);
             expect(tracksStopped).toBe(1);
+            expect(calls).toHaveLength(1);
+            expect(box.value).toBe('Make the headline shorter. And say we deliver.');
+
+            // corrected by hand, then sent
+            box.value = 'Make the headline shorter. And say we deliver to Abuja.';
+            box.dispatchEvent(new Event('input'));
+            host.querySelector('.le-chat-send').click();
+            await settle();
             expect(calls[1].url).toBe('/live-edit/assistant/chat');
-            expect(calls[1].body.message).toBe('Make the headline shorter. And say we deliver.');
-            expect(host.querySelector('.le-chat-msg.is-owner').textContent).toBe('Make the headline shorter. And say we deliver.');
+            expect(calls[1].body.message).toBe('Make the headline shorter. And say we deliver to Abuja.');
             expect(host.textContent).toContain('I made the headline shorter.');
         });
 
-        it('sends at once when the mic is tapped, after the last words settle', async () => {
+        it('waits for the last words when the mic is tapped mid-sentence, and leaves them to send', async () => {
             chatWith([pass, changed]);
             mic().click();
             await settle();
@@ -500,12 +519,12 @@ describe('Ask AI', () => {
             mic().click();
             await settle();
             // mid-sentence: the microphone is off and the last words are awaited, not cut short
-            expect(calls).toHaveLength(1);
             peers[0].hear({ type: 'conversation.item.input_audio_transcription.completed', item_id: 'a', transcript: 'Change the opening hours.' });
             await settle();
             await new Promise((resolve) => setTimeout(resolve, 20));
             await settle();
-            expect(calls[1].body.message).toBe('Change the opening hours.');
+            expect(calls).toHaveLength(1);
+            expect(host.querySelector('textarea').value).toBe('Change the opening hours.');
         });
 
         it('does not send a cough or one word, and keeps it in the box', async () => {
@@ -552,7 +571,7 @@ describe('Ask AI', () => {
             });
             afterEach(() => { delete window.webkitSpeechRecognition; delete window.liveEditChat; });
 
-            it('hears with the browser when the host has no OpenAI, and sends when the owner stops talking', async () => {
+            it('hears with the browser when the host has no OpenAI, and keeps the words for Send', async () => {
                 window.liveEditChat = { voice: false };
                 chatWith([changed]);
                 const box = host.querySelector('textarea');
@@ -568,6 +587,13 @@ describe('Ask AI', () => {
                 expect(box.value).toBe('make the head');
                 recognitions[0].hear(0, 'make the headline shorter', true);
                 await pause();
+                await settle();
+                expect(calls).toHaveLength(0);
+                mic().click();
+                await settle();
+                await new Promise((resolve) => setTimeout(resolve, 20));
+                expect(box.value).toBe('make the headline shorter');
+                host.querySelector('.le-chat-send').click();
                 await settle();
                 expect(calls[0].url).toBe('/live-edit/assistant/chat');
                 expect(calls[0].body.message).toBe('make the headline shorter');

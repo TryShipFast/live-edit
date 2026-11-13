@@ -4905,7 +4905,13 @@ const bootLiveEdit = () => {
             // beats letting it.
             const count = currentOrder().length;
             const most = parseInt(list.dataset.editListMax ?? '', 10);
-            const least = Math.max(1, parseInt(list.dataset.editListMin ?? '', 10) || 1);
+            /*
+             * The last one can go too, where its section's panel can add one back (+ Add a button; owner, 13 Nov 2026:
+             * "can't delete the second button"): what the design drew is kept, so nothing is lost. A list outside a
+             * section keeps one, as there would be nowhere to add it back from.
+             */
+            const comesBack = !sections && Boolean(list.closest('[data-edit-section]'));
+            const least = Number.isFinite(parseInt(list.dataset.editListMin ?? '', 10)) ? Math.max(0, parseInt(list.dataset.editListMin, 10)) : (comesBack ? 0 : 1);
             const full = Number.isFinite(most) && most > 0 && count >= most;
             const lowest = count <= least;
 
@@ -5098,7 +5104,7 @@ const bootLiveEdit = () => {
 
                             return;
                         }
-                        if (!await askTo({ title: `Delete this ${itemNoun(list) ?? 'card'}?`, subtitle: 'Undo brings it back.', yes: 'Delete', no: 'Keep it' })) return 'kept';
+                        if (!await askTo({ title: `Delete this ${itemNoun(list) ?? 'card'}?`, subtitle: count === 1 ? `Undo brings it back, and + Add a${/^[aeiou]/.test(itemNoun(list) ?? 'card') ? 'n' : ''} ${itemNoun(list) ?? 'card'} in its section's panel adds one again.` : 'Undo brings it back.', yes: 'Delete', no: 'Keep it' })) return 'kept';
 
                         return deleteCard('Deleted \u2713');
                     });
@@ -5149,6 +5155,40 @@ const bootLiveEdit = () => {
                     ? `This design holds ${most}. Replace one, or delete one to add another.`
                     : 'Keep at least one, so there is something to add another from.';
                 block.append(why);
+            }
+            /*
+             * A section's lists emptied to the last (its buttons all deleted): + Add a button brings back the design's
+             * own first one, with the words it had (owner, 13 Nov 2026: "can't delete the second button").
+             */
+            if (sections && item) {
+                const emptied = [...item.querySelectorAll('[data-edit-list]')].filter((inner) => inner.dataset.editListKind !== 'sections'
+                    && inner.closest('[data-edit-section]') === item
+                    && !inner.querySelector(':scope > [data-edit-item]')
+                    && (inner.dataset.editListDesigned ?? '').trim());
+                for (const inner of emptied) {
+                    const noun = itemNoun(inner) ?? 'item';
+                    const addBack = document.createElement('button');
+                    addBack.type = 'button';
+                    addBack.className = 'le-chip-btn le-add-back';
+                    addBack.textContent = `+ Add a${/^[aeiou]/.test(noun) ? 'n' : ''} ${noun}`;
+                    addBack.dataset.act = 'add-back';
+                    addBack.addEventListener('click', addBack.leRun = async () => {
+                        const first = inner.dataset.editListDesigned.trim().split(/\s+/)[0];
+                        addBack.disabled = true;
+                        try {
+                            await saveListOrder(inner, [first]);
+                            await settle('Added \u2713', inner.dataset.editList, JSON.stringify([first]), true);
+
+                            return true;
+                        } catch (error) {
+                            notify(error.message);
+                            addBack.disabled = false;
+
+                            return false;
+                        }
+                    });
+                    block.append(addBack);
+                }
             }
             // The card's category when its words do not show it (choice.js): chosen from the filter's own options.
             const choicePicker = !sections && item ? renderChoice({ item, list, save: saveSetting, notify }) : null;
@@ -9801,7 +9841,13 @@ const bootLiveEdit = () => {
                     if (!button || button.disabled || typeof button.leRun !== 'function') {
                         closeDrawer(true);
 
-                        return { ok: false, error: button?.disabled ? 'That list is as long as its design allows.' : 'That cannot be done to this list.' };
+                        // said as the panel says it: full for an add, its fewest for a remove, the end for a move
+                        const why = !button?.disabled ? 'That cannot be done to this list.'
+                            : action.action === 'remove' ? 'That list keeps as few as its design allows.'
+                                : ['add', 'duplicate'].includes(action.action) ? 'That list is as long as its design allows.'
+                                    : 'It cannot move further that way.';
+
+                        return { ok: false, error: why };
                     }
                     listRefusal = null;
                     const done = await button.leRun();

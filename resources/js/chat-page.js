@@ -45,10 +45,38 @@ const hrefKeyOf = (marker) => {
     return /^[a-z][\w-]*:[\w.:-]+$/i.test(marker) && !marker.startsWith('auto:') ? marker : null;
 };
 
+/**
+ * The section a part is in, by the name the Sections list shows; the page's hero is said to be at the top as well,
+ * since its name is often its heading ("Jordan Reese") and owners call it the hero or the top (owner, 13 Nov 2026:
+ * "struggling to delete a check a date button on the hero section"; "how does it know the section i'm talking about").
+ */
+const isTheTop = (section) => Boolean(section.querySelector('[data-hero="headline"]')) || /(^|[.\-])hero$/i.test(section.getAttribute('data-instance') || '');
 const sectionOf = (element) => {
     const section = element.closest('[data-edit-section]');
+    if (!section) return '';
+    const name = cut(section.getAttribute('data-edit-section-label') || '', 70);
 
-    return section ? cut(section.getAttribute('data-edit-section-label') || '', 80) : '';
+    return isTheTop(section) ? `${name || 'Hero'} (the hero, at the top)` : name;
+};
+
+/**
+ * The page's other layouts the design carries hidden (The Speaker's home holds Home 1, 2 and 3; one is shown): their
+ * parts are not on the owner's screen, so they are not told to Ask AI, as their lists are not.
+ */
+const inAHiddenLayout = (element, shown) => {
+    const layout = element.closest('[data-edit-list-kind="sections"]');
+
+    return Boolean(layout && shown.length && !shown.includes(layout));
+};
+
+/** A part that is itself a card of a list (a button in a row of buttons): it goes with the list's Remove. */
+const itemOf = (element) => {
+    const item = element.closest('[data-edit-item]');
+    const list = item?.parentElement?.closest('[data-edit-list]');
+    if (!item || !list || list.getAttribute('data-edit-list-kind') === 'sections') return null;
+    if (item !== element && item !== element.closest('a, button')) return null;
+
+    return { list: list.getAttribute('data-edit-list'), id: item.getAttribute('data-edit-item') };
 };
 
 /** Each marker the editor reads, and what the chat calls the thing it marks. */
@@ -176,10 +204,11 @@ export function pageForTheChat(root = document) {
     const seen = new Set();
     const placed = [];
 
+    const shownLayouts = [...root.querySelectorAll('[data-edit-list-kind="sections"]')].filter((list) => list.getClientRects().length > 0);
     const marked = root.querySelectorAll('[data-edit], [data-edit-img], [data-edit-bg], [data-edit-href], [data-edit-icon]');
     for (const element of marked) {
         if (fields.length >= MOST_FIELDS) break;
-        if (element.closest('#live-edit-ui') || locked(element)) continue;
+        if (element.closest('#live-edit-ui') || locked(element) || inAHiddenLayout(element, shownLayouts)) continue;
         // one part can hold more than one thing to change (a button's words and where it goes): each is its own
         // field, under its own marker, so a change to the address never lands on the words' key
         for (const [attribute, kind] of MARKERS) {
@@ -202,9 +231,12 @@ export function pageForTheChat(root = document) {
             // a plain name says which one ("Heading in Talks"), so the change card tells the owner what changed where
             // (owner, 12 Nov 2026, the novice walk: "Heading" alone named any of a page's headings)
             // a section a designer calls the hero is "at the top" to everyone else
-            const said = /^(hero|top|intro|introduction|banner|masthead)$/i.test(where) ? 'at the top' : `in ${where}`;
+            const said = /^(hero|top|intro|introduction|banner|masthead)$/i.test(where) || where.endsWith('(the hero, at the top)') ? 'at the top' : `in ${where}`;
             if (label) field.label = where && ['Heading', 'Photo', 'Paragraph'].includes(label) ? `${label} ${said}` : label;
             if (where) field.section = where;
+            // a button that is one of a row of buttons is taken away with that list's Remove, as its panel does
+            const item = itemOf(element);
+            if (item) field.list_item = item;
             // a link whose design keeps "open in a new tab" (the link panel shows the box only there)
             if (kind === 'link' && element.hasAttribute('data-edit-target')) field.new_tab = element.getAttribute('target') === '_blank';
             // how it looks, where the design lets it be changed (colour, size, spacing): the same choices its panel
@@ -238,7 +270,6 @@ export function pageForTheChat(root = document) {
 
     const lists = [];
     let sectionsList = null;
-    const shownLayouts = [...root.querySelectorAll('[data-edit-list-kind="sections"]')].filter((list) => list.getClientRects().length > 0);
     for (const element of root.querySelectorAll('[data-edit-list]')) {
         const key = element.getAttribute('data-edit-list');
         // the engine's guesses at a list are not offered on a page that names its own (the Kit)
@@ -262,6 +293,8 @@ export function pageForTheChat(root = document) {
             label: ofSections ? 'Page sections' : cut(element.getAttribute('data-edit-list-label') || 'List', 80),
             max: Number.isInteger(max) && max > 0 ? max : null,
             items,
+            // which section it is in: a page can have six lists called Buttons
+            ...(!ofSections && sectionOf(element) ? { section: sectionOf(element) } : {}),
         });
     }
 
