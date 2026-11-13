@@ -9,7 +9,8 @@
 
 import { declaredStyleProps, displayedValue, ownTextOf, shownWords, stylePropsFor } from './support.js';
 
-const MOST_FIELDS = 400;
+// enough for the longest home page (The Speaker: 491 parts; at 400 its FAQ and footer were never told to Ask AI, 13 Nov 2026)
+const MOST_FIELDS = 800;
 const LONGEST_VALUE = 600;
 
 const LOCKED = '[data-live-lock], [data-live-edit-lock]';
