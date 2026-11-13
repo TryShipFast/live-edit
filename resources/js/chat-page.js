@@ -10,6 +10,7 @@
 import { declaredStyleProps, displayedValue, ownTextOf, shownWords, stylePropsFor } from './support.js';
 import { columnsOf, rowsOf, tableOf } from './data-kit.js';
 import { seedForm, staysBecause, TYPE_NAMES } from './forms.js';
+import { PAIRINGS, PALETTES } from './brand.js';
 
 // enough for the longest home page (The Speaker: 491 parts; at 400 its FAQ and footer were never told to Ask AI, 13 Nov 2026)
 const MOST_FIELDS = 800;
@@ -284,6 +285,8 @@ export function pageForTheChat(root = document) {
         business: businessOf(doc, root),
         tables: tablesOf(root),
         forms: formsOf(doc, root),
+        brand: brandOf(doc),
+        seo: seoOf(doc),
         // the site's pages, by name, so "link it to the Booking page" picks one as the link panel's Goes to does
         pages: (doc.defaultView?.liveEditPages?.pages ?? []).slice(0, 80).map((page) => ({ id: String(page.id ?? ''), title: cut(page.title || page.id || 'Home', 80) })),
     };
@@ -352,6 +355,33 @@ const formsOf = (doc, root) => {
     }
 
     return forms;
+};
+
+/** What Brand offers on this design (the palettes, pairs of fonts and colour roles its tab shows), for the chat. */
+const brandOf = (doc) => {
+    const config = doc.defaultView?.liveEditBrand;
+    const tokens = config?.tokens ?? [];
+    if (!tokens.length) return null;
+    const roles = tokens.filter((t) => t.kind === 'colour').map((t) => t.key.split('.').pop());
+    const faces = new Set((config.faces ?? []).map((face) => face.id));
+    const styles = doc.defaultView.getComputedStyle(doc.documentElement);
+
+    return {
+        palettes: PALETTES.filter((p) => roles.every((role) => p.colours[role])).map((p) => p.name),
+        fonts: PAIRINGS.filter((p) => faces.has(p.display) && faces.has(p.body)).map((p) => p.name),
+        colours: Object.fromEntries(tokens.filter((t) => t.kind === 'colour').map((t) => [t.key.split('.').pop(), styles.getPropertyValue(t.property).trim()])),
+    };
+};
+
+/** The page's title and description as Google shows them, where the SEO tab can change them. */
+const seoOf = (doc) => {
+    const config = doc.defaultView?.liveEditSeo;
+    if (!config?.title?.key && !config?.descriptionKey) return null;
+
+    return {
+        title: cut(config.title?.title ?? doc.title, 200),
+        description: cut(config.description ?? doc.querySelector('meta[name="description"]')?.content ?? '', 400),
+    };
 };
 
 /** The business's own facts, set once in Brand and shown wherever the template marks them. */

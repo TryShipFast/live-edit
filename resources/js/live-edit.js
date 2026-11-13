@@ -5,7 +5,7 @@ import { describeVersion, versionsWorthShowing } from './history.js';
 import { glyphIcon } from './glyphs.js';
 import { keepClearOfTheBar } from './clear-of-the-bar.js';
 import { openDialogsInPlace } from './dialogs-in-place.js';
-import { PAIRINGS, PALETTES, renderBrandPanel } from './brand.js';
+import { PAIRINGS, PALETTES, brandChoices, renderBrandPanel } from './brand.js';
 import { BRAND_NAMES, COLOUR_KEYS, TYPE_KEYS, asMade, pairingNamed, paletteNamed } from './changes-as-made.js';
 import { MOVE_LABELS, movedOrder, placesToMove } from './moves.js';
 
@@ -9547,6 +9547,37 @@ const bootLiveEdit = () => {
                     closeDrawer(true);
 
                     return { ok: true };
+                }
+                if (action.type === 'seo') {
+                    // the page's title and description in Google, saved as the SEO tab's Save saves them
+                    const seo = window.liveEditSeo;
+                    const fields = [];
+                    if (typeof action.title === 'string' && seo?.title?.key) fields.push([seo.title.key, action.title]);
+                    if (typeof action.description === 'string' && seo?.descriptionKey) fields.push([seo.descriptionKey, action.description]);
+                    if (!fields.length) return { ok: false, error: 'This page has no SEO to change here.' };
+                    try {
+                        for (const [key, value] of fields) await saveSetting(key, value);
+                    } catch (error) {
+                        return { ok: false, error: error.message || 'Your SEO details could not be saved.' };
+                    }
+
+                    return { ok: true, reload: true };
+                }
+                if (action.type === 'brand') {
+                    /*
+                     * A palette, a pair of fonts or one colour, as Brand's own buttons set them (brandChoices), saved
+                     * as Brand's Save saves them; the page is drawn again once the answer is shown, as Brand does.
+                     */
+                    if (!window.liveEditBrand?.tokens?.length) return { ok: false, error: 'This website has no Brand tab.' };
+                    const chosen = brandChoices(window.liveEditBrand, { palette: action.palette, fonts: action.fonts, colours: action.colours ?? {} });
+                    if (chosen.refused) return { ok: false, error: chosen.refused };
+                    try {
+                        for (const [key, value] of Object.entries(chosen.values)) await saveSetting(key, value);
+                    } catch (error) {
+                        return { ok: false, error: error.message || 'Your brand could not be saved.' };
+                    }
+
+                    return { ok: true, reload: true };
                 }
                 if (action.type === 'business') {
                     /*

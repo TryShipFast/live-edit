@@ -242,6 +242,10 @@ export function createChat({ shadow, request, showSaved, openPhoto, openPublish,
                 const named = { textColor: 'text colour', background: 'background', fontSize: 'text size', fontWeight: 'boldness', textAlign: 'alignment', lineHeight: 'line spacing', paddingY: 'space above and below', paddingX: 'space left and right', radius: 'rounded corners' };
                 const said = Object.entries(change.props ?? {}).map(([prop, value]) => `${named[prop] ?? prop} ${value === '' ? 'as designed' : value}`).join(', ');
                 item.append(el('b', '', `${change.label}: `), document.createTextNode(said || 'look changed'));
+            } else if (change.type === 'seo') {
+                item.append(el('b', '', 'In Google: '), document.createTextNode([change.title ? `title “${change.title}”` : null, change.description ? 'description changed' : null].filter(Boolean).join(', ')));
+            } else if (change.type === 'brand') {
+                item.append(el('b', '', 'Brand: '), document.createTextNode([change.palette ? `${change.palette} palette` : null, change.fonts ? `${change.fonts} type` : null, ...Object.entries(change.colours ?? {}).map(([role, colour]) => `${role} ${colour}`)].filter(Boolean).join(', ')));
             } else if (change.type === 'open') {
                 item.append(document.createTextNode(change.label));
             } else if (change.type === 'undo') {

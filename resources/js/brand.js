@@ -148,6 +148,48 @@ export const PALETTES = [
     { id: 'graphite', name: 'Graphite', colours: { ink: '#141414', accent: '#454545', surface: '#FFFFFF', raised: '#F2F2F2', body: '#222222', muted: '#5E5E5E', line: '#DCDCDC' } },
 ];
 
+/**
+ * What Brand's own buttons would set for a palette, a font pair or one colour by its role, said in words (Ask AI;
+ * owner, 13 Nov 2026: chat does what a click does): { key: value } for Brand's Save, or a reason in plain words.
+ * The same choices the tab offers on this design: a palette or pair it does not offer here is refused.
+ *
+ * @returns {{ values: Record<string, string> } | { refused: string }}
+ */
+export const brandChoices = (config, { palette = null, fonts = null, colours = {} } = {}) => {
+    const tokens = config?.tokens ?? [];
+    const colourTokens = tokens.filter((t) => t.kind === 'colour');
+    const faceTokens = tokens.filter((t) => t.kind === 'face');
+    const faces = new Set((config?.faces ?? []).map((face) => face.id));
+    const values = {};
+    if (palette) {
+        const named = String(palette).toLowerCase();
+        const chosen = named.includes('design') || named === 'own' ? { colours: null }
+            : PALETTES.find((p) => p.id === named || p.name.toLowerCase() === named);
+        if (!chosen || (chosen.colours && !colourTokens.every((t) => chosen.colours[t.key.split('.').pop()]))) {
+            return { refused: `The palettes on this design are ${PALETTES.filter((p) => colourTokens.every((t) => p.colours[t.key.split('.').pop()])).map((p) => p.name).join(', ')}, and the design's own.` };
+        }
+        for (const t of colourTokens) values[t.key] = chosen.colours ? chosen.colours[t.key.split('.').pop()] : '';
+    }
+    if (fonts) {
+        const named = String(fonts).toLowerCase();
+        const display = faceTokens.find((t) => t.key.endsWith('display')) ?? faceTokens[0];
+        const body = faceTokens.find((t) => t.key.endsWith('body')) ?? faceTokens[1];
+        const pair = named.includes('design') || named === 'own' ? { display: '', body: '' }
+            : PAIRINGS.find((p) => (p.id === named || p.name.toLowerCase() === named) && faces.has(p.display) && faces.has(p.body));
+        if (!pair || !display || !body) return { refused: `The type on this design: ${PAIRINGS.filter((p) => faces.has(p.display) && faces.has(p.body)).map((p) => p.name).join(', ')}, or the design's own.` };
+        values[display.key] = pair.display;
+        values[body.key] = pair.body;
+    }
+    for (const [role, colour] of Object.entries(colours ?? {})) {
+        const token = colourTokens.find((t) => t.key.split('.').pop() === role || (SHORT[t.key.split('.').pop()] ?? '').toLowerCase() === String(role).toLowerCase());
+        if (!token) return { refused: `This design has no ${role} colour to change.` };
+        if (!/^#[0-9a-f]{6}$/i.test(String(colour))) return { refused: 'A colour is written like #1B6EF3.' };
+        values[token.key] = String(colour).toUpperCase();
+    }
+
+    return Object.keys(values).length ? { values } : { refused: 'Say a palette, a pair of fonts or a colour to change.' };
+};
+
 /** A colour role's name short enough for one cell of the strip. */
 const SHORT = { ink: 'Headings', accent: 'Links', surface: 'Page', raised: 'Cards', body: 'Text', muted: 'Captions', line: 'Borders' };
 
