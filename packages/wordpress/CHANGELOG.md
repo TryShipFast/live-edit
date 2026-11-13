@@ -1,5 +1,19 @@
 # ShipFast Live Edit for WordPress
 
+## 0.21.10 (13 Nov 2026)
+
+Ask AI, built against The Speaker (the owner: "ensure all the parts can be edited with voice or chats"); the coverage
+walk went from 59% to 90% of what a click does, and nothing done the wrong way:
+- Business details (name, phone, WhatsApp, email, address) are changed for the whole site, as Brand does, never one
+  copy that publish overwrites.
+- Links: the Kit templates' links are seen at all (marked by their bare key); a link goes to one of the site's pages
+  by name, as the link panel's Goes to does.
+- "Open in a new tab" is shown only on links whose design keeps it (elsewhere the box saved nothing), and Ask AI is
+  told which.
+- Cards in a grid move left, right, up and down as the panel's arrows do.
+- "Make it bigger" after a change is about the part changed: each answer remembers what it changed.
+- Up to 800 parts of a page are told to Ask AI (a home page's FAQ and footer were cut off at 400).
+
 ## 0.21.9 (13 Nov 2026)
 
 - What every AI call really cost is kept (the owner: "we need to be sure of the prices since image is not same as
