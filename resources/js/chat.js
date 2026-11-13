@@ -496,7 +496,14 @@ export function createChat({ shadow, request, showSaved, openPhoto, openPublish,
         send.disabled = true;
         if (typeof again !== 'string') input.value = '';
         refreshAbout();
-        const history = log.filter((entry) => !entry.wait && entry.text && !entry.buy).map((entry) => ({ role: entry.role, text: entry.text })).slice(-12);
+        // what each answer really changed goes with its words (owner, 13 Nov 2026: "if i type change heading and now make
+        // it bigger, does it still know it's the heading"): "it" then means the part changed last, by its key
+        const said = (entry) => {
+            const done = (entry.changes ?? []).filter((change) => change.label || change.key);
+            if (entry.role !== 'assistant' || !done.length || entry.state === 'undone') return entry.text;
+            return `${entry.text}\n[Changed: ${done.map((change) => `${change.label ?? 'a part'}${change.key ? ` (${change.field ?? change.key})` : ''}`).join('; ')}]`;
+        };
+        const history = log.filter((entry) => !entry.wait && entry.text && !entry.buy).map((entry) => ({ role: entry.role, text: said(entry) })).slice(-12);
         if (typeof again !== 'string') say({ role: 'user', text: sending ? `${text} 📎 ${sending.file.name || 'photo'}` : text });
         const waiting = { role: 'assistant', text: 'Working on it…', wait: true };
         log.push(waiting);

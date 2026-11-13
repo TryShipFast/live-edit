@@ -102,6 +102,23 @@ describe('Ask AI', () => {
         expect(host.textContent).toContain('Undone.');
     });
 
+    it('remembers which part it changed, so "make it bigger" next is about that part', async () => {
+        // owner, 13 Nov 2026: "if i type change heading and now make it bigger, does it still know it's the heading"
+        const action = { type: 'field', kind: 'text', label: 'Heading at the top', key: 'tpl:h1', value: 'Fresh bread' };
+        chatWith([
+            () => answer({ reply: 'Done. Have a look on the page.', actions: [action], cards: [] }),
+            () => answer({ reply: 'It is bigger now.', actions: [], cards: [] }),
+        ]);
+
+        await type('Change the heading at the top to Fresh bread');
+        await type('Now make it bigger');
+
+        expect(calls.at(-1).body.history).toEqual([
+            { role: 'user', text: 'Change the heading at the top to Fresh bread' },
+            { role: 'assistant', text: 'Done. Have a look on the page.\n[Changed: Heading at the top (tpl:h1)]' },
+        ]);
+    });
+
     it('collects the answer when the host answers on its queue', async () => {
         const action = { type: 'field', kind: 'text', label: 'Heading', key: 'tpl:h1', value: 'Made in Lagos.' };
         chatWith([
