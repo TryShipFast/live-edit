@@ -46,6 +46,7 @@ import { chartRowOf, renderChartPanel, renderChartRow, renderDataGrid, renderTab
 import { KINDS as CHART_KINDS, chartData, chartOf, itemContext as chartItemContext, kindOf as chartKindOf, tableOf as kitTableOf } from './data-kit.js';
 import { commonQuestions, listGuides, profileFor, shopQuestions } from './help.js';
 import { dropdownTriggerFrom } from './dropdown-trigger.js';
+import { partName } from './part-name.js';
 import { addressFromTheRoot } from './site-address.js';
 import { biggestThatFits, howMuchSurvives, inSourcePixels, movedWithin, whatIsThereNow } from './fitting.js';
 import { attrsWorthSending, creditWorthSending } from './only-what-changed.js';
@@ -511,21 +512,6 @@ const bootLiveEdit = () => {
             return wrap;
         };
 
-        const FIELD_NAMES = {
-            title: 'Heading', heading: 'Heading', text: 'Text', body: 'Text',
-            name: 'Name', notes: 'Notes', family: 'Category', price: 'Price', size: 'Size', label: 'Label',
-            photo: 'Photo', image: 'Photo', logo: 'Logo', caption: 'Caption', quote: 'Quote', source: 'Who said it',
-            cta: 'Button', button: 'Button', link: 'Link', email: 'Email address', phone: 'Phone number',
-            address: 'Address', date: 'Date', time: 'Time', question: 'Question', answer: 'Answer', story: 'Description',
-            description: 'Description', amount: 'Amount', meta: 'Details', note: 'Note', fine: 'Small print',
-            kind: 'Type', type: 'Type', conn: 'Connection', cloth: 'Cloth', cols: 'Colours', colours: 'Colours', k: 'Key numbers',
-            // Words templates name their fields with, said as an owner would (first-time owner walk, 7 Nov 2026).
-            car: 'Car', vehicle: 'Vehicle', role: 'Role', job: 'Job title', rating: 'Rating', location: 'Location', city: 'City',
-            hours: 'Opening hours', duration: 'How long it takes', eyebrow: 'Small heading above', subtitle: 'Subheading',
-            summary: 'Summary', excerpt: 'Summary', author: 'Author', company: 'Company', tag: 'Tag', badge: 'Badge',
-            sample: 'Sample note', step: 'Step', number: 'Number', stat: 'Figure', figure: 'Figure', unit: 'Unit',
-            day: 'Day', month: 'Month', year: 'Year', venue: 'Place', place: 'Place', detail: 'Details', details: 'Details',
-        };
 
         /** What this element is, in words a non-technical editor recognises. */
         const describeElement = (element) => {
@@ -552,18 +538,12 @@ const bootLiveEdit = () => {
              * the tag below.
              */
             /*
-             * Words the designer used for how a part reads ("lead", "intro", "text") are not names: a paragraph is
-             * called a paragraph, as Ask AI and the Delete window call it (owner, 13 Nov 2026, the hero's paragraph
-             * shown as "Introduction": "it mistook paragraph for introduction"; "it's not using label").
+             * One name for a part, wherever the owner meets it: this panel, the label on the page, Ask AI and voice, the
+             * Delete window (part-name.js; owner, 13 Nov 2026: "how come we are using another nomenclature"; "why not
+             * ai ask and voice follow same pattern").
              */
-            const named = /^(P|H[1-6])$/.test(tag) && ['text', 'body'].includes(element.dataset.field) ? null : FIELD_NAMES[element.dataset.field];
+            const named = partName(element);
             if (named) return named;
-            // Names made of parts ("price-saloon", "hero-lead"): the part an owner knows, and what it is of.
-            const parts = String(element.dataset.field ?? '').toLowerCase().split(/[-_]+/).filter(Boolean);
-            if (parts.length > 1) {
-                if (FIELD_NAMES[parts[0]]) return `${FIELD_NAMES[parts[0]]}, ${parts.slice(1).join(' ')}`;
-                if (FIELD_NAMES[parts.at(-1)]) return FIELD_NAMES[parts.at(-1)];
-            }
             // A card is named for what its list holds ("Review"), before the tag it is written as ("List item").
             if (element.hasAttribute('data-edit-item') && tag === 'LI' && element.parentElement?.dataset?.editListKind !== 'sections') {
                 const noun = itemNoun(element.parentElement);
@@ -953,14 +933,14 @@ const bootLiveEdit = () => {
                  * gave it (owner, 13 Nov 2026: "is introduction generic"), and its content shown in the window.
                  */
                 const picture = element.tagName === 'IMG' ? element : element.querySelector?.('img');
-                const thing = element.tagName === 'IMG' ? 'picture'
+                const thing = element.tagName === 'IMG' ? 'photo'
                     : /^H[1-6]$/.test(element.tagName) ? 'heading'
                         : ['A', 'BUTTON'].includes(element.tagName) ? 'button'
                             : element.tagName === 'P' ? 'paragraph' : 'text';
                 const whatGoes = () => {
                     const box = document.createElement('div');
                     box.className = 'le-ask-shows';
-                    if (thing === 'picture' && picture?.currentSrc) {
+                    if (thing === 'photo' && picture?.currentSrc) {
                         const copy = document.createElement('img');
                         copy.src = picture.currentSrc;
                         copy.alt = picture.alt || '';

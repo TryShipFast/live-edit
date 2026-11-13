@@ -1,5 +1,12 @@
 # ShipFast Live Edit for WordPress
 
+## 0.21.15 (13 Nov 2026)
+
+- One name for each part, wherever the owner meets it (owner: "how come we are using another nomenclature"; "why
+  not ai ask and voice follow same pattern"). The panel, the label on the page, Ask AI and voice, and the Delete
+  window all name a part from one place (`part-name.js`): "Paragraph at the top", "Heading", "Price", the "Book me"
+  button, "Photo". The Delete window says photo, not picture.
+
 ## 0.21.14 (13 Nov 2026)
 
 - A paragraph is called a paragraph in its panel, as Ask AI and the Delete window call it: the panel had used the

@@ -11,6 +11,7 @@ import { declaredStyleProps, displayedValue, ownTextOf, shownWords, stylePropsFo
 import { columnsOf, rowsOf, tableOf } from './data-kit.js';
 import { seedForm, staysBecause, TYPE_NAMES } from './forms.js';
 import { PAIRINGS, PALETTES } from './brand.js';
+import { partName } from './part-name.js';
 
 // enough for the longest home page (The Speaker: 491 parts; at 400 its FAQ and footer were never told to Ask AI, 13 Nov 2026)
 const MOST_FIELDS = 800;
@@ -96,31 +97,13 @@ const valueOf = (element, kind) => {
 };
 
 const labelOf = (element, kind) => {
-    const given = element.getAttribute('data-edit-label');
-    if (given) return cut(given, 80);
-    // a link's words say what it is ("Shop women"); a heading says it is the heading
-    if (kind === 'link') return cut(element.textContent, 80) || 'Link';
-    // the parts at the top of a page, named by what they are, as owners say them (owner, 13 Nov 2026: "how is paragraph
-    // related to introduction"; they said "the paragraph in the hero section"): the templates mark them
-    const hero = element.getAttribute('data-hero');
-    if (kind === 'text' && hero === 'headline') return 'Heading at the top';
-    if (kind === 'text' && hero === 'intro' && !element.closest('a, button')) {
-        return /lead|intro|sub|summary|text/i.test(element.getAttribute('data-field') || '') ? 'Paragraph at the top' : 'Line under the paragraph at the top';
-    }
-    if (/^H[1-6]$/.test(element.tagName)) return 'Heading';
-    if (kind === 'text' && element.tagName === 'P') return 'Paragraph';
-    // a button by its words, as people point at one ("the Book me button"), never "This part"
-    if (kind === 'text' && (element.tagName === 'BUTTON' || element.closest('a, button'))) {
-        const words = cut(element.textContent, 40);
-        return words ? `\u201C${words}\u201D button` : 'Button';
-    }
-    // the brand's mark is not "the photo": a picture in the header or the menu, or one named a logo, is the logo
-    if (kind === 'image' || kind === 'background image') {
-        const named = `${element.getAttribute('class') || ''} ${element.getAttribute('src') || ''} ${element.closest('a')?.getAttribute('class') || ''}`;
-        return element.closest('header, nav') || /logo|brand-mark/i.test(named) ? 'Logo' : 'Photo';
-    }
+    // a link's words say what it is ("Shop women")
+    if (kind === 'link') return cut(element.getAttribute('data-edit-label') || element.textContent, 80) || 'Link';
+    if (kind === 'icon') return cut(element.getAttribute('data-edit-label') || '', 80);
 
-    return '';
+    // every other part by the one name the editor shows for it (part-name.js): the panel, the page's label, Ask AI
+    // and voice say the same word
+    return cut(partName(element), 80);
 };
 
 /**

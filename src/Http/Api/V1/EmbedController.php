@@ -53,6 +53,7 @@ class EmbedController
         'team.js' => 'team.js',
         'chat.js' => 'chat.js',
         'chat-page.js' => 'chat-page.js',
+        'part-name.js' => 'part-name.js',
         // Ask AI, fetched on its button's first press: built on its own beside the bundle (see path())
         'ask-ai.js' => 'ask-ai.js',
         'pages.js' => 'pages.js',
