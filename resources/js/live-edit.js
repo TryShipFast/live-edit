@@ -512,7 +512,7 @@ const bootLiveEdit = () => {
         };
 
         const FIELD_NAMES = {
-            title: 'Heading', heading: 'Heading', lead: 'Introduction', intro: 'Introduction', text: 'Text', body: 'Text',
+            title: 'Heading', heading: 'Heading', text: 'Text', body: 'Text',
             name: 'Name', notes: 'Notes', family: 'Category', price: 'Price', size: 'Size', label: 'Label',
             photo: 'Photo', image: 'Photo', logo: 'Logo', caption: 'Caption', quote: 'Quote', source: 'Who said it',
             cta: 'Button', button: 'Button', link: 'Link', email: 'Email address', phone: 'Phone number',
@@ -551,7 +551,12 @@ const bootLiveEdit = () => {
              * says how it was written. Names made for code ("addcheckout") are left to
              * the tag below.
              */
-            const named = FIELD_NAMES[element.dataset.field];
+            /*
+             * Words the designer used for how a part reads ("lead", "intro", "text") are not names: a paragraph is
+             * called a paragraph, as Ask AI and the Delete window call it (owner, 13 Nov 2026, the hero's paragraph
+             * shown as "Introduction": "it mistook paragraph for introduction"; "it's not using label").
+             */
+            const named = /^(P|H[1-6])$/.test(tag) && ['text', 'body'].includes(element.dataset.field) ? null : FIELD_NAMES[element.dataset.field];
             if (named) return named;
             // Names made of parts ("price-saloon", "hero-lead"): the part an owner knows, and what it is of.
             const parts = String(element.dataset.field ?? '').toLowerCase().split(/[-_]+/).filter(Boolean);

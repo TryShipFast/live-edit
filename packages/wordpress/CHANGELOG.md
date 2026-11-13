@@ -1,5 +1,12 @@
 # ShipFast Live Edit for WordPress
 
+## 0.21.14 (13 Nov 2026)
+
+- A paragraph is called a paragraph in its panel, as Ask AI and the Delete window call it: the panel had used the
+  name the template's designer gave it ("Introduction" for The Speaker's hero paragraph), so the owner asked Ask AI
+  to delete the paragraph and was shown an Introduction ("it mistook paragraph for introduction"; "it's not using
+  label"). Generic designer words (lead, intro, text, body) no longer name a paragraph or a heading.
+
 ## 0.21.13 (13 Nov 2026)
 
 - The Shop tab lists every product, including those sold as cards on a page that shows several (The Speaker's three
