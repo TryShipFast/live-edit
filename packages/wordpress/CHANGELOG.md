@@ -1,5 +1,11 @@
 # ShipFast Live Edit for WordPress
 
+## 0.21.16 (13 Nov 2026)
+
+- The Delete window's box of what goes has no stripe down its left: a thin outline on a light tint, as our templates'
+  rule says ("but you still added left border i warned you about"). A test now fails any left border or inset left
+  shadow 2px or wider in the editor's styles.
+
 ## 0.21.15 (13 Nov 2026)
 
 - One name for each part, wherever the owner meets it (owner: "how come we are using another nomenclature"; "why

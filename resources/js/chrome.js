@@ -909,7 +909,7 @@ a.le-mark:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
 .le-btn-danger:hover { background: rgba(225,29,72,.12); }
 .le-btn-danger.le-start { margin-right: auto; }
 /* what a window asking "Delete ...?" is about: the words quoted, or the picture */
-.le-ask-shows { margin: 0; padding: 12px 14px; border-left: 3px solid var(--le-field); border-radius: 10px; background: var(--le-soft); color: var(--le-ink); font-size: 14px; line-height: 1.5; max-height: 168px; overflow: auto; overflow-wrap: anywhere; }
+.le-ask-shows { margin: 0; padding: 12px 14px; border: 1px solid var(--le-line); border-radius: 10px; background: var(--le-soft); color: var(--le-ink); font-size: 14px; line-height: 1.5; max-height: 168px; overflow: auto; overflow-wrap: anywhere; }
 .le-ask-shows img { display: block; max-width: 100%; max-height: 150px; border-radius: 8px; object-fit: contain; }
 /* Delete for one part, last in its panel and set apart, as a section's Delete is */
 .le-part-delete { display: flex; border-top: 1px solid var(--le-line); padding-top: 16px; }
