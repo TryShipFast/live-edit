@@ -1,5 +1,16 @@
 # ShipFast Live Edit for WordPress
 
+## 0.21.8 (13 Nov 2026)
+
+- The delete window shows what goes: "Delete this paragraph?" with the paragraph's own words (or the picture) in it
+  (the owner: "the modal should show me what content i'm deleting"). A part is named by what it is (paragraph,
+  heading, button, picture), never by a template's own name for it ("i requested for a label paragraph, not
+  introduction"). Ask AI calls them the same: "Paragraph at the top", "Heading at the top", a button by its words.
+- A delete is a button, never red words that read as a link ("a link leads to another page, a button takes action"):
+  outlined in a panel, solid red in the window that asks.
+- A window that asks something opens above Ask AI, never under it ("you have to close the widget to accept it").
+- Ask AI is never offered a part that is already deleted.
+
 ## 0.21.7 (13 Nov 2026)
 
 - Delete for one part: a paragraph, a heading, a button or a picture (the owner: "still not possible to delete a

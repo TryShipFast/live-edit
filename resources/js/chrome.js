@@ -908,6 +908,9 @@ a.le-mark:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
 }
 .le-btn-danger:hover { background: rgba(225,29,72,.12); }
 .le-btn-danger.le-start { margin-right: auto; }
+/* what a window asking "Delete ...?" is about: the words quoted, or the picture */
+.le-ask-shows { margin: 0; padding: 12px 14px; border-left: 3px solid var(--le-field); border-radius: 10px; background: var(--le-soft); color: var(--le-ink); font-size: 14px; line-height: 1.5; max-height: 168px; overflow: auto; overflow-wrap: anywhere; }
+.le-ask-shows img { display: block; max-width: 100%; max-height: 150px; border-radius: 8px; object-fit: contain; }
 /* Delete for one part, last in its panel and set apart, as a section's Delete is */
 .le-part-delete { display: flex; border-top: 1px solid var(--le-line); padding-top: 16px; }
 .le-hidden { display: none !important; }
@@ -1275,8 +1278,10 @@ select.le-input {
    Choosing a picture, and publishing, are the two moments in this product
    worth taking over the whole screen: one needs room to compare options, the
    other needs somebody to read a list before it goes out to the public. */
+/* above Ask AI (its box 2147483500, its conversation 2147483600): a window asking something is never under the chat
+   (owner, 13 Nov 2026: "Delete this introduction?" was "below the AI ask widget") */
 .le-scrim {
-  position: fixed; inset: 0; z-index: 2147483003;
+  position: fixed; inset: 0; z-index: 2147483620;
   background: rgba(11, 12, 15, .45); backdrop-filter: blur(6px);
   display: flex; align-items: center; justify-content: center; padding: 20px;
 }
@@ -1782,9 +1787,15 @@ textarea.le-input { border-radius: var(--le-r-control); }
 .le-help-faq details[open] .le-faq-chevron { transform: rotate(180deg); }
 .le-publish[disabled]::before { content: none; }
 
-/* one danger style: quiet red words, left, at control height */
-.le-btn-danger, .le-btn-quiet-danger, .le-delete, .le-drawer-delete { background: none; border: 0; box-shadow: none; color: var(--le-danger); font-weight: 600; min-height: var(--le-control); padding: 0; justify-content: flex-start; text-align: left; }
-.le-btn-danger:hover, .le-btn-quiet-danger:hover { text-decoration: underline; background: none; }
+/* A delete is a button, never words that read as a link (owner, 13 Nov 2026: "why is delete a link instead of a solid
+   color"; "a link leads to another page, a button takes action"). In a panel, a red-outlined button that does not
+   outshout Save; in a window asking "Delete ...?", the action it is there for, solid red (as Google and Shopify do). */
+.le-btn-danger, .le-delete, .le-drawer-delete { display: inline-flex; align-items: center; justify-content: center; background: #fff; border: 1px solid rgba(225,29,72,.45); box-shadow: none; color: var(--le-danger); font-weight: 600; min-height: var(--le-control); padding: 0 16px; border-radius: 999px; text-align: center; cursor: pointer; }
+.le-btn-danger:hover, .le-delete:hover, .le-drawer-delete:hover { background: rgba(225,29,72,.06); border-color: var(--le-danger); text-decoration: none; }
+.le-modal-foot .le-btn-danger, .le-sheet .le-btn-danger { background: var(--le-danger); border-color: var(--le-danger); color: #fff; }
+.le-modal-foot .le-btn-danger:hover, .le-sheet .le-btn-danger:hover { background: #be123c; border-color: #be123c; }
+.le-btn-quiet-danger { background: none; border: 0; box-shadow: none; color: var(--le-danger); font-weight: 600; min-height: var(--le-control); padding: 0; justify-content: flex-start; text-align: left; }
+.le-btn-quiet-danger:hover { text-decoration: underline; background: none; }
 
 /* names in a list wrap to two lines rather than being cut */
 .le-library-name, .le-section-name, .le-pick-name, .le-insert-name { white-space: normal; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; text-overflow: clip; }

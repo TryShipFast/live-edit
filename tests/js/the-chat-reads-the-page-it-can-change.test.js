@@ -44,7 +44,7 @@ describe('the page the chat sends', () => {
 
     it('gives a button its words and where it goes as two fields, each under its own key', () => {
         const { fields } = pageForTheChat(document);
-        expect(fields).toContainEqual({ key: 'tpl:sale.text', kind: 'text', value: 'See the sale', section: 'Hero' });
+        expect(fields).toContainEqual({ key: 'tpl:sale.text', kind: 'text', value: 'See the sale', label: '\u201CSee the sale\u201D button', section: 'Hero' });
         expect(fields).toContainEqual({ key: 'tpl:sale.href', kind: 'link', value: '/sale', label: 'See the sale', section: 'Hero' });
     });
 
@@ -56,11 +56,11 @@ describe('the page the chat sends', () => {
                 <p data-hero="intro" data-field="avail" data-edit="setting:tpl:avail">Booking January to September 2027</p>
             </section>`);
         const fields = pageForTheChat(document).fields;
-        expect(fields.find((f) => f.key === 'tpl:name').label).toBe('Main heading at the top');
-        expect(fields.find((f) => f.key === 'tpl:intro').label).toBe('Introduction at the top');
-        expect(fields.find((f) => f.key === 'tpl:avail').label).toBe('Line under the introduction');
-        expect(tappedForTheChat(document.querySelector('[data-edit="setting:tpl:intro"]'))).toEqual({ key: 'tpl:intro', kind: 'text', label: 'Introduction at the top' });
-        expect(tappedForTheChat(document.querySelector('[data-edit="setting:tpl:sale.text"]'))).toEqual({ key: 'tpl:sale.text', kind: 'text', label: 'See the sale' });
+        expect(fields.find((f) => f.key === 'tpl:name').label).toBe('Heading at the top');
+        expect(fields.find((f) => f.key === 'tpl:intro').label).toBe('Paragraph at the top');
+        expect(fields.find((f) => f.key === 'tpl:avail').label).toBe('Line under the paragraph at the top');
+        expect(tappedForTheChat(document.querySelector('[data-edit="setting:tpl:intro"]'))).toEqual({ key: 'tpl:intro', kind: 'text', label: 'Paragraph at the top' });
+        expect(tappedForTheChat(document.querySelector('[data-edit="setting:tpl:sale.text"]'))).toEqual({ key: 'tpl:sale.text', kind: 'text', label: '\u201CSee the sale\u201D button' });
     });
 
     it('tells the chat how each part may look, from the same list its panel offers', () => {

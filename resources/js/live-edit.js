@@ -943,7 +943,30 @@ const bootLiveEdit = () => {
              */
             const mayGo = element && stylePropsFor(element, propNames).includes('hidden') && values.hidden !== '1' && !element.matches('[data-edit-section], [data-edit-item], [data-edit-list]');
             if (mayGo) {
-                const thing = describeElement(element).toLowerCase();
+                /*
+                 * Named by what it is (paragraph, heading, button, picture), not by the name the template's designer
+                 * gave it (owner, 13 Nov 2026: "is introduction generic"), and its content shown in the window.
+                 */
+                const picture = element.tagName === 'IMG' ? element : element.querySelector?.('img');
+                const thing = element.tagName === 'IMG' ? 'picture'
+                    : /^H[1-6]$/.test(element.tagName) ? 'heading'
+                        : ['A', 'BUTTON'].includes(element.tagName) ? 'button'
+                            : element.tagName === 'P' ? 'paragraph' : 'text';
+                const whatGoes = () => {
+                    const box = document.createElement('div');
+                    box.className = 'le-ask-shows';
+                    if (thing === 'picture' && picture?.currentSrc) {
+                        const copy = document.createElement('img');
+                        copy.src = picture.currentSrc;
+                        copy.alt = picture.alt || '';
+                        box.append(copy);
+                    } else {
+                        const words = (element.innerText || element.textContent || '').replace(/\s+/g, ' ').trim();
+                        box.textContent = words.length > 280 ? `${words.slice(0, 279)}\u2026` : words;
+                    }
+
+                    return box.textContent || box.firstChild ? box : null;
+                };
                 const row = document.createElement('div');
                 row.className = 'le-part-delete';
                 const remove = document.createElement('button');
@@ -954,7 +977,7 @@ const bootLiveEdit = () => {
                 // what happened is returned for Ask AI, which presses this as a person does: 'kept' when they said
                 // Keep it, else whether the save went through
                 remove.addEventListener('click', remove.leRun = async () => {
-                    if (!await askTo({ title: `Delete this ${thing}?`, subtitle: 'It goes from the page. Undo brings it back.', yes: `Delete ${thing}`, no: 'Keep it' })) return 'kept';
+                    if (!await askTo({ title: `Delete this ${thing}?`, subtitle: 'It goes from the page. Undo brings it back.', yes: `Delete ${thing}`, no: 'Keep it', shows: whatGoes() })) return 'kept';
                     const mark = document.createElement('input');
                     mark.type = 'hidden';
                     mark.dataset.styleProp = 'hidden';
@@ -1194,12 +1217,15 @@ const bootLiveEdit = () => {
         });
 
         /** One question, two answers, drawn in the editor (never a native dialog). Resolves true for `yes`. */
-        const askTo = ({ title, subtitle, yes, no, danger = true }) => new Promise((resolve) => {
+        // `shows`: what the answer is about, drawn in the window (owner, 13 Nov 2026: "the modal should show me what
+        // content i'm deleting"), as Google Drive names the file it is about to delete
+        const askTo = ({ title, subtitle, yes, no, danger = true, shows = null }) => new Promise((resolve) => {
             const sheet = ui.modal({
                 title,
                 subtitle,
                 size: 'is-narrow',
             });
+            if (shows) sheet.body.append(shows);
 
             let answered = false;
             const answer = (discard) => {
@@ -9357,6 +9383,7 @@ const bootLiveEdit = () => {
                     await settled();
                     const button = drawerFields.querySelector('[data-act="delete-part"]');
                     if (!button?.leRun) { closeDrawer(true); return { ok: false, error: 'That part cannot be deleted here.' }; }
+                    // asked first, as a press is (owner, 13 Nov 2026: "it's good to ask for confirmation")
                     const done = await button.leRun();
                     if (done === 'kept') { closeDrawer(true); return { ok: false, kept: true, error: 'Kept as it was.' }; }
 

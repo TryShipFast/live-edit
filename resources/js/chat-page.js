@@ -83,13 +83,20 @@ const labelOf = (element, kind) => {
     if (given) return cut(given, 80);
     // a link's words say what it is ("Shop women"); a heading says it is the heading
     if (kind === 'link') return cut(element.textContent, 80) || 'Link';
-    // the parts at the top of a page, named as owners say them ("the introduction on the hero"): the templates mark them
+    // the parts at the top of a page, named by what they are, as owners say them (owner, 13 Nov 2026: "how is paragraph
+    // related to introduction"; they said "the paragraph in the hero section"): the templates mark them
     const hero = element.getAttribute('data-hero');
-    if (kind === 'text' && hero === 'headline') return 'Main heading at the top';
+    if (kind === 'text' && hero === 'headline') return 'Heading at the top';
     if (kind === 'text' && hero === 'intro' && !element.closest('a, button')) {
-        return /lead|intro|sub|summary|text/i.test(element.getAttribute('data-field') || '') ? 'Introduction at the top' : 'Line under the introduction';
+        return /lead|intro|sub|summary|text/i.test(element.getAttribute('data-field') || '') ? 'Paragraph at the top' : 'Line under the paragraph at the top';
     }
     if (/^H[1-6]$/.test(element.tagName)) return 'Heading';
+    if (kind === 'text' && element.tagName === 'P') return 'Paragraph';
+    // a button by its words, as people point at one ("the Book me button"), never "This part"
+    if (kind === 'text' && (element.tagName === 'BUTTON' || element.closest('a, button'))) {
+        const words = cut(element.textContent, 40);
+        return words ? `\u201C${words}\u201D button` : 'Button';
+    }
     // the brand's mark is not "the photo": a picture in the header or the menu, or one named a logo, is the logo
     if (kind === 'image' || kind === 'background image') {
         const named = `${element.getAttribute('class') || ''} ${element.getAttribute('src') || ''} ${element.closest('a')?.getAttribute('class') || ''}`;
@@ -138,8 +145,10 @@ export function pageForTheChat(root = document) {
                 if (props.length) {
                     field.style_key = styleKey;
                     field.style = props.filter((prop) => prop !== 'backgroundImage' && prop !== 'hidden').slice(0, 12);
-                    // the panel's Delete for one part (a paragraph, a heading, a button): Ask AI may press it too
-                    if (stylePropsFor(element, props).includes('hidden') && !element.matches('[data-edit-section], [data-edit-item], [data-edit-list]')) field.can_delete = true;
+                    // the panel's Delete for one part (a paragraph, a heading, a button): Ask AI may press it too; never
+                    // one already deleted (owner, 13 Nov 2026: the chat tried the paragraph they had just deleted)
+                    const deleted = String((doc.defaultView?.liveEditStyles ?? {})[styleKey]?.hidden ?? '') === '1';
+                    if (!deleted && stylePropsFor(element, props).includes('hidden') && !element.matches('[data-edit-section], [data-edit-item], [data-edit-list]')) field.can_delete = true;
                 }
             }
             fields.push(field);
