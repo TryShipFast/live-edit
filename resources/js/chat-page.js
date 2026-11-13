@@ -215,6 +215,8 @@ export function pageForTheChat(root = document) {
             const said = /^(hero|top|intro|introduction|banner|masthead)$/i.test(where) ? 'at the top' : `in ${where}`;
             if (label) field.label = where && ['Heading', 'Photo', 'Paragraph'].includes(label) ? `${label} ${said}` : label;
             if (where) field.section = where;
+            // a link whose design keeps "open in a new tab" (the link panel shows the box only there)
+            if (kind === 'link' && element.hasAttribute('data-edit-target')) field.new_tab = element.getAttribute('target') === '_blank';
             // how it looks, where the design lets it be changed (colour, size, spacing): the same choices its panel
             // offers, so Ask AI can do what the panel's style controls do and no more
             const styleKey = element.getAttribute('data-style');

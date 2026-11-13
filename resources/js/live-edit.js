@@ -3421,7 +3421,7 @@ const bootLiveEdit = () => {
                 if (current.hrefKey) {
                     // Saved from the site's root where the host keys this link once for every page (site-address.js).
                     const hrefValue = addressFromTheRoot(drawerFields.querySelector('[data-link-field=href]').value.trim(), current.hrefRoot, pageBase(window.liveEditPages, document.baseURI));
-                    const newTab = drawerFields.querySelector('[data-link-field=target]').checked;
+                    const newTab = drawerFields.querySelector('[data-link-field=target]')?.checked ?? false;
                     await request('/live-edit/setting', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
@@ -4136,13 +4136,19 @@ const bootLiveEdit = () => {
             targetInput.dataset.linkField = 'target';
             targetInput.checked = element.getAttribute('target') === '_blank';
             targetWrap.append(targetInput, 'Open in a new tab');
+            /*
+             * "Open in a new tab" only where it is kept: a link the design gives a place for it (data-edit-target).
+             * Elsewhere the box was ticked and nothing saved it (13 Nov 2026, found proving Ask AI on The Speaker):
+             * a dead control, so it is not shown.
+             */
+            const tabIsKept = Boolean(element.dataset.editTarget);
             if (picker) {
                 const said = document.createElement('span');
                 said.className = 'le-hint';
                 said.textContent = 'Address';
-                group.append(picker, said, hrefInput, targetWrap);
+                group.append(picker, said, hrefInput, ...(tabIsKept ? [targetWrap] : []));
             } else {
-                group.append(hrefInput, targetWrap);
+                group.append(hrefInput, ...(tabIsKept ? [targetWrap] : []));
             }
             drawerFields.append(group);
         };
@@ -4991,6 +4997,8 @@ const bootLiveEdit = () => {
                     move.textContent = label;
                     move.dataset.act = 'move';
                     move.dataset.to = target;
+                    // the way it is drawn (up, left, right, down), for Ask AI's "move it left" (chatAct)
+                    move.dataset.direction = direction;
                     move.leRun = () => {
                         const order = currentOrder();
 
@@ -9315,7 +9323,9 @@ const bootLiveEdit = () => {
                     }
                     if (typeof action.new_tab === 'boolean') {
                         const tab = drawerFields.querySelector('input[data-link-field=target]');
-                        if (tab && tab.checked !== action.new_tab) {
+                        // the design keeps no tab choice for this link: said, rather than a change that does nothing
+                        if (!tab) { closeDrawer(true); return { ok: false, error: 'This design does not let that link open in a new tab.' }; }
+                        if (tab.checked !== action.new_tab) {
                             tab.checked = action.new_tab;
                             tab.dispatchEvent(new Event('change', { bubbles: true }));
                         }
@@ -9442,7 +9452,16 @@ const bootLiveEdit = () => {
                         button = buttons.find((b) => b.dataset.act === (item ? 'duplicate' : 'add')) ?? buttons.find((b) => b.dataset.act === 'add');
                     } else if (action.action === 'duplicate' || action.action === 'remove') {
                         button = buttons.find((b) => b.dataset.act === action.action);
-                    } else if (action.action === 'move_up' || action.action === 'move_down') {
+                    } else if (['move_up', 'move_down', 'move_left', 'move_right'].includes(action.action)) {
+                        /*
+                         * The panel's own button for that way, by where the card is drawn: in a grid left and right go
+                         * along its row, up and down to the row above or below (owner, 13 Nov 2026, the coverage walk:
+                         * 143 grids on The Speaker moved by list order, which is not what the panel does).
+                         */
+                        const way = action.action.slice(5);
+                        button = buttons.find((b) => b.dataset.act === 'move' && b.dataset.direction === way);
+                    }
+                    if (!button && (action.action === 'move_up' || action.action === 'move_down')) {
                         const order = [...list.children].filter((child) => child.dataset.editItem).map((child) => child.dataset.editItem);
                         const want = order[order.indexOf(action.item_id) + (action.action === 'move_up' ? -1 : 1)];
                         button = buttons.find((b) => b.dataset.act === 'move' && b.dataset.to === want);
