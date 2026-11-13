@@ -1418,7 +1418,8 @@ const bootLiveEdit = () => {
             });
         };
         // New page: a window of its own (pages.js), opened from the bar.
-        const openNewPage = () => {
+        // `made`: Ask AI is told the new page's address rather than the page going there at once (chatAct 'page')
+        const openNewPage = (made = null) => {
             if (!window.liveEditPages) return null;
             if (!document.body.classList.contains('editing')) setEditing(true);
             closeDrawer(true);
@@ -1428,6 +1429,7 @@ const bootLiveEdit = () => {
                 config: window.liveEditPages,
                 save: saveSetting,
                 go: (href) => {
+                    if (made) { made(href); return; }
                     sessionStorage.setItem('tb_editing', '1');
                     leaving.allow();
                     window.location.href = href;
@@ -4765,7 +4767,8 @@ const bootLiveEdit = () => {
         /** The library's group of forms ("Forms"), where the website has forms to add, else null. */
         const formsGroup = () => (window.liveEditPages?.library ?? []).find((section) => section.kind === 'form')?.page ?? null;
 
-        const openSectionPicker = ({ list, after = null, only = null }) => {
+        // `added`: Ask AI is told once it is added, and draws the page again after its answer (chatAct 'add_section')
+        const openSectionPicker = ({ list, after = null, only = null, added = null }) => {
             const builder = window.liveEditPages;
             if (!canAddSections() || !list?.dataset?.editList) return null;
             if (!arrangementIsFree()) return null;
@@ -4838,7 +4841,8 @@ const bootLiveEdit = () => {
                         await saveSetting(builder.structureKey, addedWith(builder.added, id, section.from, builder.beside, beside));
                         await saveListOrder(list, orderWith(order, `s-${id}`, after));
                         handle.close();
-                        reloadWithToast(`${section.label.replace(/ · \d+ left$/, '')} added ✓`);
+                        if (added) added(section);
+                        else reloadWithToast(`${section.label.replace(/ · \d+ left$/, '')} added ✓`);
                     } catch (error) {
                         handle.allowDismiss(true);
                         // Said in the window, where they are looking; a toast would sit behind it.
@@ -9395,6 +9399,128 @@ const bootLiveEdit = () => {
                     if (current) current.dirty = true;
 
                     return pressSave();
+                }
+                if (action.type === 'add_section') {
+                    /*
+                     * A section (or a form) from the design's own library added where it is asked for, by the picker
+                     * a click opens: its row chosen by name, its place chosen, Add pressed (owner, 13 Nov 2026: chat
+                     * does what a click does). The page is drawn again once the answer is shown.
+                     */
+                    const list = document.querySelector('[data-edit-list-kind="sections"]') ?? shownSectionLists(document)[0];
+                    if (!list) return { ok: false, error: 'Sections cannot be added on this page.' };
+                    let addedSection = null;
+                    const handle = openSectionPicker({ list, after: action.after ?? null, only: action.form ? formsGroup() : null, added: (section) => { addedSection = section; } });
+                    if (!handle) return { ok: false, error: 'Sections cannot be added on this page.' };
+                    await settled();
+                    const wanted = String(action.name ?? '').toLowerCase();
+                    const rows = [...ui.shadow.querySelectorAll('.le-modal .le-library-item')];
+                    const row = rows.find((r) => (r.querySelector('.le-library-name')?.textContent ?? '').toLowerCase() === wanted)
+                        ?? rows.find((r) => (r.querySelector('.le-library-name')?.textContent ?? '').toLowerCase().includes(wanted));
+                    if (!row) { handle.close?.(); return { ok: false, error: `This design has no section called “${action.name}”.` }; }
+                    row.click();
+                    await settled();
+                    const where = ui.shadow.querySelector('.le-modal select.le-browser-where-pick');
+                    if (where && action.after) {
+                        where.value = action.after === 'top' ? AT_THE_TOP : action.after;
+                        where.dispatchEvent(new Event('change', { bubbles: true }));
+                    }
+                    const add = ui.shadow.querySelector('.le-modal .le-browser-add');
+                    if (!add || add.disabled) { handle.close?.(); return { ok: false, error: 'That section cannot be added just now (the plan may not include it).' }; }
+                    add.click();
+                    for (let i = 0; i < 80 && !addedSection; i++) await new Promise((resolve) => setTimeout(resolve, 250));
+                    if (!addedSection) { handle.close?.(); return { ok: false, error: 'That section could not be added just now.' }; }
+
+                    return { ok: true, reload: true };
+                }
+                if (action.type === 'page') {
+                    /*
+                     * A page added, renamed, put in or out of the menu, moved, copied or deleted, with the Pages list's
+                     * own buttons and the New page window (owner, 13 Nov 2026: chat does what a click does). A delete
+                     * asks first in its own window. A new page is gone to once the answer is shown.
+                     */
+                    const waitFor = async (find, seconds) => {
+                        for (let i = 0; i < seconds * 4; i++) {
+                            const found = find();
+                            if (found) return found;
+                            await new Promise((resolve) => setTimeout(resolve, 250));
+                        }
+                        return null;
+                    };
+                    const closeWindow = () => ui.shadow.querySelector('.le-modal .le-close')?.click();
+                    if (action.do === 'add') {
+                        let madeAt = null;
+                        if (!openNewPage((href) => { madeAt = href; })) return { ok: false, error: 'Pages cannot be added on this website.' };
+                        await settled();
+                        const wanted = String(action.kind ?? '').toLowerCase();
+                        const cards = [...ui.shadow.querySelectorAll('.le-modal .le-start')];
+                        const card = cards.find((c) => (c.querySelector('.le-start-name')?.textContent ?? '').toLowerCase().startsWith(wanted)) ?? cards.find((c) => (c.querySelector('.le-start-name')?.textContent ?? '').toLowerCase().includes(wanted));
+                        if (!card) { closeWindow(); return { ok: false, error: `This design has no kind of page like “${action.kind}”. The kinds are: ${cards.map((c) => c.querySelector('.le-start-name')?.textContent).filter(Boolean).slice(0, 12).join(', ')}.` }; }
+                        card.click();
+                        await settled();
+                        const title = ui.shadow.querySelector('.le-modal input.le-name-title');
+                        const create = ui.shadow.querySelector('.le-modal .le-create-page');
+                        if (!title || !create) { closeWindow(); return { ok: false, error: 'That page could not be made here.' }; }
+                        title.value = String(action.title ?? '').slice(0, 120);
+                        title.dispatchEvent(new Event('input', { bubbles: true }));
+                        create.click();
+                        const href = await waitFor(() => madeAt, 30);
+                        closeWindow();
+                        if (!href) return { ok: false, error: 'That page could not be made just now.' };
+
+                        return { ok: true, goTo: href };
+                    }
+                    const page = (window.liveEditPages?.pages ?? []).find((p) => String(p.id ?? '') === String(action.page_id ?? ''));
+                    if (!page) return { ok: false, error: 'That page is not on this website.' };
+                    if (!openPages()) return { ok: false, error: 'This website has no Pages list.' };
+                    await settled();
+                    const row = await waitFor(() => ui.shadow.querySelector(`.le-modal .le-page-row[data-page="${CSS.escape(String(page.id))}"]`), 5);
+                    const press = (selector) => {
+                        const button = row?.querySelector(selector);
+                        if (!button || button.disabled) return false;
+                        button.click();
+                        return true;
+                    };
+                    let pressed = false;
+                    if (action.do === 'rename') {
+                        if (press('.le-page-rename-btn')) {
+                            await settled();
+                            const box = ui.shadow.querySelector('.le-modal input.le-page-rename');
+                            if (box) {
+                                box.value = String(action.title ?? '').slice(0, 120);
+                                box.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+                                pressed = true;
+                            }
+                        }
+                    } else if (action.do === 'menu') {
+                        const box = row?.querySelector('.le-page-menu input');
+                        if (box && !box.disabled) {
+                            if (box.checked !== Boolean(action.in_menu)) {
+                                box.checked = Boolean(action.in_menu);
+                                box.dispatchEvent(new Event('change', { bubbles: true }));
+                            }
+                            pressed = true;
+                        }
+                    } else if (action.do === 'move') {
+                        pressed = press(action.by < 0 ? '.le-page-up' : '.le-page-down');
+                    } else if (action.do === 'duplicate') {
+                        pressed = press('.le-page-duplicate');
+                    } else if (action.do === 'delete') {
+                        pressed = press('.le-page-delete');
+                        if (pressed) {
+                            // asked first, in its own window: the answer is the owner's
+                            const asking = () => [...ui.shadow.querySelectorAll('.le-modal-title')].some((t) => t.textContent.trim().startsWith('Delete'));
+                            await waitFor(asking, 5);
+                            await waitFor(() => !asking(), 300);
+                            await settled();
+                            if (ui.shadow.querySelector(`.le-modal .le-page-row[data-page="${CSS.escape(String(page.id))}"]`)) { closeWindow(); return { ok: false, kept: true, error: 'Kept as it was.' }; }
+                        }
+                    }
+                    if (!pressed) { closeWindow(); return { ok: false, error: action.do === 'delete' ? 'That page cannot be deleted.' : action.do === 'rename' ? 'That page cannot be renamed.' : 'That cannot be done to that page.' }; }
+                    // the list saves as it goes; give it a moment, then close it and draw the page again (the menu)
+                    await new Promise((resolve) => setTimeout(resolve, 1200));
+                    closeWindow();
+
+                    return { ok: true, reload: true };
                 }
                 if (action.type === 'open') {
                     /*

@@ -246,6 +246,11 @@ export function createChat({ shadow, request, showSaved, openPhoto, openPublish,
                 item.append(el('b', '', 'In Google: '), document.createTextNode([change.title ? `title “${change.title}”` : null, change.description ? 'description changed' : null].filter(Boolean).join(', ')));
             } else if (change.type === 'brand') {
                 item.append(el('b', '', 'Brand: '), document.createTextNode([change.palette ? `${change.palette} palette` : null, change.fonts ? `${change.fonts} type` : null, ...Object.entries(change.colours ?? {}).map(([role, colour]) => `${role} ${colour}`)].filter(Boolean).join(', ')));
+            } else if (change.type === 'add_section') {
+                item.append(el('b', '', `${change.label}: `), document.createTextNode('added'));
+            } else if (change.type === 'page') {
+                const did = { add: 'added', rename: `renamed “${change.title}”`, menu: change.in_menu ? 'in the menu' : 'out of the menu', move: change.by < 0 ? 'moved up the menu' : 'moved down the menu', duplicate: 'copied', delete: 'deleted' }[change.do] ?? 'changed';
+                item.append(el('b', '', `${change.label}: `), document.createTextNode(did));
             } else if (change.type === 'open') {
                 item.append(document.createTextNode(change.label));
             } else if (change.type === 'undo') {

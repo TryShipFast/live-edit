@@ -286,9 +286,17 @@ export function pageForTheChat(root = document) {
         tables: tablesOf(root),
         forms: formsOf(doc, root),
         brand: brandOf(doc),
+        // the design's own sections and forms that can be added, by name (the + Section picker)
+        library: (doc.defaultView?.liveEditPages?.library ?? []).slice(0, 80).map((section) => ({ name: cut(String(section.label ?? '').replace(/ · \d+ left$/, ''), 80), ...(section.kind === 'form' ? { form: true } : {}) })).filter((section) => section.name),
         seo: seoOf(doc),
         // the site's pages, by name, so "link it to the Booking page" picks one as the link panel's Goes to does
-        pages: (doc.defaultView?.liveEditPages?.pages ?? []).slice(0, 80).map((page) => ({ id: String(page.id ?? ''), title: cut(page.title || page.id || 'Home', 80) })),
+        // a page the owner added (made) is renamed, hidden and moved in the Pages list; the design's own pages by their
+        // words in the menu and the menu's list, as a click does (pages-list.js pageRows)
+        pages: (doc.defaultView?.liveEditPages?.pages ?? []).slice(0, 80).map((page) => ({
+            id: String(page.id ?? ''),
+            title: cut(page.title || page.id || 'Home', 80),
+            ...((doc.defaultView?.liveEditPages?.made ?? []).some((made) => made.id === page.id) ? { made: true } : {}),
+        })),
     };
 }
 
