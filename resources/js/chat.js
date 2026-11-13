@@ -246,6 +246,8 @@ export function createChat({ shadow, request, showSaved, openPhoto, openPublish,
                 item.append(el('b', '', 'In Google: '), document.createTextNode([change.title ? `title “${change.title}”` : null, change.description ? 'description changed' : null].filter(Boolean).join(', ')));
             } else if (change.type === 'brand') {
                 item.append(el('b', '', 'Brand: '), document.createTextNode([change.palette ? `${change.palette} palette` : null, change.fonts ? `${change.fonts} type` : null, ...Object.entries(change.colours ?? {}).map(([role, colour]) => `${role} ${colour}`)].filter(Boolean).join(', ')));
+            } else if (change.type === 'shop_term') {
+                item.append(el('b', '', `${change.label}: `), document.createTextNode(`${change.value}, everywhere it is written`));
             } else if (change.type === 'add_section') {
                 item.append(el('b', '', `${change.label}: `), document.createTextNode('added'));
             } else if (change.type === 'page') {

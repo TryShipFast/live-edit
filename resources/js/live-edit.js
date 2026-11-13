@@ -29,7 +29,7 @@ const shopTermsHere = () => Boolean(window.liveEditShop);
 import { computedOf, computedKind } from './computed.js';
 import { uploadWidget } from './upload.js';
 import { renderSeoPanel } from './seo.js';
-import { renderShopPanel } from './shop.js';
+import { renderShopPanel, withWhatsappNumber } from './shop.js';
 import { renderCsvImport, renderNewCollection, renderSearchPanel, renderTableEditor } from './collections-panel.js';
 import { renderImport, undoTheLastImport, UNDO_KEY } from './catalogue.js';
 import { AT_THE_TOP, aChartOrTable, addedWith, besidePlace, describeStructure, hrefTo, newAddedId, nounFor, orderWith, pageBase, pageOfLink, renderCategoryProducts, renderNewCategory, renderNewPage, renderSectionBrowser } from './pages.js';
@@ -9399,6 +9399,27 @@ const bootLiveEdit = () => {
                     if (current) current.dirty = true;
 
                     return pressSave();
+                }
+                if (action.type === 'shop_term') {
+                    /*
+                     * A shop's term (a delivery price, free delivery over, the code on offer, WhatsApp for orders) saved
+                     * as the Shop tab saves it: to every copy at once, so the page says what the bag charges.
+                     */
+                    const shop = window.liveEditShop;
+                    if (!shop) return { ok: false, error: 'This website has no shop.' };
+                    const value = String(action.value ?? '').trim();
+                    const field = (shop.fields ?? []).find((f) => f.label === action.term);
+                    const choice = (shop.delivery?.choices ?? []).find((c) => `Delivery: ${c.name}` === action.term);
+                    const keys = field ? (field.keys ?? [field.key]) : choice ? (choice.priceKeys ?? []) : [];
+                    if (!keys.length || !value) return { ok: false, error: 'That is not one of this shop\'s terms.' };
+                    try {
+                        // WhatsApp for orders is kept as the Shop tab keeps it: the number inside the link
+                        for (const key of keys) await saveSetting(key, field?.kind === 'whatsapp' ? withWhatsappNumber(field.value, value) : value);
+                    } catch (error) {
+                        return { ok: false, error: error.message || 'The shop details could not be saved.' };
+                    }
+
+                    return { ok: true, reload: true };
                 }
                 if (action.type === 'add_section') {
                     /*

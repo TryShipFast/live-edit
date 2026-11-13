@@ -205,6 +205,9 @@ export function pageForTheChat(root = document) {
             // changed in Brand (below, `business`): never one copy here, which publish would overwrite (owner,
             // 13 Nov 2026, the coverage walk: 181 on The Speaker). A link marked "link" keeps its own words.
             if (followsTheBrand(element, attribute)) continue;
+            // a shop's terms (delivery prices, free delivery over, the code on offer) are changed as the Shop tab does,
+            // every copy at once (`shop_terms`), never one copy here
+            if (doc.defaultView?.liveEditShop && element.closest(SHOP_TERMS)) continue;
             const key = attribute === 'data-edit-href' ? hrefKeyOf(element.getAttribute(attribute)) : keyOf(element.getAttribute(attribute));
             if (key === null || seen.has(key)) continue;
             const value = valueOf(element, kind);
@@ -252,6 +255,7 @@ export function pageForTheChat(root = document) {
 
     const lists = [];
     let sectionsList = null;
+    const shownLayouts = [...root.querySelectorAll('[data-edit-list-kind="sections"]')].filter((list) => list.getClientRects().length > 0);
     for (const element of root.querySelectorAll('[data-edit-list]')) {
         const key = element.getAttribute('data-edit-list');
         // the engine's guesses at a list are not offered on a page that names its own (the Kit)
@@ -260,6 +264,8 @@ export function pageForTheChat(root = document) {
         // the page's own sections are a list too: a section is taken away with its Delete, as in the panel
         const ofSections = element.getAttribute('data-edit-list-kind') === 'sections';
         if (ofSections && sectionsList) continue;
+        // a page carrying the design's other layouts hidden (The Speaker's home: Home 1, 2 and 3) is told the one shown
+        if (ofSections && shownLayouts.length && !shownLayouts.includes(element)) continue;
         const items = [...element.querySelectorAll(':scope > [data-edit-item]')].slice(0, 200).map((item) => ({
             id: item.getAttribute('data-edit-item'),
             label: cut((ofSections && (item.getAttribute('data-edit-section-label') || item.querySelector('[data-edit-section-label]')?.getAttribute('data-edit-section-label')))
@@ -286,6 +292,7 @@ export function pageForTheChat(root = document) {
         tables: tablesOf(root),
         forms: formsOf(doc, root),
         brand: brandOf(doc),
+        shop_terms: shopTermsOf(doc),
         // the design's own sections and forms that can be added, by name (the + Section picker)
         library: (doc.defaultView?.liveEditPages?.library ?? []).slice(0, 80).map((section) => ({ name: cut(String(section.label ?? '').replace(/ · \d+ left$/, ''), 80), ...(section.kind === 'form' ? { form: true } : {}) })).filter((section) => section.name),
         seo: seoOf(doc),
@@ -390,6 +397,21 @@ const seoOf = (doc) => {
         title: cut(config.title?.title ?? doc.title, 200),
         description: cut(config.description ?? doc.querySelector('meta[name="description"]')?.content ?? '', 400),
     };
+};
+
+/** A shop's terms, written as words on its pages, which the Shop tab saves everywhere at once. */
+const SHOP_TERMS = '[data-kit-rate], [data-kit-free-over], [data-kit-deal-code], [data-kit-deal-percent]';
+
+/** The shop's terms and delivery choices as the Shop tab shows them, for the chat to change the same way. */
+const shopTermsOf = (doc) => {
+    const shop = doc.defaultView?.liveEditShop;
+    if (!shop) return [];
+    const terms = (shop.fields ?? []).filter((f) => f.label).map((f) => ({ term: cut(f.label, 80), value: cut(f.value ?? '', 120) }));
+    for (const choice of shop.delivery?.choices ?? []) {
+        terms.push({ term: cut(`Delivery: ${choice.name}`, 80), value: cut(choice.price ?? '', 60) });
+    }
+
+    return terms.slice(0, 30);
 };
 
 /** The business's own facts, set once in Brand and shown wherever the template marks them. */
