@@ -197,6 +197,10 @@ export function pageForTheChat(root = document) {
         // field, under its own marker, so a change to the address never lands on the words' key
         for (const [attribute, kind] of MARKERS) {
             if (!element.hasAttribute(attribute)) continue;
+            // the business's own facts (name, logo, phone, WhatsApp, email, address) are one value for the whole site,
+            // changed in Brand (below, `business`): never one copy here, which publish would overwrite (owner,
+            // 13 Nov 2026, the coverage walk: 181 on The Speaker). A link marked "link" keeps its own words.
+            if (followsTheBrand(element, attribute)) continue;
             const key = attribute === 'data-edit-href' ? hrefKeyOf(element.getAttribute(attribute)) : keyOf(element.getAttribute(attribute));
             if (key === null || seen.has(key)) continue;
             const value = valueOf(element, kind);
@@ -272,8 +276,41 @@ export function pageForTheChat(root = document) {
         sections,
         lists,
         sectionsList,
+        business: businessOf(doc, root),
     };
 }
+
+/** The business's own facts, set once in Brand and shown wherever the template marks them. */
+const BRAND_MARKERS = ['data-logo', 'data-brand-name', 'data-brand-phone', 'data-brand-phone-2', 'data-brand-whatsapp', 'data-brand-email', 'data-brand-address'];
+
+/** Whether this marker on this element shows a business fact rather than words of its own. */
+const followsTheBrand = (element, attribute) => {
+    const marker = BRAND_MARKERS.find((name) => element.hasAttribute(name));
+    if (!marker) return false;
+    // "link": only where it leads follows the brand; its words are the owner's here
+    if (element.getAttribute(marker) === 'link') return attribute === 'data-edit-href';
+
+    return true;
+};
+
+/**
+ * The business details the chat can change for the whole site, as Brand does (key, what it is, what it says now):
+ * the name and the ways it is reached that this page shows.
+ */
+const businessOf = (doc, root) => {
+    const identity = doc.defaultView?.liveEditBrand?.identity ?? {};
+    const details = [];
+    if (identity.nameKey && root.querySelector('[data-brand-name]')) {
+        const shown = clean(root.querySelector('[data-brand-name]')?.textContent ?? '');
+        details.push({ key: identity.nameKey, label: 'Business name', value: cut(identity.name || shown, 120) });
+    }
+    for (const contact of identity.contacts ?? []) {
+        if (!contact?.key || !contact.marker || !root.querySelector(`[${contact.marker}]`)) continue;
+        details.push({ key: contact.key, label: cut(contact.label || 'Contact', 60), value: cut(contact.value || '', 240) });
+    }
+
+    return details;
+};
 
 /** What the owner has tapped, so "this" means it. */
 export function tappedForTheChat(element) {

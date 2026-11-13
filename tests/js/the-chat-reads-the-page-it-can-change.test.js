@@ -138,3 +138,27 @@ describe('links on the Kit templates', () => {
         expect(fields.find((f) => f.key === 'auto:guess')).toBeUndefined();
     });
 });
+
+describe('business details', () => {
+    it('offers the business name and contacts as Brand has them, never one copy on the page', () => {
+        // owner, 13 Nov 2026, the coverage walk: 181 business details on The Speaker would have changed one copy only
+        window.liveEditBrand = { identity: { nameKey: 'brand.name', name: 'Jordan Reese', contacts: [
+            { key: 'brand.phone', label: 'Phone', marker: 'data-brand-phone', value: '+234 803 000 0137' },
+            { key: 'brand.whatsapp', label: 'WhatsApp', marker: 'data-brand-whatsapp', value: '' },
+        ] } };
+        document.body.innerHTML = `
+            <header><a href="/" data-brand-name data-edit="setting:tpl:name">Jordan Reese</a></header>
+            <footer>
+                <a href="tel:+2348030000137" data-brand-phone data-edit="setting:tpl:phone" data-edit-href="tpl:phone.href">+234 803 000 0137</a>
+                <a href="tel:+2348030000137" data-brand-phone="link" data-edit="setting:tpl:call" data-edit-href="tpl:call.href">Call us</a>
+            </footer>`;
+        const { fields, business } = pageForTheChat(document);
+
+        expect(fields.map((f) => f.key)).toEqual(['tpl:call']);
+        expect(business).toEqual([
+            { key: 'brand.name', label: 'Business name', value: 'Jordan Reese' },
+            { key: 'brand.phone', label: 'Phone', value: '+234 803 000 0137' },
+        ]);
+        delete window.liveEditBrand;
+    });
+});

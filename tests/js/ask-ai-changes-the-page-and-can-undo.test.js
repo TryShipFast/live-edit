@@ -119,6 +119,17 @@ describe('Ask AI', () => {
         ]);
     });
 
+    it('draws the page again after a business detail changes, so every copy shows it', async () => {
+        const action = { type: 'business', key: 'brand.phone', value: '0803 111 2222', label: 'Phone' };
+        chatWith([() => answer({ reply: 'Your number is changed everywhere.', actions: [action], cards: [] })]);
+        deps.act.mockImplementationOnce(async () => ({ ok: true, reload: true }));
+
+        await type('Change my phone number to 0803 111 2222');
+
+        expect(host.querySelector('.le-chat-card').textContent).toContain('Phone: “0803 111 2222”, on every page');
+        expect(deps.showSaved).toHaveBeenLastCalledWith('Saved \u2713', { reload: true });
+    });
+
     it('collects the answer when the host answers on its queue', async () => {
         const action = { type: 'field', kind: 'text', label: 'Heading', key: 'tpl:h1', value: 'Made in Lagos.' };
         chatWith([

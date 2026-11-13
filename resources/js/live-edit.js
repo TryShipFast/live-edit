@@ -9369,6 +9369,23 @@ const bootLiveEdit = () => {
 
                     return pressSave();
                 }
+                if (action.type === 'business') {
+                    /*
+                     * A business detail (name, phone, WhatsApp, email, address), saved as Brand saves it: one setting,
+                     * shown on every page that marks it (owner, 13 Nov 2026: business details are changed in Brand,
+                     * never one copy). The page is drawn again to show every copy.
+                     */
+                    const identity = window.liveEditBrand?.identity ?? {};
+                    const known = [identity.nameKey, ...(identity.contacts ?? []).map((contact) => contact.key)].filter(Boolean);
+                    if (!known.includes(action.key)) return { ok: false, error: 'That business detail is not set up on this website.' };
+                    try {
+                        await request('/live-edit/setting', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ key: action.key, value: String(action.value ?? '') }) });
+                    } catch (error) {
+                        return { ok: false, error: error.message || 'That could not be saved.' };
+                    }
+
+                    return { ok: true, reload: true };
+                }
                 if (action.type === 'delete') {
                     /*
                      * A paragraph, heading or button taken off the page, with the Delete in its own panel (owner,
