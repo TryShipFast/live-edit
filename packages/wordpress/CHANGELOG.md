@@ -1,5 +1,14 @@
 # ShipFast Live Edit for WordPress
 
+## 0.21.18 (13 Nov 2026)
+
+Found by the comprehensive audit on The Speaker's real pages (owner: "that's why i said you need a comprehensive audit"):
+- Every part says where it is, the parts every page shares too: "Menu bar at the top of every page", "Phone menu, on
+  every page", "Footer of every page", and a shared part by its own name ("Cookie notice, on every page"). The menu's
+  and the footer's Check a date buttons had said no place.
+- The lists inside a page's hidden layouts are no longer sent (The Speaker's home sent Home 2's hero buttons too).
+- A list item's words are spaced ("Virtual keynote from", not "Virtual keynotefrom").
+
 ## 0.21.17 (13 Nov 2026)
 
 From the owner trying Ask AI and voice on The Speaker:

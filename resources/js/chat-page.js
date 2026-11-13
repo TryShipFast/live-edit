@@ -53,7 +53,20 @@ const hrefKeyOf = (marker) => {
 const isTheTop = (section) => Boolean(section.querySelector('[data-hero="headline"]')) || /(^|[.\-])hero$/i.test(section.getAttribute('data-instance') || '');
 const sectionOf = (element) => {
     const section = element.closest('[data-edit-section]');
-    if (!section) return '';
+    // the parts every page shares, outside its sections: the menu bar and the footer (the comprehensive audit, 13 Nov
+    // 2026: The Speaker's menu and footer each have a Check a date button, and neither said where it was)
+    if (!section) {
+        // a part every page shares names itself (the Kit's site.* parts: Header, Menu, Showreel, Cookie notice)
+        const shared = element.closest('[data-instance^="site."]');
+        const name = cut(shared?.getAttribute('data-label') || '', 40);
+        if (shared?.matches('header, [data-instance="site.header"]') || (!shared && element.closest('header'))) return 'Menu bar at the top of every page';
+        if (shared?.matches('footer, [data-instance="site.footer"]') || (!shared && element.closest('footer'))) return 'Footer of every page';
+        if (shared && /menu/i.test(name)) return 'Phone menu, on every page';
+        if (name) return `${name}, on every page`;
+        if (element.closest('nav')) return 'Menu bar at the top of every page';
+
+        return '';
+    }
     const name = cut(section.getAttribute('data-edit-section-label') || '', 70);
 
     return isTheTop(section) ? `${name || 'Hero'} (the hero, at the top)` : name;
@@ -67,6 +80,18 @@ const inAHiddenLayout = (element, shown) => {
     const layout = element.closest('[data-edit-list-kind="sections"]');
 
     return Boolean(layout && shown.length && !shown.includes(layout));
+};
+
+/** An item's words with a space between its parts ("Virtual keynote from ₦4,000,000", never "Virtual keynotefrom"). */
+const spacedWords = (element) => {
+    const words = [];
+    const walker = (element.ownerDocument || document).createTreeWalker(element, 4);
+    for (let node = walker.nextNode(); node; node = walker.nextNode()) {
+        const said = node.nodeValue.replace(/\s+/g, ' ').trim();
+        if (said) words.push(said);
+    }
+
+    return words.join(' ');
 };
 
 /** A part that is itself a card of a list (a button in a row of buttons): it goes with the list's Remove. */
@@ -280,10 +305,12 @@ export function pageForTheChat(root = document) {
         if (ofSections && sectionsList) continue;
         // a page carrying the design's other layouts hidden (The Speaker's home: Home 1, 2 and 3) is told the one shown
         if (ofSections && shownLayouts.length && !shownLayouts.includes(element)) continue;
+        // and none of the lists inside the layouts not shown (the comprehensive audit: Home 2's hero buttons were sent)
+        if (!ofSections && inAHiddenLayout(element, shownLayouts)) continue;
         const items = [...element.querySelectorAll(':scope > [data-edit-item]')].slice(0, 200).map((item) => ({
             id: item.getAttribute('data-edit-item'),
             label: cut((ofSections && (item.getAttribute('data-edit-section-label') || item.querySelector('[data-edit-section-label]')?.getAttribute('data-edit-section-label')))
-                || item.getAttribute('data-edit-item-label') || item.textContent, 80),
+                || item.getAttribute('data-edit-item-label') || spacedWords(item), 80),
         })).filter((item) => item.id);
         if (items.length === 0) continue;
         if (ofSections) sectionsList = key;
