@@ -468,6 +468,49 @@ export const unfinished = (form) => {
     return empty ? `“${empty.label}” needs at least one choice. Type one under it and press Add.` : null;
 };
 
+/**
+ * Changes said in words (Ask AI), made with the builder's own functions and its rules, all or nothing: the form after
+ * them, or the first reason one cannot be made, said as the builder says it (owner, 13 Nov 2026: chat does what a click
+ * does; the coverage walk on The Speaker: 105 form parts could not be changed by chat).
+ *
+ * @returns {{ form: object } | { refused: string }}
+ */
+export function changeForm(handed, changes) {
+    const form = copyOf(handed);
+    const valueOf = (field, label) => field?.options?.find((o) => !o.retired && (o.label === label || o.value === label))?.value;
+    for (const change of changes ?? []) {
+        const field = form.fields.find((f) => f.key === change.question);
+        let why = null;
+        switch (change.do) {
+            case 'rename': why = rename(form, change.question, change.label); break;
+            case 'help': why = setHelp(form, change.question, change.help); break;
+            case 'required': why = setRequired(form, change.question, Boolean(change.required)); break;
+            case 'type': why = TYPES.includes(change.type) ? setType(form, change.question, change.type) : 'That kind of answer is not offered.'; break;
+            case 'remove': why = retireField(form, change.question); break;
+            case 'restore': restoreField(form, change.question); break;
+            case 'move': why = moveField(form, change.question, change.by < 0 ? -1 : 1) ? null : 'That question cannot move further that way.'; break;
+            case 'add': {
+                if (!TYPES.includes(change.type)) { why = 'That kind of answer is not offered.'; break; }
+                const key = addField(form, change.type);
+                if (key === null) { why = addingWaitsBecause(form); break; }
+                if (change.label) why = rename(form, key, change.label);
+                if (!why && change.required) why = setRequired(form, key, true);
+                if (!why && change.help) why = setHelp(form, key, change.help);
+                for (const choice of change.choices ?? []) why = why ?? addOption(form, key, choice);
+                break;
+            }
+            case 'add_choice': why = addOption(form, change.question, change.choice); break;
+            case 'remove_choice': why = valueOf(field, change.choice) === undefined ? 'That choice is not there.' : removeOption(form, change.question, valueOf(field, change.choice)); break;
+            case 'rename_choice': why = valueOf(field, change.choice) === undefined ? 'That choice is not there.' : renameOption(form, change.question, valueOf(field, change.choice), change.to); break;
+            default: why = 'That change cannot be made to a form.';
+        }
+        if (why) return { refused: why };
+    }
+    const unfinishedBecause = unfinished(form);
+
+    return unfinishedBecause ? { refused: unfinishedBecause } : { form };
+}
+
 /** What is saved: only the definition, never the reasons and counts the host works out again. */
 export const definitionOf = (form) => ({
     fields: form.fields.map((f) => ({

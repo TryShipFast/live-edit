@@ -162,3 +162,27 @@ describe('business details', () => {
         delete window.liveEditBrand;
     });
 });
+
+describe('tables', () => {
+    it('tells the chat each table with its columns and rows, named as its panel is', () => {
+        // the coverage walk on The Speaker: 115 table cells could not be changed by chat
+        document.body.innerHTML = `
+            <section data-edit-section="compare" data-edit-section-label="Compare">
+                <div data-kit-table><h2 class="kit-data__title">Which keynote fits your event?</h2>
+                    <table>
+                        <thead><tr data-edit-list="tpl:compare.cols" data-edit-list-max="4"><th data-edit-item="c1">Keynote</th><th data-edit-item="c2">Best for</th></tr></thead>
+                        <tbody data-edit-list="tpl:compare.rows" data-edit-list-max="8">
+                            <tr data-edit-item="r1"><th data-edit-item="c1">Hard Rooms</th><td data-edit-item="c2">Leadership offsites</td></tr>
+                            <tr data-edit-item="r2"><th data-edit-item="c1">Teach It Back</th><td data-edit-item="c2">Conferences</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </section>`;
+        const { tables } = pageForTheChat(document);
+
+        expect(tables).toEqual([{
+            id: 'tpl:compare.rows', name: 'Which keynote fits your event?', columns: ['Keynote', 'Best for'],
+            rows: [['Hard Rooms', 'Leadership offsites'], ['Teach It Back', 'Conferences']], most: { rows: 8, columns: 4 },
+        }]);
+    });
+});

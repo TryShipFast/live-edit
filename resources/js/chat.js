@@ -242,6 +242,10 @@ export function createChat({ shadow, request, showSaved, openPhoto, openPublish,
                 const named = { textColor: 'text colour', background: 'background', fontSize: 'text size', fontWeight: 'boldness', textAlign: 'alignment', lineHeight: 'line spacing', paddingY: 'space above and below', paddingX: 'space left and right', radius: 'rounded corners' };
                 const said = Object.entries(change.props ?? {}).map(([prop, value]) => `${named[prop] ?? prop} ${value === '' ? 'as designed' : value}`).join(', ');
                 item.append(el('b', '', `${change.label}: `), document.createTextNode(said || 'look changed'));
+            } else if (change.type === 'form') {
+                item.append(el('b', '', `${change.label}: `), document.createTextNode(`${change.changes.length} change${change.changes.length === 1 ? '' : 's'} to its questions`));
+            } else if (change.type === 'table') {
+                item.append(el('b', '', `${change.label}: `), document.createTextNode(`table changed, ${change.rows.length} row${change.rows.length === 1 ? '' : 's'}`));
             } else if (change.type === 'business') {
                 item.append(el('b', '', `${change.label}: `), document.createTextNode(`“${change.value}”, on every page`));
             } else if (change.type === 'delete') {

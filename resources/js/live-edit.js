@@ -40,7 +40,7 @@ import { DETAIL_MODE, copiedItemSettings, copiedStyles, copyPageForCard, deletab
 import { renderChoice } from './choice.js';
 import { COL, COLUMNS, SKU_TAKEN, choosableCollections, collectionsCell, collectionsOfCell, collectionsSaid, gridRows, keepSizesInStep, keptRead, priceAsWritten, productsPlan, readProduct, rowCells, sharedSkus, shownColumns, stockOfSize, watchedBy, stillHolds } from './products.js';
 import { SALE_HEADS, SALE_KINDS, STOCK_HEAD, dayOf, endSaid, flashSalePlan, keepRowInStep, keptProduct, ownPriceOf, ownPricesAmong, readSale, saleLabel, saleLineOf, saleRow, sizeKey, sizesSummary, stockFor, stockPlan, todayIs, withWrites } from './sale.js';
-import { TYPES as FORM_TYPES, seedForm } from './forms.js';
+import { TYPES as FORM_TYPES, changeForm, definitionOf as formDefinitionOf, seedForm } from './forms.js';
 import { renderFormBuilder } from './form-builder.js';
 import { chartRowOf, renderChartPanel, renderChartRow, renderDataGrid, renderTableControls, renderTablePanel } from './data-panel.js';
 import { KINDS as CHART_KINDS, chartData, chartOf, itemContext as chartItemContext, kindOf as chartKindOf, tableOf as kitTableOf } from './data-kit.js';
@@ -9395,6 +9395,54 @@ const bootLiveEdit = () => {
                     if (current) current.dirty = true;
 
                     return pressSave();
+                }
+                if (action.type === 'form') {
+                    /*
+                     * A form's questions changed with the builder's own functions and rules, then saved as its Save does
+                     * (the form's setting); the host draws the form again, so the page is drawn again.
+                     */
+                    const element = document.querySelector(`form[data-kit-form="${CSS.escape(action.key)}"]`);
+                    if (!element || !formsAreShaped()) return { ok: false, error: 'That form is not on this page any more.' };
+                    const refused = refusedFor(element);
+                    if (refused) return refused;
+                    const instance = element.closest('[data-component^="form."]') ?? element;
+                    const handed = window.liveEditForms?.forms?.[action.key] ?? { ...seedForm(instance), key: action.key, settingKey: `form:${action.key}`, saved: false };
+                    if (!handed?.fields) return { ok: false, error: 'That form cannot be changed here.' };
+                    const result = changeForm(handed, action.changes);
+                    if (result.refused) return { ok: false, error: result.refused };
+                    try {
+                        await saveSetting(handed.settingKey ?? `form:${action.key}`, JSON.stringify(formDefinitionOf(result.form)));
+                    } catch (error) {
+                        return { ok: false, error: error.message || 'That form could not be saved.' };
+                    }
+
+                    return { ok: true, reload: true };
+                }
+                if (action.type === 'table') {
+                    /*
+                     * A table as the owner asked it to be: the grid's own Save (data-panel.js), which works out the
+                     * cells, rows and columns that changed, as when they type into it.
+                     */
+                    const rows = document.querySelector(`tbody[data-edit-list="${CSS.escape(action.key)}"]`);
+                    const cell = rows?.closest('[data-kit-table]')?.querySelector('td, th');
+                    if (!cell) return { ok: false, error: 'That table is not on this page any more.' };
+                    const refused = refusedFor(cell);
+                    if (refused) return refused;
+                    if (team && !team.beforeEdit(cell, { onRefused: () => closeDrawer(true) })) return { ok: false, locked: heldBySomeoneElse(cell) ?? { label: 'that table', name: 'A teammate' } };
+                    editTable(cell);
+                    await settled();
+                    const grid = drawerFields.querySelector('.le-data');
+                    if (typeof grid?.leSave !== 'function') { closeDrawer(true); return { ok: false, error: 'That table cannot be changed here.' }; }
+                    try {
+                        const notSaved = await grid.leSave({ heads: action.columns, rows: action.rows });
+                        if (notSaved?.length) { closeDrawer(true); return { ok: false, error: String(notSaved[0]) }; }
+                    } catch (error) {
+                        closeDrawer(true);
+                        return { ok: false, error: error.message || 'That table could not be saved.' };
+                    }
+                    closeDrawer(true);
+
+                    return { ok: true };
                 }
                 if (action.type === 'business') {
                     /*

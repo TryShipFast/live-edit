@@ -742,21 +742,25 @@ export const renderTablePanel = ({ element, save, saveOrder, refresh, applyOrder
     const place = cellPlace(element);
     const wrap = el('div', 'le-data');
     wrap.append(el('p', 'le-hint', 'Type in any cell. Add or delete rows and columns, or paste rows from Excel or Google Sheets into a cell. Then Save changes.'));
+    const onSave = async ({ heads, rows: grid }) => {
+        const plan = tablePlan(info, grid, heads);
+        if (plan.refused.length) return plan.refused;
+        await fillTable({ info, plan, save, saveOrder, applyOrder });
+        await refresh(`Table saved ✓ ${plan.grid.length} rows, ${plan.columns.length} columns.`);
+
+        return [];
+    };
     wrap.append(renderDataGrid({
         heads: columns.map((c) => c.name),
         rows: rows.map((tr) => cellWords(tr).slice(0, columns.length)),
         mostRows: parseInt(info.rowsList?.dataset?.editListMax ?? '', 10) || 40,
         mostColumns: parseInt(info.head?.dataset?.editListMax ?? '', 10) || 8,
         focus: place ? { row: place.rowIndex, col: Math.max(0, place.columnIndex) } : { row: 0, col: 0 },
-        onSave: async ({ heads, rows: grid }) => {
-            const plan = tablePlan(info, grid, heads);
-            if (plan.refused.length) return plan.refused;
-            await fillTable({ info, plan, save, saveOrder, applyOrder });
-            await refresh(`Table saved ✓ ${plan.grid.length} rows, ${plan.columns.length} columns.`);
-
-            return [];
-        },
+        onSave,
     }));
+    // the grid's own Save, for Ask AI, which sends the table as it should be (owner, 13 Nov 2026: chat does what a
+    // click does): what could not be saved comes back, as it does under the grid
+    wrap.leSave = onSave;
 
     return wrap;
 };

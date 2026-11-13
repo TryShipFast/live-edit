@@ -8,6 +8,8 @@
  */
 
 import { declaredStyleProps, displayedValue, ownTextOf, shownWords, stylePropsFor } from './support.js';
+import { columnsOf, rowsOf, tableOf } from './data-kit.js';
+import { seedForm, staysBecause, TYPE_NAMES } from './forms.js';
 
 // enough for the longest home page (The Speaker: 491 parts; at 400 its FAQ and footer were never told to Ask AI, 13 Nov 2026)
 const MOST_FIELDS = 800;
@@ -280,10 +282,77 @@ export function pageForTheChat(root = document) {
         lists,
         sectionsList,
         business: businessOf(doc, root),
+        tables: tablesOf(root),
+        forms: formsOf(doc, root),
         // the site's pages, by name, so "link it to the Booking page" picks one as the link panel's Goes to does
         pages: (doc.defaultView?.liveEditPages?.pages ?? []).slice(0, 80).map((page) => ({ id: String(page.id ?? ''), title: cut(page.title || page.id || 'Home', 80) })),
     };
 }
+
+/**
+ * The page's tables (data-kit-table), each with its columns and rows as its grid shows them, so the chat can change a
+ * cell, a row or a column the way the grid does (owner, 13 Nov 2026, the coverage walk: 115 table cells on The
+ * Speaker could not be changed by chat). Its id is its rows' list key.
+ */
+const tablesOf = (root) => {
+    const tables = [];
+    for (const block of root.querySelectorAll('[data-kit-table]')) {
+        if (block.closest('#live-edit-ui') || locked(block) || tables.length >= 10) continue;
+        const info = tableOf(block.querySelector('th, td') ?? block);
+        const id = info?.rowsList?.dataset?.editList;
+        if (!info || !id) continue;
+        const section = block.closest('[data-edit-section]');
+        // named as its panel is (the table's own title), else its caption or its section's heading
+        const named = clean(block.querySelector('.kit-data__title, h2, h3')?.textContent ?? '')
+            || clean(info.table.querySelector('caption')?.textContent ?? '')
+            || clean(section?.querySelector('h1, h2, h3')?.textContent ?? '')
+            || 'Table';
+        tables.push({
+            id,
+            name: cut(named, 80),
+            columns: columnsOf(info).map((column) => cut(column.name, 80)),
+            rows: rowsOf(info).slice(0, 40).map((tr) => [...tr.children].filter((cell) => cell.matches('th, td')).slice(0, 8).map((cell) => cut(cell.textContent, 200))),
+            most: { rows: parseInt(info.rowsList.dataset.editListMax ?? '', 10) || 40, columns: parseInt(info.head?.dataset?.editListMax ?? '', 10) || 8 },
+        });
+    }
+
+    return tables;
+};
+
+/**
+ * The page's forms a click can shape (the form builder: where the host keeps forms), each with its questions as the
+ * builder shows them, so the chat can reword, add, remove, move a question or change its choices the builder's way.
+ */
+const formsOf = (doc, root) => {
+    const kept = doc.defaultView?.liveEditForms;
+    if (!kept) return [];
+    const forms = [];
+    for (const element of root.querySelectorAll('form[data-kit-form]')) {
+        if (element.closest('#live-edit-ui') || locked(element) || forms.length >= 6) continue;
+        const key = element.dataset.kitForm;
+        const instance = element.closest('[data-component^="form."]') ?? element;
+        const handed = kept.forms?.[key] ?? seedForm(instance);
+        if (!key || !handed?.fields) continue;
+        forms.push({
+            key,
+            name: cut(handed.label || element.dataset.kitFormLabel || 'Form', 80),
+            questions: handed.fields.slice(0, 30).map((field) => ({
+                key: field.key,
+                question: cut(field.label, 200),
+                answer: TYPE_NAMES[field.type] ?? field.type,
+                ...(field.required ? { required: true } : {}),
+                ...(field.help ? { help: cut(field.help, 200) } : {}),
+                ...((field.options ?? []).some((o) => !o.retired) ? { choices: field.options.filter((o) => !o.retired).map((o) => cut(o.label, 120)) } : {}),
+                // choices that are words on the page (the template's own dropdown): changed there, as list items
+                ...(field.choices === 'template' ? { choices_on_page: true } : {}),
+                ...(field.retired ? { taken_off: true } : {}),
+                ...(staysBecause(field) ? { stays: true } : {}),
+            })),
+        });
+    }
+
+    return forms;
+};
 
 /** The business's own facts, set once in Brand and shown wherever the template marks them. */
 const BRAND_MARKERS = ['data-logo', 'data-brand-name', 'data-brand-phone', 'data-brand-phone-2', 'data-brand-whatsapp', 'data-brand-email', 'data-brand-address'];
