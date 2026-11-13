@@ -257,7 +257,7 @@ export function pageForTheChat(root = document) {
             // (owner, 12 Nov 2026, the novice walk: "Heading" alone named any of a page's headings)
             // a section a designer calls the hero is "at the top" to everyone else
             const said = /^(hero|top|intro|introduction|banner|masthead)$/i.test(where) || where.endsWith('(the hero, at the top)') ? 'at the top' : `in ${where}`;
-            if (label) field.label = where && ['Heading', 'Photo', 'Paragraph'].includes(label) ? `${label} ${said}` : label;
+            if (label) field.label = where && ['Heading', 'Photo', 'Paragraph', 'Sample note'].includes(label) ? `${label} ${said}` : label;
             if (where) field.section = where;
             // a button that is one of a row of buttons is taken away with that list's Remove, as its panel does
             const item = itemOf(element);

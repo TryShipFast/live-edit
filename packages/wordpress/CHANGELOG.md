@@ -1,5 +1,12 @@
 # ShipFast Live Edit for WordPress
 
+## 0.21.19 (13 Nov 2026)
+
+- Every part has a name in the panel, on the page's label and for Ask AI: the template's sample marks are "Sample
+  note" (with where they are, "Sample note in What an organiser said"), and words with no name of their own are called
+  by what they say ("“Booking January to September 2027”"), never by their section alone (owner: "Delete any sample
+  text" was reported as "Jordan Reese (the hero, at the top): deleted").
+
 ## 0.21.18 (13 Nov 2026)
 
 Found by the comprehensive audit on The Speaker's real pages (owner: "that's why i said you need a comprehensive audit"):

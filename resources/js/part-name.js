@@ -11,7 +11,8 @@
  *   3. a picture: "Logo" in the header or menu, else "Photo";
  *   4. the template's field name when it is a word an owner uses ("Price", "Phone number", "Date"), never the words a
  *      designer uses for how a part reads (lead, intro, text, body) or for what it is (button, link);
- *   5. what it is: "Heading", "Paragraph", the "Book me" button.
+ *   5. what it is: "Heading", "Paragraph", the "Book me" button, a "Sample note";
+ *   6. else its own words in quotes ("Booking January to September 2027").
  *
  * '' when none of these says what it is: the caller names it its own way (a card by its list, a section by its band).
  */
@@ -74,6 +75,8 @@ export const partName = (element) => {
     }
     if (!isText) return '';
 
+    // the template's own sample marks ("Sample", "(Sample fees)"), as the panel calls them
+    if (element.hasAttribute('data-sample-note')) return 'Sample note';
     const owners = fieldName(element.getAttribute('data-field'));
     if (owners) return owners;
     if (/^H[1-6]$/.test(element.tagName)) return 'Heading';
@@ -83,6 +86,10 @@ export const partName = (element) => {
         return said ? `\u201C${said}\u201D button` : 'Button';
     }
     if (element.tagName === 'P') return 'Paragraph';
+    // words with no name of their own (a line inside a paragraph, a date): called by what they say, never by their
+    // section alone (owner, 13 Nov 2026: "Delete any sample text" was reported as "Jordan Reese (the hero, at the top):
+    // deleted")
+    const said = words(element, 40);
 
-    return '';
+    return said ? `\u201C${said}\u201D` : '';
 };
