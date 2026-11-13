@@ -1,5 +1,18 @@
 # ShipFast Live Edit for WordPress
 
+## 0.21.11 (13 Nov 2026)
+
+Ask AI does everything a click does on The Speaker: 4,640 of 4,640 (the owner: "Let's make the speaker 100"; "the
+plug-in that's it's capable of clicks, chat and voice"). Each done with the editor's own controls and saves:
+- Tables changed as their grid does; forms as their builder does (its rules: a question the booking needs stays).
+- Pictures: a free photo found by words, an AI picture, a description.
+- Brand: a palette, a pair of fonts, one colour by its role. SEO: the page's title and description.
+- Pages: added (New page), renamed, in or out of the menu, moved, copied, deleted (asked first).
+- Sections and forms added from the design's library, by name and where.
+- Shop terms (delivery prices, free delivery over, the code, WhatsApp) changed everywhere at once, as the Shop tab.
+- Opens Brand, SEO, Shop, Pages, Changes, History, Preview; goes to another page; Undo and Redo.
+- A page carrying the design's other layouts hidden is told the one shown.
+
 ## 0.21.10 (13 Nov 2026)
 
 Ask AI, built against The Speaker (the owner: "ensure all the parts can be edited with voice or chats"); the coverage
