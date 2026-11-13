@@ -1,5 +1,14 @@
 # ShipFast Live Edit for WordPress
 
+## 0.21.12 (13 Nov 2026)
+
+From the owner trying 0.21.11:
+- Ask AI is one conversation for the whole website, carried from page to page ("seems ask AI feels new on each
+  page"); each earlier message says which page it was on.
+- A photo is the owner's choice: Ask AI searches free photos or makes AI pictures and leaves the choices in front of
+  them; the one they press is used, and closing the window keeps the picture ("it went ahead and choose a random
+  image").
+
 ## 0.21.11 (13 Nov 2026)
 
 Ask AI does everything a click does on The Speaker: 4,640 of 4,640 (the owner: "Let's make the speaker 100"; "the

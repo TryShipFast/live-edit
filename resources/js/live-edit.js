@@ -9625,13 +9625,29 @@ const bootLiveEdit = () => {
                             search.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
                         }
                         const pick = await waitFor(() => ui.shadow.querySelector('.le-modal .le-grid .le-pick'), action.make ? 150 : 25);
+                        if (!pick && !ui.shadow.querySelector('.le-modal .le-grid')) {
+                            // the owner closed the window before choosing: kept, as a person closing it keeps it
+                            closeDrawer(true);
+                            return { ok: false, kept: true, error: 'Kept the picture as it was.' };
+                        }
                         if (!pick) {
                             ui.shadow.querySelector('.le-modal .le-close')?.click();
                             closeDrawer(true);
                             return { ok: false, error: action.make ? 'No picture came back. Your credits were given back.' : `No free photo was found for “${action.find}”.` };
                         }
-                        pick.click();
+                        /*
+                         * The owner chooses, as they do by hand (owner, 13 Nov 2026: "it went ahead and choose a random
+                         * image"): the search done or the pictures made, the choices are left in front of them, and the
+                         * one they press is used. Closing the window keeps the picture as it was.
+                         */
+                        const address = drawerFields.querySelector('input[type=url]');
+                        const file = drawerFields.querySelector('input[type=file]');
+                        const before = address?.value ?? '';
+                        const open = () => Boolean(ui.shadow.querySelector('.le-modal .le-grid'));
+                        await waitFor(() => !open(), 600);
                         await settled();
+                        const chose = (address && address.value && address.value !== before) || (file?.files?.length ?? 0) > 0;
+                        if (!chose) { closeDrawer(true); return { ok: false, kept: true, error: 'Kept the picture as it was.' }; }
                     }
                     if (typeof action.description === 'string') {
                         const alt = drawerFields.querySelector('[data-img-attr="alt"]');

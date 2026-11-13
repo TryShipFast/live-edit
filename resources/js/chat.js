@@ -140,7 +140,9 @@ export function startersFor(page) {
  * @param {string}   [deps.site]             to keep the conversation for this website through a reload
  */
 export function createChat({ shadow, request, showSaved, openPhoto, openPublish, shown = () => {}, act = async () => ({ ok: false }), snapshot = async () => null, undoPlan = () => ({ revert: [], restore: [] }), undo: takeBack = async () => {}, busy: heldNow = () => [], selected = () => null, site = '' }) {
-    const memoryKey = `le-chat:${site}:${location.pathname}`;
+    // one conversation for the whole website, carried from page to page (owner, 13 Nov 2026: "seems ask AI feels new on
+    // each page"): "take me to the Book page" and then what to change there is one conversation
+    const memoryKey = `le-chat:${site}`;
     const remembered = (() => {
         try { return JSON.parse(sessionStorage.getItem(memoryKey) || 'null'); } catch { return null; }
     })();
@@ -499,6 +501,8 @@ export function createChat({ shadow, request, showSaved, openPhoto, openPublish,
     }
 
     const say = (entry) => {
+        // the page it was said on, as the conversation now follows the owner from page to page
+        entry.page ??= location.pathname;
         log.push(entry);
         remember();
         draw();
@@ -525,9 +529,11 @@ export function createChat({ shadow, request, showSaved, openPhoto, openPublish,
         // what each answer really changed goes with its words (owner, 13 Nov 2026: "if i type change heading and now make
         // it bigger, does it still know it's the heading"): "it" then means the part changed last, by its key
         const said = (entry) => {
+            // said on another page: the model is told where, so "it" there is not a part of this page
+            const elsewhere = entry.page && entry.page !== location.pathname ? `[On the page ${entry.page}] ` : '';
             const done = (entry.changes ?? []).filter((change) => change.label || change.key);
-            if (entry.role !== 'assistant' || !done.length || entry.state === 'undone') return entry.text;
-            return `${entry.text}\n[Changed: ${done.map((change) => `${change.label ?? 'a part'}${change.key ? ` (${change.field ?? change.key})` : ''}`).join('; ')}]`;
+            if (entry.role !== 'assistant' || !done.length || entry.state === 'undone') return `${elsewhere}${entry.text}`;
+            return `${elsewhere}${entry.text}\n[Changed: ${done.map((change) => `${change.label ?? 'a part'}${change.key ? ` (${change.field ?? change.key})` : ''}`).join('; ')}]`;
         };
         const history = log.filter((entry) => !entry.wait && entry.text && !entry.buy).map((entry) => ({ role: entry.role, text: said(entry) })).slice(-12);
         if (typeof again !== 'string') say({ role: 'user', text: sending ? `${text} 📎 ${sending.file.name || 'photo'}` : text });

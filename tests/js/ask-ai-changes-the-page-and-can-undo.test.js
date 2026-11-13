@@ -130,6 +130,23 @@ describe('Ask AI', () => {
         expect(deps.showSaved).toHaveBeenLastCalledWith('Saved \u2713', { reload: true });
     });
 
+    it('keeps one conversation for the whole website, saying which page each message was on', async () => {
+        // owner, 13 Nov 2026: "seems ask AI feels new on each page"
+        sessionStorage.setItem('le-chat:oxbow', JSON.stringify({ log: [
+            { role: 'user', text: 'Take me to the Book page', page: '/edit/' },
+            { role: 'assistant', text: 'Going there now.', page: '/edit/' },
+        ], open: true }));
+        chatWith([() => answer({ reply: 'Done.', actions: [], cards: [] })]);
+
+        expect(host.textContent).toContain('Take me to the Book page');
+        await type('Make free delivery over 80,000');
+
+        expect(calls.at(-1).body.history).toEqual([
+            { role: 'user', text: '[On the page /edit/] Take me to the Book page' },
+            { role: 'assistant', text: '[On the page /edit/] Going there now.' },
+        ]);
+    });
+
     it('collects the answer when the host answers on its queue', async () => {
         const action = { type: 'field', kind: 'text', label: 'Heading', key: 'tpl:h1', value: 'Made in Lagos.' };
         chatWith([
@@ -369,7 +386,7 @@ describe('Ask AI', () => {
     });
 
     it('sends the waiting message when the owner comes back from a card page', async () => {
-        sessionStorage.setItem(`le-chat:oxbow:${location.pathname}`, JSON.stringify({ log: [{ role: 'user', text: 'Change the headline' }], open: true, waiting: 'Change the headline' }));
+        sessionStorage.setItem('le-chat:oxbow', JSON.stringify({ log: [{ role: 'user', text: 'Change the headline' }], open: true, waiting: 'Change the headline' }));
         history.replaceState(null, '', `${location.pathname}?ai-credits=back`);
         try {
             const replies = [() => answer({ reply: 'Done, the headline is new.', actions: [], cards: [] })];
