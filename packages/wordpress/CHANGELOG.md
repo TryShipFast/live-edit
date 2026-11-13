@@ -1,5 +1,13 @@
 # ShipFast Live Edit for WordPress
 
+## 0.21.21 (13 Nov 2026)
+
+- The logo by chat and voice, as Brand does it (owner: "change my logo" was asked "header, footer or both?"): told
+  to Ask AI with the business details; an attached photo is uploaded as Brand's Upload your logo does and becomes the
+  logo on every page; "the old logo back" puts the design's own back.
+- Ask AI's credits are the host's balance as it is now, every page (window.liveEditChat.balance), never the one kept
+  with the conversation (owner: the chat said "2 left" beside a dashboard showing 12: "contradicts").
+
 ## 0.21.20 (13 Nov 2026)
 
 - The Delete window names the part as everything else does (part-name.js): "Delete this sample note?" where it had

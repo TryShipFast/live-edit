@@ -9779,10 +9779,23 @@ const bootLiveEdit = () => {
                      * never one copy). The page is drawn again to show every copy.
                      */
                     const identity = window.liveEditBrand?.identity ?? {};
-                    const known = [identity.nameKey, ...(identity.contacts ?? []).map((contact) => contact.key)].filter(Boolean);
+                    const known = [identity.nameKey, identity.logoKey, ...(identity.contacts ?? []).map((contact) => contact.key)].filter(Boolean);
                     if (!known.includes(action.key)) return { ok: false, error: 'That business detail is not set up on this website.' };
+                    let value = String(action.value ?? '');
+                    // the logo: the photo attached to the message, uploaded as Brand's own Upload your logo does, or ''
+                    // for the design's own logo back
+                    if (action.key === identity.logoKey && action.attachment) {
+                        if (!(action.file instanceof Blob)) return { ok: false, error: 'That photo did not come through. Please add it again.' };
+                        try {
+                            const body = new FormData();
+                            body.append('file', action.file instanceof File ? action.file : new File([action.file], action.name || 'logo.png', { type: action.file.type || 'image/png' }));
+                            value = (await (await request('/live-edit/upload', { method: 'POST', body })).json()).url;
+                        } catch (error) {
+                            return { ok: false, error: error.message || 'Your logo could not be uploaded.' };
+                        }
+                    }
                     try {
-                        await request('/live-edit/setting', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ key: action.key, value: String(action.value ?? '') }) });
+                        await request('/live-edit/setting', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ key: action.key, value }) });
                     } catch (error) {
                         return { ok: false, error: error.message || 'That could not be saved.' };
                     }

@@ -148,7 +148,9 @@ export function createChat({ shadow, request, showSaved, openPhoto, openPublish,
     })();
     /** What was said, and what each answer did, so the conversation is still there after the page reloads. */
     const log = Array.isArray(remembered?.log) ? remembered.log : [];
-    let credits = remembered?.credits ?? null;
+    // the balance as the host says it is now, every page (owner, 13 Nov 2026: the chat said "2 left" from its last
+    // message while the dashboard showed 12 after a top-up: "contradicts"); never the one kept with the conversation
+    let credits = typeof window.liveEditChat?.balance?.balance === 'number' ? { ...window.liveEditChat.balance } : null;
     /** The message that ran out of credits, sent again once credits are added (here, or back from a card page). */
     let waitingToSend = typeof remembered?.waiting === 'string' ? remembered.waiting : null;
     let busy = false;
@@ -156,7 +158,7 @@ export function createChat({ shadow, request, showSaved, openPhoto, openPublish,
 
     const remember = () => {
         try {
-            sessionStorage.setItem(memoryKey, JSON.stringify({ log: log.slice(-40), credits, open: !panel.hidden, waiting: waitingToSend }));
+            sessionStorage.setItem(memoryKey, JSON.stringify({ log: log.slice(-40), open: !panel.hidden, waiting: waitingToSend }));
         } catch { /* private mode: the chat still works */ }
     };
 
@@ -267,7 +269,8 @@ export function createChat({ shadow, request, showSaved, openPhoto, openPublish,
             } else if (change.type === 'table') {
                 item.append(el('b', '', `${change.label}: `), document.createTextNode(`table changed, ${change.rows.length} row${change.rows.length === 1 ? '' : 's'}`));
             } else if (change.type === 'business') {
-                item.append(el('b', '', `${change.label}: `), document.createTextNode(`“${change.value}”, on every page`));
+                const said = change.attachment ? 'your new logo' : change.label === 'Logo' && !change.value ? 'the design\u2019s own logo back' : `\u201C${change.value}\u201D`;
+                item.append(el('b', '', `${change.label}: `), document.createTextNode(`${said}, on every page`));
             } else if (change.type === 'delete') {
                 item.append(el('b', '', `${change.label}: `), document.createTextNode('deleted'));
             } else {
@@ -572,7 +575,8 @@ export function createChat({ shadow, request, showSaved, openPhoto, openPublish,
                 let goTo = null;
                 for (const action of planned) {
                     // a photo the owner attached goes with the change that asks for it
-                    const doing = action.type === 'image' ? { ...action, file: sending?.id === action.attachment ? sending.file : null, name: sending?.file?.name } : action;
+                    // the attached photo goes with the change that uses it: a picture on the page, or the logo
+                    const doing = action.type === 'image' || (action.type === 'business' && action.attachment) ? { ...action, file: sending?.id === action.attachment ? sending.file : null, name: sending?.file?.name } : action;
                     const done = await act(doing).catch((error) => ({ ok: false, error: error.message }));
                     if (done?.ok && !done.unchanged) entry.changes.push(action);
                     if (done?.ok && done.reload) drawAgain = true;

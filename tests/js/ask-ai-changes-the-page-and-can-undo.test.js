@@ -67,6 +67,16 @@ describe('Ask AI', () => {
         document.body.append(host);
     });
 
+    it('shows the balance the host gives now, never one kept with the conversation', () => {
+        // owner, 13 Nov 2026: the chat said "2 left" from its last message beside a dashboard showing 12 ("contradicts")
+        for (let i = 0; i < sessionStorage.length; i++) sessionStorage.removeItem(sessionStorage.key(i));
+        sessionStorage.setItem(`le-chat:${location.hostname}`, JSON.stringify({ log: [], credits: { balance: 2, cost: 1 } }));
+        window.liveEditChat = { balance: { balance: 12, cost: 1 }, credits: 'https://live.example.test/billing#ai-credits' };
+        chatWith([]);
+        expect(host.querySelector('.le-chat-foot').textContent).toBe('Each message uses 1 AI credit. 12 left.');
+        delete window.liveEditChat;
+    });
+
     it('greets with suggestions from the page and sends the page with the message', async () => {
         chatWith([() => answer({ reply: 'I made it shorter.', changes: [], cards: [], undo: [], credits: { balance: 9, cost: 1 } })]);
 

@@ -487,6 +487,12 @@ const businessOf = (doc, root) => {
         const shown = clean(root.querySelector(`[${contact.marker}]:not([${contact.marker}="link"])`)?.textContent ?? '');
         details.push({ key: contact.key, label: cut(contact.label || 'Contact', 60), value: cut(contact.value || shown, 240) });
     }
+    // the logo, one for the whole site as Brand sets it (owner, 13 Nov 2026: "change my logo" was asked "header,
+    // footer or both?"): what it is now, the owner's upload or the design's own
+    if (identity.logoKey && root.querySelector('[data-logo], [data-brand-header]')) {
+        const own = String(identity.logo ?? '');
+        details.push({ key: identity.logoKey, label: 'Logo', value: own ? `your uploaded logo (${cut(own.split('/').pop(), 80)})` : "the design's own logo" });
+    }
 
     return details;
 };
