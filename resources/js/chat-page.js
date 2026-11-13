@@ -107,6 +107,66 @@ const labelOf = (element, kind) => {
 };
 
 /**
+ * What sits next to each part on the screen: the nearest part above, below, to the left and to the right, named the
+ * way the owner sees it (owner, 13 Nov 2026: "the moat is chatting to replace mouse control"; "if i say delete
+ * paragraph next to or beside or above an element, does the ai ask understand that"). Worked out from where each
+ * part is drawn, so two paragraphs side by side in columns are beside each other, not one under the other. A part
+ * not drawn (a closed menu, a hidden tab) has none, and a button's words and its link are one part.
+ *
+ * @param {{field: object, element: Element}[]} placed
+ */
+const besides = (placed) => {
+    const nameOf = (field) => {
+        if (field.kind === 'text') {
+            const label = field.label ?? '';
+            // a button is already named by its words
+            if (/\u201D button$/.test(label)) return label;
+            const words = cut(field.value, 28);
+            return `${label || 'Text'} \u201C${words}\u201D`;
+        }
+
+        return field.label || (field.kind === 'link' ? 'Link' : 'Photo');
+    };
+    // one box per drawn part (a button's words and its link share the element: its words name it)
+    const boxes = [];
+    const byElement = new Map();
+    for (const { field, element } of placed) {
+        if (byElement.has(element)) continue;
+        const rect = element.getBoundingClientRect?.();
+        if (!rect || rect.width <= 0 || rect.height <= 0) continue;
+        const box = { field, element, top: rect.top, bottom: rect.bottom, left: rect.left, right: rect.right, name: nameOf(field) };
+        byElement.set(element, box);
+        boxes.push(box);
+    }
+    const across = (a, b) => Math.min(a.right, b.right) - Math.max(a.left, b.left);
+    const down = (a, b) => Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top);
+    for (const box of boxes) {
+        let above = null; let below = null; let left = null; let right = null;
+        for (const other of boxes) {
+            if (other === box || other.element.contains(box.element) || box.element.contains(other.element)) continue;
+            // in the same column: overlapping across; beside: sharing at least a third of the shorter one's height
+            if (across(box, other) > 0) {
+                if (other.bottom <= box.top + 2 && (!above || other.bottom > above.bottom)) above = other;
+                if (other.top >= box.bottom - 2 && (!below || other.top < below.top)) below = other;
+            } else if (down(box, other) >= Math.min(box.bottom - box.top, other.bottom - other.top) / 3) {
+                if (other.right <= box.left + 2 && (!left || other.right > left.right)) left = other;
+                if (other.left >= box.right - 2 && (!right || other.left < right.left)) right = other;
+            }
+        }
+        const near = {};
+        if (above) near.above = above.name;
+        if (below) near.below = below.name;
+        if (left) near.left = left.name;
+        if (right) near.right = right.name;
+        if (Object.keys(near).length) {
+            box.field.near = near;
+            // the same neighbours for its link, which is the same part
+            for (const { field, element } of placed) if (element === box.element && field !== box.field) field.near = near;
+        }
+    }
+};
+
+/**
  * @param {Document|Element} root
  * @returns {{page: {title: string, path: string}, fields: object[], sections: object[], lists: object[]}}
  */
@@ -114,6 +174,7 @@ export function pageForTheChat(root = document) {
     const doc = root.ownerDocument || root;
     const fields = [];
     const seen = new Set();
+    const placed = [];
 
     const marked = root.querySelectorAll('[data-edit], [data-edit-img], [data-edit-bg], [data-edit-href], [data-edit-icon]');
     for (const element of marked) {
@@ -135,7 +196,7 @@ export function pageForTheChat(root = document) {
             // (owner, 12 Nov 2026, the novice walk: "Heading" alone named any of a page's headings)
             // a section a designer calls the hero is "at the top" to everyone else
             const said = /^(hero|top|intro|introduction|banner|masthead)$/i.test(where) ? 'at the top' : `in ${where}`;
-            if (label) field.label = where && ['Heading', 'Photo'].includes(label) ? `${label} ${said}` : label;
+            if (label) field.label = where && ['Heading', 'Photo', 'Paragraph'].includes(label) ? `${label} ${said}` : label;
             if (where) field.section = where;
             // how it looks, where the design lets it be changed (colour, size, spacing): the same choices its panel
             // offers, so Ask AI can do what the panel's style controls do and no more
@@ -152,8 +213,10 @@ export function pageForTheChat(root = document) {
                 }
             }
             fields.push(field);
+            placed.push({ field, element });
         }
     }
+    besides(placed);
 
     const sections = [];
     for (const element of root.querySelectorAll('[data-edit-section]')) {
