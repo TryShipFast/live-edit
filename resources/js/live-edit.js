@@ -9396,6 +9396,75 @@ const bootLiveEdit = () => {
 
                     return pressSave();
                 }
+                if (action.type === 'picture') {
+                    /*
+                     * A picture changed as a person changes it (owner, 13 Nov 2026: chat does what a click does; the
+                     * coverage walk on The Speaker: 64 photos only took an attached photo): Replace image, then Free
+                     * photos searched with their words or Generate with AI made from them (its credits, as the button
+                     * says), the first one picked; or the description box; then the panel's Save.
+                     */
+                    const named = CSS.escape(`setting:${action.key}`);
+                    const all = [...document.querySelectorAll(`[data-edit-img="${named}"], [data-edit-bg="${named}"]`)].filter((node) => !node.closest('#live-edit-ui'));
+                    const picture = all.find((node) => node.getClientRects().length > 0) ?? all[0];
+                    if (!picture) return { ok: false, error: 'That picture is not on this page any more.' };
+                    const refused = refusedFor(picture);
+                    if (refused) return refused;
+                    if (team && !team.beforeEdit(picture, { onRefused: () => closeDrawer(true) })) return { ok: false, locked: heldBySomeoneElse(picture) ?? { label: 'that part', name: 'A teammate' } };
+                    openNode(picture);
+                    await settled();
+                    const waitFor = async (find, seconds) => {
+                        for (let i = 0; i < seconds * 4; i++) {
+                            const found = find();
+                            if (found) return found;
+                            await new Promise((resolve) => setTimeout(resolve, 250));
+                        }
+                        return null;
+                    };
+                    if (action.find || action.make) {
+                        const replace = [...drawerFields.querySelectorAll('button')].find((b) => /^Replace (image|background)$/.test(b.textContent.trim()));
+                        if (!replace) { closeDrawer(true); return { ok: false, error: 'That picture cannot be replaced here.' }; }
+                        replace.click();
+                        await settled();
+                        const tab = [...ui.shadow.querySelectorAll('.le-modal-tab')].find((b) => b.textContent.trim() === (action.make ? 'Generate with AI' : 'Free photos'));
+                        if (!tab) { closeDrawer(true); return { ok: false, error: action.make ? 'Making a picture is not set up on this website.' : 'Free photos are not set up on this website.' }; }
+                        tab.click();
+                        await settled();
+                        if (action.make) {
+                            const box = ui.shadow.querySelector('.le-modal textarea.le-textarea');
+                            const go = [...ui.shadow.querySelectorAll('.le-modal button')].find((b) => b.textContent.trim().startsWith('Make a picture'));
+                            if (!box || !go || go.disabled) { closeDrawer(true); return { ok: false, error: 'A picture cannot be made just now: check your AI credits.' }; }
+                            box.value = String(action.make).slice(0, 600);
+                            box.dispatchEvent(new Event('input', { bubbles: true }));
+                            go.click();
+                        } else {
+                            const search = ui.shadow.querySelector('.le-modal input.le-search[type=search]');
+                            if (!search) { closeDrawer(true); return { ok: false, error: 'Free photos are not set up on this website.' }; }
+                            search.value = String(action.find).slice(0, 120);
+                            search.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+                        }
+                        const pick = await waitFor(() => ui.shadow.querySelector('.le-modal .le-grid .le-pick'), action.make ? 150 : 25);
+                        if (!pick) {
+                            ui.shadow.querySelector('.le-modal .le-close')?.click();
+                            closeDrawer(true);
+                            return { ok: false, error: action.make ? 'No picture came back. Your credits were given back.' : `No free photo was found for “${action.find}”.` };
+                        }
+                        pick.click();
+                        await settled();
+                    }
+                    if (typeof action.description === 'string') {
+                        const alt = drawerFields.querySelector('[data-img-attr="alt"]');
+                        if (alt) {
+                            alt.value = action.description.slice(0, 250);
+                            alt.dispatchEvent(new Event('input', { bubbles: true }));
+                        } else if (!action.find && !action.make) {
+                            closeDrawer(true);
+                            return { ok: false, error: 'That picture has no description to change here.' };
+                        }
+                    }
+                    if (current) current.dirty = true;
+
+                    return pressSave();
+                }
                 if (action.type === 'form') {
                     /*
                      * A form's questions changed with the builder's own functions and rules, then saved as its Save does
