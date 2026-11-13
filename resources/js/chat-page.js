@@ -27,6 +27,19 @@ const keyOf = (marker) => (typeof marker === 'string' && marker.startsWith('sett
 
 const locked = (element) => Boolean(element.closest(LOCKED));
 
+/*
+ * A link's address is saved under its marker as written: "setting:tpl:abc" on some sites, the bare "tpl:abc" on the
+ * Kit's templates (the editor's link panel saves `dataset.editHref` as it is). The chat never saw the bare ones, so it
+ * could change no link on The Speaker (owner, 13 Nov 2026, the coverage walk: 1,127 links). An engine guess ("auto:")
+ * is still not offered.
+ */
+const hrefKeyOf = (marker) => {
+    if (typeof marker !== 'string' || marker === '') return null;
+    if (marker.startsWith('setting:')) return marker.slice(8);
+
+    return /^[a-z][\w-]*:[\w.:-]+$/i.test(marker) && !marker.startsWith('auto:') ? marker : null;
+};
+
 const sectionOf = (element) => {
     const section = element.closest('[data-edit-section]');
 
@@ -184,7 +197,7 @@ export function pageForTheChat(root = document) {
         // field, under its own marker, so a change to the address never lands on the words' key
         for (const [attribute, kind] of MARKERS) {
             if (!element.hasAttribute(attribute)) continue;
-            const key = keyOf(element.getAttribute(attribute));
+            const key = attribute === 'data-edit-href' ? hrefKeyOf(element.getAttribute(attribute)) : keyOf(element.getAttribute(attribute));
             if (key === null || seen.has(key)) continue;
             const value = valueOf(element, kind);
             if (value === '' && kind === 'text') continue;
@@ -270,7 +283,7 @@ export function tappedForTheChat(element) {
     // the clicked part as one thing: the first of its markers, with that marker's own key and kind (a button's words,
     // not its words' key called a link)
     const [attribute, kind] = MARKERS.find(([name]) => holder.hasAttribute(name)) ?? [];
-    const key = attribute ? keyOf(holder.getAttribute(attribute)) : null;
+    const key = !attribute ? null : attribute === 'data-edit-href' ? hrefKeyOf(holder.getAttribute(attribute)) : keyOf(holder.getAttribute(attribute));
     if (key === null) return null;
 
     return { key, kind, label: labelOf(holder, kind) || cut(holder.textContent, 80) || 'This part' };

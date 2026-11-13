@@ -9245,7 +9245,9 @@ const bootLiveEdit = () => {
             const settled = () => new Promise((resolve) => setTimeout(resolve, 0));
             const byKey = (attr, key) => {
                 const named = CSS.escape(`setting:${key}`);
-                const all = [...document.querySelectorAll(`[${attr}="${named}"]`)].filter((element) => !element.closest('#live-edit-ui'));
+                // a link's address is marked as its key is saved: "setting:tpl:abc" or the Kit's bare "tpl:abc"
+                const bare = attr === 'data-edit-href' ? `, [${attr}="${CSS.escape(key)}"]` : '';
+                const all = [...document.querySelectorAll(`[${attr}="${named}"]${bare}`)].filter((element) => !element.closest('#live-edit-ui'));
 
                 return all.find((element) => element.getClientRects().length > 0) ?? all[0] ?? null;
             };

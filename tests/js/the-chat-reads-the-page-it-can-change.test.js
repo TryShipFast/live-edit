@@ -123,3 +123,18 @@ describe('the page the chat sends', () => {
         expect(tappedForTheChat(document.querySelector('[data-live-lock] p'))).toBeNull();
     });
 });
+
+describe('links on the Kit templates', () => {
+    it('offers a link whose address is marked by its bare key, as the editor saves it', () => {
+        // owner, 13 Nov 2026, the coverage walk on The Speaker: no link was offered (1,127), marked data-edit-href="tpl:…"
+        document.body.innerHTML = `
+            <section data-edit-section="hero" data-edit-section-label="Hero">
+                <a href="/booking/" data-edit-href="tpl:book" data-edit="setting:tpl:book.text">Check a date</a>
+                <a href="/x/" data-edit-href="auto:guess">A guess</a>
+            </section>`;
+        const { fields } = pageForTheChat(document);
+
+        expect(fields.find((f) => f.key === 'tpl:book')).toMatchObject({ kind: 'link', value: '/booking/' });
+        expect(fields.find((f) => f.key === 'auto:guess')).toBeUndefined();
+    });
+});
