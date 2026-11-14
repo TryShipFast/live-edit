@@ -1,4 +1,5 @@
 import { createChrome } from './chrome.js';
+import { renderConnectedList, connectionOf } from './connected-list.js';
 import { toolbarIcon } from './toolbar-icons.js';
 import { createTeam, splitChanges, TEAM_CSS } from './team.js';
 import { describeVersion, versionsWorthShowing } from './history.js';
@@ -5140,6 +5141,27 @@ const bootLiveEdit = () => {
             // The card's category when its words do not show it (choice.js): chosen from the filter's own options.
             const choicePicker = !sections && item ? renderChoice({ item, list, save: saveSetting, notify }) : null;
             if (choicePicker) block.append(choicePicker);
+            /*
+             * A list drawn from the owner's own API (connected-list.js; owner, 14 Nov 2026: pricing "can be gotten from
+             * the api url"): Get these from a link, or where a connected one comes from. Its rows come from the link,
+             * so adding, moving and deleting them here would change nothing a visitor sees: those buttons go.
+             */
+            if (!sections && window.liveEditLists) {
+                const connected = renderConnectedList({
+                    list,
+                    label: list.dataset.editListLabel || 'This list',
+                    notify,
+                    askTo,
+                    settle: (message) => settle(message, null, null, true),
+                });
+                if (connected) {
+                    if (connectionOf(list.dataset.editList)) {
+                        row.replaceChildren();
+                        block.querySelectorAll(':scope > .le-hint').forEach((hint) => hint.remove());
+                    }
+                    block.append(connected);
+                }
+            }
             /*
              * The card's own page. A product card, a journal card or a project
              * card opens a detail page; the panel opens that page over the list,
