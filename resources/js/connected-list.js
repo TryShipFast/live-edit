@@ -87,7 +87,13 @@ export function partsOf(item) {
     const parts = [];
     const lists = new Set();
     let priceAt = null;
-    for (const el of item.querySelectorAll('[data-edit], [data-edit-href]')) {
+    for (const el of item.querySelectorAll('[data-edit], [data-edit-href], img[data-edit-img]')) {
+        // its photo: a picture the template keyed, filled from a picture the link gives
+        if (el.tagName === 'IMG' && el.hasAttribute('data-edit-img')) {
+            const key = baseKey(el.getAttribute('data-edit-img'));
+            if (/^tpl:[0-9a-f]{12}$/.test(key) && !parts.some((p) => p.key === key)) parts.push({ key, as: 'picture', role: 'picture', words: el.currentSrc || el.getAttribute('src') || '' });
+            continue;
+        }
         const href = el.getAttribute('data-edit-href');
         if (href && /^tpl:[0-9a-f]{12}/.test(baseKey(href))) {
             parts.push({ key: baseKey(href), as: 'link', role: 'link', words: el.getAttribute('href') ?? '' });
@@ -139,7 +145,7 @@ export function partsOf(item) {
 }
 
 /** A field's choice in words: its name and an example from the owner's own rows. */
-const choiceLabel = (field) => `${field.field}${field.example ? ` (${field.example})` : ''}`;
+const choiceLabel = (field) => (field.label ? field.label : `${field.field}${field.example ? ` (${field.example})` : ''}`);
 
 async function send(url, body, token) {
     const response = await fetch(url, {
@@ -325,7 +331,7 @@ export function renderConnectedList({ list, label = 'This list', notify = () => 
                 matching.append(field('Which list', which));
             }
             const dateField = answer.fields.find((f) => /(^|\.)(date|published(_at)?|created(_at)?|posted(_at)?|start(s|_at|_date)?|when)$/i.test(f.field))?.field;
-            const guessFor = { date: dateField, name: answer.guess.name, price: answer.guess.price, period: answer.guess.period, description: answer.guess.description, features: answer.guess.features, button: answer.guess.button, link: answer.guess.link };
+            const guessFor = { picture: answer.guess.picture, date: dateField, name: answer.guess.name, price: answer.guess.price, period: answer.guess.period, description: answer.guess.description, features: answer.guess.features, button: answer.guess.button, link: answer.guess.link };
             const picks = [];
             for (const part of parts) {
                 const pick = el('select', 'le-input');
@@ -334,12 +340,25 @@ export function renderConnectedList({ list, label = 'This list', notify = () => 
                 for (const one of answer.fields) {
                     if (part.as === 'list' && one.kind !== 'list' && one.kind !== 'words') continue;
                     if (part.as === 'link' && one.kind !== 'link') continue;
+                    if ((part.as === 'picture') !== (one.kind === 'picture')) continue;
                     const option = el('option', '', choiceLabel(one));
                     option.value = one.field;
                     pick.append(option);
                 }
                 pick.value = was?.matches?.[part.key]?.field ?? guessFor[part.role] ?? '';
                 if (pick.selectedIndex < 0) pick.value = '';
+                if (part.as === 'picture') {
+                    const wrap = el('label', 'le-field');
+                    const head = el('span', 'le-connected-photo');
+                    const thumb = el('img');
+                    thumb.src = part.words;
+                    thumb.alt = '';
+                    head.append(thumb, 'Its photo');
+                    wrap.append(head, pick);
+                    matching.append(wrap);
+                    picks.push([part, pick]);
+                    continue;
+                }
                 const named = part.as === 'link' ? 'Where its button goes' : `“${part.words.length > 40 ? `${part.words.slice(0, 40)}…` : part.words}”`;
                 matching.append(field(named, pick));
                 picks.push([part, pick]);
@@ -363,12 +382,27 @@ export function renderConnectedList({ list, label = 'This list', notify = () => 
                 const priceKind = answer.fields.find((f) => f.field === price?.[1].value)?.kind;
                 smallestField.hidden = priceKind !== 'number';
                 const lines = (answer.rows ?? []).slice(0, 3).map((row) => picks
-                    .filter(([part, pick]) => pick.value && part.as !== 'link' && part.role !== 'features' && part.role !== 'button')
+                    .filter(([part, pick]) => pick.value && part.as !== 'link' && part.as !== 'picture' && part.role !== 'features' && part.role !== 'button')
                     .map(([part, pick]) => shownAs(valueAt(row, pick.value), part.as, { symbol: part.symbol, smallest: smallest.checked, format: part.format }))
                     .map((words) => (words.length > 70 ? `${words.slice(0, 70).replace(/\s+\S*$/, '')}\u2026` : words))
                     .filter(Boolean)
                     .join(', '));
-                preview.replaceChildren(el('div', 'le-section-heading', 'They will read'), ...lines.filter(Boolean).map((line) => el('p', 'le-hint', line)));
+                const photo = picks.find(([p]) => p.as === 'picture')?.[1].value;
+                const rowsShown = lines.map((line, i) => {
+                    const row = el('div', 'le-connected-row');
+                    const src = photo ? valueAt((answer.rows ?? [])[i] ?? {}, photo.replace(/#first-picture$/, '')) : null;
+                    const url = photo?.endsWith('#first-picture') ? (String(src ?? '').match(/<img\b[^>]*\bsrc=["'](https:[^"']+)/i) ?? [])[1] : src;
+                    if (typeof url === 'string' && /^https:\/\//.test(url)) {
+                        const thumb = el('img');
+                        thumb.src = url;
+                        thumb.alt = '';
+                        thumb.loading = 'lazy';
+                        row.append(thumb);
+                    }
+                    row.append(el('p', 'le-hint', line));
+                    return row;
+                });
+                preview.replaceChildren(el('div', 'le-section-heading', 'They will read'), ...rowsShown);
             };
             for (const [, pick] of picks) pick.addEventListener('change', drawPreview);
             smallest.addEventListener('change', drawPreview);

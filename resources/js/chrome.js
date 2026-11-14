@@ -929,6 +929,9 @@ a.le-mark:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
 .le-connected .le-link-btn { align-self: flex-start; }
 .le-connected-preview { display: flex; flex-direction: column; gap: 4px; padding: 12px 14px; border: 1px solid var(--le-line); border-radius: 10px; }
 .le-connected-preview .le-section-heading { margin: 0 0 4px; }
+.le-connected-photo { display: flex; align-items: center; gap: 10px; }
+.le-connected-photo img, .le-connected-row img { width: 48px; height: 36px; object-fit: cover; border-radius: 6px; flex: none; background: var(--le-line); }
+.le-connected-row { display: flex; align-items: center; gap: 10px; }
 .le-input {
   width: 100%; border: 1px solid var(--le-field); border-radius: 12px; background: #fff;
   padding: 11px 14px; font-size: 14px; font-weight: 400; letter-spacing: normal; text-transform: none;
