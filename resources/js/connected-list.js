@@ -11,6 +11,18 @@
 
 const MONEY = /^\s*([₦$€£₵¥₹]|NGN|USD|GHS|KES|ZAR|EUR|GBP)?\s*[\d][\d,.\s]*\s*$|[₦$€£₵¥₹]\s*\d/;
 const SYMBOL = /([₦$€£₵¥₹])/;
+const MONTHS = 'Jan(?:uary)?|Feb(?:ruary)?|Mar(?:ch)?|Apr(?:il)?|May|June?|July?|Aug(?:ust)?|Sep(?:t(?:ember)?)?|Oct(?:ober)?|Nov(?:ember)?|Dec(?:ember)?';
+
+/** The way a design writes a date, as PHP's date format the host fills it in with ("14 October 2026" is "j F Y"). */
+export function dateFormatOf(words) {
+    const w = String(words ?? '').trim();
+    if (new RegExp(`^\\d{1,2} (${MONTHS}) \\d{4}$`).test(w)) return /^\d{1,2} [A-Za-z]{3} \d{4}$/.test(w) ? 'j M Y' : 'j F Y';
+    if (new RegExp(`^(${MONTHS}) \\d{1,2}, \\d{4}$`).test(w)) return /^[A-Za-z]{3} /.test(w) ? 'M j, Y' : 'F j, Y';
+    if (/^\d{4}-\d{2}-\d{2}$/.test(w)) return 'Y-m-d';
+    if (/^\d{1,2}\/\d{1,2}\/\d{4}$/.test(w)) return 'd/m/Y';
+
+    return null;
+}
 
 const PERIODS = { day: 'a day', daily: 'a day', week: 'a week', weekly: 'a week', month: 'a month', monthly: 'a month', mo: 'a month', quarter: 'every 3 months', quarterly: 'every 3 months', year: 'a year', yearly: 'a year', annually: 'a year', annual: 'a year', yr: 'a year', once: 'once' };
 
@@ -26,7 +38,7 @@ const plainWords = (value) => {
 };
 
 /** A part as the page will show it, the way the host words it (TheRowsAListShows): what the owner checks before saving. */
-export function shownAs(value, as, { symbol = '', smallest = false } = {}) {
+export function shownAs(value, as, { symbol = '', smallest = false, format = null } = {}) {
     if (as === 'price') {
         const plain = typeof value === 'string' ? value.replace(/[,\s]/g, '') : value;
         if (typeof plain === 'string' && !/^-?\d+(\.\d+)?$/.test(plain)) return plainWords(value);
@@ -42,6 +54,15 @@ export function shownAs(value, as, { symbol = '', smallest = false } = {}) {
         return PERIODS[words.toLowerCase().replace(/^(?:(?:per|every|a|an)\s+|\/\s*)/, '')] ?? words;
     }
     if (as === 'link') return '';
+    if (as === 'date') {
+        const when = new Date(String(value ?? ''));
+        if (Number.isNaN(when.getTime())) return plainWords(value);
+        const long = when.toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' });
+
+        return format?.startsWith('M') || format?.startsWith('F') ? when.toLocaleDateString('en-US', { month: format.startsWith('M') ? 'short' : 'long', day: 'numeric', year: 'numeric' })
+            : format === 'j M Y' ? when.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })
+                : format === 'Y-m-d' ? when.toISOString().slice(0, 10) : long;
+    }
 
     return plainWords(value);
 }
@@ -85,7 +106,8 @@ export function partsOf(item) {
             parts.push({ key, as: 'list', role: 'features', words: lines.map((line) => line.textContent.trim()).join(', ') });
             continue;
         }
-        if (key.endsWith('.text') && el.closest('a, button')) {
+        // Its button's words: short words in a link or button, never a heading that is also the card's link.
+        if (key.endsWith('.text') && el.closest('a, button') && !/^H[1-6]$/.test(el.tagName) && !el.querySelector('h1, h2, h3, h4, h5, h6') && words.split(' ').length <= 5) {
             parts.push({ key, as: 'words', role: 'button', words });
             continue;
         }
@@ -94,13 +116,23 @@ export function partsOf(item) {
             parts.push({ key, as: 'price', role: 'price', words, symbol: (words.match(SYMBOL) ?? [])[1] ?? '' });
             continue;
         }
+        const format = el.tagName === 'TIME' || dateFormatOf(words) ? (dateFormatOf(words) ?? 'j F Y') : null;
+        if (format) {
+            parts.push({ key, as: 'date', role: 'date', words, format });
+            continue;
+        }
         const nextToPrice = priceAt && (priceAt.nextElementSibling === el || priceAt.parentElement === el.parentElement);
         if (nextToPrice) {
             parts.push({ key, as: 'period', role: 'period', words });
             continue;
         }
-        const role = /^H[1-6]$/.test(el.tagName) || !parts.some((p) => p.role === 'name') ? 'name' : 'description';
-        parts.push({ key, as: 'words', role, words });
+        parts.push({ key, as: 'words', role: /^H[1-6]$/.test(el.tagName) ? 'name' : 'words', words, heading: /^H[1-6]$/.test(el.tagName) });
+    }
+
+    // Its heading is its name; without one, its first words are. The rest are its description.
+    const named = parts.find((p) => p.heading) ?? parts.find((p) => p.role === 'words');
+    for (const part of parts) {
+        if (part.role === 'name' || part.role === 'words') part.role = part === named ? 'name' : 'description';
     }
 
     return parts;
@@ -292,7 +324,8 @@ export function renderConnectedList({ list, label = 'This list', notify = () => 
                 which.addEventListener('change', () => look.leRun(which.value));
                 matching.append(field('Which list', which));
             }
-            const guessFor = { name: answer.guess.name, price: answer.guess.price, period: answer.guess.period, description: answer.guess.description, features: answer.guess.features, button: answer.guess.button, link: answer.guess.link };
+            const dateField = answer.fields.find((f) => /(^|\.)(date|published(_at)?|created(_at)?|posted(_at)?|start(s|_at|_date)?|when)$/i.test(f.field))?.field;
+            const guessFor = { date: dateField, name: answer.guess.name, price: answer.guess.price, period: answer.guess.period, description: answer.guess.description, features: answer.guess.features, button: answer.guess.button, link: answer.guess.link };
             const picks = [];
             for (const part of parts) {
                 const pick = el('select', 'le-input');
@@ -331,7 +364,8 @@ export function renderConnectedList({ list, label = 'This list', notify = () => 
                 smallestField.hidden = priceKind !== 'number';
                 const lines = (answer.rows ?? []).slice(0, 3).map((row) => picks
                     .filter(([part, pick]) => pick.value && part.as !== 'link' && part.role !== 'features' && part.role !== 'button')
-                    .map(([part, pick]) => shownAs(valueAt(row, pick.value), part.as, { symbol: part.symbol, smallest: smallest.checked }))
+                    .map(([part, pick]) => shownAs(valueAt(row, pick.value), part.as, { symbol: part.symbol, smallest: smallest.checked, format: part.format }))
+                    .map((words) => (words.length > 70 ? `${words.slice(0, 70).replace(/\s+\S*$/, '')}\u2026` : words))
                     .filter(Boolean)
                     .join(', '));
                 preview.replaceChildren(el('div', 'le-section-heading', 'They will read'), ...lines.filter(Boolean).map((line) => el('p', 'le-hint', line)));
@@ -350,7 +384,7 @@ export function renderConnectedList({ list, label = 'This list', notify = () => 
             save.addEventListener('click', save.leRun = async () => {
                 const matches = {};
                 for (const [part, pick] of picks) {
-                    if (pick.value) matches[part.key] = { field: pick.value, as: part.as, ...(part.symbol ? { symbol: part.symbol } : {}) };
+                    if (pick.value) matches[part.key] = { field: pick.value, as: part.as, ...(part.symbol ? { symbol: part.symbol } : {}), ...(part.format ? { format: part.format } : {}) };
                 }
                 if (!Object.keys(matches).length) { said.textContent = 'Choose what fills at least one part, or press Cancel.'; return false; }
                 save.disabled = true;
