@@ -79,7 +79,9 @@ export function connectionOf(listKey, lists = window.liveEditLists) {
 function pageItOpens(link) {
     if (!link.hasAttribute('data-link-page')) return null;
     try {
-        const at = new URL(link.getAttribute('href') ?? '', window.location.href);
+        // from the page's folder, as the published site resolves it: the editor's address has no closing slash
+        const folder = window.location.origin + window.location.pathname.replace(/\/?$/, '/');
+        const at = new URL(link.getAttribute('href') ?? '', folder);
         if (at.origin !== window.location.origin) return null;
         const page = (at.pathname.match(/\/edit\/(.*)$/) ?? [])[1];
 

@@ -1,5 +1,14 @@
 # ShipFast Live Edit for WordPress
 
+## 0.23.1 (14 Nov 2026)
+
+Each blog post's own page, from a link (display only: owner, 14 Nov 2026, "just display for now"):
+- A connected list's card button (or title link) can open **Its own page on this website, in the design of your
+  "<article>" page**: the host then shows each post (title, date, lead, photo and its words, made safe) in that page's
+  design (connected-list.js).
+- A card's own page address is worked out from the page's folder, so it is right whether or not the editor's address
+  ends in a slash.
+
 ## 0.23.0 (14 Nov 2026)
 
 v0.22.0 was tagged on the 0.21.24 code and holds nothing new; this is the next real release.
