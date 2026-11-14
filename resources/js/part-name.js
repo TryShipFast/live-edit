@@ -58,7 +58,8 @@ const fieldName = (field) => {
 
 export const partName = (element) => {
     if (!element?.getAttribute) return '';
-    const given = element.getAttribute('data-edit-label');
+    // a part that is a whole piece of the design on its own (a closure notice, data-instance) is called by its name
+    const given = element.getAttribute('data-edit-label') || (element.hasAttribute('data-instance') ? element.getAttribute('data-label') : null);
     if (given) return given.length > 80 ? given.slice(0, 80) : given;
 
     const picture = element.hasAttribute('data-edit-img') || element.hasAttribute('data-edit-bg') || element.tagName === 'IMG';
@@ -96,4 +97,59 @@ export const partName = (element) => {
     const said = words(element, 40);
 
     return said ? `\u201C${said}\u201D` : '';
+};
+
+/** What a list's cards are each called, from the list's own name ("Reviews" makes "review"); null when it says nothing. */
+export const itemNoun = (list) => {
+    const label = String(list?.dataset?.editListLabel ?? '').trim().toLowerCase();
+    if (!/^[a-z]+$/.test(label) || label === 'items') return null;
+
+    return label.endsWith('ies') ? `${label.slice(0, -3)}y` : label.endsWith('s') ? label.slice(0, -1) : label;
+};
+
+/**
+ * What a click calls a part: the editor panel's title, the label on the page and the trail, and what Ask AI and voice
+ * are told, from this one function (owner, 14 Nov 2026: "the ai ask only needs to learn how the live edit gets the
+ * labels when click and replicate same when texted"). Never ''.
+ */
+export const clickedName = (element) => {
+    const tag = element.tagName;
+    // A band the mapper named ("Hero", "Pricing") beats the tag it happens to be written as.
+    if (element.dataset?.editRegion) return element.dataset.editRegion;
+    const named = partName(element);
+    if (named) return named;
+    // A card is named for what its list holds ("Review"), before the tag it is written as ("List item").
+    if (element.hasAttribute('data-edit-item') && tag === 'LI' && element.parentElement?.dataset?.editListKind !== 'sections') {
+        const noun = itemNoun(element.parentElement);
+
+        return noun ? `${noun[0].toUpperCase()}${noun.slice(1)}` : 'Card';
+    }
+    if (tag === 'IMG') return 'Image';
+    if (tag === 'BUTTON') return 'Button';
+    if (tag === 'A') return /\b(btn|button)\b/i.test(String(element.className)) ? 'Button' : 'Link';
+    if (/^H[1-6]$/.test(tag)) return 'Heading';
+    if (tag === 'P') return 'Paragraph';
+    if (tag === 'LI') return 'List item';
+    if (tag === 'UL' || tag === 'OL') return 'List';
+    if (tag === 'NAV') return 'Menu';
+    if (tag === 'HEADER') return 'Header';
+    if (tag === 'FOOTER') return 'Footer';
+    if (tag === 'FORM') return 'Form';
+    if (element.hasAttribute('data-edit-item')) {
+        if (element.parentElement?.dataset?.editListKind === 'sections') return 'Section';
+        // a table's own parts are called what they are, not a card
+        if (element.matches('td, th')) return 'Cell';
+        if (element.matches('tr')) return 'Row';
+
+        return 'Card';
+    }
+    if (element.hasAttribute('data-edit-icon')) return 'Icon';
+    if (element.hasAttribute('data-edit-svg')) return 'Drawing';
+    if (element.hasAttribute('data-edit')) return 'Text';
+    if (element.hasAttribute('data-has-bg') || element.hasAttribute('data-edit-bg')) return 'Background';
+    if (tag === 'SECTION' || tag === 'MAIN' || tag === 'ARTICLE') return 'Section';
+    const rect = element.getBoundingClientRect?.() ?? { width: 0, height: 0 };
+    const wide = element.ownerDocument?.defaultView?.innerWidth ?? 1440;
+
+    return rect.width > wide * 0.6 && rect.height > 180 ? 'Section' : 'Group';
 };

@@ -32,4 +32,13 @@ describe('Ask AI knows where the shared parts are', () => {
         expect(lists.map((l) => l.key)).not.toContain('btns2');
         expect(lists.find((l) => l.key === 'fees').items[0].label).toBe('Virtual keynote from');
     });
+
+    it('tells Ask AI an empty notice the design names, so it can be written', () => {
+        // Adeola Crest School's closure notice: empty, so visitors do not see it, until the owner writes one
+        const host = document.createElement('div');
+        host.innerHTML = '<p class="notice" data-edit="setting:tpl:notice" data-label="Closure notice" data-instance="site.notice"></p><p data-edit="setting:tpl:blank"></p>';
+        const fields = pageForTheChat(host).fields;
+        expect(fields.find((f) => f.key === 'tpl:notice')).toMatchObject({ value: '', label: 'Closure notice' });
+        expect(fields.some((f) => f.key === 'tpl:blank')).toBe(false);
+    });
 });

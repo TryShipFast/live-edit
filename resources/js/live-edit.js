@@ -46,7 +46,7 @@ import { chartRowOf, renderChartPanel, renderChartRow, renderDataGrid, renderTab
 import { KINDS as CHART_KINDS, chartData, chartOf, itemContext as chartItemContext, kindOf as chartKindOf, tableOf as kitTableOf } from './data-kit.js';
 import { commonQuestions, listGuides, profileFor, shopQuestions } from './help.js';
 import { dropdownTriggerFrom } from './dropdown-trigger.js';
-import { partName } from './part-name.js';
+import { clickedName, itemNoun, partName } from './part-name.js';
 import { addressFromTheRoot } from './site-address.js';
 import { biggestThatFits, howMuchSurvives, inSourcePixels, movedWithin, whatIsThereNow } from './fitting.js';
 import { attrsWorthSending, creditWorthSending } from './only-what-changed.js';
@@ -514,69 +514,12 @@ const bootLiveEdit = () => {
 
 
         /** What this element is, in words a non-technical editor recognises. */
-        const describeElement = (element) => {
-            const tag = element.tagName;
-
-            /*
-             * A band the mapper named ("Hero", "Pricing", "Contact") beats the
-             * tag it happens to be written as. This has to come first: the
-             * region only ever lands on section, header, footer, nav, article
-             * or aside, and three of those six have a tag-name answer further
-             * down. "Hero" lost to "Header" and "Contact" to "Footer" on every
-             * page whose author used the semantic tag, which is every page
-             * worth mapping.
-             *
-             * labelForNode() already ranks them this way and says so. The two
-             * disagreeing is what made the region look like dead output.
-             */
-            if (element.dataset.editRegion) return element.dataset.editRegion;
-
-            /*
-             * The name the template gave this field (data-field), when it is a word an
-             * owner would use: "Price" or "Notes" says what they clicked; "Paragraph"
-             * says how it was written. Names made for code ("addcheckout") are left to
-             * the tag below.
-             */
-            /*
-             * One name for a part, wherever the owner meets it: this panel, the label on the page, Ask AI and voice, the
-             * Delete window (part-name.js; owner, 13 Nov 2026: "how come we are using another nomenclature"; "why not
-             * ai ask and voice follow same pattern").
-             */
-            const named = partName(element);
-            if (named) return named;
-            // A card is named for what its list holds ("Review"), before the tag it is written as ("List item").
-            if (element.hasAttribute('data-edit-item') && tag === 'LI' && element.parentElement?.dataset?.editListKind !== 'sections') {
-                const noun = itemNoun(element.parentElement);
-
-                return noun ? `${noun[0].toUpperCase()}${noun.slice(1)}` : 'Card';
-            }
-
-            if (tag === 'IMG') return 'Image';
-            if (tag === 'BUTTON') return 'Button';
-            if (tag === 'A') return /\b(btn|button)\b/i.test(String(element.className)) ? 'Button' : 'Link';
-            if (/^H[1-6]$/.test(tag)) return 'Heading';
-            if (tag === 'P') return 'Paragraph';
-            if (tag === 'LI') return 'List item';
-            if (tag === 'UL' || tag === 'OL') return 'List';
-            if (tag === 'NAV') return 'Menu';
-            if (tag === 'HEADER') return 'Header';
-            if (tag === 'FOOTER') return 'Footer';
-            if (tag === 'FORM') return 'Form';
-            if (element.hasAttribute('data-edit-item')) {
-                if (element.parentElement?.dataset?.editListKind === 'sections') return 'Section';
-                // a table's own parts are called what they are, not a card
-                if (element.matches('td, th')) return 'Cell';
-                if (element.matches('tr')) return 'Row';
-                return 'Card';
-            }
-            if (element.hasAttribute('data-edit-icon')) return 'Icon';
-            if (element.hasAttribute('data-edit-svg')) return 'Drawing';
-            if (element.hasAttribute('data-edit')) return 'Text';
-            if (element.hasAttribute('data-has-bg') || element.hasAttribute('data-edit-bg')) return 'Background';
-            if (tag === 'SECTION' || tag === 'MAIN' || tag === 'ARTICLE') return 'Section';
-            const rect = element.getBoundingClientRect();
-            return rect.width > window.innerWidth * 0.6 && rect.height > 180 ? 'Section' : 'Group';
-        };
+        /*
+         * What a click calls a part: the panel's title, the label on the page and the trail. Ask AI and voice are told
+         * the same name from the same function (part-name.js clickedName; owner, 14 Nov 2026: "the ai ask only needs to
+         * learn how the live edit gets the labels when click and replicate same when texted").
+         */
+        const describeElement = (element) => clickedName(element);
 
         /** A computed colour as a hex the picker understands; '' when transparent. */
         const rgbToHex = (value) => {
@@ -5869,12 +5812,7 @@ const bootLiveEdit = () => {
         };
 
         /** What one thing in a list is called, from the list's own one-word name ("Reviews": "review"), or null. */
-        const itemNoun = (list) => {
-            const label = String(list?.dataset?.editListLabel ?? '').trim().toLowerCase();
-            if (!/^[a-z]+$/.test(label) || label === 'items') return null;
-
-            return label.endsWith('ies') ? `${label.slice(0, -3)}y` : label.endsWith('s') ? label.slice(0, -1) : label;
-        };
+        // what a list's cards are each called (part-name.js, shared with Ask AI)
 
         /** A chart: its settings and its figures as a grid (the bar, point or slice pressed, ready to type in). */
         const editChart = (chart, focusRow = null) => {

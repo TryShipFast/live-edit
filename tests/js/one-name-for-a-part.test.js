@@ -45,3 +45,21 @@ describe('one name for a part, wherever the owner meets it', () => {
         }
     });
 });
+
+describe('Ask AI is told the name a click shows', () => {
+    // owner, 14 Nov 2026: "the ai ask only needs to learn how the live edit gets the labels when click and replicate
+    // same when texted": the panel's title (clickedName) is where every label Ask AI is told starts
+    it('names every part on a page as its panel does', async () => {
+        const { clickedName } = await import('../../resources/js/part-name.js');
+        document.body.innerHTML = `<main><section data-edit-section="s1" data-edit-section-label="Fees"><h2 data-edit="setting:a">Fees</h2>
+            <p data-edit="setting:b" data-field="lead">From ₦8,000,000</p><span data-edit="setting:c">Sample line</span>
+            <ul data-edit-list="tpl:r" data-edit-list-label="Reviews"><li data-edit-item="t1"><p data-edit="setting:d">Loved it</p></li></ul>
+            <a href="/x" data-edit="setting:e">All fees</a><a class="btn" href="/y"><span data-edit="setting:f">Book</span></a>
+            <img data-edit-img="setting:g" src="a.jpg" alt="Stage"></section></main>`;
+        for (const field of pageForTheChat(document).fields) {
+            const element = document.querySelector(`[data-edit="setting:${field.key}"], [data-edit-img="setting:${field.key}"]`);
+            if (!element || field.kind === 'link') continue;
+            expect(field.label.startsWith(clickedName(element))).toBe(true);
+        }
+    });
+});

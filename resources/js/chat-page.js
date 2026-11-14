@@ -11,7 +11,7 @@ import { declaredStyleProps, displayedValue, ownTextOf, shownWords, stylePropsFo
 import { columnsOf, rowsOf, tableOf } from './data-kit.js';
 import { seedForm, staysBecause, TYPE_NAMES } from './forms.js';
 import { PAIRINGS, PALETTES } from './brand.js';
-import { partName } from './part-name.js';
+import { clickedName, partName } from './part-name.js';
 import { sectionName } from './section-inserter.js';
 
 // enough for the longest home page (The Speaker: 491 parts; at 400 its FAQ and footer were never told to Ask AI, 13 Nov 2026)
@@ -156,9 +156,9 @@ const labelOf = (element, kind) => {
     if (kind === 'link') return cut(element.getAttribute('data-edit-label') || element.textContent, 80) || 'Link';
     if (kind === 'icon') return cut(element.getAttribute('data-edit-label') || '', 80);
 
-    // every other part by the one name the editor shows for it (part-name.js): the panel, the page's label, Ask AI
-    // and voice say the same word
-    return cut(partName(element), 80);
+    // every other part by the name a click shows for it (part-name.js clickedName): the panel's title, the page's
+    // label, Ask AI and voice say the same words (owner, 14 Nov 2026: "replicate same when texted")
+    return cut(clickedName(element), 80);
 };
 
 /**
@@ -250,7 +250,10 @@ export function pageForTheChat(root = document) {
             const key = attribute === 'data-edit-href' ? hrefKeyOf(element.getAttribute(attribute)) : keyOf(element.getAttribute(attribute));
             if (key === null || seen.has(key)) continue;
             const value = valueOf(element, kind);
-            if (value === '' && kind === 'text') continue;
+            // empty words are left out, except a part the design names that is empty until the owner writes it (a
+            // school's closure notice on every page: the comprehensive walk, 14 Nov 2026), so "add a closure notice"
+            // can be done by chat as a click on its placeholder does
+            if (value === '' && kind === 'text' && !(element.hasAttribute('data-instance') && element.getAttribute('data-label'))) continue;
             seen.add(key);
             const field = { key, kind, value };
             const label = labelOf(element, kind);
@@ -259,7 +262,8 @@ export function pageForTheChat(root = document) {
             // (owner, 12 Nov 2026, the novice walk: "Heading" alone named any of a page's headings)
             // a section a designer calls the hero is "at the top" to everyone else
             const said = /^(hero|top|intro|introduction|banner|masthead)$/i.test(where) || where.endsWith('(the hero, at the top)') ? 'at the top' : `in ${where}`;
-            if (label) field.label = where && ['Heading', 'Photo', 'Paragraph', 'Sample note'].includes(label) ? `${label} ${said}` : label;
+            // a name many parts share ("Heading", "Text", "Cell") says where it is, as the panel's trail does
+            if (label) field.label = where && ['Heading', 'Photo', 'Image', 'Paragraph', 'Sample note', 'Text', 'Link', 'Button', 'Card', 'Cell', 'Row', 'List item', 'Caption', 'Name', 'Details', 'Note', 'Price'].includes(label) ? `${label} ${said}` : label;
             if (where) field.section = where;
             // a button that is one of a row of buttons is taken away with that list's Remove, as its panel does
             const item = itemOf(element);
