@@ -9742,6 +9742,33 @@ const bootLiveEdit = () => {
 
                     return { ok: true, reload: true };
                 }
+                if (action.type === 'connect') {
+                    /*
+                     * A list from the owner's own link (connected-list.js), the way a click does it: the list's panel,
+                     * Get these from a link, the link typed in and Check the link pressed. The panel is left open with
+                     * each part pre-matched, for the owner to look over and Save: their choices are never made for
+                     * them, and an access key is typed there, never in the chat.
+                     */
+                    const list = document.querySelector(`[data-edit-list="${CSS.escape(action.key)}"]`);
+                    if (!list) return { ok: false, error: 'That list is not on this page any more.' };
+                    const refused = refusedFor(list);
+                    if (refused) return refused;
+                    editList(list);
+                    await settled();
+                    if (window.liveEditLists?.offered === false) return { ok: false, error: 'Dynamic pricing and blog posts from a link come with the Pro plan.' };
+                    const open = drawerFields.querySelector('[data-act="connected-open"]') ?? drawerFields.querySelector('.le-connected button');
+                    if (!open) { closeDrawer(true); return { ok: false, error: 'This list cannot be filled from a link.' }; }
+                    open.click();
+                    await settled();
+                    const url = drawerFields.querySelector('[data-connected="url"]');
+                    const look = drawerFields.querySelector('[data-act="connected-look"]');
+                    if (!url || !look) return { ok: false, error: 'This list cannot be filled from a link.' };
+                    url.value = action.url;
+                    const found = await look.leRun();
+                    const said = drawerFields.querySelector('.le-connected [role="status"]')?.textContent ?? '';
+
+                    return found ? { ok: true, waiting: true, said } : { ok: false, error: said || 'That link could not be read.' };
+                }
                 if (action.type === 'chart') {
                     /*
                      * A chart as the owner asked it to be: its grid's own Save (data-panel.js renderChartPanel), which

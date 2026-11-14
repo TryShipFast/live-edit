@@ -268,6 +268,8 @@ export function createChat({ shadow, request, showSaved, openPhoto, openPublish,
                 item.append(el('b', '', `${change.label}: `), document.createTextNode(`${change.changes.length} change${change.changes.length === 1 ? '' : 's'} to its questions`));
             } else if (change.type === 'icon') {
                 item.append(el('b', '', `${change.label}: `), document.createTextNode(`now ${change.icon}`));
+            } else if (change.type === 'connect') {
+                item.append(el('b', '', `${change.label}: `), document.createTextNode('your link is checked; look over what fills each part in the panel and press Save'));
             } else if (change.type === 'chart') {
                 item.append(el('b', '', `${change.label}: `), document.createTextNode(`chart changed, ${change.rows.length} row${change.rows.length === 1 ? '' : 's'}`));
             } else if (change.type === 'table') {
