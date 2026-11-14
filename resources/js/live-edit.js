@@ -9336,6 +9336,31 @@ const bootLiveEdit = () => {
 
                     return pressSave();
                 }
+                if (action.type === 'icon') {
+                    /*
+                     * An icon chosen by name ("a phone icon") with the icon picker a click opens: its search is typed
+                     * in, the best match pressed, and Save (the comprehensive walk, 14 Nov 2026: icons were a gap on
+                     * Halvermoor University and Ilé Àdìrẹ).
+                     */
+                    const element = byKey('data-edit-icon', action.key);
+                    if (!element) return { ok: false, error: 'That icon is not on this page any more.' };
+                    const refused = refusedFor(element);
+                    if (refused) return refused;
+                    await editIcon(element);
+                    const search = drawerFields.querySelector('input[type=search]');
+                    if (!search) { closeDrawer(true); return { ok: false, error: 'This site\u2019s icons cannot be listed here, so pick one by clicking it.' }; }
+                    const wanted = String(action.icon ?? '').trim().toLowerCase();
+                    search.value = wanted;
+                    search.dispatchEvent(new Event('input', { bubbles: true }));
+                    await new Promise((resolve) => setTimeout(resolve, 50));
+                    const choices = [...drawerFields.querySelectorAll('.le-icon-choice')].filter((choice) => choice.getClientRects().length > 0 || !choice.hidden);
+                    const pick = choices.find((choice) => choice.title.toLowerCase() === wanted) ?? choices[0];
+                    if (!pick) { closeDrawer(true); return { ok: false, error: `There is no icon like \u201C${action.icon}\u201D in this site\u2019s icons.` }; }
+                    pick.click();
+                    if (current) current.dirty = true;
+
+                    return pressSave();
+                }
                 if (action.type === 'image') {
                     /*
                      * A photo the owner uploaded in the chat, put in place the way the picture's own panel does it:

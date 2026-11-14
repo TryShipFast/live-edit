@@ -139,7 +139,13 @@ const valueOf = (element, kind) => {
     }
     if (kind === 'background image') return 'a background photo';
     if (kind === 'link') return cut(element.getAttribute('href') || '', 300);
-    if (kind === 'icon') return cut(element.getAttribute('aria-label') || 'an icon', 80);
+    // an icon by what it shows now (the picker's own name for it, "phone", "map pin"), so "use a phone icon instead" is
+    // understood against what is there
+    if (kind === 'icon') {
+        const name = String(element.dataset?.editIconCurrent ?? '').replace(/^[a-z]+-/, '').replace(/-/g, ' ').trim();
+
+        return cut(name ? `the ${name} icon` : element.getAttribute('aria-label') || 'an icon', 80);
+    }
 
     // the words exactly as the editor's own words panel holds them (live-edit.js editText): what it shows, the words
     // around formatted parts that have keys of their own, a rich setting as it is; so the chat never writes words the
