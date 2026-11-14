@@ -37,15 +37,15 @@ describe('the page the chat sends', () => {
 
         expect(page.title).toBe('Oxbow & Hem');
         // named with where it is, as an owner would say it ("Hero" is the designer's word for the top)
-        expect(fields).toContainEqual({ key: 'tpl:h1', kind: 'text', value: 'Cut to fit. Made to last.', label: 'Heading at the top', section: 'Hero' });
-        expect(fields).toContainEqual({ key: 'tpl:cta', kind: 'link', value: '/women', label: 'Shop women', section: 'Hero' });
-        expect(fields).toContainEqual({ key: 'tpl:photo', kind: 'image', value: 'alt: A woman laughing', label: 'Photo at the top', section: 'Hero' });
+        expect(fields).toContainEqual({ key: 'tpl:h1', kind: 'text', value: 'Cut to fit. Made to last.', label: 'Heading at the top', section: 'Cut to fit. Made to last. (the hero, at the top)' });
+        expect(fields).toContainEqual({ key: 'tpl:cta', kind: 'link', value: '/women', label: 'Shop women', section: 'Cut to fit. Made to last. (the hero, at the top)' });
+        expect(fields).toContainEqual({ key: 'tpl:photo', kind: 'image', value: 'alt: A woman laughing', label: 'Photo at the top', section: 'Cut to fit. Made to last. (the hero, at the top)' });
     });
 
     it('gives a button its words and where it goes as two fields, each under its own key', () => {
         const { fields } = pageForTheChat(document);
-        expect(fields).toContainEqual({ key: 'tpl:sale.text', kind: 'text', value: 'See the sale', label: '\u201CSee the sale\u201D button', section: 'Hero' });
-        expect(fields).toContainEqual({ key: 'tpl:sale.href', kind: 'link', value: '/sale', label: 'See the sale', section: 'Hero' });
+        expect(fields).toContainEqual({ key: 'tpl:sale.text', kind: 'text', value: 'See the sale', label: '\u201CSee the sale\u201D button', section: 'Cut to fit. Made to last. (the hero, at the top)' });
+        expect(fields).toContainEqual({ key: 'tpl:sale.href', kind: 'link', value: '/sale', label: 'See the sale', section: 'Cut to fit. Made to last. (the hero, at the top)' });
     });
 
     it('names the parts at the top as owners say them, and a clicked button as one part', () => {

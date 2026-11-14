@@ -94,9 +94,14 @@ describe('the line a section is added on', () => {
         expect(shownSectionLists()).toEqual([]);
     });
 
-    it('names the section it goes below', () => {
-        expect(sectionName(at.fees)).toBe('What a term costs');
+    // by its own heading as the page reads it now, the designer's name only without one (owner, 13 Nov 2026: "how does
+    // it know the section i'm talking about")
+    it('names the section by its heading as it reads now', () => {
+        expect(sectionName(at.fees)).toBe('Fees');
         expect(sectionName(at.visit)).toBe('Come and see us');
+        expect(sectionName(at.hidden)).toBe('Hidden by the owner');
         expect(sectionName(null)).toBe('this section');
+        at.fees.querySelector('h2').textContent = 'What it costs';
+        expect(sectionName(at.fees)).toBe('What it costs');
     });
 });

@@ -2341,8 +2341,8 @@ const bootLiveEdit = () => {
             // (owner, 7 Nov 2026: a table's changes read "Text: A list of 4 items" before publishing).
             const list = listForChange(change);
             if (list) {
-                const where = list.closest('[data-edit-section-label]')?.dataset.editSectionLabel
-                    ?? list.closest('[data-label]')?.getAttribute('data-label');
+                const where = list.closest('[data-edit-section]') ? sectionName(list.closest('[data-edit-section]'), 60)
+                    : list.closest('[data-label]')?.getAttribute('data-label');
                 const what = list.dataset.editListLabel || 'List';
 
                 return where && where !== what ? `${what} in “${where}”` : what;

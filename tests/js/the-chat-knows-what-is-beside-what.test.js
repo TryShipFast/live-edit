@@ -29,9 +29,9 @@ describe('what the chat is told sits beside each part', () => {
         const { fields } = pageForTheChat(document);
         const near = (key) => fields.find((f) => f.key === key)?.near;
 
-        expect(near('tpl:left')).toEqual({ above: 'Heading in Talks “Four keynotes”', below: '“Book me” button', right: 'Paragraph in Talks “Leadership offsites with on…”' });
-        expect(near('tpl:right')).toEqual({ above: 'Heading in Talks “Four keynotes”', left: 'Paragraph in Talks “Sales kick-offs that people…”' });
-        expect(near('tpl:book').above).toBe('Paragraph in Talks “Sales kick-offs that people…”');
+        expect(near('tpl:left')).toEqual({ above: 'Heading in Four keynotes “Four keynotes”', below: '“Book me” button', right: 'Paragraph in Four keynotes “Leadership offsites with on…”' });
+        expect(near('tpl:right')).toEqual({ above: 'Heading in Four keynotes “Four keynotes”', left: 'Paragraph in Four keynotes “Sales kick-offs that people…”' });
+        expect(near('tpl:book').above).toBe('Paragraph in Four keynotes “Sales kick-offs that people…”');
         // the button's link is the same part, with the same neighbours
         expect(near('tpl:book.href')).toEqual(near('tpl:book'));
         expect(near('tpl:hidden')).toBeUndefined();

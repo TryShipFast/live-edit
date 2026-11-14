@@ -85,11 +85,24 @@ export function sectionUnder(element, root = document) {
     return null;
 }
 
-/** What a section is called, for "It goes below …". */
-export function sectionName(section) {
-    const name = section?.dataset?.editSectionLabel
-        || section?.querySelector?.('h1, h2, h3')?.textContent
+/**
+ * What a section is called, everywhere the owner meets it (the Sections list, its panel, "It goes below …", Ask AI and
+ * voice): its own heading as the page reads it now, so a heading the owner changed renames it (owner, 13 Nov 2026: "how
+ * does it know the section i'm talking about"; 873 of 918 sections across the templates are named by their heading);
+ * the designer's name only where it has no heading of its own. Its own: not a card's heading inside it.
+ */
+export function sectionName(section, most = 48) {
+    const own = [...(section?.querySelectorAll?.('h1, h2, h3') ?? [])].find((heading) => {
+        const item = heading.closest('[data-edit-item]');
+
+        const inside = heading.closest('[data-edit-section]');
+
+        return (!item || item === section || !section.contains(item)) && (inside === section || !inside || !section.contains(inside));
+    });
+    const name = (own?.textContent ?? '').replace(/\s+/g, ' ').trim()
+        || section?.dataset?.editSectionLabel
+        || section?.getAttribute?.('data-label')
         || 'this section';
 
-    return String(name).replace(/\s+/g, ' ').trim().slice(0, 48);
+    return String(name).replace(/\s+/g, ' ').trim().slice(0, most);
 }

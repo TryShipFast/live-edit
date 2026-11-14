@@ -12,6 +12,7 @@ import { columnsOf, rowsOf, tableOf } from './data-kit.js';
 import { seedForm, staysBecause, TYPE_NAMES } from './forms.js';
 import { PAIRINGS, PALETTES } from './brand.js';
 import { partName } from './part-name.js';
+import { sectionName } from './section-inserter.js';
 
 // enough for the longest home page (The Speaker: 491 parts; at 400 its FAQ and footer were never told to Ask AI, 13 Nov 2026)
 const MOST_FIELDS = 800;
@@ -50,7 +51,8 @@ const hrefKeyOf = (marker) => {
  * since its name is often its heading ("Jordan Reese") and owners call it the hero or the top (owner, 13 Nov 2026:
  * "struggling to delete a check a date button on the hero section"; "how does it know the section i'm talking about").
  */
-const isTheTop = (section) => Boolean(section.querySelector('[data-hero="headline"]')) || /(^|[.\-])hero$/i.test(section.getAttribute('data-instance') || '');
+const isTheTop = (section) => Boolean(section.querySelector('[data-hero="headline"]')) || /(^|[.\-])hero$/i.test(section.getAttribute('data-instance') || '')
+    || /^(hero|top|intro|introduction|banner|masthead)$/i.test(section.getAttribute('data-edit-section-label') || '');
 const sectionOf = (element) => {
     const section = element.closest('[data-edit-section]');
     // the parts every page shares, outside its sections: the menu bar and the footer (the comprehensive audit, 13 Nov
@@ -67,7 +69,7 @@ const sectionOf = (element) => {
 
         return '';
     }
-    const name = cut(section.getAttribute('data-edit-section-label') || '', 70);
+    const name = cut(sectionName(section, 70), 70);
 
     return isTheTop(section) ? `${name || 'Hero'} (the hero, at the top)` : name;
 };
@@ -290,7 +292,7 @@ export function pageForTheChat(root = document) {
         const id = element.getAttribute('data-edit-section');
         if (!id || sections.length >= 80) continue;
         // named, so the owner's words ("the reviews") find it; taken away with the sections list's Delete, as a press does
-        sections.push({ id, label: cut(element.getAttribute('data-edit-section-label') || 'Section', 80) });
+        sections.push({ id, label: cut(sectionName(element, 80), 80) });
     }
 
     const lists = [];
@@ -309,7 +311,7 @@ export function pageForTheChat(root = document) {
         if (!ofSections && inAHiddenLayout(element, shownLayouts)) continue;
         const items = [...element.querySelectorAll(':scope > [data-edit-item]')].slice(0, 200).map((item) => ({
             id: item.getAttribute('data-edit-item'),
-            label: cut((ofSections && (item.getAttribute('data-edit-section-label') || item.querySelector('[data-edit-section-label]')?.getAttribute('data-edit-section-label')))
+            label: cut((ofSections && sectionName(item.matches('[data-edit-section], [data-edit-section-label]') ? item : item.querySelector('[data-edit-section], [data-edit-section-label]') ?? item, 80))
                 || item.getAttribute('data-edit-item-label') || spacedWords(item), 80),
         })).filter((item) => item.id);
         if (items.length === 0) continue;

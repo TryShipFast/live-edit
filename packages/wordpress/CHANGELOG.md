@@ -1,5 +1,12 @@
 # ShipFast Live Edit for WordPress
 
+## 0.21.22 (14 Nov 2026)
+
+- A section is called by its own heading as the page reads it now, everywhere: the Sections list, its panel, "It goes
+  below …", the list of changes, Ask AI and voice. A heading the owner changes renames the section; the designer's name
+  only where a section has no heading (873 of 918 sections across the templates were already named by their heading).
+  Owner: "how does it know the section i'm talking about".
+
 ## 0.21.21 (13 Nov 2026)
 
 - The logo by chat and voice, as Brand does it (owner: "change my logo" was asked "header, footer or both?"): told
