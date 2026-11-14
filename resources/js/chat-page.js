@@ -319,6 +319,10 @@ export function pageForTheChat(root = document) {
         if (ofSections && shownLayouts.length && !shownLayouts.includes(element)) continue;
         // and none of the lists inside the layouts not shown (the comprehensive audit: Home 2's hero buttons were sent)
         if (!ofSections && inAHiddenLayout(element, shownLayouts)) continue;
+        // a grid table's rows and columns are the table's (tables, change_table), as its grid holds them: told as lists
+        // too, a size guide's tables used up the 80 lists and its footer was never told (the comprehensive walk, Oxbow & Hem)
+        const gridTable = element.closest('[data-kit-table]');
+        if (gridTable && gridTable.querySelector('thead tr[data-edit-list]') && element.closest('table')) continue;
         const items = [...element.querySelectorAll(':scope > [data-edit-item]')].slice(0, 200).map((item) => ({
             id: item.getAttribute('data-edit-item'),
             label: cut((ofSections && sectionName(item.matches('[data-edit-section], [data-edit-section-label]') ? item : item.querySelector('[data-edit-section], [data-edit-section-label]') ?? item, 80))

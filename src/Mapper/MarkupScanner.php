@@ -321,6 +321,10 @@ class MarkupScanner
         if ($node->hasAttribute('data-edit') || $node->hasAttribute('data-edit-img') || $node->hasAttribute('data-edit-href')) {
             return; // already tagged — apply is idempotent
         }
+        // a guess is never made inside what a template declares (below)
+        if ($this->autoMode && $this->insideDeclaredStructure($node)) {
+            return;
+        }
 
         // Somebody else is already writing here. Guarded at the point of
         // writing rather than in one caller, because a tag added by any other
@@ -1468,7 +1472,7 @@ class MarkupScanner
              * the links inside it still carrying data-edit-item while every
              * other marker had correctly been withheld.
              */
-            if ($this->insideChrome($container)) {
+            if ($this->insideChrome($container) || $this->insideDeclaredStructure($container)) {
                 continue;
             }
 
@@ -1821,7 +1825,7 @@ class MarkupScanner
             // An icon in a bought theme is a class on an empty element, not
             // content, so nothing above would ever offer it for editing.
             $icon = $this->iconTokenOf($el);
-            if ($icon !== null && ! $el->hasAttribute('data-edit-icon')) {
+            if ($icon !== null && ! $el->hasAttribute('data-edit-icon') && ! $this->insideDeclaredStructure($el)) {
                 $el->setAttribute('data-edit-icon', 'setting:auto:'.$this->autoKey($el, '#icon'));
                 $el->setAttribute('data-edit-icon-current', $icon);
             }
@@ -2004,6 +2008,25 @@ class MarkupScanner
             'data-bind',                // Knockout, and a common hand-rolled name
         ] as $attribute) {
             if ($element->hasAttribute($attribute)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * Inside a part our templates declare (the Kit's data-instance: a section, the header, the phone menu, a search
+     * page's results), everything the owner edits is already marked, with its lists, links and icons. Nothing is guessed
+     * there: a guess made a menu, a row of filters, a chart's toggles or a calendar the page draws from data look like a
+     * list to add to, which the page builder, the data or nothing at all owns (the comprehensive walk, 14 Nov 2026: 457
+     * such guesses on 13 templates). "Live Edit may guess at the structure of someone else's website; ours declares it,
+     * so nothing is left to a guess" (templates/CLAUDE.md). A site without the Kit's markers is guessed at as before.
+     */
+    protected function insideDeclaredStructure(DOMElement $element): bool
+    {
+        for ($node = $element; $node instanceof DOMElement; $node = $node->parentNode) {
+            if ($node->hasAttribute('data-instance')) {
                 return true;
             }
         }
