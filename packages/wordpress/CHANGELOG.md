@@ -1,5 +1,22 @@
 # ShipFast Live Edit for WordPress
 
+## 0.23.0 (14 Nov 2026)
+
+v0.22.0 was tagged on the 0.21.24 code and holds nothing new; this is the next real release.
+
+Dynamic pricing and blog posts from the owner's own system, on our hosted templates (Pro and Agency, decided by the
+host: owner, 14 Nov 2026, "make sure dynamic data is pro only"):
+- A list's panel offers **Get these from a link**: the owner gives the link and, if it needs one, an access key (or a
+  username and password), presses Check the link, and is shown each part of their first item in their own words
+  ("Club", "₦4,500", its photo) with the fields the link answered with, one pre-selected; they choose, see how the
+  first ones will read ("They will read", with their photos), and Save. Prices in kobo or cents, dates in the design's
+  own style, a card's heading as its name even when it is the card's link (connected-list.js).
+- A connected list says where it comes from, with Check now, Change and Stop using the link; its Add, Move and Delete
+  go, since its rows come from the link. Below the plan that has it, the panel says so with See plans.
+- The Publish window says a change the host named as it named it ("Plans | from api.example.com").
+- Ask AI's connect opens the list's panel with the link checked and leaves the matches to the owner.
+- connected-list.js is served by the embed controller.
+
 ## 0.21.24 (14 Nov 2026)
 
 From the Ask AI coverage walk over all 51 templates (375,614 of 377,922 things a click can do at first; every one at
