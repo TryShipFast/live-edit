@@ -2271,7 +2271,17 @@ const bootLiveEdit = () => {
             return count === 1 ? one : plural;
         };
 
+        // A change the host made and named itself ("Plans: from api.example.com", a list from a link): said as it named it.
+        const namedByTheHost = (change) => {
+            const what = typeof change.what === 'string' ? change.what : '';
+            const at = what.indexOf(': ');
+
+            return at > 0 ? { label: what.slice(0, at), after: what.slice(at + 2) } : null;
+        };
+
         const labelForChange = (change) => {
+            const named = namedByTheHost(change);
+            if (named) return named.label;
             const said = arrangement(change);
 
             if (said) return said.label;
@@ -2339,6 +2349,8 @@ const bootLiveEdit = () => {
          * its children, the row shows the sentence a visitor will read.
          */
         const readsOnThePageAs = (change) => {
+            const named = namedByTheHost(change);
+            if (named) return named.after;
             // Pages and sections arranged, said in words, as the Changes tab says them: the review before
             // Publish printed the stored arrangement ({"added":{...}}) instead (owner, 7 Nov 2026).
             const said = arrangement(change);
