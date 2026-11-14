@@ -17,7 +17,7 @@ describe('what the chat is told sits beside each part', () => {
                 <h2 data-edit="setting:tpl:h">Four keynotes</h2>
                 <p data-edit="setting:tpl:left">Sales kick-offs that people remember on Monday</p>
                 <p data-edit="setting:tpl:right">Leadership offsites with one question</p>
-                <a href="/book" data-edit="setting:tpl:book" data-edit-href="setting:tpl:book.href">Book me</a>
+                <a class="btn" href="/book" data-edit="setting:tpl:book" data-edit-href="setting:tpl:book.href">Book me</a>
                 <p data-edit="setting:tpl:hidden">In a closed tab</p>
             </section>`;
         place('[data-edit="setting:tpl:h"]', 0, 0, 1000, 60);

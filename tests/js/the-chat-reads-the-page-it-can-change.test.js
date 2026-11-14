@@ -13,7 +13,7 @@ describe('the page the chat sends', () => {
             <section data-edit-section="hero" data-edit-section-label="Hero" data-style="shero">
                 <h1 data-edit="setting:tpl:h1">Cut to fit.   Made to last.</h1>
                 <a href="/women" data-edit-href="setting:tpl:cta">Shop women</a>
-                <a href="/sale" data-edit="setting:tpl:sale.text" data-edit-href="setting:tpl:sale.href">See the sale</a>
+                <a class="btn" href="/sale" data-edit="setting:tpl:sale.text" data-edit-href="setting:tpl:sale.href">See the sale</a>
                 <img src="/a/jean-worn.jpg" alt="A woman laughing" data-edit-img="setting:tpl:photo">
                 <p data-edit="auto:abc123">A guessed key the chat does not offer</p>
                 <p data-edit="setting:tpl:lede">Free delivery over <strong data-edit="setting:tpl:over">₦50,000</strong> and 30-day returns.</p>

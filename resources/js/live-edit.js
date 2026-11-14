@@ -5918,6 +5918,36 @@ const bootLiveEdit = () => {
             drawerTitle.textContent = info.block.querySelector('.kit-data__title, h2, h3')?.textContent.trim() || 'Table';
             drawerDelete.classList.add('le-hidden');
             drawerFields.replaceChildren(renderTablePanel({ element: cell, ...dataDeps() }));
+            /*
+             * A table whose cells are links (The Speaker's keynote names, each opening its page; owner, 14 Nov 2026:
+             * "Grid keeps the links"): the grid changes their words, and each one's address is changed here, with the
+             * link panel every other link opens.
+             */
+            const links = [...info.table.querySelectorAll('tbody a[data-edit-href]')].filter((a) => a.closest('[data-edit-item]'));
+            if (links.length) {
+                const where = document.createElement('div');
+                where.className = 'le-table-links';
+                const heading = document.createElement('div');
+                heading.className = 'le-section-heading';
+                heading.textContent = 'Where each name goes';
+                where.append(heading);
+                for (const a of links) {
+                    const row = document.createElement('div');
+                    row.className = 'le-row le-table-link';
+                    const name = document.createElement('span');
+                    name.className = 'le-table-link-name';
+                    name.textContent = (a.textContent || '').replace(/\s+/g, ' ').trim().slice(0, 60);
+                    const change = document.createElement('button');
+                    change.type = 'button';
+                    change.className = 'le-chip-btn';
+                    change.textContent = 'Change link';
+                    change.setAttribute('aria-label', `Change where ${name.textContent} goes`);
+                    change.addEventListener('click', () => { lastOpened = a; editText(a, a, { asWords: true }); });
+                    row.append(name, change);
+                    where.append(row);
+                }
+                drawerFields.append(where);
+            }
             const section = info.block.closest('[data-edit-item]');
             if (section) {
                 const open = document.createElement('button');

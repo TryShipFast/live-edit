@@ -912,6 +912,9 @@ a.le-mark:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
 .le-ask-shows { margin: 0; padding: 12px 14px; border: 1px solid var(--le-line); border-radius: 10px; background: var(--le-soft); color: var(--le-ink); font-size: 14px; line-height: 1.5; max-height: 168px; overflow: auto; overflow-wrap: anywhere; }
 .le-ask-shows img { display: block; max-width: 100%; max-height: 150px; border-radius: 8px; object-fit: contain; }
 /* Delete for one part, last in its panel and set apart, as a section's Delete is */
+.le-table-links { display: grid; gap: 6px; border-top: 1px solid var(--le-line); padding-top: 14px; margin-top: 4px; }
+.le-table-link { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.le-table-link-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 14px; color: var(--le-ink); }
 .le-part-delete { display: flex; border-top: 1px solid var(--le-line); padding-top: 16px; }
 .le-hidden { display: none !important; }
 

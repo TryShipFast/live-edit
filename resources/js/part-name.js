@@ -82,8 +82,12 @@ export const partName = (element) => {
     if (/^H[1-6]$/.test(element.tagName)) return 'Heading';
     if (element.tagName === 'BUTTON' || element.closest('a, button')) {
         const said = words(element, 40);
+        // a link drawn as words (a keynote's name in a table, a menu entry) is a link; one drawn as a button, a button
+        const link = element.closest('a');
+        const looks = `${link?.getAttribute('class') || ''} ${element.getAttribute('class') || ''}`;
+        const kind = element.tagName === 'BUTTON' || element.closest('button') || !link || /\b(btn|button|cta)/i.test(looks) ? 'button' : 'link';
 
-        return said ? `\u201C${said}\u201D button` : 'Button';
+        return said ? `\u201C${said}\u201D ${kind}` : (kind === 'link' ? 'Link' : 'Button');
     }
     if (element.tagName === 'P') return 'Paragraph';
     // words with no name of their own (a line inside a paragraph, a date): called by what they say, never by their

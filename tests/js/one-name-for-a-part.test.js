@@ -30,6 +30,14 @@ describe('one name for a part, wherever the owner meets it', () => {
         expect(name('img')).toBe('Photo');
     });
 
+    it('calls a link drawn as words a link, and one drawn as a button a button', () => {
+        // owner, 14 Nov 2026: a keynote's name in The Speaker's table was called a "button" in its link panel
+        const host = document.createElement('div');
+        host.innerHTML = '<a href="/k"><span data-edit="setting:k">Hard Rooms</span></a><a class="btn" href="/b"><span data-edit="setting:b">Book now</span></a>';
+        expect(partName(host.querySelector('[data-edit="setting:k"]'))).toBe('\u201CHard Rooms\u201D link');
+        expect(partName(host.querySelector('[data-edit="setting:b"]'))).toBe('\u201CBook now\u201D button');
+    });
+
     it('gives Ask AI and voice the same name the editor shows', () => {
         const fields = pageForTheChat(document).fields;
         for (const [key, said] of [['p', 'Paragraph at the top'], ['h', 'Heading at the top'], ['b', '“Book Jordan” button'], ['price', 'Price']]) {

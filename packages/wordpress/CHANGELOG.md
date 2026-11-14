@@ -1,5 +1,13 @@
 # ShipFast Live Edit for WordPress
 
+## 0.21.23 (14 Nov 2026)
+
+- A table's cells can be links (owner: "Grid keeps the links", for The Speaker's keynote table): the grid changes a
+  name's words and the link keeps going where it went; under the grid, "Where each name goes" lists each linked name
+  with Change link, which opens the link panel every other link opens.
+- A link drawn as words is called a link ("“Hard Rooms” link"), one drawn as a button a button, in the panel, the
+  page's labels and for Ask AI.
+
 ## 0.21.22 (14 Nov 2026)
 
 - A section is called by its own heading as the page reads it now, everywhere: the Sections list, its panel, "It goes
