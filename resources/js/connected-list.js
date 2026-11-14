@@ -72,6 +72,23 @@ export function connectionOf(listKey, lists = window.liveEditLists) {
     return (lists?.lists ?? []).find((one) => one.list === listKey) ?? null;
 }
 
+/**
+ * The website's own page a link opens, as publishing names pages ("blog/why-cold-brew-steeps-18-hours"): where it goes
+ * in the editor (/sites/{site}/edit/<page>), or null when it leaves the website.
+ */
+function pageItOpens(link) {
+    if (!link.hasAttribute('data-link-page')) return null;
+    try {
+        const at = new URL(link.getAttribute('href') ?? '', window.location.href);
+        if (at.origin !== window.location.origin) return null;
+        const page = (at.pathname.match(/\/edit\/(.*)$/) ?? [])[1];
+
+        return page === undefined ? null : decodeURIComponent(page).replace(/^\/+|\/+$/g, '').replace(/\/index\.html$/, '') || null;
+    } catch {
+        return null;
+    }
+}
+
 /** A setting key as the design item carries it, without the copy's `@id`. */
 const baseKey = (key) => String(key ?? '').replace(/^setting:/, '').split('@')[0];
 
@@ -96,7 +113,8 @@ export function partsOf(item) {
         }
         const href = el.getAttribute('data-edit-href');
         if (href && /^tpl:[0-9a-f]{12}/.test(baseKey(href))) {
-            parts.push({ key: baseKey(href), as: 'link', role: 'link', words: el.getAttribute('href') ?? '' });
+            // a card that opens one of the website's own pages can open its post's own page, in that page's design
+            parts.push({ key: baseKey(href), as: 'link', role: 'link', words: el.getAttribute('href') ?? '', page: pageItOpens(el) });
         }
         const edit = el.getAttribute('data-edit') ?? '';
         if (!edit.startsWith('setting:') || el.hasAttribute('data-edit-img')) continue;
@@ -377,6 +395,10 @@ export function renderConnectedList({ list, label = 'This list', notify = () => 
                 const pick = el('select', 'le-input');
                 pick.dataset.connected = `part:${part.key}`;
                 pick.append(Object.assign(el('option', '', 'Keep my words'), { value: '' }));
+                const postId = answer.fields.find((f) => /(^|\.)(id|slug|uuid|key)$/i.test(f.field))?.field;
+                if (part.as === 'link' && part.page && postId) {
+                    pick.append(Object.assign(el('option', '', `Its own page on this website, in the design of your \u201C${part.page.split('/').pop()}\u201D page`), { value: '@post' }));
+                }
                 for (const one of answer.fields) {
                     if (part.as === 'list' && one.kind !== 'list' && one.kind !== 'words') continue;
                     if (part.as === 'link' && one.kind !== 'link') continue;
@@ -385,7 +407,8 @@ export function renderConnectedList({ list, label = 'This list', notify = () => 
                     option.value = one.field;
                     pick.append(option);
                 }
-                pick.value = was?.matches?.[part.key]?.field ?? guessFor[part.role] ?? '';
+                const opensItsOwn = part.as === 'link' && part.page && postId && (was ? was.matches?.[part.key]?.as === 'post' : true);
+                pick.value = opensItsOwn ? '@post' : (was?.matches?.[part.key]?.field ?? guessFor[part.role] ?? '');
                 if (pick.selectedIndex < 0) pick.value = '';
                 if (part.as === 'picture') {
                     const wrap = el('label', 'le-field');
@@ -457,14 +480,21 @@ export function renderConnectedList({ list, label = 'This list', notify = () => 
             matching.append(saveRow);
             save.addEventListener('click', save.leRun = async () => {
                 const matches = {};
+                let postPage = null;
                 for (const [part, pick] of picks) {
+                    if (pick.value === '@post') {
+                        // each card opens its post's own page (ShowAListsPost), by the post's id
+                        matches[part.key] = { field: answer.fields.find((f) => /(^|\.)(id|slug|uuid|key)$/i.test(f.field)).field, as: 'post' };
+                        postPage = part.page;
+                        continue;
+                    }
                     if (pick.value) matches[part.key] = { field: pick.value, as: part.as, ...(part.symbol ? { symbol: part.symbol } : {}), ...(part.format ? { format: part.format } : {}) };
                 }
                 if (!Object.keys(matches).length) { said.textContent = 'Choose what fills at least one part, or press Cancel.'; return false; }
                 save.disabled = true;
                 said.textContent = 'Saving…';
                 try {
-                    const answered = await send(config.save, { ...asked(), at: answer.at, label, smallest: smallest.checked, matches, page: location.pathname }, config.token);
+                    const answered = await send(config.save, { ...asked(), at: answer.at, label, smallest: smallest.checked, matches, page: location.pathname, post_page: postPage }, config.token);
                     save.disabled = false;
                     if (!answered.ok) { said.textContent = answered.error; return false; }
                     remember(answered.list);
