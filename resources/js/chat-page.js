@@ -378,8 +378,10 @@ export function pageForTheChat(root = document) {
  */
 const chartsOf = (root) => {
     const charts = [];
+    // only the layout shown (a dashboard home carries three, eleven charts each: Tallyline), and room for every one
+    const shown = [...root.querySelectorAll('[data-edit-list-kind="sections"]')].filter((list) => list.getClientRects().length > 0);
     for (const chart of root.querySelectorAll('[data-chart]')) {
-        if (chart.closest('#live-edit-ui') || locked(chart) || charts.length >= 10) continue;
+        if (chart.closest('#live-edit-ui') || locked(chart) || inAHiddenLayout(chart, shown) || charts.length >= 40) continue;
         const kind = chartKindOf(chart);
         const { list, heads, rows } = chartData(chart);
         const id = list?.dataset?.editList;
@@ -401,8 +403,9 @@ const chartsOf = (root) => {
 
 const tablesOf = (root) => {
     const tables = [];
+    const shown = [...root.querySelectorAll('[data-edit-list-kind="sections"]')].filter((list) => list.getClientRects().length > 0);
     for (const block of root.querySelectorAll('[data-kit-table]')) {
-        if (block.closest('#live-edit-ui') || locked(block) || tables.length >= 10) continue;
+        if (block.closest('#live-edit-ui') || locked(block) || inAHiddenLayout(block, shown) || tables.length >= 40) continue;
         const info = tableOf(block.querySelector('th, td') ?? block);
         const id = info?.rowsList?.dataset?.editList;
         if (!info || !id) continue;
