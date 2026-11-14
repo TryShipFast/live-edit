@@ -184,6 +184,17 @@ export const renderChartPanel = ({ chart, save, saveOrder, refresh, notify, rend
     wrap.append(el('div', 'le-section-heading', `Its ${spec.many}`));
     const headCells = chartData(chart).table?.querySelector('thead tr') ? cellsOf(chartData(chart).table.querySelector('thead tr')) : [];
     const width = 1 + spec.fields.length;
+    const onSave = async ({ heads, rows: grid }) => {
+        const plan = chartPlan(chart, grid, heads);
+        if (plan.refused.length) return plan.refused;
+        await fillRows({ list, plan: plan.order, values: plan.grid, heads: plan.heads, headCells: headCells.length ? headCells : null, save, saveOrder, applyOrder });
+        await refresh(`Chart saved ✓ ${plan.grid.length} ${plan.grid.length === 1 ? spec.one.toLowerCase() : spec.many}.${plan.notes.length ? ` ${plan.notes[0]}` : ''}`);
+
+        return [];
+    };
+    // the grid's own Save, for Ask AI, which sends the chart as it should be (the comprehensive walk, 14 Nov 2026:
+    // Halvermoor University's charts were the most a click did that the chat could not)
+    wrap.leSave = onSave;
     wrap.append(renderDataGrid({
         heads: Array.from({ length: width }, (_, i) => String(headCells[i]?.textContent ?? [spec.label, ...spec.fields][i] ?? '').trim()),
         rows: rows.map((tr) => cellWords(tr).slice(0, width)),
@@ -192,14 +203,7 @@ export const renderChartPanel = ({ chart, save, saveOrder, refresh, notify, rend
         figures: [false, ...spec.fields.map(() => true)],
         rowNoun: spec.one.toLowerCase(),
         focus: focusRow && rows.includes(focusRow) ? { row: rows.indexOf(focusRow), col: 1 } : null,
-        onSave: async ({ heads, rows: grid }) => {
-            const plan = chartPlan(chart, grid, heads);
-            if (plan.refused.length) return plan.refused;
-            await fillRows({ list, plan: plan.order, values: plan.grid, heads: plan.heads, headCells: headCells.length ? headCells : null, save, saveOrder, applyOrder });
-            await refresh(`Chart saved ✓ ${plan.grid.length} ${plan.grid.length === 1 ? spec.one.toLowerCase() : spec.many}.${plan.notes.length ? ` ${plan.notes[0]}` : ''}`);
-
-            return [];
-        },
+        onSave,
     }));
 
     // How it is drawn comes after its figures: the figures are what an owner opens a chart to change.

@@ -8,7 +8,7 @@
  */
 
 import { declaredStyleProps, displayedValue, ownTextOf, shownWords, stylePropsFor } from './support.js';
-import { columnsOf, rowsOf, tableOf } from './data-kit.js';
+import { KINDS as CHART_KINDS, chartData, columnsOf, kindOf as chartKindOf, mostFor as chartMost, rowsOf, tableOf } from './data-kit.js';
 import { seedForm, staysBecause, TYPE_NAMES } from './forms.js';
 import { PAIRINGS, PALETTES } from './brand.js';
 import { clickedName, partName } from './part-name.js';
@@ -339,6 +339,7 @@ export function pageForTheChat(root = document) {
         sectionsList,
         business: businessOf(doc, root),
         tables: tablesOf(root),
+        charts: chartsOf(root),
         forms: formsOf(doc, root),
         brand: brandOf(doc),
         shop_terms: shopTermsOf(doc),
@@ -361,6 +362,33 @@ export function pageForTheChat(root = document) {
  * cell, a row or a column the way the grid does (owner, 13 Nov 2026, the coverage walk: 115 table cells on The
  * Speaker could not be changed by chat). Its id is its rows' list key.
  */
+/**
+ * The page's charts, each with its kind and its rows as its grid shows them, so the chat can change a chart the way its
+ * grid does (the comprehensive walk, 14 Nov 2026: 261 of Halvermoor University's 342 gaps were its charts).
+ */
+const chartsOf = (root) => {
+    const charts = [];
+    for (const chart of root.querySelectorAll('[data-chart]')) {
+        if (chart.closest('#live-edit-ui') || locked(chart) || charts.length >= 10) continue;
+        const kind = chartKindOf(chart);
+        const { list, heads, rows } = chartData(chart);
+        const id = list?.dataset?.editList;
+        if (!kind || !id) continue;
+        const spec = CHART_KINDS[kind];
+        const width = 1 + spec.fields.length;
+        charts.push({
+            id,
+            name: cut(clean(chart.querySelector('.kit-data__title, h2, h3')?.textContent ?? '') || clean(chart.closest('[data-edit-section]')?.querySelector('h1, h2, h3')?.textContent ?? '') || 'Chart', 80),
+            kind,
+            columns: Array.from({ length: width }, (_, i) => cut(heads[i] || [spec.label, ...spec.fields][i], 60)),
+            rows: rows.slice(0, 60).map((tr) => [...tr.children].filter((cell) => cell.matches('th, td')).slice(0, width).map((cell) => cut(cell.textContent, 120))),
+            most: chartMost(chart),
+        });
+    }
+
+    return charts;
+};
+
 const tablesOf = (root) => {
     const tables = [];
     for (const block of root.querySelectorAll('[data-kit-table]')) {

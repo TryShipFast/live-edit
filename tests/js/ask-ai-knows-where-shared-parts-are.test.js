@@ -42,3 +42,13 @@ describe('Ask AI knows where the shared parts are', () => {
         expect(fields.some((f) => f.key === 'tpl:blank')).toBe(false);
     });
 });
+
+describe('Ask AI is told the page\'s charts', () => {
+    it('gives each chart its kind, columns and rows as its grid shows them', () => {
+        const host = document.createElement('div');
+        host.innerHTML = `<figure data-chart="donut"><h3 class="kit-data__title">Students by faculty</h3><table data-chart-table>
+            <thead><tr><th>Faculty</th><th>Share</th></tr></thead>
+            <tbody data-edit-list="tpl:faculties" data-max="6"><tr data-edit-item="t1"><th>Arts</th><td>40</td></tr><tr data-edit-item="t2"><th>Science</th><td>60</td></tr></tbody></table></figure>`;
+        expect(pageForTheChat(host).charts).toEqual([{ id: 'tpl:faculties', name: 'Students by faculty', kind: 'donut', columns: ['Faculty', 'Share'], rows: [['Arts', '40'], ['Science', '60']], most: 6 }]);
+    });
+});

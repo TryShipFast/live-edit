@@ -9683,6 +9683,32 @@ const bootLiveEdit = () => {
 
                     return { ok: true, reload: true };
                 }
+                if (action.type === 'chart') {
+                    /*
+                     * A chart as the owner asked it to be: its grid's own Save (data-panel.js renderChartPanel), which
+                     * works out the bars, slices or points that changed, as when they type into it.
+                     */
+                    const rowsList = document.querySelector(`tbody[data-edit-list="${CSS.escape(action.key)}"]`);
+                    const chart = rowsList?.closest('[data-chart]');
+                    if (!chart) return { ok: false, error: 'That chart is not on this page any more.' };
+                    const refused = refusedFor(chart);
+                    if (refused) return refused;
+                    if (team && !team.beforeEdit(chart, { onRefused: () => closeDrawer(true) })) return { ok: false, locked: heldBySomeoneElse(chart) ?? { label: 'that chart', name: 'A teammate' } };
+                    editChart(chart);
+                    await settled();
+                    const grid = drawerFields.querySelector('.le-data');
+                    if (typeof grid?.leSave !== 'function') { closeDrawer(true); return { ok: false, error: 'That chart cannot be changed here.' }; }
+                    try {
+                        const notSaved = await grid.leSave({ heads: action.columns ?? null, rows: action.rows });
+                        if (notSaved?.length) { closeDrawer(true); return { ok: false, error: String(notSaved[0]) }; }
+                    } catch (error) {
+                        closeDrawer(true);
+                        return { ok: false, error: error.message || 'That chart could not be saved.' };
+                    }
+                    closeDrawer(true);
+
+                    return { ok: true };
+                }
                 if (action.type === 'table') {
                     /*
                      * A table as the owner asked it to be: the grid's own Save (data-panel.js), which works out the

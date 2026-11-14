@@ -266,6 +266,8 @@ export function createChat({ shadow, request, showSaved, openPhoto, openPublish,
                 item.append(el('b', '', `${change.label}: `), document.createTextNode([what, change.description ? 'description changed' : null].filter(Boolean).join(', ')));
             } else if (change.type === 'form') {
                 item.append(el('b', '', `${change.label}: `), document.createTextNode(`${change.changes.length} change${change.changes.length === 1 ? '' : 's'} to its questions`));
+            } else if (change.type === 'chart') {
+                item.append(el('b', '', `${change.label}: `), document.createTextNode(`chart changed, ${change.rows.length} row${change.rows.length === 1 ? '' : 's'}`));
             } else if (change.type === 'table') {
                 item.append(el('b', '', `${change.label}: `), document.createTextNode(`table changed, ${change.rows.length} row${change.rows.length === 1 ? '' : 's'}`));
             } else if (change.type === 'business') {
