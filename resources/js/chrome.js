@@ -921,6 +921,14 @@ a.le-mark:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
 /* ---- fields ---- */
 .le-field { display: flex; flex-direction: column; gap: 7px; font-size: 13px; font-weight: 600; color: var(--le-body); }
 .le-field.le-divided { border-top: 1px solid var(--le-line); padding-top: 18px; }
+/* A list from a link (connected-list.js): its fields spaced as the panel's own, each label close to its box and apart from the next field. */
+.le-connected, .le-connected-matches { display: flex; flex-direction: column; gap: 16px; }
+.le-connected:empty, .le-connected-matches:empty { display: none; }
+.le-connected > .le-hint, .le-connected-matches > .le-hint, .le-connected-preview .le-hint { margin: 0; }
+.le-connected > .le-row, .le-connected-matches > .le-row { margin: 0; }
+.le-connected .le-link-btn { align-self: flex-start; }
+.le-connected-preview { display: flex; flex-direction: column; gap: 4px; padding: 12px 14px; border: 1px solid var(--le-line); border-radius: 10px; }
+.le-connected-preview .le-section-heading { margin: 0 0 4px; }
 .le-input {
   width: 100%; border: 1px solid var(--le-field); border-radius: 12px; background: #fff;
   padding: 11px 14px; font-size: 14px; font-weight: 400; letter-spacing: normal; text-transform: none;
