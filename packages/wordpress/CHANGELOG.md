@@ -1,5 +1,21 @@
 # ShipFast Live Edit for WordPress
 
+## 0.21.24 (14 Nov 2026)
+
+From the Ask AI coverage walk over all 51 templates (375,614 of 377,922 things a click can do at first; every one at
+100% with this release and the app's):
+- Ask AI is told each part by the name a click shows (part-name.js clickedName: the panel's title, the page's label;
+  owner: "the ai ask only needs to learn how the live edit gets the labels when click and replicate same when texted").
+- Charts by chat and voice: Ask AI is told each chart (its kind, columns and rows) and changes it with the chart's own
+  grid (change_chart); every chart of the layout shown, up to 40 (Tallyline's dashboards carry eleven a layout).
+- Icons by chat and voice: chosen by what they show with the icon picker's search (change_icon).
+- An empty notice a template names (a school's closure notice) is told to Ask AI, so it can be written by chat.
+- Nothing is guessed inside a part a template declares (data-instance): menus, filters, chart toggles and what a
+  page draws from data are no longer offered as lists, links or icons to add to. A site without the Kit's markers is
+  guessed at as before.
+- A grid table's rows and columns are told to Ask AI through the table, not as lists, so they no longer use up the
+  80 lists a page tells it (Oxbow & Hem's size guide).
+
 ## 0.21.23 (14 Nov 2026)
 
 - A table's cells can be links (owner: "Grid keeps the links", for The Speaker's keynote table): the grid changes a
