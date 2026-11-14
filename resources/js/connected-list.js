@@ -200,7 +200,41 @@ export function renderConnectedList({ list, label = 'This list', notify = () => 
         config.lists = lists;
     };
 
+    // Pro and Agency only (owner, 14 Nov 2026: "make sure dynamic data is pro only"): the reason said here, with the way to Pro.
+    const planNote = (words) => {
+        const note = el('div', 'le-connected-plan');
+        note.append(el('p', 'le-hint', words));
+        if (config.plans) {
+            const see = el('a', 'le-chip-btn', 'See plans');
+            see.href = config.plans;
+            see.target = '_blank';
+            see.rel = 'noopener';
+            note.append(see);
+        }
+
+        return note;
+    };
+
     const showConnected = (one) => {
+        if (config.offered === false) {
+            block.replaceChildren();
+            block.append(el('div', 'le-section-heading', `${label} from a link`));
+            block.append(planNote(`${label} came from ${one.from}. Lists from a link come with the Pro plan, so your website shows your own words here until you choose Pro. Your link and choices are kept.`));
+            const stopOnly = el('button', 'le-btn-danger', 'Stop using the link');
+            stopOnly.type = 'button';
+            stopOnly.addEventListener('click', async () => {
+                if (!await askTo({ title: 'Stop using the link?', subtitle: `${label} shows your own words, and your link and choices are forgotten.`, yes: 'Stop using it', no: 'Keep it' })) return;
+                try {
+                    await send(config.stop, { list: key, label }, config.token);
+                    remember(null);
+                    await settle(`${label}: your own words again. Publish to show them \u2713`);
+                    showStart();
+                } catch (error) { notify(error.message); }
+            });
+            block.append(stopOnly);
+
+            return;
+        }
         block.replaceChildren();
         block.append(el('div', 'le-section-heading', `${label} from a link`));
         block.append(el('p', 'le-hint', `From ${one.from}, checked every 5 minutes. Change them there, and your website shows the change.`));
@@ -250,7 +284,13 @@ export function renderConnectedList({ list, label = 'This list', notify = () => 
         open.type = 'button';
         open.title = 'Show this list from your own system (an API link), kept up to date';
         open.dataset.act = 'connected-open';
-        open.addEventListener('click', () => showSteps(null));
+        open.addEventListener('click', () => {
+            if (config.offered === false) {
+                block.replaceChildren(open, planNote('Lists from a link come with the Pro plan: your prices or posts from your own system, kept up to date on your website.'));
+                return;
+            }
+            showSteps(null);
+        });
         block.append(open);
     };
 

@@ -932,6 +932,8 @@ a.le-mark:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
 .le-connected-photo { display: flex; align-items: center; gap: 10px; }
 .le-connected-photo img, .le-connected-row img { width: 48px; height: 36px; object-fit: cover; border-radius: 6px; flex: none; background: var(--le-line); }
 .le-connected-row { display: flex; align-items: center; gap: 10px; }
+.le-connected-plan { display: flex; flex-direction: column; align-items: flex-start; gap: 10px; }
+.le-connected-plan > .le-hint { margin: 0; }
 .le-input {
   width: 100%; border: 1px solid var(--le-field); border-radius: 12px; background: #fff;
   padding: 11px 14px; font-size: 14px; font-weight: 400; letter-spacing: normal; text-transform: none;
