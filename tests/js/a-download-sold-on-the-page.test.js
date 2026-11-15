@@ -27,7 +27,7 @@ describe('a download sold on the page', () => {
         expect(rows[0].querySelector('.le-upload input[type="file"]').accept).toBe('.pdf,.zip');
         expect(rows[0].querySelector('.le-upload-title').textContent).toBe('Upload the file');
         // no size of its own: the room the plan leaves
-        expect(rows[0].querySelector('.le-upload-hint').textContent).toBe('A PDF, zip, audio or video file. Your plan has 300 MB free');
+        expect(rows[0].querySelector('.le-upload-hint').textContent).toBe('A PDF, zip, audio or video file. This website has 300 MB free');
         expect(rows[1].querySelector('.le-shop-download')).toBeNull();
     });
 
@@ -122,6 +122,19 @@ describe('a download sold on the page', () => {
 
             await expect(attachADownload(shop.products[0], new File(['x'], 'course.zip'), shop)).rejects.toThrow(room);
             expect(fetched).toHaveBeenCalledTimes(1);
+        });
+
+        it('a refusal for room asks the editor for Get more storage, with where more is got', async () => {
+            const shop = structuredClone(config);
+            const full = 'This upload is 1.2 GB, and this website has 300 MB left of 1 GB its hosting gives it. To add more, upgrade to Pro for 5 GB or add 1 GB for a year for ₦4,000.';
+            vi.spyOn(globalThis, 'fetch').mockResolvedValue(json({ ok: false, error: full, storage: true, upgrade: 'https://console.test/billing?site=adas-pot#storage' }, 422));
+            const heard = [];
+            const listen = (event) => heard.push(event.detail);
+            window.addEventListener('live-edit:storage-full', listen);
+
+            await expect(attachADownload(shop.products[0], new File(['x'], 'course.zip'), shop)).rejects.toThrow(full);
+            window.removeEventListener('live-edit:storage-full', listen);
+            expect(heard).toEqual([{ message: full, upgrade: 'https://console.test/billing?site=adas-pot#storage' }]);
         });
 
         it('tells Ask AI the downloads, with the file each gives now', () => {

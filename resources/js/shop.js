@@ -719,14 +719,14 @@ export const renderShopPanel = ({
         };
         show(product.file ?? null);
         wrap.append(said);
-        // the only limit on its size: the room the website's plan leaves (the host's words, "300 MB")
+        // the only limit on its size: the room the website's storage leaves (its plan, its hosting or extra storage: the host's words, "300 MB")
         const room = config?.downloads?.room;
         if (attachFile) {
             const box = uploadWidget({
                 compact: true,
                 accept: config?.downloads?.accept || '*/*',
                 title: product.file ? 'Replace the file' : 'Upload the file',
-                hint: `A PDF, zip, audio or video file${room ? `. Your plan has ${room} free` : ''}`,
+                hint: `A PDF, zip, audio or video file${room ? `. This website has ${room} free` : ''}`,
                 label: `Choose the file buyers of ${product.name} download`,
                 onFile: async (file) => {
                     said.textContent = `Uploading ${file.name}…`;

@@ -15,6 +15,8 @@ them to upgrade for more storage"):
 - Pictures are counted as they are stored (made fit for a page), not at the size they arrived; `Meter::release` gives
   space back, and `php artisan live-edit:recount-storage [site...] [--dry-run]` measures each site's files on the disk
   and corrects its figure (no file is touched).
+- The Shop tab's upload box says the room the website really has ("This website has 300 MB free": its plan, its paid
+  hosting or extra storage), not the plan's alone.
 - WordPress: unchanged. Its uploads go to the site's own media library, on its own server, so no storage limit of ours
   applies there.
 
