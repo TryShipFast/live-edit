@@ -16,6 +16,7 @@ use ShipFast\LiveEdit\Http\Api\V1\SessionController;
 use ShipFast\LiveEdit\Http\Api\V1\SignInController;
 use ShipFast\LiveEdit\Http\Api\V1\SiteController;
 use ShipFast\LiveEdit\Http\Api\V1\TeamController;
+use ShipFast\LiveEdit\Http\Api\V1\VideoController;
 use ShipFast\LiveEdit\Http\Controllers\ShopStockController;
 use ShipFast\LiveEdit\Http\Middleware\RecoversAnExpiredSignIn;
 
@@ -161,6 +162,9 @@ Route::prefix(config('live-edit.api.prefix', 'api/live-edit/v1').'/{site}')
             // otherwise be printed into every site we are installed on.
             Route::get('/photos', [ContentController::class, 'photos'])->name('live-edit.api.photos');
             Route::post('/photos/used', [ContentController::class, 'photoUsed'])->name('live-edit.api.photos.used');
+
+            // A video from YouTube or Vimeo: its title, and its cover stored as the site's own picture (LookUpAVideo).
+            Route::get('/video', [VideoController::class, 'look'])->name('live-edit.api.video');
 
             // Making one, when no photograph will do.
             Route::post('/imagine', [ContentController::class, 'imagine'])->name('live-edit.api.imagine');

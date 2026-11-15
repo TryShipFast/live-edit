@@ -294,6 +294,8 @@ export const apiRequestFor = (url, options = {}, api) => {
         '/live-edit/photos': `${base}/${api?.site}/photos`,
         '/live-edit/photos/used': `${base}/${api?.site}/photos/used`,
         '/live-edit/imagine': `${base}/${api?.site}/imagine`,
+        // A video from YouTube or Vimeo: its title and cover, read from its link (embeds.js).
+        '/live-edit/video': `${base}/${api?.site}/video`,
         // Ask AI, the chat beside the page (chat.js): a message, and undoing what an answer changed.
         '/live-edit/assistant/chat': `${base}/${api?.site}/assistant/chat`,
         '/live-edit/assistant/voice': `${base}/${api?.site}/assistant/voice`,

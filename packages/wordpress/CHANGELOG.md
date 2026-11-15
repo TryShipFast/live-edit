@@ -1,5 +1,36 @@
 # ShipFast Live Edit for WordPress
 
+## 0.23.4 (15 Nov 2026)
+
+A video from YouTube or Vimeo and a map to an address, the way Wix's and Squarespace's video and map blocks work
+(owner's brief, 15 Nov 2026):
+- **Video.** Added from the add window with its link (**Video link**); YouTube (`youtube.com/watch`, `youtu.be`,
+  shorts, embed, live) and Vimeo (`vimeo.com/<id>`, unlisted, channels, `player.vimeo.com`) only, anything else refused
+  where the owner is looking: "Paste a link to a YouTube or Vimeo video." (`embed-links.js`, `embeds.js`). Pressing the
+  video opens its panel: **Video link** and **Caption (optional)**, **Save**.
+- Visitors see its cover and title with a play button, in a 16:9 frame with no layout shift; nothing from YouTube or
+  Vimeo loads until the press, which swaps in `www.youtube-nocookie.com/embed/<id>?autoplay=1` or
+  `player.vimeo.com/video/<id>?dnt=1&autoplay=1`. Keyboard and screen reader friendly ("Play: <title>", a button,
+  Enter and Space) (`kit-embeds.js`).
+- Its title and cover are read from the link by `GET /video?url=` (`VideoController`, `LookUpAVideo`): the service's
+  oEmbed (`youtube.com/oembed`, `vimeo.com/api/oembed.json`), the cover fetched and made fit through the site's own
+  image store, so no page hotlinks a picture from YouTube or Vimeo (`FindPhotos::offer`). Where it cannot be stored, the
+  frame shows the title on the template's colours. A Laravel website keeping its own content has the route too
+  (`/live-edit/video`), with no cover to store.
+- **Map.** Added with its **Address**; Google's keyless map (`maps.google.com/maps?q=…&output=embed`), lazy and titled
+  "Map of <address>", with **Get directions** opening Google Maps' directions in a new tab. Pressing the map opens its
+  panel: **Address** and **Button words**, **Save**. Nothing else to set.
+- Both are made of the parts every adapter already saves (a link, a picture, words: `data-kit-video`,
+  `data-kit-video-link`, `-cover`, `-title`, `-caption`; `data-kit-map`, `-frame`, `-address`, `-directions`), so they
+  work on every adapter. The visitor's script (`resources/dist/kit-embeds.js`, its look `kit-embeds.css`) is loaded by
+  `embed.js` on a page that holds one, and the editor runs it. React and Next.js: `LiveEditVideo` and `LiveEditMap`
+  (`@shipfasts/live-edit-react`).
+- **Ask AI, by chat and voice**: told each video and map (`videos`, `maps`, as their panels show them; their link,
+  cover, title and address never as fields one at a time), and the add window's Video and Map (`video`, `map`); it adds
+  one by typing the link or the address into the add window's box and pressing Add (a refusal is the window's), and
+  changes one with the panel's own Save (chatAct `video`, `map`).
+- WordPress: a page that holds a video or a map gets the service's `kit-embeds.js` (`Embeds`), cached pages too.
+
 ## 0.23.3 (15 Nov 2026)
 
 Storage that really holds, the way Google storage works (owner, 15 Nov 2026: "each plan has a storage capacity"; "ask

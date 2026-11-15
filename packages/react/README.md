@@ -410,6 +410,24 @@ cannot resolve to a file it is about to rewrite, from a package or behind an
 import it cannot follow, is reported rather than wired, so it does not read as
 coverage.
 
+## A video and a map (engine 0.23.4)
+
+A video from YouTube or Vimeo, and a Google map of an address, editable in the editor's Video and Map panels like on
+every other adapter:
+
+```jsx
+import { LiveEditMap, LiveEditVideo } from '@shipfasts/live-edit-react';
+
+<LiveEditVideo contentKey="homeVideo" link="https://youtu.be/dQw4w9WgXcQ" title="Our story" cover="/story.jpg" />
+<LiveEditMap contentKey="visit" address="12 Allen Avenue, Ikeja" />
+```
+
+The video shows its cover and title with a play button, and loads nothing from YouTube or Vimeo until the visitor
+presses play (then `youtube-nocookie.com` or `player.vimeo.com` with Do Not Track). The map is Google's keyless embed,
+loaded lazily, with Get directions. Values are kept under `<contentKey>.link`, `.cover`, `.title`, `.caption` and
+`<contentKey>.address`, `.directions`, `.directions.text`. Their look is the engine's `kit-embeds.css` (or your own,
+on the same classes: `.kit-video__frame`, `.kit-map__frame`, ...).
+
 ## Saving
 
 Edits show immediately and save after a pause. One request per key per pause,

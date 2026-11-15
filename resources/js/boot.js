@@ -365,6 +365,14 @@
          */
         var editorReady = editing ? load('live-edit.js') : Promise.resolve();
 
+        /*
+         * A video from YouTube or Vimeo, or a map to an address, on this page: the small script that plays the video
+         * on a press and draws the map (kit-embeds.js), for every visitor, and only where the page holds one.
+         */
+        if (document.querySelector('[data-kit-video], [data-kit-map]')) {
+            load('kit-embeds.js').catch(function () { /* the cover still links to the video, the address to directions */ });
+        }
+
         return ready
             .then(function () { return load('content.js'); })
             .then(function () { return editorReady; });

@@ -43,6 +43,10 @@ import { COL, COLUMNS, SKU_TAKEN, choosableCollections, collectionsCell, collect
 import { SALE_HEADS, SALE_KINDS, STOCK_HEAD, dayOf, endSaid, flashSalePlan, keepRowInStep, keptProduct, ownPriceOf, ownPricesAmong, readSale, saleLabel, saleLineOf, saleRow, sizeKey, sizesSummary, stockFor, stockPlan, todayIs, withWrites } from './sale.js';
 import { TYPES as FORM_TYPES, changeForm, definitionOf as formDefinitionOf, seedForm } from './forms.js';
 import { renderFormBuilder } from './form-builder.js';
+import { PENDING as EMBED_PENDING, anEmbed, embedOf, renderMapPanel, renderVideoPanel, saveMap, saveVideo } from './embeds.js';
+import { cleanAddress } from './embed-links.js';
+// plays a video on a press and draws a map in the editor too (the page's own copy, where it has one, is the same file)
+import './kit-embeds.js';
 import { chartRowOf, renderChartPanel, renderChartRow, renderDataGrid, renderTableControls, renderTablePanel } from './data-panel.js';
 import { KINDS as CHART_KINDS, chartData, chartOf, itemContext as chartItemContext, kindOf as chartKindOf, tableOf as kitTableOf } from './data-kit.js';
 import { commonQuestions, listGuides, profileFor, shopQuestions } from './help.js';
@@ -4806,6 +4810,25 @@ const bootLiveEdit = () => {
                 upgrade: window.liveEditEditor?.billing ?? null,
                 add: async (section, chosen) => {
                     if (chosen !== undefined) after = chosen;
+                    /*
+                     * A video or a map is added with what was typed for it in this window (embeds.js): a video's link is
+                     * read by the host first, so a link that is not a video is refused here, before anything is added.
+                     * It is saved into the new section once the page is drawn again with it (EMBED_PENDING, below).
+                     */
+                    let embedded = null;
+                    if (anEmbed(section)) {
+                        handle.allowDismiss(false);
+                        try {
+                            embedded = section.kind === 'video'
+                                ? { kind: 'video', found: await lookUpVideo(section.value) }
+                                : { kind: 'map', address: cleanAddress(section.value) };
+                        } catch (error) {
+                            handle.allowDismiss(true);
+                            picker.say(error.message || 'That video could not be read. Check the link and try again.');
+
+                            return;
+                        }
+                    }
                     const id = newAddedId();
                     const order = [...list.children].filter((child) => child.dataset.editItem).map((child) => child.dataset.editItem);
                     // On the left: just before its partner; on the right: just after it.
@@ -4820,6 +4843,9 @@ const bootLiveEdit = () => {
                     try {
                         await saveSetting(builder.structureKey, addedWith(builder.added, id, section.from, builder.beside, beside));
                         await saveListOrder(list, orderWith(order, `s-${id}`, after));
+                        if (embedded) {
+                            try { sessionStorage.setItem(EMBED_PENDING, JSON.stringify({ ...embedded, item: `s-${id}` })); } catch { /* added; its panel takes the link */ }
+                        }
                         handle.close();
                         if (added) added(section);
                         else reloadWithToast(`${section.label.replace(/ · \d+ left$/, '')} added ✓`);
@@ -5972,6 +5998,80 @@ const bootLiveEdit = () => {
             // a table reads as a spreadsheet: wide, its names whole (editor audit B3)
             drawer.classList.add('is-grid');
             ui.root.classList.add('le-grid-open');
+        };
+
+        /** A picture saved by its address (a video's cover the host already stored as the site's own), or emptied. */
+        const saveImageAddress = async (target, url, alt = '') => {
+            const form = new FormData();
+            form.append('target', target);
+            if (url) form.append('url', url);
+            else form.append('remove', '1');
+            form.append('alt', alt);
+            await request('/live-edit/image', { method: 'POST', body: form });
+        };
+
+        /** A YouTube or Vimeo link read by the host: the video's own page, its title and its cover stored as the site's own. */
+        const lookUpVideo = async (link) => {
+            const response = await request(`/live-edit/video?url=${encodeURIComponent(link)}`, { method: 'GET' });
+            const data = await response.json();
+            if (!data?.video?.link) throw new Error('That video could not be read. Check the link and try again.');
+
+            return data.video;
+        };
+
+        /** A section's own Move or delete, under a video's or a map's panel, as a chart's has. */
+        const sectionButtonFor = (element) => {
+            const section = element.closest('[data-edit-item]');
+            if (!section) return null;
+            const open = document.createElement('button');
+            open.type = 'button';
+            open.className = 'le-chip-btn';
+            open.textContent = 'Move or delete this section';
+            open.addEventListener('click', () => editStyle(section));
+
+            return open;
+        };
+
+        /** A video (embeds.js): Video link and Caption (optional), saved with the panel's own Save. */
+        const editVideo = (figure) => {
+            current = { kind: 'video' };
+            lastOpened = figure;
+            drawerTitle.textContent = 'Video';
+            drawerDelete.classList.add('le-hidden');
+            const panel = renderVideoPanel({
+                figure,
+                lookUp: lookUpVideo,
+                save: (found, caption) => saveVideo(figure, found, caption, { saveSetting, saveImage: saveImageAddress }),
+                done: (message) => { closeDrawer(true); void settle(message, null, null, true); },
+            });
+            drawerFields.replaceChildren(panel);
+            const section = sectionButtonFor(figure);
+            if (section) drawerFields.append(section);
+            setTrail(figure);
+            showTab('Edit');
+            // the panel has its own Save
+            ui.drawerFoot.classList.add('le-hidden');
+            openDrawer();
+        };
+
+        /** A map (embeds.js): Address and Button words, saved with the panel's own Save. */
+        const editMap = (map) => {
+            current = { kind: 'map' };
+            lastOpened = map;
+            drawerTitle.textContent = 'Map';
+            drawerDelete.classList.add('le-hidden');
+            const panel = renderMapPanel({
+                map,
+                save: (chosen) => saveMap(map, chosen, { saveSetting }),
+                done: (message) => { closeDrawer(true); void settle(message, null, null, true); },
+            });
+            drawerFields.replaceChildren(panel);
+            const section = sectionButtonFor(map);
+            if (section) drawerFields.append(section);
+            setTrail(map);
+            showTab('Edit');
+            ui.drawerFoot.classList.add('le-hidden');
+            openDrawer();
         };
 
         /*
@@ -8021,6 +8121,12 @@ const bootLiveEdit = () => {
             const chip = node.closest('[data-style-edit]');
             if (chip) return { element: chip, kind: 'style' };
             /*
+             * A video from YouTube or Vimeo, or a map to an address (embeds.js): pressed anywhere, it opens its own
+             * panel (Video link and Caption; Address and Button words), as Wix's and Squarespace's blocks do.
+             */
+            const embed = embedOf(node);
+            if (embed) return { element: embed.element, kind: embed.kind, box: embed.element, label: embed.kind === 'video' ? 'Video: press to change it' : 'Map: press to change it' };
+            /*
              * A chart (data-kit.js): a bar, point, slice or stage, drawn or in its table, is one of
              * its rows, opened in the kind's own words; anywhere else on the drawing is the chart.
              * Its title, readout and headings are words like any others, below.
@@ -8302,6 +8408,31 @@ const bootLiveEdit = () => {
             window.addEventListener('scroll', () => formHandle.classList.remove('is-visible'), { passive: true });
         }
 
+        /*
+         * Back from adding a video or a map: the link or the address typed in the add window saved into it, now that the
+         * page draws it, with its panel's own saves (embeds.js), and the page brought to it.
+         */
+        try {
+            const waiting = sessionStorage.getItem(EMBED_PENDING);
+            if (waiting) {
+                sessionStorage.removeItem(EMBED_PENDING);
+                const pending = JSON.parse(waiting);
+                window.setTimeout(async () => {
+                    const section = document.querySelector(`[data-edit-item="${CSS.escape(String(pending.item ?? ''))}"]`);
+                    const embed = section?.querySelector(pending.kind === 'video' ? '[data-kit-video]' : '[data-kit-map]');
+                    if (!embed) return;
+                    try {
+                        if (pending.kind === 'video') await saveVideo(embed, pending.found, null, { saveSetting, saveImage: saveImageAddress });
+                        else await saveMap(embed, { address: pending.address }, { saveSetting });
+                        embed.scrollIntoView({ block: 'center' });
+                        void settle(pending.kind === 'video' ? 'Video added ✓' : 'Map added ✓', null, null, true);
+                    } catch (error) {
+                        notify(error.message || 'It was added. Press it to set its link or address.');
+                    }
+                }, 300);
+            }
+        } catch { /* nothing waiting */ }
+
         // Back from a save: the builder opens again on the form, as drawn now.
         try {
             const again = sessionStorage.getItem(FORM_REOPEN);
@@ -8329,6 +8460,8 @@ const bootLiveEdit = () => {
                 return;
             }
             if (kind === 'search') editSearch(element);
+            else if (kind === 'video') editVideo(element);
+            else if (kind === 'map') editMap(element);
             else if (kind === 'chart-row') editChart(chartOf(element), element);
             else if (kind === 'chart') editChart(element);
             else if (kind === 'table') editTable(element);
@@ -9549,6 +9682,12 @@ const bootLiveEdit = () => {
                     if (!row) { handle.close?.(); return { ok: false, error: `This design has no section called “${action.name}”.` }; }
                     row.click();
                     await settled();
+                    // a video's link or a map's address, typed into the add window's box as the owner would (embeds.js)
+                    const asked = ui.shadow.querySelector('.le-modal .le-embed-value');
+                    if (asked) {
+                        asked.value = String(action.link ?? action.address ?? '');
+                        asked.dispatchEvent(new Event('input', { bubbles: true }));
+                    }
                     const where = ui.shadow.querySelector('.le-modal select.le-browser-where-pick');
                     if (where && action.after) {
                         where.value = action.after === 'top' ? AT_THE_TOP : action.after;
@@ -9557,7 +9696,14 @@ const bootLiveEdit = () => {
                     const add = ui.shadow.querySelector('.le-modal .le-browser-add');
                     if (!add || add.disabled) { handle.close?.(); return { ok: false, error: 'That section cannot be added just now (the plan may not include it).' }; }
                     add.click();
-                    for (let i = 0; i < 80 && !addedSection; i++) await new Promise((resolve) => setTimeout(resolve, 250));
+                    // what the window says when it cannot add it (a link that is not a video) is the answer, as it is to a click
+                    const refusedHere = () => {
+                        const note = ui.shadow.querySelector('.le-modal .le-browser-note');
+
+                        return note && !note.hidden && note.textContent.trim() ? note.textContent.trim() : null;
+                    };
+                    for (let i = 0; i < 80 && !addedSection && !refusedHere(); i++) await new Promise((resolve) => setTimeout(resolve, 250));
+                    if (!addedSection && refusedHere()) { const said = refusedHere(); handle.close?.(); return { ok: false, error: said }; }
                     if (!addedSection) { handle.close?.(); return { ok: false, error: 'That section could not be added just now.' }; }
 
                     return { ok: true, reload: true };
@@ -9820,6 +9966,30 @@ const bootLiveEdit = () => {
                     const said = drawerFields.querySelector('.le-connected [role="status"]')?.textContent ?? '';
 
                     return found ? { ok: true, waiting: true, said } : { ok: false, error: said || 'That link could not be read.' };
+                }
+                if (action.type === 'video' || action.type === 'map') {
+                    /*
+                     * A video's link or a map's address, changed with its own panel's Save (embeds.js), as when the owner
+                     * presses it and types: the same refusal ("Paste a link to a YouTube or Vimeo video.") is the answer.
+                     */
+                    const marked = action.type === 'video'
+                        ? document.querySelector(`[data-kit-video-link][data-edit-href="${CSS.escape(action.key)}"], [data-kit-video-link][data-edit-href="setting:${CSS.escape(action.key)}"]`)
+                        : document.querySelector(`[data-kit-map-address][data-edit="setting:${CSS.escape(action.key)}"], [data-kit-map-address][data-edit="${CSS.escape(action.key)}"]`);
+                    const embed = marked?.closest(action.type === 'video' ? '[data-kit-video]' : '[data-kit-map]');
+                    if (!embed) return { ok: false, error: `That ${action.type} is not on this page any more.` };
+                    const refused = refusedFor(embed);
+                    if (refused) return refused;
+                    if (team && !team.beforeEdit(embed, { onRefused: () => closeDrawer(true) })) return { ok: false, locked: heldBySomeoneElse(embed) ?? { label: `that ${action.type}`, name: 'A teammate' } };
+                    let saidDone = null;
+                    const panel = action.type === 'video'
+                        ? renderVideoPanel({ figure: embed, lookUp: lookUpVideo, save: (found, caption) => saveVideo(embed, found, caption, { saveSetting, saveImage: saveImageAddress }), done: (message) => { saidDone = message; } })
+                        : renderMapPanel({ map: embed, save: (chosen) => saveMap(embed, chosen, { saveSetting }), done: (message) => { saidDone = message; } });
+                    const notSaved = action.type === 'video'
+                        ? await panel.leSave({ link: action.link, caption: action.caption ?? undefined })
+                        : await panel.leSave({ address: action.address, words: action.words ?? undefined });
+                    if (notSaved?.length) return { ok: false, error: String(notSaved[0]) };
+
+                    return { ok: true, reload: true, said: saidDone };
                 }
                 if (action.type === 'chart') {
                     /*

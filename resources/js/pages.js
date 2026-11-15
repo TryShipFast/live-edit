@@ -14,6 +14,7 @@
  */
 
 import { KINDS } from './data-kit.js';
+import { anEmbed, askedInTheAddWindow, embedSays, refusalFor } from './embeds.js';
 
 /** What a chart of a kind, or a table, holds and keeps to, for choosing one before it is added. */
 export function kindSays(kind, section = {}) {
@@ -28,6 +29,8 @@ export function kindSays(kind, section = {}) {
             'It arrives with sample rows to replace.',
         ];
     }
+    // A video from YouTube or Vimeo, a map to an address (embeds.js).
+    if (kind === 'video' || kind === 'map') return embedSays(kind);
     if (kind === 'search') {
         return [
             'A search over one of your collections: a box for words or a part number (found with or without dashes and spaces), and filters made from the collection\'s fields.',
@@ -144,6 +147,8 @@ export function nounFor(section) {
     if (section.kind === 'form') return 'form';
     if (section.kind === 'table') return 'table';
     if (section.kind === 'search') return 'search';
+    if (section.kind === 'video') return 'video';
+    if (section.kind === 'map') return 'map';
     if (KINDS[section.kind]) return 'chart';
 
     return 'section';
@@ -1010,6 +1015,9 @@ export function renderSectionBrowser({ container, library, add, multiple = false
     // A chart's drawing script, loaded now so the first chart chosen is drawn without waiting for it.
     if (drawWith && (library ?? []).some((section) => KINDS[section.kind] || section.kind === 'table') && !window.kitData) loadScript(drawWith);
     let looking = null;
+    // a video's link or a map's address typed in this window, by kind, and its box while one is chosen
+    const typed = {};
+    let asked = null;
 
     const paintSize = () => Object.entries(sizeButtons).forEach(([key, b]) => b.classList.toggle('is-on', key === size));
     paintSize();
@@ -1037,6 +1045,16 @@ export function renderSectionBrowser({ container, library, add, multiple = false
         stageFrom.textContent = section.kind ? 'Drawn in your site’s own colours and type' : section.page ? `From your ${section.page} page` : '';
         paintAction();
         list.querySelectorAll('.le-library-item').forEach((row) => row.classList.toggle('is-looking', row.dataset.from === section.from));
+        /*
+         * A video or a map: what it is added with, asked here first (its link, its address), then how it will look and
+         * what it does. What was typed stays while they look at another and come back.
+         */
+        asked = null;
+        if (anEmbed(section)) {
+            asked = askedInTheAddWindow(view.ownerDocument, section, typed[section.kind] ?? '');
+            asked.input.addEventListener('input', () => { typed[section.kind] = asked.input.value; say(''); });
+            asked.input.addEventListener('keydown', (event) => { if (event.key === 'Enter') { event.preventDefault(); action.click(); } });
+        }
         // A form (TheFormsAnOwnerAdds), a chart or a table: the thing itself as it will be added, then what it holds.
         if (section.preview) {
             const width = size === 'phone' ? 390 : 1280;
@@ -1065,13 +1083,15 @@ export function renderSectionBrowser({ container, library, add, multiple = false
                 frame.style.height = `${tall}px`;
                 holder.style.height = `${Math.round(tall * scale)}px`;
             });
-            view.replaceChildren(holder, ...(section.kind ? kindSays(section.kind, section) : []).map((line) => el('p', 'le-hint', line)));
+            view.replaceChildren(...(asked ? [asked.wrap] : []), holder, ...(section.kind ? kindSays(section.kind, section) : []).map((line) => el('p', 'le-hint', line)));
+            asked?.input.focus();
 
             return;
         }
         // A chart or a table (data-kit.js): what it holds and the rules it keeps, since it is not on any page yet.
         if (section.kind) {
-            view.replaceChildren(...kindSays(section.kind, section).map((line) => el('p', 'le-hint', line)));
+            view.replaceChildren(...(asked ? [asked.wrap] : []), ...kindSays(section.kind, section).map((line) => el('p', 'le-hint', line)));
+            asked?.input.focus();
 
             return;
         }
@@ -1128,6 +1148,17 @@ export function renderSectionBrowser({ container, library, add, multiple = false
             draw();
             paintAction();
             onChange([...on]);
+        } else if (anEmbed(looking)) {
+            // a video's link or a map's address: refused here, with the reason, until it is one
+            const value = asked?.input.value ?? '';
+            const why = refusalFor(looking.kind, value);
+            if (why) {
+                say(why);
+                asked?.input.focus();
+
+                return;
+            }
+            add({ ...looking, value }, whereTo ? (whereTo.value === '' ? null : whereTo.value) : undefined);
         } else {
             add(looking, whereTo ? (whereTo.value === '' ? null : whereTo.value) : undefined);
         }

@@ -13,6 +13,7 @@ import { seedForm, staysBecause, TYPE_NAMES } from './forms.js';
 import { PAIRINGS, PALETTES } from './brand.js';
 import { clickedName, partName } from './part-name.js';
 import { sectionName } from './section-inserter.js';
+import { mapsOf, ownedByAnEmbed, videosOf } from './embeds.js';
 
 // enough for the longest home page (The Speaker: 491 parts; at 400 its FAQ and footer were never told to Ask AI, 13 Nov 2026)
 const MOST_FIELDS = 800;
@@ -253,6 +254,9 @@ export function pageForTheChat(root = document) {
             // a shop's terms (delivery prices, free delivery over, the code on offer) are changed as the Shop tab does,
             // every copy at once (`shop_terms`), never one copy here
             if (doc.defaultView?.liveEditShop && element.closest(SHOP_TERMS)) continue;
+            // a video's link, cover and title, and a map's address and where its button goes, are changed together with
+            // change_video and change_map (`videos`, `maps`), as their panels do; never one part here
+            if (ownedByAnEmbed(element, attribute)) continue;
             const key = attribute === 'data-edit-href' ? hrefKeyOf(element.getAttribute(attribute)) : keyOf(element.getAttribute(attribute));
             if (key === null || seen.has(key)) continue;
             const value = valueOf(element, kind);
@@ -350,6 +354,9 @@ export function pageForTheChat(root = document) {
         business: businessOf(doc, root),
         tables: tablesOf(root),
         charts: chartsOf(root),
+        // the videos from YouTube or Vimeo and the maps to an address, each as its panel shows it (embeds.js)
+        videos: videosOf(root),
+        maps: mapsOf(root),
         forms: formsOf(doc, root),
         brand: brandOf(doc),
         shop_terms: shopTermsOf(doc),
@@ -357,7 +364,7 @@ export function pageForTheChat(root = document) {
         // with a file attached goes to the right one
         downloads: downloadsOf(doc),
         // the design's own sections and forms that can be added, by name (the + Section picker)
-        library: (doc.defaultView?.liveEditPages?.library ?? []).slice(0, 80).map((section) => ({ name: cut(String(section.label ?? '').replace(/ · \d+ left$/, ''), 80), ...(section.kind === 'form' ? { form: true } : {}) })).filter((section) => section.name),
+        library: (doc.defaultView?.liveEditPages?.library ?? []).slice(0, 80).map((section) => ({ name: cut(String(section.label ?? '').replace(/ · \d+ left$/, ''), 80), ...(section.kind === 'form' ? { form: true } : {}), ...(section.kind === 'video' ? { video: true } : {}), ...(section.kind === 'map' ? { map: true } : {}) })).filter((section) => section.name),
         seo: seoOf(doc),
         // the site's pages, by name, so "link it to the Booking page" picks one as the link panel's Goes to does
         // a page the owner added (made) is renamed, hidden and moved in the Pages list; the design's own pages by their

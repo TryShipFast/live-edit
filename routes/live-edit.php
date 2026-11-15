@@ -2,6 +2,7 @@
 
 use Illuminate\Support\Facades\Route;
 use ShipFast\LiveEdit\Http\Api\V1\EmbedController;
+use ShipFast\LiveEdit\Http\Api\V1\VideoController;
 use ShipFast\LiveEdit\Http\Controllers\EditorSessionController;
 use ShipFast\LiveEdit\Http\Controllers\LiveEditController;
 use ShipFast\LiveEdit\Http\Controllers\ShopStockController;
@@ -29,6 +30,8 @@ Route::middleware(array_merge(
         Route::post('/undo', [LiveEditController::class, 'undo'])->name('undo');
         Route::post('/publish', [LiveEditController::class, 'publish'])->name('publish');
         Route::post('/draft/discard', [LiveEditController::class, 'discardDraft'])->name('draft.discard');
+        // A video from YouTube or Vimeo pasted into its panel: its title (VideoController::lookHere).
+        Route::get('/video', [VideoController::class, 'lookHere'])->name('video');
 
         /*
          * What is waiting, and taking one item back.

@@ -62,6 +62,11 @@ class EmbedController
         'unsaved.js' => 'unsaved.js',
         'toolbar-icons.js' => 'toolbar-icons.js',
         'kit-carry.js' => 'kit-carry.js',
+        // A video from YouTube or Vimeo and a map to an address: what a visitor's browser runs, loaded by
+        // embed.js on a page that holds one, and the addresses both are made of.
+        'kit-embeds.js' => 'kit-embeds.js',
+        'embed-links.js' => 'embed-links.js',
+        'embeds.js' => 'embeds.js',
         'dropdown-trigger.js' => 'dropdown-trigger.js',
         'linked-detail-scope.js' => 'linked-detail-scope.js',
         'card-page.js' => 'card-page.js',

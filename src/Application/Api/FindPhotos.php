@@ -255,6 +255,15 @@ class FindPhotos
         return Cache::has(self::offeredKey($address));
     }
 
+    /**
+     * Let one picture this application found itself be fetched and stored as the site's own (a video's cover, read
+     * from YouTube or Vimeo by LookUpAVideo), the way a photo a search offered is.
+     */
+    public static function offer(string $address): void
+    {
+        Cache::put(self::offeredKey($address), true, now()->addHour());
+    }
+
     private static function offeredKey(string $address): string
     {
         return 'live-edit:photo-offered:'.sha1($address);

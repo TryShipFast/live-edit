@@ -196,3 +196,30 @@ export declare function contentKeyFor(list: string, field: string, item: unknown
  * row with no identity renders as ordinary markup with no editing marker.
  */
 export declare function editMarkerFor(list: string, field: string, item: unknown): string | undefined;
+
+/**
+ * A video from YouTube or Vimeo: its cover and title with a play button, and nothing from YouTube or Vimeo loaded
+ * until the visitor presses play. Its parts are saved under `<contentKey>.link`, `.cover`, `.title` and `.caption`,
+ * and changed in the editor's Video panel.
+ */
+export interface LiveEditVideoProps {
+    contentKey: string;
+    link?: string;
+    title?: string;
+    cover?: string;
+    caption?: string;
+    className?: string;
+}
+export declare function LiveEditVideo(props: LiveEditVideoProps): ReactElement;
+
+/**
+ * A Google map of an address, loaded lazily, with Get directions. Saved under `<contentKey>.address`, `.directions`
+ * and `.directions.text`, and changed in the editor's Map panel.
+ */
+export interface LiveEditMapProps {
+    contentKey: string;
+    address?: string;
+    button?: string;
+    className?: string;
+}
+export declare function LiveEditMap(props: LiveEditMapProps): ReactElement;

@@ -92,7 +92,7 @@ class Frontend
             $cached = get_transient(self::cacheKey());
 
             if (is_string($cached) && $cached !== '') {
-                return $cached;
+                return self::withEmbeds($cached);
             }
         }
 
@@ -143,7 +143,7 @@ class Frontend
             $lastGood = get_transient(self::lastGoodKey());
 
             if (is_string($lastGood) && $lastGood !== '') {
-                return $editing ? self::markBodyForEditing($lastGood) : $lastGood;
+                return self::withEmbeds($editing ? self::markBodyForEditing($lastGood) : $lastGood);
             }
 
             // Nothing to fall back to. The page is the point and the editor is
@@ -187,7 +187,15 @@ class Frontend
             $tagged = self::saysWhyEditingIsOff($tagged);
         }
 
-        return $tagged;
+        return self::withEmbeds($tagged);
+    }
+
+    /** A video or a map on the page: the script that plays and draws them, from the service (Embeds). */
+    private static function withEmbeds(string $html): string
+    {
+        $base = rtrim((string) Settings::get('api_base'), '/');
+
+        return Embeds::addedTo($html, $base === '' ? null : (string) preg_replace('#/api/live-edit/v\\d+$#', '', $base));
     }
 
     /**
