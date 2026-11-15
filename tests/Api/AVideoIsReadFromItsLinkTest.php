@@ -22,6 +22,22 @@ class AVideoIsReadFromItsLinkTest extends TestCase
 
     private string $session;
 
+    protected function defineEnvironment($app): void
+    {
+        parent::defineEnvironment($app);
+
+        // The API is off unless asked for (LiveEditServiceProvider), as in every other API test.
+        $generous = ['burst' => ['max' => 600, 'seconds' => 60], 'sustained' => ['max' => 6000, 'seconds' => 3600]];
+        $app['config']->set('live-edit.api', [
+            'enabled' => true,
+            'prefix' => 'api/live-edit/v1',
+            'session_ttl' => 1800,
+            'throttle' => array_fill_keys(['read', 'write', 'session', 'publish', 'upload', 'tag'], $generous),
+            'cache' => ['pointer_seconds' => 30, 'version_seconds' => 31536000, 'stale_while_revalidate' => 86400],
+        ]);
+        $app['config']->set('cors.paths', []);
+    }
+
     protected function setUp(): void
     {
         parent::setUp();
@@ -43,7 +59,7 @@ class AVideoIsReadFromItsLinkTest extends TestCase
 
     private function look(string $link)
     {
-        return $this->getJson('/'.config('live-edit.api.prefix').'/client/video?url='.urlencode($link), ['Authorization' => 'Bearer '.$this->session]);
+        return $this->getJson('/'.config('live-edit.api.prefix', 'api/live-edit/v1').'/client/video?url='.urlencode($link), ['Authorization' => 'Bearer '.$this->session]);
     }
 
     public function test_the_links_people_paste_are_read_one_way_and_anything_else_is_refused(): void
