@@ -1,5 +1,15 @@
 # ShipFast Live Edit for WordPress
 
+## 0.23.7 (15 Nov 2026)
+
+Ask AI adds a row with its words, as + Add then typing does (owner, 15 Nov 2026: "Add Saturday 2pm for Ngozi" must add a
+row reading "Sat 2pm", not a copy of the last row):
+- A chat's list add or copy may carry the new item's words (`words`, in the order its parts read). The add is the list's
+  own (+ Add, or the item's copy, as before); then the item that was not in the list before takes the words, each part by
+  the panel's own save, so the chat's one Undo takes back the item and its words together. A word left empty keeps the
+  copy's words for that part; a part that only holds others, and a nested list's parts, are not filled.
+- Any Kit list, on every adapter: nothing knows a template (`resources/js/new-item-words.js`).
+
 ## 0.23.6 (15 Nov 2026)
 
 A map waits for the visitor's press, like the video (owner, 15 Nov 2026: so the templates' "no cookies, no tracking"

@@ -3,6 +3,7 @@ import { renderConnectedList, connectionOf } from './connected-list.js';
 import { toolbarIcon } from './toolbar-icons.js';
 import { createTeam, splitChanges, TEAM_CSS } from './team.js';
 import { describeVersion, versionsWorthShowing } from './history.js';
+import { itemIdsOf, newItemIn, wordsForNewItem } from './new-item-words.js';
 import { glyphIcon } from './glyphs.js';
 import { keepClearOfTheBar } from './clear-of-the-bar.js';
 import { openDialogsInPlace } from './dialogs-in-place.js';
@@ -10169,8 +10170,24 @@ const bootLiveEdit = () => {
                         return { ok: false, error: why };
                     }
                     listRefusal = null;
+                    // the items there before, so the one an add makes is known afterwards (its words below)
+                    const had = itemIdsOf(list);
                     const done = await button.leRun();
                     closeDrawer(true);
+                    /*
+                     * "Add Saturday 2pm for Ngozi": an add that says its words fills them in, as + Add then typing does
+                     * (one turn, so the chat's one Undo takes back the new item and its words together; new-item-words.js).
+                     */
+                    const words = Array.isArray(action.words) ? action.words : [];
+                    if (done !== false && done !== 'kept' && done !== 'held' && ['add', 'duplicate'].includes(action.action) && words.some((one) => typeof one === 'string' && one.trim() !== '')) {
+                        await settled();
+                        const made = newItemIn(document.querySelector(`[data-edit-list="${CSS.escape(action.key)}"]`), had);
+                        if (!made) return { ok: false, error: 'The new item was added, but its words could not be filled in. Tell me what it should say.' };
+                        for (const { key, value } of wordsForNewItem(made, words)) {
+                            const filled = await chatAct({ type: 'field', kind: 'text', key, value });
+                            if (!filled?.ok) return filled ?? { ok: false, error: 'That could not be saved.' };
+                        }
+                    }
                     if (done === false && listRefusal?.sectionLocked) return { ok: false, locked: heldBySomeoneElse(target) ?? { label: 'that part', name: 'A teammate' } };
                     if (done === false && listRefusal?.message) return { ok: false, error: listRefusal.message, status: listRefusal.status ?? null };
                     if (done === 'kept') return { ok: false, kept: true, error: 'Kept as it was.' };

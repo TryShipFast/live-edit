@@ -74,6 +74,8 @@ class EmbedController
         'sale.js' => 'sale.js',
         'products.js' => 'products.js',
         'history.js' => 'history.js',
+        // An item Ask AI adds with its words ("add Saturday 2pm"): which item is new, and which parts take the words.
+        'new-item-words.js' => 'new-item-words.js',
         'glyphs.js' => 'glyphs.js',
         'shop.js' => 'shop.js',
         'catalogue.js' => 'catalogue.js',
