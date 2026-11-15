@@ -12,7 +12,7 @@
  *                                > img[data-kit-video-cover] (its cover, stored as the site's own picture)
  *                                > [data-kit-video-title] (its title, the press's accessible name)
  *                            > [data-kit-video-caption] (optional words under it)
- *   map    [data-kit-map]    > [data-kit-map-frame] (the room the map is drawn in)
+ *   map    [data-kit-map]    > [data-kit-map-frame] (the room the map is drawn in, its Show map button inside)
  *                            > [data-kit-map-address] (the address, words)
  *                            > a[data-kit-map-directions] (Get directions: its words, and an address the panel keeps)
  */
@@ -349,7 +349,7 @@ export function embedSays(kind) {
     if (kind === 'map') {
         return [
             'A Google map of your address, with a Get directions button that opens Google Maps.',
-            'It loads only as visitors scroll near it, so your page stays fast.',
+            'Visitors see a drawn map with Show map: nothing from Google loads until they press it, so your page stays fast and sets no cookies before then.',
             'Change the address or the button’s words any time by pressing the map.',
         ];
     }

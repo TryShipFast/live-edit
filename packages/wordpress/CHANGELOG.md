@@ -1,5 +1,19 @@
 # ShipFast Live Edit for WordPress
 
+## 0.23.6 (15 Nov 2026)
+
+A map waits for the visitor's press, like the video (owner, 15 Nov 2026: so the templates' "no cookies, no tracking"
+stays true):
+- Until **Show map** is pressed the map's room shows our own drawn picture of streets and a pin in the template's colours
+  (`MAP_PICTURE`, one drawing for every adapter) and the button: no frame, no Google picture, no Google request of any
+  kind. The button is a real button, named "Show map of <address>", with a visible focus ring.
+- The press swaps in Google's keyless map in the same room (`loading="eager"` now), with no layout shift; an address
+  changed afterwards is the map drawn. **Get directions** stays a link to Google Maps in a new tab.
+- Under the buttons, in the muted text: "The map loads from Google when you press Show map." (the host's markup and
+  React's `note`), hidden once the map shows.
+- In the editor the map shows the picture too, and a press anywhere on it (Show map included) opens its panel.
+- React and Next.js: `LiveEditMap` does the same (`note` prop).
+
 ## 0.23.5 (15 Nov 2026)
 
 - A video too big for a download's file (over the host's video cap, 200 MB) now points to the Video section added in

@@ -423,8 +423,8 @@ import { LiveEditMap, LiveEditVideo } from '@shipfasts/live-edit-react';
 ```
 
 The video shows its cover and title with a play button, and loads nothing from YouTube or Vimeo until the visitor
-presses play (then `youtube-nocookie.com` or `player.vimeo.com` with Do Not Track). The map is Google's keyless embed,
-loaded lazily, with Get directions. Values are kept under `<contentKey>.link`, `.cover`, `.title`, `.caption` and
+presses play (then `youtube-nocookie.com` or `player.vimeo.com` with Do Not Track). The map is a drawn picture with **Show map**:
+Google's keyless embed loads only when it is pressed. Get directions opens Google Maps. Values are kept under `<contentKey>.link`, `.cover`, `.title`, `.caption` and
 `<contentKey>.address`, `.directions`, `.directions.text`. Their look is the engine's `kit-embeds.css` (or your own,
 on the same classes: `.kit-video__frame`, `.kit-map__frame`, ...).
 

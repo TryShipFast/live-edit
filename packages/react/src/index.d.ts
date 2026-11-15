@@ -213,13 +213,16 @@ export interface LiveEditVideoProps {
 export declare function LiveEditVideo(props: LiveEditVideoProps): ReactElement;
 
 /**
- * A Google map of an address, loaded lazily, with Get directions. Saved under `<contentKey>.address`, `.directions`
+ * A Google map of an address, loaded only when the visitor presses Show map (a drawn picture until then), with Get
+ * directions. Saved under `<contentKey>.address`, `.directions`
  * and `.directions.text`, and changed in the editor's Map panel.
  */
 export interface LiveEditMapProps {
     contentKey: string;
     address?: string;
     button?: string;
+    /** The line under the buttons; "" for none. */
+    note?: string;
     className?: string;
 }
 export declare function LiveEditMap(props: LiveEditMapProps): ReactElement;

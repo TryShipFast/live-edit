@@ -47,9 +47,17 @@ describe('a video and a map, in React', () => {
         fireEvent.click(container.querySelector('[data-kit-video-link]'));
         expect(container.querySelector('[data-kit-video] iframe').getAttribute('src')).toBe('https://player.vimeo.com/video/76979871?dnt=1&autoplay=1');
 
+        // nothing of Google's until Show map is pressed
+        expect(container.querySelector('[data-kit-map-frame] iframe')).toBeNull();
+        expect(container.querySelector('[data-kit-map-frame] svg.kit-map__picture')).not.toBeNull();
+        const show = container.querySelector('button[data-kit-map-show]');
+        expect(show.getAttribute('aria-label')).toBe('Show map of Lekki Phase 1, Lagos');
+        expect(container.querySelector('.kit-map__note').textContent).toBe('The map loads from Google when you press Show map.');
+        fireEvent.click(show);
         const frame = container.querySelector('[data-kit-map-frame] iframe');
         expect(frame.getAttribute('src')).toBe('https://maps.google.com/maps?q=Lekki%20Phase%201%2C%20Lagos&output=embed');
-        expect(frame.getAttribute('loading')).toBe('lazy');
+        expect(frame.getAttribute('loading')).toBe('eager');
+        expect(container.querySelector('[data-kit-map-show]')).toBeNull();
         expect(frame.getAttribute('title')).toBe('Map of Lekki Phase 1, Lagos');
         const go = container.querySelector('[data-kit-map-directions]');
         expect(go.getAttribute('href')).toBe('https://www.google.com/maps/dir/?api=1&destination=Lekki%20Phase%201%2C%20Lagos');

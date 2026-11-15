@@ -3,7 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { NOT_A_VIDEO, aFrameWeAllow, addressOfDirections, directionsFor, mapSrc, playerFor, videoOf } from '../../resources/js/embed-links.js';
 import * as reactCopy from '../../packages/react/src/embed-links.js';
 import { embedOf, mapsOf, ownedByAnEmbed, refusalFor, renderMapPanel, renderVideoPanel, saveMap, saveVideo, videosOf } from '../../resources/js/embeds.js';
-import { drawMap, play, start } from '../../resources/js/kit-embeds.js';
+import { drawMap, play, showMap, start } from '../../resources/js/kit-embeds.js';
 import { kindSays, nounFor, renderSectionBrowser } from '../../resources/js/pages.js';
 import { pageForTheChat } from '../../resources/js/chat-page.js';
 
@@ -138,18 +138,55 @@ describe('on the page a visitor sees', () => {
         expect(document.querySelector('iframe')).toBeNull();
     });
 
-    it('draws the map from the address shown, lazily, named for it, and follows a changed address', async () => {
+    it('a map loads nothing from Google until Show map is pressed, then Google’s map in the same room', () => {
         document.body.innerHTML = map();
         start(document);
-        const frame = document.querySelector('[data-kit-map-frame] iframe');
-        expect(frame.getAttribute('src')).toBe('https://maps.google.com/maps?q=12%20Allen%20Avenue%2C%20Ikeja&output=embed');
-        expect(frame.getAttribute('loading')).toBe('lazy');
-        expect(frame.title).toBe('Map of 12 Allen Avenue, Ikeja');
+        // before the press: our own drawn picture and the button, no frame, nothing of Google's but the directions link
+        const room = document.querySelector('[data-kit-map-frame]');
+        expect(room.querySelector('iframe')).toBeNull();
+        expect(room.querySelector('svg.kit-map__picture')?.getAttribute('aria-hidden')).toBe('true');
+        expect(room.innerHTML).not.toMatch(/google|https?:/);
+        const show = room.querySelector('button[data-kit-map-show]');
+        expect(show.textContent).toBe('Show map');
+        expect(show.getAttribute('type')).toBe('button');
+        expect(show.getAttribute('aria-label')).toBe('Show map of 12 Allen Avenue, Ikeja');
+        expect([...document.querySelectorAll('[src], [srcset]')].filter((n) => /google/.test(n.getAttribute('src') ?? ''))).toHaveLength(0);
+        // directions is a link the visitor chooses, in a new tab
+        expect(document.querySelector('a[data-kit-map-directions]').getAttribute('href')).toBe('https://www.google.com/maps/dir/?api=1&destination=12%20Allen%20Avenue%2C%20Ikeja');
+
+        // the address changed before the press: the button's name follows, still nothing loaded
         document.querySelector('[data-kit-map-address]').textContent = 'Lekki Phase 1, Lagos';
         drawMap(document.querySelector('[data-kit-map]'));
-        expect(document.querySelectorAll('[data-kit-map-frame] iframe')).toHaveLength(1);
-        expect(frame.getAttribute('src')).toContain('Lekki%20Phase%201');
-        expect(document.querySelector('[data-kit-map-directions]').getAttribute('href')).toBe('https://www.google.com/maps/dir/?api=1&destination=Lekki%20Phase%201%2C%20Lagos');
+        expect(show.getAttribute('aria-label')).toBe('Show map of Lekki Phase 1, Lagos');
+        expect(room.querySelector('iframe')).toBeNull();
+
+        // the press: Google's map, eager now, named for the place; the picture and the button go
+        const press = new MouseEvent('click', { bubbles: true, cancelable: true });
+        show.dispatchEvent(press);
+        expect(press.defaultPrevented).toBe(true);
+        const frame = room.querySelector('iframe');
+        expect(frame.getAttribute('src')).toBe('https://maps.google.com/maps?q=Lekki%20Phase%201%2C%20Lagos&output=embed');
+        expect(frame.getAttribute('loading')).toBe('eager');
+        expect(frame.title).toBe('Map of Lekki Phase 1, Lagos');
+        expect(room.querySelector('.kit-map__picture, [data-kit-map-show]')).toBeNull();
+        expect(document.querySelector('[data-kit-map]').hasAttribute('data-kit-map-shown')).toBe(true);
+
+        // shown, an address changed in the editor is the map drawn
+        document.querySelector('[data-kit-map-address]').textContent = 'Wuse 2, Abuja';
+        drawMap(document.querySelector('[data-kit-map]'));
+        expect(room.querySelectorAll('iframe')).toHaveLength(1);
+        expect(frame.getAttribute('src')).toContain('Wuse%202');
+        expect(document.querySelector('[data-kit-map-directions]').getAttribute('href')).toBe('https://www.google.com/maps/dir/?api=1&destination=Wuse%202%2C%20Abuja');
+    });
+
+    it('a press on Show map while the page is edited opens nothing (the editor opens the map’s panel)', () => {
+        document.body.innerHTML = map();
+        start(document);
+        document.body.classList.add('editing');
+        document.querySelector('[data-kit-map-show]').dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
+        expect(document.querySelector('iframe')).toBeNull();
+        expect(showMap(document.querySelector('[data-kit-map]'))).toBe(true);
+        expect(document.querySelector('iframe')).not.toBeNull();
     });
 });
 
@@ -161,6 +198,7 @@ describe('in the editor', () => {
         expect(embedOf(document.querySelector('[data-kit-video-title]'))?.kind).toBe('video');
         expect(embedOf(document.querySelector('[data-kit-video-caption]'))?.kind).toBe('video');
         expect(embedOf(document.querySelector('[data-kit-map-directions]'))?.kind).toBe('map');
+        expect(embedOf(document.querySelector('[data-kit-map-frame]'))?.kind).toBe('map');
         expect(embedOf(document.body)).toBeNull();
     });
 

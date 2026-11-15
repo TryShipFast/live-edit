@@ -134,3 +134,26 @@ export function aFrameWeAllow(src) {
 
     return host === 'www.youtube-nocookie.com' || host === 'player.vimeo.com' || (host === 'maps.google.com' && url.pathname === '/maps');
 }
+
+/**
+ * The still picture a map shows until the visitor presses Show map: our own drawn streets and a pin, in the template's
+ * colours (kit-embeds.css colours its parts by class), so nothing of Google's is loaded, not even a picture. One drawing
+ * for every adapter (kit-embeds.js puts it in the map's frame; React draws it itself). Decorative: hidden from screen
+ * readers, as the Show map button says what it does.
+ */
+export const MAP_PICTURE = '<svg class="kit-map__picture" viewBox="0 0 640 360" preserveAspectRatio="xMidYMid slice" aria-hidden="true" focusable="false">'
+    + '<rect class="kit-map__ground" width="640" height="360"/>'
+    + '<path class="kit-map__water" d="M0 286c70-18 120-6 182 8s128 18 196-6 150-30 262-10v82H0z"/>'
+    + '<g class="kit-map__blocks"><rect x="28" y="24" width="116" height="74" rx="6"/><rect x="176" y="24" width="150" height="74" rx="6"/><rect x="360" y="24" width="98" height="74" rx="6"/>'
+    + '<rect x="492" y="24" width="124" height="120" rx="6"/><rect x="28" y="130" width="116" height="96" rx="6"/><rect x="176" y="130" width="72" height="96" rx="6"/>'
+    + '<rect x="282" y="130" width="176" height="96" rx="6"/><rect x="492" y="176" width="124" height="70" rx="6"/></g>'
+    + '<g class="kit-map__roads"><path d="M0 114h640M160 0v262M342 0v250M476 0v246M0 246c90-8 220-4 340 2s200 2 300-8"/><path class="kit-map__lane" d="M264 114v124M28 166h116M492 160h124"/></g>'
+    + '<g class="kit-map__pin" transform="translate(320 150)"><path d="M0 0c-22-30-34-47-34-63a34 34 0 0 1 68 0c0 16-12 33-34 63z"/><circle class="kit-map__pin-dot" cy="-63" r="12"/></g>'
+    + '</svg>';
+
+/** What the Show map button says to a screen reader. */
+export function showMapName(address) {
+    const said = cleanAddress(address);
+
+    return said === '' ? 'Show map' : `Show map of ${said}`;
+}

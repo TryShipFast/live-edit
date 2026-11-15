@@ -1,6 +1,6 @@
 import { createElement as h, useState } from 'react';
 import { useContent } from './useContent.js';
-import { directionsFor, mapSrc, playerFor } from './embed-links.js';
+import { MAP_PICTURE, directionsFor, mapSrc, playerFor, showMapName } from './embed-links.js';
 
 /*
  * A video from YouTube or Vimeo, and a map to an address, for React and Next.js (LIVE-EDIT-STRUCTURE.md, "A video from
@@ -8,7 +8,7 @@ import { directionsFor, mapSrc, playerFor } from './embed-links.js';
  *
  * The same markup and markers as every other adapter, so the editor's Video and Map panels change them here too, and
  * the same behaviour as the script other adapters load (kit-embeds.js), done by React: nothing from YouTube or Vimeo
- * loads before the visitor presses play, and the map is Google's keyless embed, loaded lazily.
+ * loads before the visitor presses play, and nothing of Google's before Show map is pressed.
  *
  *   <LiveEditVideo contentKey="homeVideo" link="https://youtu.be/…" title="Our story" cover="/story.jpg" />
  *   <LiveEditMap contentKey="visit" address="12 Allen Avenue, Ikeja" />
@@ -62,14 +62,29 @@ export function LiveEditVideo({ contentKey, link = '', title = 'Video', cover = 
         h('figcaption', { className: 'kit-video__caption', 'data-kit-video-caption': '', 'data-edit': marker(`${contentKey}.caption`) }, words));
 }
 
-export function LiveEditMap({ contentKey, address = '', button = 'Get directions', className = '' }) {
+export function LiveEditMap({ contentKey, address = '', button = 'Get directions', note = 'The map loads from Google when you press Show map.', className = '' }) {
     const place = useContent(`${contentKey}.address`, address);
     const words = useContent(`${contentKey}.directions.text`, button);
+    const [shown, setShown] = useState(false);
     const src = mapSrc(place);
 
-    return h('div', { className: `kit-map__figure ${className}`.trim(), 'data-kit-map': '' },
-        h('div', { className: 'kit-map__frame', 'data-kit-map-frame': '' },
-            src ? h('iframe', { src, title: `Map of ${place}`, loading: 'lazy', referrerPolicy: 'no-referrer-when-downgrade', allowFullScreen: true }) : null),
+    // nothing of Google's before the visitor presses Show map: our own drawn picture, then the map in the same room
+    const room = shown && src
+        ? h('iframe', { src, title: `Map of ${place}`, loading: 'eager', referrerPolicy: 'no-referrer-when-downgrade', allowFullScreen: true })
+        : [
+            h('span', { key: 'picture', 'aria-hidden': 'true', dangerouslySetInnerHTML: { __html: MAP_PICTURE } }),
+            h('button', {
+                key: 'show',
+                type: 'button',
+                className: 'kit-map__show',
+                'data-kit-map-show': '',
+                'aria-label': showMapName(place),
+                onClick: () => { if (!editing() && src) setShown(true); },
+            }, 'Show map'),
+        ];
+
+    return h('div', { className: `kit-map__figure ${className}`.trim(), 'data-kit-map': '', ...(shown ? { 'data-kit-map-shown': '' } : {}) },
+        h('div', { className: 'kit-map__frame', 'data-kit-map-frame': '' }, room),
         h('div', { className: 'kit-map__bar' },
             h('p', { className: 'kit-map__address', 'data-kit-map-address': '', 'data-edit': marker(`${contentKey}.address`) }, place),
             h('a', {
@@ -80,5 +95,6 @@ export function LiveEditMap({ contentKey, address = '', button = 'Get directions
                 'data-kit-map-directions': '',
                 'data-edit-href': marker(`${contentKey}.directions`),
                 'data-edit': marker(`${contentKey}.directions.text`),
-            }, words)));
+            }, words),
+            note ? h('p', { className: 'kit-map__note' }, note) : null));
 }

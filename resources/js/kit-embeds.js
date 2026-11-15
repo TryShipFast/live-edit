@@ -7,16 +7,17 @@
  *   loads before the press: the press swaps in the player (youtube-nocookie.com or player.vimeo.com with Do Not
  *   Track), playing at once, in the same 16:9 room, so nothing moves. Without this script the cover is a link to the
  *   video's own page.
- * - A map is Google's keyless embed of the address the page shows, loaded lazily as it nears the screen, with Get
- *   directions beside it. The frame is made here from the address, so an address changed in the editor (or saved on
- *   any adapter) is the map drawn, and its room is held by the stylesheet before it loads.
+ * - A map is our own still picture of streets and a pin with Show map, and Get directions beside it: nothing of
+ *   Google's loads until the visitor presses Show map (owner, 15 Nov 2026: so the templates' "no cookies, no tracking"
+ *   stays true), which swaps in Google's keyless embed of the address the page shows, in the same room. The frame is
+ *   made here from the address, so an address changed in the editor (or saved on any adapter) is the map drawn.
  *
  * One file for every adapter: the host writes it beside a published site (assets/kit/kit-embeds.js), the HTML and
  * Laravel adapters' embed loads it on a page that holds one, WordPress adds it to such a page, and the editor runs it.
  * While the page is being edited (body.editing) a press opens the editor's panel instead, and the map lets presses
  * through to the editor.
  */
-import { aFrameWeAllow, cleanAddress, directionsFor, mapSrc, playerFor } from './embed-links.js';
+import { MAP_PICTURE, aFrameWeAllow, cleanAddress, directionsFor, mapSrc, playerFor, showMapName } from './embed-links.js';
 
 /* kit-embeds:base */
 export const KIT_EMBEDS_CSS = ':where(.kit-embed){display:block;padding-block:var(--kit-section-space,clamp(48px,7vw,96px));color:var(--brand-body,inherit)}'
@@ -45,6 +46,19 @@ export const KIT_EMBEDS_CSS = ':where(.kit-embed){display:block;padding-block:va
     + ':where(.kit-map__address){margin:0;color:var(--brand-ink,inherit);font-weight:500;min-width:0;overflow-wrap:anywhere}'
     + ':where(.kit-map__directions){display:inline-flex;align-items:center;min-height:44px;padding:0 20px;border-radius:999px;background:var(--brand-accent,#2e6b9f);color:var(--brand-on-accent,#fff);font-weight:600;text-decoration:none;white-space:nowrap}'
     + ':where(.kit-map__directions:focus-visible){outline:3px solid var(--brand-ink,#0f2447);outline-offset:2px}'
+    + ':where(.kit-map__picture){position:absolute;inset:0;width:100%;height:100%;display:block}'
+    + ':where(.kit-map__ground){fill:var(--brand-raised,#eef2f6)}'
+    + ':where(.kit-map__water){fill:color-mix(in srgb,var(--brand-accent,#2e6b9f) 16%,var(--brand-raised,#eef2f6))}'
+    + ':where(.kit-map__blocks rect){fill:color-mix(in srgb,var(--brand-line,#d1d9e2) 55%,var(--brand-raised,#eef2f6))}'
+    + ':where(.kit-map__roads path){fill:none;stroke:var(--brand-surface,#fff);stroke-width:14;stroke-linecap:round}'
+    + ':where(.kit-map__roads .kit-map__lane){stroke-width:7}'
+    + ':where(.kit-map__pin){fill:var(--brand-accent,#2e6b9f)}'
+    + ':where(.kit-map__pin-dot){fill:var(--brand-surface,#fff)}'
+    + ':where(.kit-map__show){position:absolute;left:50%;bottom:clamp(14px,4%,28px);transform:translateX(-50%);display:inline-flex;align-items:center;min-height:44px;padding:0 22px;'
+    + 'border:1px solid var(--brand-line,#d1d9e2);border-radius:999px;background:var(--brand-surface,#fff);color:var(--brand-ink,#0f2447);font:inherit;font-weight:600;cursor:pointer;box-shadow:0 4px 14px rgba(0,0,0,.12);white-space:nowrap}'
+    + ':where(.kit-map__show:focus-visible){outline:3px solid var(--brand-accent,#2e6b9f);outline-offset:2px}'
+    + ':where(.kit-map__note){flex-basis:100%;margin:0;font-size:.85rem;color:var(--brand-muted,#6b7280)}'
+    + ':where([data-kit-map-shown] .kit-map__note){display:none}'
     + 'body.editing :where(.kit-map__frame iframe){pointer-events:none}';
 /* /kit-embeds:base */
 
@@ -81,13 +95,38 @@ export function play(link) {
     return true;
 }
 
-/** A map's frame, made or brought up to date from the address the page shows, and its directions with it. */
+/**
+ * A map, kept in step with the address the page shows. Until the visitor presses Show map it is our own still picture
+ * and the button, and nothing of Google's is loaded (the templates say they set no cookies and do no tracking, and that
+ * stays true); once pressed, Google's map in the same room. Get directions follows the address either way.
+ */
 export function drawMap(map) {
     const doc = map.ownerDocument;
     const address = cleanAddress(map.querySelector('[data-kit-map-address]')?.textContent ?? '');
     const room = map.querySelector('[data-kit-map-frame]');
-    const src = mapSrc(address);
+    const directions = map.querySelector('[data-kit-map-directions]');
+    const to = directionsFor(address);
+    if (directions && to && directions.getAttribute('href') !== to) directions.setAttribute('href', to);
     if (!room) return;
+
+    if (!map.hasAttribute('data-kit-map-shown')) {
+        room.querySelector('iframe')?.remove();
+        if (!room.querySelector('.kit-map__picture')) room.insertAdjacentHTML('afterbegin', MAP_PICTURE);
+        let show = room.querySelector('[data-kit-map-show]');
+        if (!show) {
+            show = doc.createElement('button');
+            show.type = 'button';
+            show.className = 'kit-map__show';
+            show.setAttribute('data-kit-map-show', '');
+            show.textContent = 'Show map';
+            room.append(show);
+        }
+        if (show.getAttribute('aria-label') !== showMapName(address)) show.setAttribute('aria-label', showMapName(address));
+
+        return;
+    }
+
+    const src = mapSrc(address);
     let frame = room.querySelector('iframe');
     if (!src) {
         frame?.remove();
@@ -96,17 +135,27 @@ export function drawMap(map) {
     }
     if (!frame) {
         frame = doc.createElement('iframe');
-        frame.setAttribute('loading', 'lazy');
+        // pressed: wanted now
+        frame.setAttribute('loading', 'eager');
         frame.setAttribute('referrerpolicy', 'no-referrer-when-downgrade');
         frame.setAttribute('allowfullscreen', '');
         room.append(frame);
     }
     if (frame.getAttribute('src') !== src) frame.setAttribute('src', src);
-    frame.title = `Map of ${address}`;
-    // the button follows the address too, wherever the page was saved without it
-    const directions = map.querySelector('[data-kit-map-directions]');
-    const to = directionsFor(address);
-    if (directions && to && directions.getAttribute('href') !== to) directions.setAttribute('href', to);
+    if (frame.title !== `Map of ${address}`) frame.title = `Map of ${address}`;
+}
+
+/** Show map pressed: Google's map in place of the picture, in the same room, focus kept on the map. */
+export function showMap(map) {
+    if (!mapSrc(map.querySelector('[data-kit-map-address]')?.textContent ?? '')) return false;
+    map.setAttribute('data-kit-map-shown', '');
+    const room = map.querySelector('[data-kit-map-frame]');
+    room?.querySelector('.kit-map__picture')?.remove();
+    room?.querySelector('[data-kit-map-show]')?.remove();
+    drawMap(map);
+    room?.querySelector('iframe')?.focus?.();
+
+    return true;
 }
 
 /** Every video and map on the page, made ready, and kept ready as the page changes (the editor, an adapter). */
@@ -126,6 +175,8 @@ export function start(doc = document) {
         if (editing(doc) || event.defaultPrevented || event.button > 0 || event.metaKey || event.ctrlKey || event.shiftKey) return;
         const link = event.target?.closest?.('[data-kit-video] [data-kit-video-link]');
         if (link && play(link)) event.preventDefault();
+        const show = event.target?.closest?.('[data-kit-map] [data-kit-map-show]');
+        if (show && showMap(show.closest('[data-kit-map]'))) event.preventDefault();
     });
     doc.addEventListener('keydown', (event) => {
         if (editing(doc) || event.key !== ' ') return;
