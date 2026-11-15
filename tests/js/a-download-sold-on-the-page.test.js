@@ -1,5 +1,6 @@
-import { describe, expect, it } from 'vitest';
-import { renderShopPanel } from '../../resources/js/shop.js';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { attachADownload, renderShopPanel } from '../../resources/js/shop.js';
+import { pageForTheChat } from '../../resources/js/chat-page.js';
 
 /*
  * A download sold on the page (owner, 15 Nov 2026: "pay now, then download"): the Shop tab shows, beside a product
@@ -65,5 +66,37 @@ describe('a download sold on the page', () => {
 
         expect(said).toEqual(['Your website has no room left for this file.']);
         expect(container.querySelector('.le-shop-download-file').textContent).toBe('File buyers download: Old.pdf (2 KB)');
+    });
+
+    describe('the one way a file is attached, by click or by Ask AI', () => {
+        afterEach(() => { vi.restoreAllMocks(); delete window.liveEditShop; });
+
+        it('sends the product and the file to the host, and the Shop tab lists it from then on', async () => {
+            const shop = structuredClone(config);
+            const fetched = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(JSON.stringify({ ok: true, file: { name: 'The Pot.pdf', size: 4 } }), { status: 200 }));
+
+            expect(await attachADownload(shop.products[0], new File(['%PDF'], 'The Pot.pdf'), shop)).toEqual({ name: 'The Pot.pdf', size: 4 });
+            const [url, options] = fetched.mock.calls[0];
+            expect(url).toBe('/sites/adas-pot/downloads');
+            expect(options.headers['X-CSRF-TOKEN']).toBe('t');
+            expect(options.body.get('product')).toBe('cookbook');
+            expect(shop.products[0].file).toEqual({ name: 'The Pot.pdf', size: 4 });
+        });
+
+        it('refuses a file too big before sending it, and passes on the host\'s own refusal', async () => {
+            const shop = structuredClone({ ...config, downloads: { ...config.downloads, maxMb: 1 } });
+            const fetched = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(JSON.stringify({ ok: false, error: 'That kind of file cannot be sold.' }), { status: 422 }));
+
+            await expect(attachADownload(shop.products[0], new File([new Uint8Array(2 * 1048576)], 'big.pdf'), shop)).rejects.toThrow('That file is too big. Choose one under 1 MB.');
+            expect(fetched).not.toHaveBeenCalled();
+            await expect(attachADownload(shop.products[0], new File(['x'], 'setup.exe'), shop)).rejects.toThrow('That kind of file cannot be sold.');
+        });
+
+        it('tells Ask AI the downloads, with the file each gives now', () => {
+            window.liveEditShop = structuredClone({ ...config, products: [{ ...config.products[0], file: { name: 'The Pot.pdf', size: 4 } }, config.products[1]] });
+            document.body.innerHTML = '<main><h1 data-edit="setting:tpl:h1">The e-cookbook</h1></main>';
+
+            expect(pageForTheChat(document).downloads).toEqual([{ product: 'cookbook', name: 'The Pot, volume one', file: 'The Pot.pdf' }]);
+        });
     });
 });

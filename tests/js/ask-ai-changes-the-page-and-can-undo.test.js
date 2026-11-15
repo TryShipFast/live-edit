@@ -287,6 +287,54 @@ describe('Ask AI', () => {
         });
     });
 
+    describe('a download\'s file, attached in the chat (as the Shop tab\'s Upload the file)', () => {
+        let picked;
+        let accepted;
+        beforeEach(() => {
+            window.liveEditShop = { downloads: { attach: '/sites/adas-pot/downloads', token: 't', maxMb: 100, accept: '.pdf,.zip' }, products: [{ id: 'cookbook', name: 'The Pot, volume one', download: true }] };
+            picked = new File(['%PDF'], 'The Pot.pdf', { type: 'application/pdf' });
+            vi.spyOn(HTMLInputElement.prototype, 'click').mockImplementation(function () {
+                if (this.type !== 'file') return;
+                accepted = this.accept;
+                Object.defineProperty(this, 'files', { configurable: true, value: [picked] });
+                this.dispatchEvent(new Event('change'));
+            });
+        });
+        afterEach(() => { vi.restoreAllMocks(); delete window.liveEditShop; });
+
+        const attachAndSay = async (said, acted) => {
+            chatWith([]);
+            deps.act.mockImplementation(async () => acted);
+            host.querySelector('button[aria-label="Add a photo or a file to your message"]').click();
+            deps.request.mockImplementationOnce((url, options) => {
+                const body = JSON.parse(options.body);
+                calls.push({ url, body });
+                return answer({ reply: 'Done.', actions: [{ type: 'download', product: 'cookbook', attachment: body.attachments[0].id, label: 'The Pot, volume one' }], cards: [] });
+            });
+            await type(said);
+        };
+
+        it('takes a file with +, sends it as the Shop tab does, and says it in the Shop tab\'s words', async () => {
+            await attachAndSay('this is the cookbook PDF', { ok: true, final: true, file: { name: 'The Pot.pdf', size: 4 }, said: 'The Pot, volume one: buyers now download The Pot.pdf after they pay.' });
+
+            expect(accepted).toBe('image/*,.pdf,.zip');
+            expect(calls[0].body.attachments).toEqual([{ id: expect.stringMatching(/^p/), name: 'The Pot.pdf' }]);
+            expect(deps.act).toHaveBeenCalledWith(expect.objectContaining({ type: 'download', product: 'cookbook', file: picked }));
+            const reply = [...host.querySelectorAll('.le-chat-msg')].pop();
+            expect(reply.textContent).toContain('The Pot, volume one: buyers now download The Pot.pdf after they pay.');
+            // saved at once, as the Shop tab saves it: nothing to keep or undo
+            expect(host.querySelector('.le-chat-card').textContent).toContain('The Pot, volume one: buyers now download The Pot.pdf after they pay');
+            expect(host.querySelector('.le-chat-card').textContent).toContain('Saved.');
+            expect(buttonNamed('Undo')).toBeFalsy();
+        });
+
+        it('says why a file was refused, in the Shop tab\'s words', async () => {
+            await attachAndSay('use this for the cookbook', { ok: false, error: 'Your website has no room left for this file. Remove files you no longer use, or choose a bigger plan.' });
+
+            expect([...host.querySelectorAll('.le-chat-msg')].pop().textContent).toContain('Your website has no room left for this file. Remove files you no longer use, or choose a bigger plan.');
+        });
+    });
+
     it('says what it could not change because a teammate is working there', async () => {
         chatWith([() => answer({ reply: 'Done.', actions: [
             { type: 'field', kind: 'text', label: 'Opening hours', key: 'tpl:hours', value: 'Mon to Sat, 9 to 7' },

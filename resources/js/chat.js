@@ -68,6 +68,7 @@ export const CHAT_CSS = `
 .le-chat-attached { display: flex; align-items: center; gap: 8px; margin: 0 16px; padding: 6px 8px; border: 1px solid var(--le-line, #E6E7EA); border-radius: 10px; font-size: 13px; }
 .le-chat-attached[hidden] { display: none; }
 .le-chat-attached img { width: 36px; height: 36px; object-fit: cover; border-radius: 6px; }
+.le-chat-file { display: inline-flex; align-items: center; justify-content: center; width: 36px; height: 36px; border-radius: 6px; background: var(--le-tint, #F2F3F5); font-size: 10px; letter-spacing: .02em; }
 .le-chat-attached span { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .le-chat-attached button { border: 0; background: none; font-size: 18px; cursor: pointer; color: var(--le-muted, #6B6F78); }
 .le-chat-pack { display: flex; align-items: center; gap: 10px; min-height: 44px; padding: 0 10px; border: 1px solid var(--le-field, #DADCE0); border-radius: 10px; font-size: 14px; cursor: pointer; }
@@ -203,7 +204,9 @@ export function createChat({ shadow, request, showSaved, openPhoto, openPublish,
     const attach = el('button', 'le-chat-tool');
     attach.type = 'button';
     attach.innerHTML = PLUS_ICON;
-    attach.setAttribute('aria-label', 'Add a photo to your message');
+    // a shop that sells downloads takes their files here too ("this is the cookbook PDF"), as its Shop tab does
+    const sellsDownloads = () => Boolean(window.liveEditShop?.downloads?.attach);
+    attach.setAttribute('aria-label', sellsDownloads() ? 'Add a photo or a file to your message' : 'Add a photo to your message');
     const mic = el('button', 'le-chat-tool le-chat-mic');
     mic.type = 'button';
     mic.innerHTML = MIC_ICON;
@@ -274,6 +277,9 @@ export function createChat({ shadow, request, showSaved, openPhoto, openPublish,
                 item.append(el('b', '', `${change.label}: `), document.createTextNode(`chart changed, ${change.rows.length} row${change.rows.length === 1 ? '' : 's'}`));
             } else if (change.type === 'table') {
                 item.append(el('b', '', `${change.label}: `), document.createTextNode(`table changed, ${change.rows.length} row${change.rows.length === 1 ? '' : 's'}`));
+            } else if (change.type === 'download') {
+                // the Shop tab's own words for it
+                item.append(el('b', '', `${change.label}: `), document.createTextNode(`buyers now download ${change.fileName ?? 'your file'} after they pay`));
             } else if (change.type === 'business') {
                 const said = change.attachment ? 'your new logo' : change.label === 'Logo' && !change.value ? 'the design\u2019s own logo back' : `\u201C${change.value}\u201D`;
                 item.append(el('b', '', `${change.label}: `), document.createTextNode(`${said}, on every page`));
@@ -292,6 +298,9 @@ export function createChat({ shadow, request, showSaved, openPhoto, openPublish,
 
         if (!entry.changes.length) {
             // nothing changed, nothing to keep or undo
+        } else if (entry.changes.every((change) => change.final)) {
+            // saved at once, as the Shop tab saves a download's file: no Undo to offer (another file replaces it)
+            card.append(el('p', 'le-chat-done', 'Saved.'));
         } else if (entry.state === 'kept') {
             card.append(el('p', 'le-chat-done', 'Kept.'));
         } else if (entry.state === 'undone') {
@@ -346,11 +355,11 @@ export function createChat({ shadow, request, showSaved, openPhoto, openPublish,
         return box;
     };
 
-    /** A file picker for one photo, as every upload button opens. */
-    const pickAFile = (then) => {
+    /** A file picker for one photo, as every upload button opens; the message's + also takes a download's file. */
+    const pickAFile = (then, files = false) => {
         const picker = document.createElement('input');
         picker.type = 'file';
-        picker.accept = 'image/*';
+        picker.accept = files && sellsDownloads() ? `image/*,${window.liveEditShop.downloads.accept || '*/*'}` : 'image/*';
         picker.addEventListener('change', () => { if (picker.files?.[0]) then(picker.files[0]); });
         picker.click();
     };
@@ -582,17 +591,23 @@ export function createChat({ shadow, request, showSaved, openPhoto, openPublish,
                 for (const action of planned) {
                     // a photo the owner attached goes with the change that asks for it
                     // the attached photo goes with the change that uses it: a picture on the page, or the logo
-                    const doing = action.type === 'image' || (action.type === 'business' && action.attachment) ? { ...action, file: sending?.id === action.attachment ? sending.file : null, name: sending?.file?.name } : action;
+                    const doing = action.type === 'image' || action.type === 'download' || (action.type === 'business' && action.attachment) ? { ...action, file: sending?.id === action.attachment ? sending.file : null, name: sending?.file?.name } : action;
                     const done = await act(doing).catch((error) => ({ ok: false, error: error.message }));
-                    if (done?.ok && !done.unchanged) entry.changes.push(action);
+                    if (done?.ok && !done.unchanged) entry.changes.push(done.final ? { ...action, final: true, fileName: done.file?.name, said: done.said } : action);
                     if (done?.ok && done.reload) drawAgain = true;
                     if (done?.ok && done.goTo) goTo = done.goTo;
                     else if (!done?.ok) entry.missed.push({ label: action.label, locked: done?.locked ?? null, error: done?.error ?? null });
                 }
                 if (entry.changes.length && before) entry.undo = undoPlan(before, await snapshot());
+                // a download's file: said in the Shop tab's own words, whatever the model wrote
+                const saidAsTheShop = entry.changes.filter((change) => change.said).map((change) => change.said);
+                if (saidAsTheShop.length && entry.changes.every((change) => change.final)) entry.text = saidAsTheShop.join(' ');
                 entry.drawAgain = drawAgain;
                 entry.goTo = goTo;
-                if (!entry.changes.length) entry.text = entry.missed.some((missed) => missed.locked)
+                // a file refused (too big, a kind that cannot be sold, no room left): its reason, as the Shop tab says it
+                const refusedFile = planned.length && planned.every((action) => action.type === 'download') ? entry.missed.find((missed) => missed.error) : null;
+                if (!entry.changes.length && refusedFile) entry.text = refusedFile.error;
+                else if (!entry.changes.length) entry.text = entry.missed.some((missed) => missed.locked)
                     ? 'I could not change that: someone else is working on that part right now.'
                     : 'I could not make that change on this page.';
             }
@@ -921,13 +936,17 @@ export function createChat({ shadow, request, showSaved, openPhoto, openPublish,
         attachedRow.hidden = !attached;
         input.placeholder = attached ? 'Where does it go?' : 'Ask for a change';
         if (!attached) return;
-        const thumb = el('img');
-        thumb.alt = '';
-        thumb.src = URL.createObjectURL(attached.file);
-        const name = el('span', '', attached.file.name || 'Photo');
+        // a photo shows itself; a file (a PDF, a zip) shows its kind
+        const photo = String(attached.file.type || '').startsWith('image/');
+        const thumb = photo ? el('img') : el('b', 'le-chat-file', (String(attached.file.name || '').split('.').pop() || 'file').slice(0, 4).toUpperCase());
+        if (photo) {
+            thumb.alt = '';
+            thumb.src = URL.createObjectURL(attached.file);
+        }
+        const name = el('span', '', attached.file.name || (photo ? 'Photo' : 'File'));
         const off = el('button', '', '×');
         off.type = 'button';
-        off.setAttribute('aria-label', 'Take the photo off');
+        off.setAttribute('aria-label', photo ? 'Take the photo off' : 'Take the file off');
         off.addEventListener('click', () => { attached = null; showAttached(); input.focus(); });
         attachedRow.append(thumb, name, off);
     };
@@ -935,7 +954,7 @@ export function createChat({ shadow, request, showSaved, openPhoto, openPublish,
         attached = { id: `p${Date.now().toString(36)}`, file };
         showAttached();
         input.focus();
-    }));
+    }, true));
     input.addEventListener('keydown', (event) => {
         // Enter sends, Shift+Enter makes a new line: as in every chat people use
         if (event.key === 'Enter' && !event.shiftKey && !event.isComposing) {

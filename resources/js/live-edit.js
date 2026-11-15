@@ -30,7 +30,7 @@ const shopTermsHere = () => Boolean(window.liveEditShop);
 import { computedOf, computedKind } from './computed.js';
 import { uploadWidget } from './upload.js';
 import { renderSeoPanel } from './seo.js';
-import { renderShopPanel, withWhatsappNumber } from './shop.js';
+import { attachADownload, downloadAttachedWords, renderShopPanel, withWhatsappNumber } from './shop.js';
 import { renderCsvImport, renderNewCollection, renderSearchPanel, renderTableEditor } from './collections-panel.js';
 import { renderImport, undoTheLastImport, UNDO_KEY } from './catalogue.js';
 import { AT_THE_TOP, aChartOrTable, addedWith, besidePlace, describeStructure, hrefTo, newAddedId, nounFor, orderWith, pageBase, pageOfLink, renderCategoryProducts, renderNewCategory, renderNewPage, renderSectionBrowser } from './pages.js';
@@ -1644,20 +1644,7 @@ const bootLiveEdit = () => {
                 return (await response.json()).url;
             },
             // A download's file, kept by the host (window.liveEditShop.downloads): private, never on the published site.
-            attachFile: window.liveEditShop?.downloads?.attach ? async (product, file) => {
-                const body = new FormData();
-                body.append('product', product.id);
-                body.append('file', file);
-                const response = await fetch(window.liveEditShop.downloads.attach, {
-                    method: 'POST',
-                    credentials: 'same-origin',
-                    headers: { Accept: 'application/json', 'X-CSRF-TOKEN': window.liveEditShop.downloads.token ?? '', 'X-Requested-With': 'XMLHttpRequest' },
-                    body,
-                });
-                const answer = await response.json().catch(() => ({}));
-                if (!response.ok || !answer.ok) throw new Error(answer.error || (response.status === 413 ? 'That file is too big.' : 'That did not upload. Please try again.'));
-                return answer.file;
-            } : null,
+            attachFile: window.liveEditShop?.downloads?.attach ? (product, file) => attachADownload(product, file) : null,
         });
         const renderSeo = () => {
             seoPanel = renderSeoPanel({
@@ -9334,6 +9321,23 @@ const bootLiveEdit = () => {
             };
             const chatAct = async (action) => {
                 if (!document.body.classList.contains('editing')) setEditing(true);
+                /*
+                 * A download's file, attached to the message ("this is the cookbook PDF"): sent exactly as the Shop tab's
+                 * Upload the file sends it (attachADownload), with the same refusals, and said in the same words.
+                 */
+                if (action.type === 'download') {
+                    const product = (window.liveEditShop?.products ?? []).find((one) => one.id === action.product && one.download);
+                    if (!product || !window.liveEditShop?.downloads?.attach) return { ok: false, error: 'That product is not sold as a download on this website.' };
+                    if (!(action.file instanceof Blob)) return { ok: false, error: 'That file did not come through. Please add it again with the + beside the message box.' };
+                    try {
+                        const file = action.file instanceof File ? action.file : new File([action.file], action.name || 'download', { type: action.file.type || 'application/octet-stream' });
+                        const kept = await attachADownload(product, file);
+
+                        return { ok: true, said: downloadAttachedWords(product.name, kept), file: kept, final: true };
+                    } catch (error) {
+                        return { ok: false, error: error.message || 'That did not upload. Please try again.' };
+                    }
+                }
                 if (action.type === 'field' && action.kind === 'text') {
                     const element = byKey('data-edit', action.key);
                     if (!element) return { ok: false, error: 'That part is not on this page any more.' };

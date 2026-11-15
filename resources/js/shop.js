@@ -46,6 +46,36 @@ import { readRows } from './catalogue.js';
 import { amountOf } from './sale.js';
 import { uploadWidget } from './upload.js';
 
+/**
+ * A download's file sent to the host that keeps it (window.liveEditShop.downloads), the one way both the Shop tab and
+ * Ask AI attach one: the same size check first, the host's own refusals (kind, room) passed on in its words.
+ * Answers the file as the host keeps it ({ name, size }).
+ */
+export const attachADownload = async (product, file, shop = window.liveEditShop) => {
+    const downloads = shop?.downloads;
+    if (!downloads?.attach) throw new Error('This website does not sell downloads.');
+    if (downloads.maxMb && file.size > downloads.maxMb * 1048576) throw new Error(`That file is too big. Choose one under ${downloads.maxMb} MB.`);
+    const body = new FormData();
+    body.append('product', product.id);
+    body.append('file', file);
+    const response = await fetch(downloads.attach, {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: { Accept: 'application/json', 'X-CSRF-TOKEN': downloads.token ?? '', 'X-Requested-With': 'XMLHttpRequest' },
+        body,
+    });
+    const answer = await response.json().catch(() => ({}));
+    if (!response.ok || !answer.ok) throw new Error(answer.error || (response.status === 413 ? 'That file is too big.' : 'That did not upload. Please try again.'));
+    // the Shop tab's products list shows it from now on
+    const listed = (shop.products ?? []).find((one) => one.id === product.id);
+    if (listed) listed.file = answer.file;
+
+    return answer.file;
+};
+
+/** What the Shop tab and Ask AI both say once a download's file is attached. */
+export const downloadAttachedWords = (name, file) => `${name}: buyers now download ${file.name} after they pay.`;
+
 /** The number in a WhatsApp link, as digits ("https://wa.me/447700900123?text=Hi" gives "447700900123"). */
 export const whatsappNumber = (href) => (String(href ?? '').match(/wa\.me\/(\d+)/) ?? String(href ?? '').match(/phone=(\d+)/) ?? [])[1] ?? '';
 
@@ -675,7 +705,7 @@ export const renderShopPanel = ({
                     try {
                         product.file = await attachFile(product, file);
                         show(product.file);
-                        notify(`${product.name}: buyers now download ${product.file.name} after they pay.`);
+                        notify(downloadAttachedWords(product.name, product.file));
                     } catch (error) {
                         show(product.file ?? null);
                         notify(error.message);

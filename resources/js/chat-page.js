@@ -353,6 +353,9 @@ export function pageForTheChat(root = document) {
         forms: formsOf(doc, root),
         brand: brandOf(doc),
         shop_terms: shopTermsOf(doc),
+        // the products sold as downloads, with the file buyers get now (the Shop tab's), so "this is the cookbook PDF"
+        // with a file attached goes to the right one
+        downloads: downloadsOf(doc),
         // the design's own sections and forms that can be added, by name (the + Section picker)
         library: (doc.defaultView?.liveEditPages?.library ?? []).slice(0, 80).map((section) => ({ name: cut(String(section.label ?? '').replace(/ · \d+ left$/, ''), 80), ...(section.kind === 'form' ? { form: true } : {}) })).filter((section) => section.name),
         seo: seoOf(doc),
@@ -487,6 +490,15 @@ const seoOf = (doc) => {
         title: cut(config.title?.title ?? doc.title, 200),
         description: cut(config.description ?? doc.querySelector('meta[name="description"]')?.content ?? '', 400),
     };
+};
+
+/** The shop's downloads as the Shop tab lists them: each product's id, its name, and its file's name or null. */
+const downloadsOf = (doc) => {
+    const shop = doc.defaultView?.liveEditShop;
+    if (!shop?.downloads?.attach) return [];
+
+    return (shop.products ?? []).filter((p) => p.download).slice(0, 40)
+        .map((p) => ({ product: cut(String(p.id), 120), name: cut(p.name ?? '', 120), file: p.file?.name ? cut(p.file.name, 120) : null }));
 };
 
 /** A shop's terms, written as words on its pages, which the Shop tab saves everywhere at once. */

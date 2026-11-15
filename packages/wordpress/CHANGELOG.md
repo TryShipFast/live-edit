@@ -7,6 +7,13 @@ A download sold on the page (owner, 15 Nov 2026: digital products sold "pay now,
   download: The Pot.pdf (2.1 MB)", or "No file yet. Add the file buyers download: until then nobody can pay for it."),
   and **Upload the file** / **Replace the file** in the editor's one upload box. It is saved at once with the host
   that keeps it (`window.liveEditShop.downloads`), never on the published website (shop.js, live-edit.js).
+- Ask AI attaches or replaces a download's file by chat and by voice, the same way (owner, 15 Nov 2026: clicks, chat and
+  voice are one product): the + beside the message box takes a file as well as a photo where the shop sells downloads
+  ("Add a photo or a file to your message"); "this is the cookbook PDF" or "use this for the Zanzibar guide" with the
+  file attached is sent through the one upload the Shop tab uses (`attachADownload`), with the same refusals (size,
+  kind, room), and said in the Shop tab's words ("The Pot, volume one: buyers now download The Pot.pdf after they
+  pay."), saved at once with no Undo, as the Shop tab saves it. The chat is told the downloads (`downloads`, with the
+  file each gives now; chat-page.js) and carries out the host's `download` action (chatAct).
 - A host without downloads shows nothing new.
 
 ## 0.23.1 (14 Nov 2026)
