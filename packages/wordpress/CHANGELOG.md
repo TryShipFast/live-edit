@@ -7,6 +7,11 @@ A download sold on the page (owner, 15 Nov 2026: digital products sold "pay now,
   download: The Pot.pdf (2.1 MB)", or "No file yet. Add the file buyers download: until then nobody can pay for it."),
   and **Upload the file** / **Replace the file** in the editor's one upload box. It is saved at once with the host
   that keeps it (`window.liveEditShop.downloads`), never on the published website (shop.js, live-edit.js).
+- A download's file has no size of its own: it is held only to the room the website's plan leaves (owner, 15 Nov 2026:
+  "this depends on their plan"), which the upload box says ("Your plan has 300 MB free"), and the host's refusal says
+  how much is free and the plan's next step. It goes straight from the browser to the host's storage, however big (the
+  host's `start` gives a presigned upload address, the file is PUT there with its progress shown, `finish` says it
+  arrived), and through the host's own `attach` only where its storage gives no upload address (`attachADownload`).
 - Ask AI attaches or replaces a download's file by chat and by voice, the same way (owner, 15 Nov 2026: clicks, chat and
   voice are one product): the + beside the message box takes a file as well as a photo where the shop sells downloads
   ("Add a photo or a file to your message"); "this is the cookbook PDF" or "use this for the Zanzibar guide" with the
