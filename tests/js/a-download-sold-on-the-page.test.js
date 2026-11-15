@@ -12,7 +12,7 @@ const config = {
         { id: 'cookbook', name: 'The Pot, volume one', shown: '/edit/cookbook', download: true, file: null },
         { id: 'tote', name: 'Canvas tote', href: '/edit/shop/tote' },
     ],
-    downloads: { attach: '/sites/adas-pot/downloads', token: 't', maxMb: 100, accept: '.pdf,.zip' },
+    downloads: { attach: '/sites/adas-pot/downloads', start: '/sites/adas-pot/downloads/start', finish: '/sites/adas-pot/downloads/finish', token: 't', room: '300 MB', accept: '.pdf,.zip' },
     checkout: { href: '', modes: [] },
     fields: [],
 };
@@ -26,6 +26,8 @@ describe('a download sold on the page', () => {
         expect(rows[0].querySelector('.le-shop-download-file').textContent).toBe('No file yet. Add the file buyers download: until then nobody can pay for it.');
         expect(rows[0].querySelector('.le-upload input[type="file"]').accept).toBe('.pdf,.zip');
         expect(rows[0].querySelector('.le-upload-title').textContent).toBe('Upload the file');
+        // no size of its own: the room the plan leaves
+        expect(rows[0].querySelector('.le-upload-hint').textContent).toBe('A PDF, zip, audio or video file. Your plan has 300 MB free');
         expect(rows[1].querySelector('.le-shop-download')).toBeNull();
     });
 
@@ -71,25 +73,55 @@ describe('a download sold on the page', () => {
     describe('the one way a file is attached, by click or by Ask AI', () => {
         afterEach(() => { vi.restoreAllMocks(); delete window.liveEditShop; });
 
-        it('sends the product and the file to the host, and the Shop tab lists it from then on', async () => {
-            const shop = structuredClone(config);
-            const fetched = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(JSON.stringify({ ok: true, file: { name: 'The Pot.pdf', size: 4 } }), { status: 200 }));
+        const json = (body, status = 200) => new Response(JSON.stringify(body), { status });
 
-            expect(await attachADownload(shop.products[0], new File(['%PDF'], 'The Pot.pdf'), shop)).toEqual({ name: 'The Pot.pdf', size: 4 });
-            const [url, options] = fetched.mock.calls[0];
-            expect(url).toBe('/sites/adas-pot/downloads');
-            expect(options.headers['X-CSRF-TOKEN']).toBe('t');
-            expect(options.body.get('product')).toBe('cookbook');
+        it('uploads straight to the host\'s storage by the address it gives, then says it arrived', async () => {
+            const shop = structuredClone(config);
+            const fetched = vi.spyOn(globalThis, 'fetch')
+                .mockResolvedValueOnce(json({ ok: true, upload: { id: 'u1', url: 'https://bucket.example/7/The Pot.pdf?signed', headers: { 'Content-Type': ['application/pdf'], Host: ['bucket.example'] } } }))
+                .mockResolvedValueOnce(json({ ok: true, file: { name: 'The Pot.pdf', size: 4 } }));
+            const sent = [];
+            class FakeUpload {
+                constructor() { this.upload = {}; this.headers = {}; }
+                open(method, url) { this.method = method; this.url = url; }
+                setRequestHeader(name, value) { this.headers[name] = value; }
+                send(body) { sent.push(this); this.status = 200; this.upload.onprogress?.({ lengthComputable: true, loaded: 2, total: 4 }); this.onload(); }
+            }
+            vi.stubGlobal('XMLHttpRequest', FakeUpload);
+            const parts = [];
+
+            expect(await attachADownload(shop.products[0], new File(['%PDF'], 'The Pot.pdf', { type: 'application/pdf' }), shop, (p) => parts.push(p))).toEqual({ name: 'The Pot.pdf', size: 4 });
+            expect(JSON.parse(fetched.mock.calls[0][1].body)).toEqual({ product: 'cookbook', name: 'The Pot.pdf', size: 4, type: 'application/pdf' });
+            expect(fetched.mock.calls[0][1].headers['X-CSRF-TOKEN']).toBe('t');
+            // the file itself goes to the storage's address, never through the host's server
+            expect(sent[0].method).toBe('PUT');
+            expect(sent[0].url).toBe('https://bucket.example/7/The Pot.pdf?signed');
+            expect(sent[0].headers).toEqual({ 'Content-Type': 'application/pdf' });
+            expect(parts).toEqual([0.5]);
+            expect(fetched.mock.calls[1][0]).toBe('/sites/adas-pot/downloads/finish');
+            expect(JSON.parse(fetched.mock.calls[1][1].body)).toEqual({ upload: 'u1' });
             expect(shop.products[0].file).toEqual({ name: 'The Pot.pdf', size: 4 });
+            vi.unstubAllGlobals();
         });
 
-        it('refuses a file too big before sending it, and passes on the host\'s own refusal', async () => {
-            const shop = structuredClone({ ...config, downloads: { ...config.downloads, maxMb: 1 } });
-            const fetched = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(JSON.stringify({ ok: false, error: 'That kind of file cannot be sold.' }), { status: 422 }));
+        it('sends the file in the request where the host gives no upload address', async () => {
+            const shop = structuredClone(config);
+            const fetched = vi.spyOn(globalThis, 'fetch')
+                .mockResolvedValueOnce(json({ ok: true, direct: false }))
+                .mockResolvedValueOnce(json({ ok: true, file: { name: 'The Pot.pdf', size: 4 } }));
 
-            await expect(attachADownload(shop.products[0], new File([new Uint8Array(2 * 1048576)], 'big.pdf'), shop)).rejects.toThrow('That file is too big. Choose one under 1 MB.');
-            expect(fetched).not.toHaveBeenCalled();
-            await expect(attachADownload(shop.products[0], new File(['x'], 'setup.exe'), shop)).rejects.toThrow('That kind of file cannot be sold.');
+            expect(await attachADownload(shop.products[0], new File(['%PDF'], 'The Pot.pdf'), shop)).toEqual({ name: 'The Pot.pdf', size: 4 });
+            expect(fetched.mock.calls[1][0]).toBe('/sites/adas-pot/downloads');
+            expect(fetched.mock.calls[1][1].body.get('product')).toBe('cookbook');
+        });
+
+        it('passes on the host\'s refusal in its own words, before anything is uploaded', async () => {
+            const shop = structuredClone(config);
+            const room = 'Your website has no room left for this file. It is 1.2 GB, and your website has 300 MB free of its 1 GB. Remove files you no longer use, or upgrade to Pro for 5 GB of storage.';
+            const fetched = vi.spyOn(globalThis, 'fetch').mockResolvedValue(json({ ok: false, error: room }, 422));
+
+            await expect(attachADownload(shop.products[0], new File(['x'], 'course.zip'), shop)).rejects.toThrow(room);
+            expect(fetched).toHaveBeenCalledTimes(1);
         });
 
         it('tells Ask AI the downloads, with the file each gives now', () => {

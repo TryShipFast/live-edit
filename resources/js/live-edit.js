@@ -1644,7 +1644,7 @@ const bootLiveEdit = () => {
                 return (await response.json()).url;
             },
             // A download's file, kept by the host (window.liveEditShop.downloads): private, never on the published site.
-            attachFile: window.liveEditShop?.downloads?.attach ? (product, file) => attachADownload(product, file) : null,
+            attachFile: window.liveEditShop?.downloads?.attach ? (product, file, progress) => attachADownload(product, file, window.liveEditShop, progress) : null,
         });
         const renderSeo = () => {
             seoPanel = renderSeoPanel({

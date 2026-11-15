@@ -291,7 +291,7 @@ describe('Ask AI', () => {
         let picked;
         let accepted;
         beforeEach(() => {
-            window.liveEditShop = { downloads: { attach: '/sites/adas-pot/downloads', token: 't', maxMb: 100, accept: '.pdf,.zip' }, products: [{ id: 'cookbook', name: 'The Pot, volume one', download: true }] };
+            window.liveEditShop = { downloads: { attach: '/sites/adas-pot/downloads', start: '/sites/adas-pot/downloads/start', finish: '/sites/adas-pot/downloads/finish', token: 't', room: '300 MB', accept: '.pdf,.zip' }, products: [{ id: 'cookbook', name: 'The Pot, volume one', download: true }] };
             picked = new File(['%PDF'], 'The Pot.pdf', { type: 'application/pdf' });
             vi.spyOn(HTMLInputElement.prototype, 'click').mockImplementation(function () {
                 if (this.type !== 'file') return;

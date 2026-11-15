@@ -25,7 +25,8 @@
  * config = {
  *   products: [{ id, name, href, download?, file? }],  // the design's products, each with its page in the editor; a
  *             // download (`download: true`) with the file buyers get after paying (`file: { name, size }` or null)
- *   downloads: { attach, token, maxMb, accept },   // where a download's file is attached (the host's), and what it takes
+ *   downloads: { attach, start, finish, token, room, accept },   // where a download's file goes (the host's: straight
+ *             // to its storage by start and finish, else attach), the room the plan leaves, the kinds it takes
  *   checkout: { href, modes: [{ id, label, needs: [..] }] },
  *   currency: { key, value, options: [{ value, label }] },   // what the shop sells in (naira by default)
  *   layouts:  { key, value, paid?, options: [{ id, label, hint, plan: 'all' | 'paid' }] },  // the catalogue's layouts
@@ -48,29 +49,50 @@ import { uploadWidget } from './upload.js';
 
 /**
  * A download's file sent to the host that keeps it (window.liveEditShop.downloads), the one way both the Shop tab and
- * Ask AI attach one: the same size check first, the host's own refusals (kind, room) passed on in its words.
- * Answers the file as the host keeps it ({ name, size }).
+ * Ask AI attach one. Straight to the host's private storage, however big (the conventional presigned upload: `start`
+ * gives an upload address, the browser PUTs the file there, `finish` says it arrived), so a file of gigabytes never
+ * passes through the host's server. Its size is held only to the room the website's plan leaves, which the host says
+ * in its own words; any refusal (the room, the kind of file) is passed on as the host words it. A host with no upload
+ * address, or one that gives none for its storage (`direct: false`), takes the file in the request instead (`attach`).
+ * `progress(0..1)` follows the upload. Answers the file as the host keeps it ({ name, size }).
  */
-export const attachADownload = async (product, file, shop = window.liveEditShop) => {
+export const attachADownload = async (product, file, shop = window.liveEditShop, progress = () => {}) => {
     const downloads = shop?.downloads;
-    if (!downloads?.attach) throw new Error('This website does not sell downloads.');
-    if (downloads.maxMb && file.size > downloads.maxMb * 1048576) throw new Error(`That file is too big. Choose one under ${downloads.maxMb} MB.`);
-    const body = new FormData();
-    body.append('product', product.id);
-    body.append('file', file);
-    const response = await fetch(downloads.attach, {
-        method: 'POST',
-        credentials: 'same-origin',
-        headers: { Accept: 'application/json', 'X-CSRF-TOKEN': downloads.token ?? '', 'X-Requested-With': 'XMLHttpRequest' },
-        body,
-    });
-    const answer = await response.json().catch(() => ({}));
-    if (!response.ok || !answer.ok) throw new Error(answer.error || (response.status === 413 ? 'That file is too big.' : 'That did not upload. Please try again.'));
+    if (!downloads?.attach && !downloads?.start) throw new Error('This website does not sell downloads.');
+    const headers = { Accept: 'application/json', 'X-CSRF-TOKEN': downloads.token ?? '', 'X-Requested-With': 'XMLHttpRequest' };
+    const answered = async (response) => {
+        const answer = await response.json().catch(() => ({}));
+        if (!response.ok || !answer.ok) throw new Error(answer.error || (response.status === 413 ? 'That file did not arrive. Please try again.' : 'That did not upload. Please try again.'));
+        return answer;
+    };
+    const post = async (url, body) => answered(await fetch(url, { method: 'POST', credentials: 'same-origin', headers: { ...headers, 'Content-Type': 'application/json' }, body: JSON.stringify(body) }));
+
+    let kept = null;
+    const started = downloads.start ? await post(downloads.start, { product: product.id, name: file.name, size: file.size, type: file.type || '' }) : { direct: false };
+    if (started.upload?.url) {
+        await new Promise((resolve, reject) => {
+            const put = new XMLHttpRequest();
+            put.open('PUT', started.upload.url);
+            for (const [name, value] of Object.entries(started.upload.headers ?? {})) {
+                if (String(name).toLowerCase() !== 'host') put.setRequestHeader(name, Array.isArray(value) ? value.join(', ') : String(value));
+            }
+            put.upload.onprogress = (event) => { if (event.lengthComputable) progress(event.loaded / event.total); };
+            put.onload = () => (put.status >= 200 && put.status < 300 ? resolve() : reject(new Error('That did not upload. Please try again.')));
+            put.onerror = () => reject(new Error('That did not upload. Check your connection and try again.'));
+            put.send(file);
+        });
+        kept = (await post(downloads.finish, { upload: started.upload.id })).file;
+    } else {
+        const body = new FormData();
+        body.append('product', product.id);
+        body.append('file', file);
+        kept = (await answered(await fetch(downloads.attach, { method: 'POST', credentials: 'same-origin', headers, body }))).file;
+    }
     // the Shop tab's products list shows it from now on
     const listed = (shop.products ?? []).find((one) => one.id === product.id);
-    if (listed) listed.file = answer.file;
+    if (listed) listed.file = kept;
 
-    return answer.file;
+    return kept;
 };
 
 /** What the Shop tab and Ask AI both say once a download's file is attached. */
@@ -688,22 +710,19 @@ export const renderShopPanel = ({
         };
         show(product.file ?? null);
         wrap.append(said);
-        const most = config?.downloads?.maxMb;
+        // the only limit on its size: the room the website's plan leaves (the host's words, "300 MB")
+        const room = config?.downloads?.room;
         if (attachFile) {
             const box = uploadWidget({
                 compact: true,
                 accept: config?.downloads?.accept || '*/*',
                 title: product.file ? 'Replace the file' : 'Upload the file',
-                hint: `A PDF, zip, audio or video file${most ? `, up to ${most} MB` : ''}`,
+                hint: `A PDF, zip, audio or video file${room ? `. Your plan has ${room} free` : ''}`,
                 label: `Choose the file buyers of ${product.name} download`,
                 onFile: async (file) => {
-                    if (most && file.size > most * 1048576) {
-                        notify(`That file is too big. Choose one under ${most} MB.`);
-                        return;
-                    }
                     said.textContent = `Uploading ${file.name}…`;
                     try {
-                        product.file = await attachFile(product, file);
+                        product.file = await attachFile(product, file, (part) => { said.textContent = `Uploading ${file.name}… ${Math.round(part * 100)}%`; });
                         show(product.file);
                         notify(downloadAttachedWords(product.name, product.file));
                     } catch (error) {
