@@ -9,6 +9,9 @@ row reading "Sat 2pm", not a copy of the last row):
   the panel's own save, so the chat's one Undo takes back the item and its words together. A word left empty keeps the
   copy's words for that part; a part that only holds others, and a nested list's parts, are not filled.
 - Any Kit list, on every adapter: nothing knows a template (`resources/js/new-item-words.js`).
+- Ask AI is told the add window's Video and Map on every design: the page data kept the add window's first 80 sections,
+  and the video and the map come after a design's own sections and its charts and tables, so a design with that many
+  (Quillstack Academy, The Blogger) told Ask AI of neither (`libraryForTheChat` in `chat-page.js`).
 
 ## 0.23.6 (15 Nov 2026)
 

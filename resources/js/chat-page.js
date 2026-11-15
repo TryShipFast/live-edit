@@ -15,6 +15,14 @@ import { clickedName, partName } from './part-name.js';
 import { sectionName } from './section-inserter.js';
 import { mapsOf, ownedByAnEmbed, videosOf } from './embeds.js';
 
+/** The add window's sections for the chat: the first 80, keeping every video and map entry (they come last). */
+export const libraryForTheChat = (library, most = 80) => {
+    const always = library.filter((section) => section?.kind === 'video' || section?.kind === 'map');
+    const rest = library.filter((section) => !always.includes(section));
+
+    return [...rest.slice(0, Math.max(0, most - always.length)), ...always];
+};
+
 // enough for the longest home page (The Speaker: 491 parts; at 400 its FAQ and footer were never told to Ask AI, 13 Nov 2026)
 const MOST_FIELDS = 800;
 const LONGEST_VALUE = 600;
@@ -364,7 +372,9 @@ export function pageForTheChat(root = document) {
         // with a file attached goes to the right one
         downloads: downloadsOf(doc),
         // the design's own sections and forms that can be added, by name (the + Section picker)
-        library: (doc.defaultView?.liveEditPages?.library ?? []).slice(0, 80).map((section) => ({ name: cut(String(section.label ?? '').replace(/ · \d+ left$/, ''), 80), ...(section.kind === 'form' ? { form: true } : {}), ...(section.kind === 'video' ? { video: true } : {}), ...(section.kind === 'map' ? { map: true } : {}) })).filter((section) => section.name),
+        // the add window's sections, at most 80; the video and the map (added after a design's own sections and its
+        // charts and tables) always among them, or a design with 80 sections of its own told Ask AI of neither
+        library: libraryForTheChat(doc.defaultView?.liveEditPages?.library ?? []).map((section) => ({ name: cut(String(section.label ?? '').replace(/ · \d+ left$/, ''), 80), ...(section.kind === 'form' ? { form: true } : {}), ...(section.kind === 'video' ? { video: true } : {}), ...(section.kind === 'map' ? { map: true } : {}) })).filter((section) => section.name),
         seo: seoOf(doc),
         // the site's pages, by name, so "link it to the Booking page" picks one as the link panel's Goes to does
         // a page the owner added (made) is renamed, hidden and moved in the Pages list; the design's own pages by their
