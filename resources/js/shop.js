@@ -62,7 +62,16 @@ export const attachADownload = async (product, file, shop = window.liveEditShop,
     const headers = { Accept: 'application/json', 'X-CSRF-TOKEN': downloads.token ?? '', 'X-Requested-With': 'XMLHttpRequest' };
     const answered = async (response) => {
         const answer = await response.json().catch(() => ({}));
-        if (!response.ok || !answer.ok) throw new Error(answer.error || (response.status === 413 ? 'That file did not arrive. Please try again.' : 'That did not upload. Please try again.'));
+        if (!response.ok || !answer.ok) {
+            const refused = new Error(answer.error || (response.status === 413 ? 'That file did not arrive. Please try again.' : 'That did not upload. Please try again.'));
+            // The website's storage is full: the editor says so with Get more storage, as every upload does (storageIsFull).
+            if (answer.storage) {
+                refused.storage = true;
+                refused.upgrade = typeof answer.upgrade === 'string' ? answer.upgrade : null;
+                window.dispatchEvent(new CustomEvent('live-edit:storage-full', { detail: { message: refused.message, upgrade: refused.upgrade } }));
+            }
+            throw refused;
+        }
         return answer;
     };
     const post = async (url, body) => answered(await fetch(url, { method: 'POST', credentials: 'same-origin', headers: { ...headers, 'Content-Type': 'application/json' }, body: JSON.stringify(body) }));

@@ -195,6 +195,58 @@ class BillingTest extends TestCase
         $this->assertSame(0, $this->site->fresh()->bytes_stored);
     }
 
+    protected function tearDown(): void
+    {
+        Meter::countAlso(null);
+        Meter::sayWhenFull(null);
+
+        parent::tearDown();
+    }
+
+    public function test_what_the_host_keeps_counts_in_the_same_storage_limit(): void
+    {
+        // The host's published versions and files are on the same storage: one figure, one limit.
+        $this->site->forceFill(['limits' => ['bytes_stored' => 1000]])->save();
+        Meter::countAlso(fn (Site $site) => 990);
+
+        $this->assertSame(990, Meter::stored($this->site->fresh()));
+        $this->assertFalse(Meter::allows($this->site->fresh(), Meter::UPLOAD, 20));
+        $this->assertTrue(Meter::allows($this->site->fresh(), Meter::UPLOAD, 10));
+        // Words add no bytes, so a full storage never stops them.
+        $this->assertTrue(Meter::allows($this->site->fresh(), Meter::WRITE));
+    }
+
+    public function test_a_full_storage_says_the_hosts_words_and_where_more_is_got(): void
+    {
+        $this->site->forceFill(['limits' => ['bytes_stored' => 10]])->save();
+        Meter::sayWhenFull(fn (Site $site, int $bytes) => ['message' => 'This website\'s storage is full.', 'upgrade' => 'https://console.test/billing']);
+
+        $this->post($this->url('/media'), ['file' => UploadedFile::fake()->image('big.jpg')], $this->editor())
+            ->assertStatus(402)
+            ->assertJsonPath('error.type', 'over_limit')
+            ->assertJsonPath('error.storage', true)
+            ->assertJsonPath('error.message', 'This website\'s storage is full.')
+            ->assertJsonPath('error.upgrade', 'https://console.test/billing');
+
+        $this->assertSame([], Storage::disk('s3')->allFiles());
+    }
+
+    public function test_a_picture_is_counted_as_it_is_stored_and_space_is_given_back(): void
+    {
+        $this->upload('a.jpg');
+        $files = Storage::disk('s3')->allFiles();
+        $this->assertNotSame([], $files);
+        $kept = array_sum(array_map(fn (string $file) => Storage::disk('s3')->size($file), $files));
+
+        $this->assertSame($kept, (int) $this->site->fresh()->bytes_stored, 'counted as kept, not as it arrived');
+
+        Meter::release($this->site->fresh(), $kept + 50);
+        $this->assertSame(0, (int) $this->site->fresh()->bytes_stored, 'never below nothing');
+
+        $this->artisan('live-edit:recount-storage')->assertSuccessful();
+        $this->assertSame($kept, (int) $this->site->fresh()->bytes_stored, 'measured again from the disk');
+    }
+
     public function test_usage_can_be_read_for_billing(): void
     {
         $this->save('one');

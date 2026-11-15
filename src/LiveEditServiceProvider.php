@@ -13,6 +13,7 @@ use ShipFast\LiveEdit\Console\Commands\LastSaveFailure;
 use ShipFast\LiveEdit\Console\Commands\ManageApiSite;
 use ShipFast\LiveEdit\Console\Commands\PruneOrphanedUploads;
 use ShipFast\LiveEdit\Console\Commands\PruneSectionLocks;
+use ShipFast\LiveEdit\Console\Commands\RecountStorage;
 use ShipFast\LiveEdit\Console\Commands\ScanForEditables;
 use ShipFast\LiveEdit\Console\Commands\SendRenewalNotices;
 use ShipFast\LiveEdit\Console\Commands\Versions;
@@ -161,7 +162,7 @@ class LiveEditServiceProvider extends ServiceProvider
         $this->loadViewsFrom(__DIR__.'/../resources/views', 'live-edit');
 
         if ($this->app->runningInConsole()) {
-            $this->commands([CheckMediaStorage::class, Diagnose::class, ImportTheme::class, LastSaveFailure::class, ManageApiSite::class, PruneOrphanedUploads::class, PruneSectionLocks::class, ScanForEditables::class, SendRenewalNotices::class, Versions::class]);
+            $this->commands([CheckMediaStorage::class, Diagnose::class, ImportTheme::class, LastSaveFailure::class, ManageApiSite::class, PruneOrphanedUploads::class, PruneSectionLocks::class, RecountStorage::class, ScanForEditables::class, SendRenewalNotices::class, Versions::class]);
 
             $this->publishes([
                 __DIR__.'/../config/live-edit.php' => config_path('live-edit.php'),

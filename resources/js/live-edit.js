@@ -1149,6 +1149,29 @@ const bootLiveEdit = () => {
             no: 'Keep editing',
         });
 
+        /*
+         * Storage full, said once in the editor's own window with the one way forward: Get more storage (a better plan,
+         * or more room for this website) on the page the host names, opened beside the editor so nothing here is lost.
+         * Without such a page (a host that sells no storage) it is said, with nothing to press.
+         */
+        let storageSaid = null;
+        const storageIsFull = (message, upgrade) => {
+            if (storageSaid) return;
+            const words = String(message || 'This website\'s storage is full. Your files are safe; to add more, get more storage.');
+            if (!upgrade) {
+                ui.toast(words, 9000);
+                return;
+            }
+            storageSaid = askTo({ title: 'Storage full', subtitle: words, yes: 'Get more storage', no: 'Not now', danger: false })
+                .then((yes) => {
+                    if (yes) window.open(upgrade, '_blank', 'noopener');
+                })
+                .finally(() => { storageSaid = null; });
+        };
+
+        // A file the host keeps itself (a download's file) refused for room: the same window (shop.js).
+        window.addEventListener('live-edit:storage-full', (event) => storageIsFull(event.detail?.message, event.detail?.upgrade ?? null));
+
         /** One question, two answers, drawn in the editor (never a native dialog). Resolves true for `yes`. */
         // `shows`: what the answer is about, drawn in the window (owner, 13 Nov 2026: "the modal should show me what
         // content i'm deleting"), as Google Drive names the file it is about to delete
@@ -3016,6 +3039,14 @@ const bootLiveEdit = () => {
                     refused.sectionLocked = true;
                     team?.refused(refused);
                 }
+                // A full storage (Meter::full): said where they are looking, in front of whatever window they are
+                // in, with Get more storage leading to the page where more is got, as Google storage does. Their
+                // files are safe and their words still save; only adding more is refused.
+                if (response.status === 402 && data.error?.type === 'over_limit' && data.error?.storage) {
+                    refused.storage = true;
+                    refused.upgrade = typeof data.error.upgrade === 'string' ? data.error.upgrade : null;
+                    storageIsFull(refused.message, refused.upgrade);
+                }
                 throw refused;
             }
             if (!isJsonResponse(response)) {
@@ -3966,7 +3997,9 @@ const bootLiveEdit = () => {
 
                     activeGenerationId = null;
                     pendingRequestId = null;
-                    grid.replaceChildren(note(imagineExcuse(payload?.reason)));
+                    // Storage full: the host's words, and Get more storage beside them (storageIsFull).
+                    if (payload?.reason === 'storage_full') storageIsFull(payload.message, payload.upgrade ?? null);
+                    grid.replaceChildren(note(payload?.reason === 'storage_full' && payload?.message ? payload.message : imagineExcuse(payload?.reason)));
                     go.disabled = false;
                     go.textContent = 'Try again · 5 credits';
 

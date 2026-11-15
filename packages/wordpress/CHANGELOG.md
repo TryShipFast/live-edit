@@ -1,5 +1,23 @@
 # ShipFast Live Edit for WordPress
 
+## 0.23.3 (15 Nov 2026)
+
+Storage that really holds, the way Google storage works (owner, 15 Nov 2026: "each plan has a storage capacity"; "ask
+them to upgrade for more storage"):
+- One figure per website: the files Live Edit stores and whatever the host keeps for it (its published versions, an
+  uploaded website's files, files a shop sells) are held to the one limit, `limits.bytes_stored`
+  (`Meter::countAlso`, `Meter::stored`).
+- A full storage is refused before anything is stored, for an upload, a chosen free photo and a picture Ask AI would
+  make (asked before any credits are spent: `storage_full`). Words and edits still save, and nothing kept is touched.
+- The refusal carries the host's words and where more storage is got (`Meter::sayWhenFull`, `error.storage`,
+  `error.upgrade`), and the editor says it in its own window with **Get more storage**, opened beside the editor, in
+  every adapter (the runtime is the same one); a download's file refused for room says it the same way.
+- Pictures are counted as they are stored (made fit for a page), not at the size they arrived; `Meter::release` gives
+  space back, and `php artisan live-edit:recount-storage [site...] [--dry-run]` measures each site's files on the disk
+  and corrects its figure (no file is touched).
+- WordPress: unchanged. Its uploads go to the site's own media library, on its own server, so no storage limit of ours
+  applies there.
+
 ## 0.23.2 (15 Nov 2026)
 
 A download sold on the page (owner, 15 Nov 2026: digital products sold "pay now, then download"):
