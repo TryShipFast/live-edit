@@ -2,6 +2,7 @@
 
 namespace ShipFast\LiveEdit\Application\Api;
 
+use ShipFast\LiveEdit\Domain\Site\Meter;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use ShipFast\LiveEdit\Models\AiCost;
@@ -38,6 +39,23 @@ class ImagineAPicture
 
     public function __construct(private readonly Credits $credits) {}
 
+    /**
+     * A full storage, before anything is made or paid for: a picture made now could not be kept. The host's words
+     * and where more storage is got (Meter::full), for the editor to say where they are looking.
+     *
+     * @return array{reason: string, message: string, upgrade?: string}|null
+     */
+    private function storageFull(Site $site): ?array
+    {
+        if (Meter::allows($site, Meter::UPLOAD, 1)) {
+            return null;
+        }
+
+        $full = Meter::full($site, 1);
+
+        return array_filter(['reason' => 'storage_full', 'message' => $full->getMessage(), 'upgrade' => $full->upgrade]);
+    }
+
     public function whyNothing(): string
     {
         return $this->whyNothing;
@@ -61,6 +79,10 @@ class ImagineAPicture
 
         if (! $this->available()) {
             return ['images' => [], 'balance' => $this->credits->balance($site), 'reason' => 'not_configured'];
+        }
+
+        if (($full = $this->storageFull($site)) !== null) {
+            return ['images' => [], 'balance' => $this->credits->balance($site), ...$full];
         }
 
         $balance = $this->credits->spend($site, 'generate_image', [
@@ -120,6 +142,10 @@ class ImagineAPicture
         // recreating the exact timeout this job exists to prevent.
         if (config('queue.default') === 'sync') {
             return ['images' => [], 'balance' => $balance, 'reason' => 'queue_unavailable'];
+        }
+
+        if (($full = $this->storageFull($site)) !== null) {
+            return ['images' => [], 'balance' => $balance, ...$full];
         }
 
         $balance = $this->credits->spend($site, 'generate_image', [
@@ -265,7 +291,7 @@ class ImagineAPicture
         $directory = (new SiteStore($site))->mediaDirectory();
 
         return collect($images)
-            ->map(function (string $image) use ($store, $directory) {
+            ->map(function (string $image) use ($store, $directory, $site) {
                 // Already an address: nothing to store, and a provider that
                 // sends one is entitled to keep serving it.
                 if (! str_starts_with($image, 'data:')) {
@@ -292,7 +318,11 @@ class ImagineAPicture
                 };
 
                 try {
-                    return $store->url($store->put($bytes, $mime, $extension, $directory));
+                    $path = $store->put($bytes, $mime, $extension, $directory);
+                    // Kept on the site's storage like any picture, so counted in it.
+                    Meter::record($site, Meter::UPLOAD, $store->size($path) ?? strlen($bytes));
+
+                    return $store->url($path);
                 } catch (\Throwable $e) {
                     // Made and paid for, and lost here: said as such, and logged for whoever runs the server.
                     $this->whyNothing = 'not_stored';

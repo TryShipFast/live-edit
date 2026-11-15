@@ -321,7 +321,7 @@ class MediaController
     {
         $file = $request->file('file');
         if ($file !== null && ! Meter::allows($site, Meter::UPLOAD, (int) $file->getSize())) {
-            return ContentController::overLimit(new OverLimit('This site has reached its storage limit.'));
+            return ContentController::overLimit(Meter::full($site, (int) $file->getSize()));
         }
 
         if (config('queue.default') === 'sync') {

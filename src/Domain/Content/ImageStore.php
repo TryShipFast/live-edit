@@ -150,6 +150,12 @@ class ImageStore
         return $path;
     }
 
+    /** The bytes a stored file takes, or null when the disk cannot say. */
+    public function size(string $path): ?int
+    {
+        return rescue(fn () => (int) Storage::disk($this->disk())->size($path), null, false);
+    }
+
     /**
      * The address a page should use for a stored image.
      *

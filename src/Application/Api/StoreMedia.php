@@ -38,12 +38,14 @@ class StoreMedia
         // Checked before the file is written, not after: refusing an upload
         // that is already in the bucket costs the storage anyway.
         if (! Meter::allows($site, Meter::UPLOAD, $bytes)) {
-            throw new OverLimit('This site has reached its storage limit.');
+            throw Meter::full($site, $bytes);
         }
 
         $path = $this->images->store($file, $fitWidth, $fitHeight, (new SiteStore($site))->mediaDirectory(), $fitExact, $crop, $logo);
 
-        Meter::record($site, Meter::UPLOAD, $bytes);
+        // What is really kept: the picture as stored (made fit for a page, often far lighter than the camera's
+        // original), never the size it arrived at. One file is written per picture.
+        Meter::record($site, Meter::UPLOAD, $this->images->size($path) ?? $bytes);
 
         return ['url' => $this->images->url($path), 'path' => $path];
     }

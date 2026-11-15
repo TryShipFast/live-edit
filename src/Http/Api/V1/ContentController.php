@@ -225,7 +225,13 @@ class ContentController
     public static function overLimit(OverLimit $e): JsonResponse
     {
         return response()->json([
-            'error' => ['type' => 'over_limit', 'message' => $e->getMessage()],
+            'error' => array_filter([
+                'type' => 'over_limit',
+                'message' => $e->getMessage(),
+                // A full storage, and where more is got: the editor says it where they are looking, with Get more storage.
+                'storage' => $e->storage ?: null,
+                'upgrade' => $e->upgrade,
+            ], fn ($value) => $value !== null),
         ], 402);
     }
 
