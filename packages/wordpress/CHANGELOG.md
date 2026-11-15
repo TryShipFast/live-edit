@@ -1,5 +1,14 @@
 # ShipFast Live Edit for WordPress
 
+## 0.23.2 (15 Nov 2026)
+
+A download sold on the page (owner, 15 Nov 2026: digital products sold "pay now, then download"):
+- The Shop tab shows, beside a product the page sells as a download, the file buyers get once they pay ("File buyers
+  download: The Pot.pdf (2.1 MB)", or "No file yet. Add the file buyers download: until then nobody can pay for it."),
+  and **Upload the file** / **Replace the file** in the editor's one upload box. It is saved at once with the host
+  that keeps it (`window.liveEditShop.downloads`), never on the published website (shop.js, live-edit.js).
+- A host without downloads shows nothing new.
+
 ## 0.23.1 (14 Nov 2026)
 
 Each blog post's own page, from a link (display only: owner, 14 Nov 2026, "just display for now"):

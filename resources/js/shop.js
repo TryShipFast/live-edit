@@ -2,7 +2,8 @@
  * The Shop tab: running a shop, in the order a shop owner sets one up.
  *
  *   1. Your products: Edit products (every product in one grid: products.js, live-edit.js editProducts), each one
- *      with Edit (its page), the owner's own with Remove, and Add a product (its SKU checked like an import's).
+ *      with Edit (its page), the owner's own with Remove, and Add a product (its SKU checked like an import's). A
+ *      download also has the file buyers get once they pay (`attachFile`).
  *   2. Collections: each one with Choose products (which products it shows), Copy and Open, then + New collection.
  *      (A shop's categories and its collections are one thing: pages that show some of its products.)
  *   Catalogue layout: the template's layouts as drawings (filters on top, at the side; more on paid plans).
@@ -22,7 +23,9 @@
  * with the key each is saved under, so this edits the same content the page shows.
  *
  * config = {
- *   products: [{ id, name, href }],          // the design's products, each with its page in the editor
+ *   products: [{ id, name, href, download?, file? }],  // the design's products, each with its page in the editor; a
+ *             // download (`download: true`) with the file buyers get after paying (`file: { name, size }` or null)
+ *   downloads: { attach, token, maxMb, accept },   // where a download's file is attached (the host's), and what it takes
  *   checkout: { href, modes: [{ id, label, needs: [..] }] },
  *   currency: { key, value, options: [{ value, label }] },   // what the shop sells in (naira by default)
  *   layouts:  { key, value, paid?, options: [{ id, label, hint, plan: 'all' | 'paid' }] },  // the catalogue's layouts
@@ -81,6 +84,7 @@ export const renderShopPanel = ({
     container, config, save, done, notify = () => {}, doc = document,
     categories = [], newCategory = null, categoryProducts = null, importProducts = null, undoImport = null,
     catalogue = null, upload = null, taken = [], flashSale = null, ask = null, products = null, knownSkus = async () => [],
+    attachFile = null,
 }) => {
     const el = (tag, className, text) => {
         const node = doc.createElement(tag);
@@ -157,7 +161,7 @@ export const renderShopPanel = ({
             li.append(...extra);
             ul.append(li);
         };
-        for (const product of designed) row(product.name, product.href ?? product.shown);
+        for (const product of designed) row(product.name, product.href ?? product.shown, product.download ? [downloadFile(product)] : []);
         for (const product of own) {
             const remove = button('le-link-btn le-shop-remove', 'Remove', `Remove ${product.name} from your shop`);
             remove.addEventListener('click', () => removeProduct(product));
@@ -631,6 +635,56 @@ export const renderShopPanel = ({
 
             return null;
         } });
+
+        return wrap;
+    }
+
+    /*
+     * A download (LIVE-EDIT-STRUCTURE.md, "A download sold on the page"): the file buyers get once they pay, attached
+     * here beside the product with the editor's one upload box. Saved at once, no publish: the next buyer gets it.
+     * Without a file the product cannot be bought, and the line says so where the owner is looking.
+     */
+    function downloadFile(product) {
+        const wrap = el('div', 'le-shop-download');
+        const said = el('p', 'le-hint le-shop-download-file');
+        const sizeOf = (bytes) => (bytes >= 1048576 ? `${(bytes / 1048576).toFixed(1)} MB` : `${Math.max(1, Math.round(bytes / 1024))} KB`);
+        const show = (file) => {
+            said.replaceChildren();
+            if (file) {
+                said.append('File buyers download: ', el('strong', '', file.name), ` (${sizeOf(file.size)})`);
+            } else {
+                said.textContent = 'No file yet. Add the file buyers download: until then nobody can pay for it.';
+            }
+        };
+        show(product.file ?? null);
+        wrap.append(said);
+        const most = config?.downloads?.maxMb;
+        if (attachFile) {
+            const box = uploadWidget({
+                compact: true,
+                accept: config?.downloads?.accept || '*/*',
+                title: product.file ? 'Replace the file' : 'Upload the file',
+                hint: `A PDF, zip, audio or video file${most ? `, up to ${most} MB` : ''}`,
+                label: `Choose the file buyers of ${product.name} download`,
+                onFile: async (file) => {
+                    if (most && file.size > most * 1048576) {
+                        notify(`That file is too big. Choose one under ${most} MB.`);
+                        return;
+                    }
+                    said.textContent = `Uploading ${file.name}…`;
+                    try {
+                        product.file = await attachFile(product, file);
+                        show(product.file);
+                        notify(`${product.name}: buyers now download ${product.file.name} after they pay.`);
+                    } catch (error) {
+                        show(product.file ?? null);
+                        notify(error.message);
+                    }
+                },
+            });
+            box.classList.add('le-shop-download-upload');
+            wrap.append(box);
+        }
 
         return wrap;
     }

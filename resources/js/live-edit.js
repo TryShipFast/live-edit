@@ -1643,6 +1643,21 @@ const bootLiveEdit = () => {
                 const response = await request('/live-edit/upload', { method: 'POST', body });
                 return (await response.json()).url;
             },
+            // A download's file, kept by the host (window.liveEditShop.downloads): private, never on the published site.
+            attachFile: window.liveEditShop?.downloads?.attach ? async (product, file) => {
+                const body = new FormData();
+                body.append('product', product.id);
+                body.append('file', file);
+                const response = await fetch(window.liveEditShop.downloads.attach, {
+                    method: 'POST',
+                    credentials: 'same-origin',
+                    headers: { Accept: 'application/json', 'X-CSRF-TOKEN': window.liveEditShop.downloads.token ?? '', 'X-Requested-With': 'XMLHttpRequest' },
+                    body,
+                });
+                const answer = await response.json().catch(() => ({}));
+                if (!response.ok || !answer.ok) throw new Error(answer.error || (response.status === 413 ? 'That file is too big.' : 'That did not upload. Please try again.'));
+                return answer.file;
+            } : null,
         });
         const renderSeo = () => {
             seoPanel = renderSeoPanel({

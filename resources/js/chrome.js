@@ -1034,6 +1034,8 @@ a.le-mark:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
 .le-shop-name { color: var(--le-ink); font-weight: 600; font-size: 14px; margin-right: auto; overflow-wrap: anywhere; }
 .le-shop-count { margin: 0; }
 .le-shop-actions { display: flex; flex-wrap: wrap; gap: 4px 14px; flex-basis: 100%; }
+.le-shop-download { display: grid; gap: 6px; flex-basis: 100%; min-width: 0; }
+.le-shop-download-file { margin: 0; overflow-wrap: anywhere; }
 .le-shop-section .le-link-btn { padding: 6px 2px; color: var(--le-ink); font-size: 13px; font-weight: 600; text-decoration: none; justify-self: start; }
 .le-shop-section .le-link-btn:hover { text-decoration: underline; }
 .le-shop-section .le-shop-remove { color: #A1260D; }
