@@ -76,6 +76,15 @@ export const attachADownload = async (product, file, shop = window.liveEditShop,
     };
     const post = async (url, body) => answered(await fetch(url, { method: 'POST', credentials: 'same-origin', headers: { ...headers, 'Content-Type': 'application/json' }, body: JSON.stringify(body) }));
 
+    // Said before anything is sent, from what the browser knows: a kind the host does not take, or bigger than the most
+    // one file may be (the host's `accept` and `mostBytes`). The host checks both again when it arrives.
+    const kinds = String(downloads.accept ?? '').split(',').map((kind) => kind.trim().toLowerCase()).filter(Boolean);
+    const ending = `.${String(file?.name ?? '').split('.').pop().toLowerCase()}`;
+    if (kinds.length && !kinds.includes(ending)) throw new Error('That kind of file cannot be added. Use a picture, a video, or a document such as a PDF.');
+    if (Number(downloads.mostBytes) > 0 && file.size > Number(downloads.mostBytes)) {
+        throw new Error(`That file is bigger than ${downloads.most ?? '500 MB'}, the most one file can be. Make it smaller, or split it into parts and sell them as two products.`);
+    }
+
     let kept = null;
     const started = downloads.start ? await post(downloads.start, { product: product.id, name: file.name, size: file.size, type: file.type || '' }) : { direct: false };
     if (started.upload?.url) {
@@ -726,7 +735,8 @@ export const renderShopPanel = ({
                 compact: true,
                 accept: config?.downloads?.accept || '*/*',
                 title: product.file ? 'Replace the file' : 'Upload the file',
-                hint: `A PDF, zip, audio or video file${room ? `. This website has ${room} free` : ''}`,
+                // what it takes, the most one file may be, and the room the website has (the host's words)
+                hint: `A picture, a video or a document such as a PDF${config?.downloads?.most ? `. Up to ${config.downloads.most}` : ''}${room ? `${config?.downloads?.most ? ', and' : '.'} this website has ${room} free` : ''}`,
                 label: `Choose the file buyers of ${product.name} download`,
                 onFile: async (file) => {
                     said.textContent = `Uploading ${file.name}…`;
