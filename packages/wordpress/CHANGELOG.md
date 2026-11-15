@@ -1,5 +1,11 @@
 # ShipFast Live Edit for WordPress
 
+## 0.23.5 (15 Nov 2026)
+
+- A video too big for a download's file (over the host's video cap, 200 MB) now points to the Video section added in
+  0.23.4: "That video is bigger than 200 MB, the most a video can be. Put it on YouTube or Vimeo, then add it with + Add
+  a section › Video and paste its link."
+
 ## 0.23.4 (15 Nov 2026)
 
 A video from YouTube or Vimeo and a map to an address, the way Wix's and Squarespace's video and map blocks work

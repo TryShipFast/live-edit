@@ -83,7 +83,7 @@ export const attachADownload = async (product, file, shop = window.liveEditShop,
     if (kinds.length && !kinds.includes(ending)) throw new Error('That kind of file cannot be added. Use a picture, a video, or a document such as a PDF.');
     const video = (downloads.video ?? []).map((kind) => String(kind).toLowerCase()).includes(ending);
     if (video && Number(downloads.videoMostBytes) > 0 && file.size > Number(downloads.videoMostBytes)) {
-        throw new Error(`That video is bigger than ${downloads.videoMost ?? '200 MB'}, the most a video can be. Use a shorter clip, or put the full video on YouTube and add its link to your page.`);
+        throw new Error(`That video is bigger than ${downloads.videoMost ?? '200 MB'}, the most a video can be. Put it on YouTube or Vimeo, then add it with + Add a section › Video and paste its link.`);
     }
     if (Number(downloads.mostBytes) > 0 && file.size > Number(downloads.mostBytes)) {
         throw new Error(`That file is bigger than ${downloads.most ?? '500 MB'}, the most one file can be. Make it smaller, or split it into parts and sell them as two products.`);

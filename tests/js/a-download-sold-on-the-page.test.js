@@ -149,7 +149,7 @@ describe('a download sold on the page', () => {
             for (const name of ['course.zip', 'song.mp3', 'setup.exe']) {
                 await expect(attachADownload(shop.products[0], sized(name, 1), shop)).rejects.toThrow('That kind of file cannot be added. Use a picture, a video, or a document such as a PDF.');
             }
-            await expect(attachADownload(shop.products[0], sized('class.mp4', 250), shop)).rejects.toThrow('That video is bigger than 200 MB, the most a video can be. Use a shorter clip, or put the full video on YouTube and add its link to your page.');
+            await expect(attachADownload(shop.products[0], sized('class.mp4', 250), shop)).rejects.toThrow('That video is bigger than 200 MB, the most a video can be. Put it on YouTube or Vimeo, then add it with + Add a section › Video and paste its link.');
             await expect(attachADownload(shop.products[0], sized('book.pdf', 600), shop)).rejects.toThrow('That file is bigger than 500 MB, the most one file can be. Make it smaller, or split it into parts and sell them as two products.');
             expect(fetched).not.toHaveBeenCalled();
         });
