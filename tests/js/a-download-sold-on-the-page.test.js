@@ -12,7 +12,7 @@ const config = {
         { id: 'cookbook', name: 'The Pot, volume one', shown: '/edit/cookbook', download: true, file: null },
         { id: 'tote', name: 'Canvas tote', href: '/edit/shop/tote' },
     ],
-    downloads: { attach: '/sites/adas-pot/downloads', start: '/sites/adas-pot/downloads/start', finish: '/sites/adas-pot/downloads/finish', token: 't', room: '300 MB', accept: '.pdf,.zip' },
+    downloads: { attach: '/sites/adas-pot/downloads', start: '/sites/adas-pot/downloads/start', finish: '/sites/adas-pot/downloads/finish', token: 't', room: '300 MB', limit: 'This website has 300 MB of its 1 GB free', accept: '.pdf,.mp4', most: '500 MB', mostBytes: 500 * 1024 * 1024, videoMost: '200 MB', videoMostBytes: 200 * 1024 * 1024, video: ['.mp4', '.webm', '.mov'] },
     checkout: { href: '', modes: [] },
     fields: [],
 };
@@ -24,10 +24,10 @@ describe('a download sold on the page', () => {
 
         const rows = [...container.querySelectorAll('.le-shop-product')];
         expect(rows[0].querySelector('.le-shop-download-file').textContent).toBe('No file yet. Add the file buyers download: until then nobody can pay for it.');
-        expect(rows[0].querySelector('.le-upload input[type="file"]').accept).toBe('.pdf,.zip');
+        expect(rows[0].querySelector('.le-upload input[type="file"]').accept).toBe('.pdf,.mp4');
         expect(rows[0].querySelector('.le-upload-title').textContent).toBe('Upload the file');
         // no size of its own: the room the plan leaves
-        expect(rows[0].querySelector('.le-upload-hint').textContent).toBe('A PDF, zip, audio or video file. This website has 300 MB free');
+        expect(rows[0].querySelector('.le-upload-hint').textContent).toBe('A picture, a video or a document such as a PDF. This website has 300 MB of its 1 GB free');
         expect(rows[1].querySelector('.le-shop-download')).toBeNull();
     });
 
@@ -120,7 +120,7 @@ describe('a download sold on the page', () => {
             const room = 'Your website has no room left for this file. It is 1.2 GB, and your website has 300 MB free of its 1 GB. Remove files you no longer use, or upgrade to Pro for 5 GB of storage.';
             const fetched = vi.spyOn(globalThis, 'fetch').mockResolvedValue(json({ ok: false, error: room }, 422));
 
-            await expect(attachADownload(shop.products[0], new File(['x'], 'course.zip'), shop)).rejects.toThrow(room);
+            await expect(attachADownload(shop.products[0], new File(['x'], 'course.pdf'), shop)).rejects.toThrow(room);
             expect(fetched).toHaveBeenCalledTimes(1);
         });
 
@@ -132,9 +132,26 @@ describe('a download sold on the page', () => {
             const listen = (event) => heard.push(event.detail);
             window.addEventListener('live-edit:storage-full', listen);
 
-            await expect(attachADownload(shop.products[0], new File(['x'], 'course.zip'), shop)).rejects.toThrow(full);
+            await expect(attachADownload(shop.products[0], new File(['x'], 'course.pdf'), shop)).rejects.toThrow(full);
             window.removeEventListener('live-edit:storage-full', listen);
             expect(heard).toEqual([{ message: full, upgrade: 'https://console.test/billing?site=adas-pot#storage' }]);
+        });
+
+        it('refuses before sending a kind it does not take, and a video or file bigger than its cap', async () => {
+            const shop = structuredClone(config);
+            const fetched = vi.spyOn(globalThis, 'fetch');
+            const sized = (name, mb) => {
+                const file = new File(['x'], name);
+                Object.defineProperty(file, 'size', { value: mb * 1024 * 1024 });
+                return file;
+            };
+
+            for (const name of ['course.zip', 'song.mp3', 'setup.exe']) {
+                await expect(attachADownload(shop.products[0], sized(name, 1), shop)).rejects.toThrow('That kind of file cannot be added. Use a picture, a video, or a document such as a PDF.');
+            }
+            await expect(attachADownload(shop.products[0], sized('class.mp4', 250), shop)).rejects.toThrow('That video is bigger than 200 MB, the most a video can be. Use a shorter clip, or put the full video on YouTube and add its link to your page.');
+            await expect(attachADownload(shop.products[0], sized('book.pdf', 600), shop)).rejects.toThrow('That file is bigger than 500 MB, the most one file can be. Make it smaller, or split it into parts and sell them as two products.');
+            expect(fetched).not.toHaveBeenCalled();
         });
 
         it('tells Ask AI the downloads, with the file each gives now', () => {

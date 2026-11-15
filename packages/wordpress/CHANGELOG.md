@@ -15,8 +15,12 @@ them to upgrade for more storage"):
 - Pictures are counted as they are stored (made fit for a page), not at the size they arrived; `Meter::release` gives
   space back, and `php artisan live-edit:recount-storage [site...] [--dry-run]` measures each site's files on the disk
   and corrects its figure (no file is touched).
-- The Shop tab's upload box says the room the website really has ("This website has 300 MB free": its plan, its paid
-  hosting or extra storage), not the plan's alone.
+- The Shop tab's upload box says the figure that really applies, in the host's words ("This website has 120 MB of its
+  256 MB free", or the per-file cap where it is smaller than the room), never a cap bigger than the room.
+- A download's file is a picture, a video or a document (owner, 15 Nov 2026: "they are only uploading images, video and
+  text"); anything else, and a video over the host's video cap (200 MB) or any file over its file cap (500 MB), is
+  refused before it is sent, in the host's words, and checked again when it arrives.
+- No video embed exists in the editor yet; a video too big is pointed to YouTube in words only.
 - WordPress: unchanged. Its uploads go to the site's own media library, on its own server, so no storage limit of ours
   applies there.
 
