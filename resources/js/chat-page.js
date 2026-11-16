@@ -15,12 +15,25 @@ import { clickedName, partName } from './part-name.js';
 import { sectionName } from './section-inserter.js';
 import { mapsOf, ownedByAnEmbed, videosOf } from './embeds.js';
 
-/** The add window's sections for the chat: the first 80, keeping every video and map entry (they come last). */
-export const libraryForTheChat = (library, most = 80) => {
-    const always = library.filter((section) => section?.kind === 'video' || section?.kind === 'map');
-    const rest = library.filter((section) => !always.includes(section));
+/**
+ * The add window's sections for the chat. Every built-in one (anything with a kind: a video, a map, a chart, a table, a
+ * form, a search) always goes, first; then the design's own sections, as many as fit both caps (most entries and
+ * characters of names), so a design with 116 sections (NewBanger) still tells Ask AI of the video and the map, and the
+ * page data stays small.
+ */
+export const libraryForTheChat = (library, most = 120, characters = 8000) => {
+    const builtIn = library.filter((section) => section && section.kind);
+    const own = library.filter((section) => section && !section.kind);
+    const out = [...builtIn];
+    let used = builtIn.reduce((sum, section) => sum + String(section.label ?? '').length, 0);
+    for (const section of own) {
+        const size = String(section.label ?? '').length;
+        if (out.length >= most || used + size > characters) break;
+        out.push(section);
+        used += size;
+    }
 
-    return [...rest.slice(0, Math.max(0, most - always.length)), ...always];
+    return out;
 };
 
 // enough for the longest home page (The Speaker: 491 parts; at 400 its FAQ and footer were never told to Ask AI, 13 Nov 2026)
