@@ -1,6 +1,11 @@
 # ShipFast Live Edit for WordPress
 
-## 0.23.7 (15 Nov 2026)
+## 0.23.8 (16 Nov 2026)
+
+The changes below, released as 0.23.8: the tag v0.23.7 was placed on 0.23.6's code (2ab8ccc4), so that number is not
+used for them (a version a cache may already hold is never reused).
+
+## 0.23.7 (15 Nov 2026, never released: its tag is 0.23.6's code)
 
 Ask AI adds a row with its words, as + Add then typing does (owner, 15 Nov 2026: "Add Saturday 2pm for Ngozi" must add a
 row reading "Sat 2pm", not a copy of the last row):
