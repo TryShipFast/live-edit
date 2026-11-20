@@ -34,7 +34,7 @@ import { renderSeoPanel } from './seo.js';
 import { attachADownload, downloadAttachedWords, renderShopPanel, withWhatsappNumber } from './shop.js';
 import { renderCsvImport, renderNewCollection, renderSearchPanel, renderTableEditor } from './collections-panel.js';
 import { renderImport, undoTheLastImport, UNDO_KEY } from './catalogue.js';
-import { AT_THE_TOP, aChartOrTable, addedWith, besidePlace, describeStructure, hrefTo, newAddedId, nounFor, orderWith, pageBase, pageOfLink, renderCategoryProducts, renderNewCategory, renderNewPage, renderSectionBrowser } from './pages.js';
+import { AT_THE_TOP, aChartOrTable, addedWith, besidePlace, describeStructure, hrefTo, newAddedId, nounFor, orderWith, pageBase, pageOfLink, renderCategoryProducts, renderNewCategory, renderNewPage, renderSectionBrowser, renamedPageAddress } from './pages.js';
 import { menuOrder, renderPagesList, startsOffered } from './pages-list.js';
 import { LEAVE_QUESTION, guardLeaving } from './unsaved.js';
 import { insertionNear, sectionName, sectionUnder, shownSectionLists, shownSections } from './section-inserter.js';
@@ -5827,6 +5827,51 @@ const bootLiveEdit = () => {
             const fields = words.map((node) => {
                 const key = parseEditKey(node.dataset.edit).key;
                 const was = shownWords(node, displayedValue({ editValue: node.dataset.editValue, ownText: ownTextOf(node), fullText: node.textContent }));
+                const link = node.closest?.('a[href]') ?? null;
+                const builder = window.liveEditPages ?? {};
+                const linkedPage = link ? pageOfLink(link, builder.pages ?? [], pageBase(builder, document.baseURI)) : null;
+                const previousRename = linkedPage
+                    ? Object.entries(builder.pageSlugs ?? {}).find(([, change]) => change.to === linkedPage.id)
+                    : null;
+                const originalPageId = previousRename?.[0] ?? linkedPage?.id ?? null;
+                let currentPageId = linkedPage?.id ?? null;
+                const availablePages = (builder.taken ?? []).filter((address) => address !== linkedPage?.id && address !== originalPageId);
+                const isCopy = /^n[0-9a-z]+(?:_[A-Za-z0-9-]+)?$/.test(item.dataset.editItem ?? '');
+                const isSharedCopy = Boolean(isCopy && linkedPage && !linkedPage.made);
+                const linkAddress = (candidate) => {
+                    try {
+                        return new URL(candidate.getAttribute('href') ?? '', document.baseURI).href;
+                    } catch {
+                        return candidate.getAttribute('href') ?? '';
+                    }
+                };
+                const linkPeers = link?.dataset?.editHref
+                    ? [...item.querySelectorAll('a[data-edit-href]')]
+                        .filter((peer) => peer === link
+                            || (link.dataset.linkPage && peer.dataset.linkPage === link.dataset.linkPage)
+                            || linkAddress(peer) === linkAddress(link))
+                        .map((peer) => ({ element: peer, key: peer.dataset.editHref, root: peer.dataset.editHrefRoot, openedHref: peer.getAttribute('href') ?? '' }))
+                    : [];
+                const hrefWithSlug = (href, slug) => {
+                    const splitAt = [href.indexOf('?'), href.indexOf('#')].filter((index) => index >= 0).sort((a, b) => a - b)[0] ?? href.length;
+                    const path = href.slice(0, splitAt);
+                    const suffix = href.slice(splitAt);
+                    if (!path || /^(?:[a-z][a-z0-9+.-]*:|\/\/|#)/i.test(path)) {
+                        if (!/^https?:\/\//i.test(path)) return href;
+                        try {
+                            if (new URL(path).origin !== window.location.origin) return href;
+                        } catch {
+                            return href;
+                        }
+                    }
+                    const pathname = /^https?:\/\//i.test(path) ? new URL(path).pathname : path;
+                    const barePath = pathname.replace(/\/+$/, '');
+                    const slash = barePath.lastIndexOf('/');
+                    if (!slug || /\.[a-z0-9]{1,8}$/i.test(barePath)) return href;
+                    const nextPath = `${barePath.slice(0, slash + 1)}${slug}${pathname.endsWith('/') ? '/' : ''}`;
+
+                    return /^https?:\/\//i.test(path) ? `${new URL(path).origin}${nextPath}${suffix}` : `${nextPath}${suffix}`;
+                };
                 const wrap = document.createElement('label');
                 wrap.className = 'le-field';
                 // Named by what the design calls it (data-field "car": Car), never "Text" twice.
@@ -5838,13 +5883,26 @@ const bootLiveEdit = () => {
                 // The page follows as it is typed, where the words are all the element holds.
                 box.addEventListener('input', () => {
                     if (!node.children.length) node.textContent = box.value;
+                    const renamedPage = !isSharedCopy && originalPageId && builder.pageSlugsKey && linkedPage && !linkedPage.made
+                        ? renamedPageAddress(originalPageId, box.value, availablePages) ?? { from: originalPageId, to: originalPageId }
+                        : null;
+                    if (renamedPage) {
+                        renamedPage.title = box.value.trim();
+                        fields.find((field) => field.node === node).pageSlugChange = renamedPage;
+                        linkPeers.forEach((peer) => peer.element.setAttribute('href', hrefWithSlug(peer.openedHref, renamedPage.to.split('/').pop())));
+                        builder.pages = (builder.pages ?? []).map((page) => page.id === currentPageId || page.id === renamedPage.from || page.id === previousRename?.[1]?.to
+                            ? { ...page, id: renamedPage.to, title: renamedPage.title, href: `${builder.editorBase ?? ''}${renamedPage.to}` }
+                            : page);
+                        currentPageId = renamedPage.to;
+                        if (!(builder.taken ?? []).includes(renamedPage.to)) builder.taken = [...(builder.taken ?? []), renamedPage.to];
+                    }
                     // unsaved: a redraw of the panel must not throw it away, and closing asks first
                     if (current) current.dirty = true;
                 });
                 wrap.append(box);
                 drawerFields.append(wrap);
 
-                return { node, key, was, box };
+                return { node, key, was, box, linkPeers, builder };
             });
             // Its photos, each replaced from here.
             const photos = [...item.querySelectorAll('img[data-edit-img]')].filter((img) => img.getBoundingClientRect().width > 0);
@@ -5865,7 +5923,27 @@ const bootLiveEdit = () => {
             // One Save, the panel's own at its foot (editor audit A11): it writes every word typed here.
             current.saveWords = async () => {
                 const changed = fields.filter((field) => field.box.value !== field.was);
-                for (const field of changed) await saveSetting(field.key, field.box.value);
+                for (const field of changed) {
+                    await saveSetting(field.key, field.box.value);
+                    for (const peer of field.linkPeers) {
+                        if (!peer.key || !peer.element.isConnected) continue;
+                        const href = peer.element.getAttribute('href') ?? '';
+                        const savedHref = addressFromTheRoot(href, peer.root, pageBase(window.liveEditPages, document.baseURI));
+                        await saveSetting(peer.key, savedHref);
+                        peer.openedHref = href;
+                    }
+                    if (field.pageSlugChange && field.builder.pageSlugsKey) {
+                        const changes = { ...(field.builder.pageSlugs ?? {}) };
+                        if (field.pageSlugChange.to === field.pageSlugChange.from) {
+                            delete changes[field.pageSlugChange.from];
+                        } else {
+                            changes[field.pageSlugChange.from] = { to: field.pageSlugChange.to, title: field.pageSlugChange.title };
+                        }
+                        await saveSetting(field.builder.pageSlugsKey, JSON.stringify(changes));
+                        field.builder.pageSlugs = changes;
+                    }
+                    field.was = field.box.value;
+                }
 
                 return changed.length > 0;
             };

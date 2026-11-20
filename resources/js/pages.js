@@ -74,6 +74,27 @@ export function slugFor(title) {
         .replace(/-+$/g, '');
 }
 
+/** Keep a design page's parent path while renaming its final segment from its title. */
+export function renamedPageAddress(page, title, taken = []) {
+    const from = String(page ?? '').replace(/^\/+|\/+$/g, '');
+    const parts = from.split('/');
+    const parent = parts.length > 1 ? `${parts.slice(0, -1).join('/')}/` : '';
+    const base = slugFor(title);
+
+    if (!from || !base) return null;
+
+    const occupied = new Set(taken.map((address) => String(address).replace(/^\/+|\/+$/g, '')));
+    let leaf = base;
+    let to = `${parent}${leaf}`;
+
+    for (let number = 2; occupied.has(to) && to !== from; number += 1) {
+        leaf = `${base}-${number}`;
+        to = `${parent}${leaf}`;
+    }
+
+    return to === from ? null : { from, to };
+}
+
 /** Why an address cannot be used, or null when it can. */
 export function addressProblem(id, taken = []) {
     if (!id) return 'Give the page an address.';

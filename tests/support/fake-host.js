@@ -529,8 +529,14 @@ export function createHost({ makeDocument, serialise = (doc) => `<!doctype html>
         return doc;
     };
 
+    const pageSlugs = () => JSON.parse(settings['structure:page-slugs'] ?? '{}');
     const pages = (editorBase) => [
-        ...Object.entries(DESIGN_HERE).filter(([id]) => !removed().includes(id)).map(([id, page]) => ({ id, title: page.title, href: `${editorBase}${id}` })),
+        ...Object.entries(DESIGN_HERE).filter(([id]) => !removed().includes(id)).map(([id, page]) => {
+            const renamed = pageSlugs()[id];
+            const pageId = renamed?.to ?? id;
+
+            return { id: pageId, title: renamed?.title ?? page.title, href: `${editorBase}${pageId}` };
+        }),
         ...made().map((entry) => ({ id: entry.id, title: entry.title, href: `${editorBase}${entry.id}`, made: true })),
     ];
 
@@ -538,6 +544,8 @@ export function createHost({ makeDocument, serialise = (doc) => `<!doctype html>
     const builderFor = (id, editorBase) => ({
         page: id,
         pagesKey: 'structure:pages',
+        pageSlugsKey: 'structure:page-slugs',
+        pageSlugs: pageSlugs(),
         made: made(),
         structureKey: `structure:page:${id === '' ? 'home' : id}`,
         added: addedTo(id),

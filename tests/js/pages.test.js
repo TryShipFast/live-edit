@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 import { describe, expect, it, vi } from 'vitest';
-import { AT_THE_TOP, addedWith, addressProblem, describeStructure, grouped, newAddedId, orderWith, previewDoc, renderLibrary, renderNewPage, renderSectionBrowser, sectionMarkup, slugFor, startingPoints, whyNotYet, withMenu } from '../../resources/js/pages.js';
+import { AT_THE_TOP, addedWith, addressProblem, describeStructure, grouped, newAddedId, orderWith, previewDoc, renderLibrary, renderNewPage, renderSectionBrowser, renamedPageAddress, sectionMarkup, slugFor, startingPoints, whyNotYet, withMenu } from '../../resources/js/pages.js';
 
 describe('the page builder names and places things the way the host reads them', () => {
     it('suggests an address from a title', () => {
@@ -9,6 +9,17 @@ describe('the page builder names and places things the way the host reads them',
         expect(slugFor('Crèche')).toBe('creche');
         expect(slugFor('  ')).toBe('');
         expect(slugFor('x'.repeat(80)).length).toBeLessThanOrEqual(48);
+    });
+
+    it('renames the last part of a detail-page route and avoids existing addresses', () => {
+        expect(renamedPageAddress('projects/kobo-js', 'Product Walkthrough')).toEqual({
+            from: 'projects/kobo-js',
+            to: 'projects/product-walkthrough',
+        });
+        expect(renamedPageAddress('projects/kobo-js', 'Product Walkthrough', ['projects/product-walkthrough'])).toEqual({
+            from: 'projects/kobo-js',
+            to: 'projects/product-walkthrough-2',
+        });
     });
 
     it('refuses an address the host would refuse, and one already taken', () => {

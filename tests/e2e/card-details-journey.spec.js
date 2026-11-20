@@ -113,6 +113,24 @@ test('a product is edited on its own page, inside the window over the shop, opti
     await expect(detail(page).locator('[data-list="sizes"] [data-edit-item]')).toHaveCount(3);
 });
 
+test('renaming a design record saves its new detail route', async ({ page }) => {
+    await openAsEditor(page);
+    await choose(page, '[data-edit-item="aster"] h3 a');
+    await typeAndSave(page, 'Aster Archive');
+
+    const card = page.locator('[data-edit-item="aster"]');
+    const links = card.locator('a[data-edit-href]');
+    await expect(links).toHaveCount(2);
+    for (const link of await links.all()) {
+        await expect(link).toHaveAttribute('href', '../products/aster-archive/');
+        const linkKey = await link.getAttribute('data-edit-href');
+        expect(site.host.settings[linkKey.replace(/^setting:/, '')]).toBe('../products/aster-archive/');
+    }
+    expect(JSON.parse(site.host.settings['structure:page-slugs'])).toEqual({
+        'products/aster-veil': { to: 'products/aster-archive', title: 'Aster Archive' },
+    });
+});
+
 test('a journal post is edited in place: its body and its pictures', async ({ page }) => {
     await openAsEditor(page);
     await openItsPage(page, 'first');
@@ -155,6 +173,7 @@ test('a copied card gets its own page, a full copy, and the two never change eac
     await choose(page, `[data-edit-item="${copy}"] h3 a`);
     await typeAndSave(page, 'Fig Archive');
     await expect(page.locator(`[data-edit-item="${copy}"] h3 a`)).toHaveText('Fig Archive');
+    await expect(page.locator(`[data-edit-item="${copy}"] h3 a`)).toHaveAttribute('href', '../products/aster-veil/');
 
     // Until it has a page of its own, the copy offers one before anything on it is edited.
     await openItsPage(page, copy, 'Give it its own page');
