@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 import { describe, expect, it, vi } from 'vitest';
-import { AT_THE_TOP, addedWith, addressProblem, describeStructure, grouped, newAddedId, orderWith, previewDoc, renderLibrary, renderNewPage, renderSectionBrowser, renamedPageAddress, sectionMarkup, slugFor, startingPoints, whyNotYet, withMenu } from '../../resources/js/pages.js';
+import { AT_THE_TOP, addedWith, addressProblem, describeStructure, grouped, legalPageCopy, newAddedId, orderWith, previewDoc, renderLibrary, renderNewPage, renderSectionBrowser, renamedPageAddress, sectionMarkup, slugFor, startingPoints, whyNotYet, withMenu } from '../../resources/js/pages.js';
 
 describe('the page builder names and places things the way the host reads them', () => {
     it('suggests an address from a title', () => {
@@ -9,6 +9,18 @@ describe('the page builder names and places things the way the host reads them',
         expect(slugFor('Crèche')).toBe('creche');
         expect(slugFor('  ')).toBe('');
         expect(slugFor('x'.repeat(80)).length).toBeLessThanOrEqual(48);
+    });
+
+    it('copies an authored legal page to a unique editable page structure', () => {
+        let sequence = 0;
+        const copy = legalPageCopy({ own: ['privacy.heading', 'privacy.notice'] }, 'Privacy Policy', ['privacy'], () => (sequence++ % 36) / 36);
+
+        expect(copy).toEqual({
+            id: 'privacy-policy',
+            title: 'Privacy Policy',
+            added: { 'add-01234567': 'privacy.heading', 'add-89abcdef': 'privacy.notice' },
+        });
+        expect(legalPageCopy({ sections: [] }, 'Privacy Policy')).toBeNull();
     });
 
     it('renames the last part of a detail-page route and avoids existing addresses', () => {

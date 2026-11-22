@@ -34,8 +34,8 @@ import { renderSeoPanel } from './seo.js';
 import { attachADownload, downloadAttachedWords, renderShopPanel, withWhatsappNumber } from './shop.js';
 import { renderCsvImport, renderNewCollection, renderSearchPanel, renderTableEditor } from './collections-panel.js';
 import { renderImport, undoTheLastImport, UNDO_KEY } from './catalogue.js';
-import { AT_THE_TOP, aChartOrTable, addedWith, besidePlace, describeStructure, hrefTo, newAddedId, nounFor, orderWith, pageBase, pageOfLink, renderCategoryProducts, renderNewCategory, renderNewPage, renderSectionBrowser, renamedPageAddress } from './pages.js';
-import { menuOrder, renderPagesList, startsOffered } from './pages-list.js';
+import { AT_THE_TOP, aChartOrTable, addedWith, besidePlace, describeStructure, hrefTo, legalPageCopy, newAddedId, nounFor, orderWith, pageBase, pageOfLink, renderCategoryProducts, renderNewCategory, renderNewPage, renderSectionBrowser, renamedPageAddress } from './pages.js';
+import { legalPageStart, menuOrder, renderPagesList, startsOffered } from './pages-list.js';
 import { LEAVE_QUESTION, guardLeaving } from './unsaved.js';
 import { insertionNear, sectionName, sectionUnder, shownSectionLists, shownSections } from './section-inserter.js';
 import { DETAIL_MODE, copiedItemSettings, copiedStyles, copyPageForCard, deletablePage, deletePage, detailAddress, keyMap, linksTo, linksWarning, showOnlyTheDetail } from './card-page.js';
@@ -9809,7 +9809,36 @@ const bootLiveEdit = () => {
                         const wanted = String(action.kind ?? '').toLowerCase();
                         const cards = [...ui.shadow.querySelectorAll('.le-modal .le-start')];
                         const card = cards.find((c) => (c.querySelector('.le-start-name')?.textContent ?? '').toLowerCase().startsWith(wanted)) ?? cards.find((c) => (c.querySelector('.le-start-name')?.textContent ?? '').toLowerCase().includes(wanted));
-                        if (!card) { closeWindow(); return { ok: false, error: `This design has no kind of page like “${action.kind}”. The kinds are: ${cards.map((c) => c.querySelector('.le-start-name')?.textContent).filter(Boolean).slice(0, 12).join(', ')}.` }; }
+                        if (!card) {
+                            const start = legalPageStart(window.liveEditPages, wanted);
+                            if (!start) {
+                                closeWindow();
+                                return { ok: false, error: `This design has no authored page like “${action.kind}”. Choose an existing page to start from.` };
+                            }
+
+                            const config = window.liveEditPages;
+                            const pageCopy = legalPageCopy(start, action.title, config.taken ?? []);
+                            if (!pageCopy || !config.pagesKey || !config.editorBase) {
+                                closeWindow();
+                                return { ok: false, error: 'That page could not be made here.' };
+                            }
+                            const { id, title: titleText, added } = pageCopy;
+                            const made = [...(config.made ?? []), { id, title: titleText, menu: false }];
+                            try {
+                                await saveSetting(`structure:page:${id}`, JSON.stringify({ added }));
+                                await saveSetting(config.pagesKey, JSON.stringify(made));
+                            } catch (error) {
+                                closeWindow();
+                                return { ok: false, error: error.message || 'That page could not be saved.' };
+                            }
+                            config.made = made;
+                            config.taken = [...(config.taken ?? []), id];
+                            config.pages = [...(config.pages ?? []), { id, title: titleText, href: `${config.editorBase}${id}`, made: true }];
+                            sessionStorage.setItem('tb_editing', '1');
+                            closeWindow();
+
+                            return { ok: true, goTo: `${config.editorBase}${id}` };
+                        }
                         card.click();
                         await settled();
                         const title = ui.shadow.querySelector('.le-modal input.le-name-title');

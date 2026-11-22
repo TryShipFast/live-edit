@@ -140,6 +140,16 @@ describe('Ask AI', () => {
         expect(deps.showSaved).toHaveBeenLastCalledWith('Saved \u2713', { reload: true });
     });
 
+    it('explains when the template has no authored legal page to build from', async () => {
+        chatWith([() => answer({ reply: 'I made the page.', actions: [{ type: 'page', do: 'add', kind: 'Privacy', title: 'Privacy Policy', label: 'Privacy Policy' }], cards: [] })]);
+        deps.act.mockResolvedValueOnce({ ok: false, error: 'This design has no authored page like “Privacy”. Choose an existing page to start from.' });
+
+        await type('Build a privacy policy page for me');
+
+        expect(host.textContent).toContain('This design has no authored page like “Privacy”. Choose an existing page to start from.');
+        expect(host.textContent).not.toContain('I made the page.');
+    });
+
     it('keeps one conversation for the whole website, saying which page each message was on', async () => {
         // owner, 13 Nov 2026: "seems ask AI feels new on each page"
         sessionStorage.setItem('le-chat:oxbow', JSON.stringify({ log: [

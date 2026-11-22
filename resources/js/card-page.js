@@ -395,10 +395,30 @@ export async function copyPageForCard({ page, title, card = null, builder, fetch
     const map = keyMap(pairsWith(copy));
     const words = copiedSettings(map.keys, settings, written);
     const looks = copiedStyles(map.styles, styles);
-    const total = words.length + looks.length;
     let done = 0;
+    const copiedLinks = new Map(map.keys);
+    const originalLinks = new Map();
+    const copiedWordKeys = new Set(words.map(([key]) => key));
+    for (const link of original.querySelectorAll('[data-edit-href]')) {
+        const from = bare(link.getAttribute('data-edit-href'));
+        const to = copiedLinks.get(from);
+        if (!to) continue;
+        originalLinks.set(to, link);
+        if (copiedWordKeys.has(to)) continue;
+
+        const href = link.getAttribute('href') ?? '';
+        const inherited = settings[from] ?? href;
+        const rewritten = hrefForCopiedPage(inherited, href, page.id, id);
+        if (rewritten !== inherited) {
+            words.push([to, rewritten]);
+            copiedWordKeys.add(to);
+        }
+    }
+    const total = words.length + looks.length;
     for (const [key, value] of words) {
-        await save(key, value);
+        const source = originalLinks.get(key);
+        const rewritten = source ? hrefForCopiedPage(value, source.getAttribute('href'), page.id, id) : value;
+        await save(key, rewritten);
         written.add(key);
         progress(`Copying its details (${++done} of ${total})…`);
     }
@@ -416,6 +436,27 @@ export async function copyPageForCard({ page, title, card = null, builder, fetch
     }
 
     return id;
+}
+
+/** Repoint a copied page's self-links to its new address; keep external and unrelated links intact. */
+function hrefForCopiedPage(value, markupHref, oldId, newId) {
+    if (typeof value !== 'string' || value === '') return value;
+    const match = value.match(/^([a-z][a-z0-9+.-]*:\/\/[^/?#]+)?([^?#]*)([?#].*)?$/i);
+    if (!match) return value;
+
+    const [, origin = '', path, suffix = ''] = match;
+    const sourceOrigin = markupHref?.match(/^[a-z][a-z0-9+.-]*:\/\/[^/?#]+/i)?.[0];
+    if (origin && sourceOrigin && origin !== sourceOrigin) return value;
+
+    const oldPath = String(oldId).replace(/^\/+|\/+$/g, '');
+    const newPath = String(newId).replace(/^\/+|\/+$/g, '');
+    const suffixPattern = new RegExp(`(^|/)${oldPath.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(?=/|$)`);
+    const found = path.match(suffixPattern);
+    if (!found || path.slice(found.index + found[0].length).replace(/\/$/, '') !== '') return value;
+
+    const rewritten = path.slice(0, found.index) + found[1] + newPath + (path.endsWith('/') ? '/' : '');
+
+    return `${origin}${rewritten}${suffix}`;
 }
 
 /** The card's own editable element for each fact, where the card has one. */
@@ -510,6 +551,7 @@ export function linksTo(page, { doc = document, settings = {}, pages = [], base 
 
     let elsewhere = 0;
     for (const [key, value] of Object.entries(settings)) {
+        if (key.startsWith(`added:${page.id}/`)) continue;
         if (keysHere.has(key) || typeof value !== 'string') continue;
         if (!/^(?:\.\.?\/|\/|https?:\/\/)/.test(value) && !/\/$/.test(value)) continue;
         if (pageOfLink(value, pages, base)?.id === page.id) elsewhere += 1;

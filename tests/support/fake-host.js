@@ -44,6 +44,9 @@ const product = (slug, name, price, story) => `
     <div class="gallery"><img data-edit="image" src="https://img.test/${slug}.jpg" alt="${name}"></div>
     <div class="buy">
       <h1 data-edit="text" data-field="name">${name}</h1>
+      <a class="self-link" href="../products/${slug}/" data-edit="link">View ${name}</a>
+      <a class="other-page-link" href="../products/blue-hour/" data-edit="link">View Blue Hour</a>
+      <a class="external-link" href="https://shop.example.test/catalog/" data-edit="link">Shop externally</a>
       <p class="price"><span data-edit="text" data-field="price" data-price-out>${price}</span></p>
       <p data-edit="text" data-field="notes">Top notes of ${slug} and cedar.</p>
       <div class="sizes" data-list="sizes" data-label="Sizes" data-max="4">

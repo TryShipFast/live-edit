@@ -139,6 +139,18 @@ export function newAddedId(random = Math.random) {
     return `add-${id}`;
 }
 
+/** A page copy from an authored legal start, with its sections keyed for the owner's page. */
+export function legalPageCopy(start, title, taken = [], random = Math.random) {
+    const name = String(title ?? '').trim().slice(0, 120);
+    const sections = start?.own ?? start?.sections;
+    if (!name || !Array.isArray(sections) || sections.length === 0) return null;
+
+    const added = {};
+    for (const from of sections) added[newAddedId(random)] = from;
+
+    return { id: freeAddress(name, taken), title: name, added };
+}
+
 /** The saved value for a page's additions, with one more (or one fewer). */
 export function addedWith(added, id, from, beside = {}, place = null) {
     const next = { ...(added ?? {}) };

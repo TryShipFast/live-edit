@@ -899,6 +899,21 @@ export const copyOfItem = (item, id) => {
 export const applyContent = (root, settings) => {
     let applied = 0;
 
+    const doc = root.nodeType === 9 ? root : root.ownerDocument;
+    const browser = globalThis.window ?? {};
+    const brandNameKey = browser.liveEditBrand?.identity?.nameKey;
+    const siteNameKey = browser.liveEditSeo?.siteNameKey;
+    const nameKey = [brandNameKey, siteNameKey].find((key) => key && Object.hasOwn(settings, key));
+    if (nameKey && typeof settings[nameKey] === 'string' && settings[nameKey].trim()) {
+        let siteName = doc?.querySelector('meta[property="og:site_name"]');
+        if (!siteName && doc?.head) {
+            siteName = doc.createElement('meta');
+            siteName.setAttribute('property', 'og:site_name');
+            doc.head.append(siteName);
+        }
+        siteName?.setAttribute('content', settings[nameKey].trim());
+    }
+
     // Lists first: an item moved or added changes what everything below has
     // to land on.
     applyOrder(root, settings);

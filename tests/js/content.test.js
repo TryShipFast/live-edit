@@ -63,6 +63,27 @@ const page = (html) => {
 };
 
 describe('putting published content into a static page', () => {
+    it("uses the saved business name for the site's share metadata", () => {
+        const previousBrand = window.liveEditBrand;
+        const previousSeo = window.liveEditSeo;
+        window.liveEditBrand = { identity: { nameKey: 'brand.name' } };
+        window.liveEditSeo = {};
+        document.head.innerHTML = '<meta property="og:site_name" content="Tobi Adewale">';
+        document.body.innerHTML = '<h1 data-edit="setting:brand.name">Tobi Adewale</h1>';
+
+        try {
+            applyContent(document, { 'brand.name': 'Northstar Learning' });
+
+            expect(document.querySelector('meta[property="og:site_name"]').content).toBe('Northstar Learning');
+            expect(document.querySelector('h1').textContent).toBe('Northstar Learning');
+        } finally {
+            if (previousBrand === undefined) delete window.liveEditBrand;
+            else window.liveEditBrand = previousBrand;
+            if (previousSeo === undefined) delete window.liveEditSeo;
+            else window.liveEditSeo = previousSeo;
+        }
+    });
+
     it('edits syntax highlighted code as one text value without leaving old code behind', () => {
         const root = page('<pre data-code data-edit="setting:auto:code"><span class="cl"><span class="tok-kw">const</span> daniel = {</span><span class="cl">  name: <span class="tok-str">"Daniel"</span></span><span class="cl">}</span></pre>');
         const original = 'const daniel = {  name: "Daniel"}';
