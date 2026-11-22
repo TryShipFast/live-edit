@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { aPageToStartFrom, duplicateOf, menuOrder, movedBy, pageKind, pageRows, renamed, renderPagesList, reordered, startsOffered, stored } from '../../resources/js/pages-list.js';
+import { aPageToStartFrom, duplicateOf, legalPageStart, menuOrder, movedBy, pageKind, pageRows, renamed, renderPagesList, reordered, startsOffered, stored } from '../../resources/js/pages-list.js';
 import { describeStructure } from '../../resources/js/pages.js';
 
 /*
@@ -65,6 +65,15 @@ describe('what kind of page it is', () => {
     it('never offers a checkout, a brand sheet, a notice or one product as a kind of new page', () => {
         expect(startsOffered(config()).map((kind) => kind.id)).toEqual(['about']);
         expect(aPageToStartFrom({ id: null, title: 'Your own choice' })).toBe(true);
+    });
+
+    it('finds an authored legal page for an AI page request without exposing it as an ordinary start choice', () => {
+        const site = config();
+        site.starts.push({ id: 'privacy', title: 'Privacy', sections: ['privacy.heading', 'privacy.notice'], own: ['privacy.heading', 'privacy.notice'] });
+
+        expect(legalPageStart(site, 'Privacy Policy')).toMatchObject({ id: 'privacy', own: ['privacy.heading', 'privacy.notice'] });
+        expect(legalPageStart(site, 'Terms and Conditions')).toBeNull();
+        expect(startsOffered(site).map((kind) => kind.id)).toEqual(['about']);
     });
 });
 

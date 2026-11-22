@@ -9,11 +9,12 @@ export const renderSeoPanel = ({ container, config, save, done, notify, pickImag
         title: titleConfig.title ?? doc.title,
         description: config?.description ?? doc.querySelector('meta[name="description"]')?.content ?? '',
         image: config?.image ?? doc.querySelector('meta[property="og:image"]')?.content ?? '',
+        siteName: config?.siteName ?? doc.querySelector('meta[property="og:site_name"]')?.content ?? '',
     };
     const pending = { ...initial };
     const originals = {
         title: doc.title,
-        metas: ['meta[property="og:title"]', 'meta[name="twitter:title"]', 'meta[name="description"]', 'meta[property="og:description"]', 'meta[name="twitter:description"]', 'meta[property="og:image"]', 'meta[name="twitter:image"]']
+        metas: ['meta[property="og:title"]', 'meta[name="twitter:title"]', 'meta[name="description"]', 'meta[property="og:description"]', 'meta[name="twitter:description"]', 'meta[property="og:image"]', 'meta[name="twitter:image"]', 'meta[property="og:site_name"]']
             .map((selector) => [selector, doc.querySelector(selector)?.getAttribute('content') ?? null]),
     };
     const el = (tag, className, text) => {
@@ -49,6 +50,12 @@ export const renderSeoPanel = ({ container, config, save, done, notify, pickImag
     titleField.append(titleInput, el('span', 'le-hint', 'Browser tabs, search results and link previews. Up to 120 characters.'));
     const descriptionField = el('label', 'le-field', 'Search description');
     descriptionField.append(descriptionInput, el('span', 'le-hint', 'A short summary shown in search results and link previews. Up to 320 characters.'));
+    const siteNameInput = el('input', 'le-input');
+    siteNameInput.maxLength = 120;
+    siteNameInput.value = initial.siteName;
+    siteNameInput.setAttribute('aria-label', 'Website name');
+    const siteNameField = el('label', 'le-field', 'Website name');
+    siteNameField.append(siteNameInput, el('span', 'le-hint', 'Shown as the name of your website when links are shared.'));
     // The picture a shared link shows, previewed the way a chat or a feed shows it.
     const share = el('div', 'le-seo-share');
     const shareShot = el('div', 'le-seo-share-shot');
@@ -86,7 +93,7 @@ export const renderSeoPanel = ({ container, config, save, done, notify, pickImag
     actions.append(cancel, saveButton);
     container.replaceChildren(
         el('p', 'le-hint', 'Set how this page appears in browser tabs, search results and social shares. Changes stay in drafts until you publish.'),
-        titleField, descriptionField, el('div', 'le-section-heading', 'Search preview'), preview,
+        titleField, descriptionField, ...(config?.siteNameKey ? [siteNameField] : []), el('div', 'le-section-heading', 'Search preview'), preview,
         el('div', 'le-section-heading', 'When it is shared'), share,
         el('p', 'le-hint', 'The picture shown when someone shares this page in a chat or a post. Upload one, pick a free photo, or make one with credits. Wide pictures (1200 by 630) fill the card best.'),
         imageRow, actions,
@@ -97,6 +104,8 @@ export const renderSeoPanel = ({ container, config, save, done, notify, pickImag
         doc.title = title;
         setMeta('meta[property="og:title"]', 'property', 'og:title', title);
         setMeta('meta[name="twitter:title"]', 'name', 'twitter:title', title);
+        const siteName = pending.siteName.trim() || config?.defaultSiteName || initial.siteName;
+        if (siteName) setMeta('meta[property="og:site_name"]', 'property', 'og:site_name', siteName);
         setMeta('meta[name="description"]', 'name', 'description', description);
         setMeta('meta[property="og:description"]', 'property', 'og:description', description);
         setMeta('meta[name="twitter:description"]', 'name', 'twitter:description', description);
@@ -112,7 +121,10 @@ export const renderSeoPanel = ({ container, config, save, done, notify, pickImag
         shareTitle.textContent = previewTitle.textContent;
         shareDescription.textContent = previewDescription.textContent;
         ownImage.hidden = !config?.imageKey || pending.image === '' || pending.image === (config?.defaultImage ?? '');
-        saveButton.disabled = pending.title === initial.title && pending.description === initial.description && pending.image === initial.image;
+        saveButton.disabled = pending.title === initial.title
+            && pending.description === initial.description
+            && pending.image === initial.image
+            && pending.siteName === initial.siteName;
     };
     const restore = () => {
         doc.title = originals.title;
@@ -124,12 +136,14 @@ export const renderSeoPanel = ({ container, config, save, done, notify, pickImag
     };
     titleInput.addEventListener('input', () => { pending.title = titleInput.value; update(); });
     descriptionInput.addEventListener('input', () => { pending.description = descriptionInput.value; update(); });
+    siteNameInput.addEventListener('input', () => { pending.siteName = siteNameInput.value; update(); });
     cancel.addEventListener('click', () => { restore(); done(''); });
     saveButton.addEventListener('click', async () => {
         const fields = [];
         if (titleConfig.key && pending.title !== initial.title) fields.push([titleConfig.key, pending.title]);
         if (config?.descriptionKey && pending.description !== initial.description) fields.push([config.descriptionKey, pending.description]);
         if (config?.imageKey && pending.image !== initial.image) fields.push([config.imageKey, pending.image === (config?.defaultImage ?? '') ? '' : pending.image]);
+        if (config?.siteNameKey && pending.siteName !== initial.siteName) fields.push([config.siteNameKey, pending.siteName]);
         if (!fields.length) return;
         saveButton.disabled = true;
         saveButton.textContent = 'Saving…';

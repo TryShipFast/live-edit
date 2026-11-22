@@ -123,7 +123,6 @@ const itemOf = (element) => {
     const item = element.closest('[data-edit-item]');
     const list = item?.parentElement?.closest('[data-edit-list]');
     if (!item || !list || list.getAttribute('data-edit-list-kind') === 'sections') return null;
-    if (item !== element && item !== element.closest('a, button')) return null;
 
     return { list: list.getAttribute('data-edit-list'), id: item.getAttribute('data-edit-item') };
 };
@@ -135,6 +134,7 @@ const MARKERS = [
     ['data-edit-img', 'image'],
     ['data-edit-bg', 'background image'],
     ['data-edit-icon', 'icon'],
+    ['data-edit-slide-caption', 'text'],
 ];
 
 const kindOf = (element) => {
@@ -151,9 +151,11 @@ const markerOf = (element) => element.getAttribute('data-edit')
     || element.getAttribute('data-edit-bg')
     || element.getAttribute('data-edit-href')
     || element.getAttribute('data-edit-icon')
+    || element.getAttribute('data-edit-slide-caption')
     || '';
 
 const valueOf = (element, kind) => {
+    if (element.hasAttribute('data-edit-slide-caption')) return cut(element.getAttribute('data-cap') || '', 200);
     if (kind === 'image') {
         const alt = element.getAttribute('alt');
 
@@ -183,6 +185,15 @@ const labelOf = (element, kind) => {
     // a link's words say what it is ("Shop women")
     if (kind === 'link') return cut(element.getAttribute('data-edit-label') || element.textContent, 80) || 'Link';
     if (kind === 'icon') return cut(element.getAttribute('data-edit-label') || '', 80);
+    if (element.hasAttribute('data-edit-slide-caption')) {
+        const slide = element.closest('[data-edit-item]');
+        const list = slide?.parentElement?.closest('[data-edit-list]');
+        const items = list ? [...list.querySelectorAll(':scope > [data-edit-item]')] : [];
+        const number = items.indexOf(slide) + 1;
+        const where = sectionOf(element);
+
+        return `Slide ${number || ''} caption${where ? ` in ${where}` : ''}`.replace(/Slide  caption/, 'Slide caption');
+    }
 
     // every other part by the name a click shows for it (part-name.js clickedName): the panel's title, the page's
     // label, Ask AI and voice say the same words (owner, 14 Nov 2026: "replicate same when texted")
@@ -260,7 +271,7 @@ export function pageForTheChat(root = document) {
     const placed = [];
 
     const shownLayouts = [...root.querySelectorAll('[data-edit-list-kind="sections"]')].filter((list) => list.getClientRects().length > 0);
-    const marked = root.querySelectorAll('[data-edit], [data-edit-img], [data-edit-bg], [data-edit-href], [data-edit-icon]');
+    const marked = root.querySelectorAll('[data-edit], [data-edit-img], [data-edit-bg], [data-edit-href], [data-edit-icon], [data-edit-slide-caption]');
     for (const element of marked) {
         if (fields.length >= MOST_FIELDS) break;
         if (element.closest('#live-edit-ui') || locked(element) || inAHiddenLayout(element, shownLayouts)) continue;
@@ -358,19 +369,62 @@ export function pageForTheChat(root = document) {
         const max = Number.parseInt(element.getAttribute('data-edit-list-max') || '', 10);
         lists.push({
             key,
+            ...(element.getAttribute('data-list') ? { name: element.getAttribute('data-list') } : {}),
             label: ofSections ? 'Page sections' : cut(element.getAttribute('data-edit-list-label') || 'List', 80),
             max: Number.isInteger(max) && max > 0 ? max : null,
+            pair: element.getAttribute('data-edit-list-pair') || null,
             items,
             // which section it is in: a page can have six lists called Buttons
             ...(!ofSections && sectionOf(element) ? { section: sectionOf(element) } : {}),
         });
     }
 
+    const carousels = [...root.querySelectorAll('[data-crossfade], [data-slides]')].map((media) => {
+        const section = media.closest('[data-instance]') || media.closest('section') || media.parentElement;
+        const images = [...media.querySelectorAll('[data-edit-img^="setting:"], [data-edit-bg^="setting:"]')]
+            .map((image) => {
+                const key = keyOf(image.getAttribute(image.hasAttribute('data-edit-img') ? 'data-edit-img' : 'data-edit-bg'));
+                const field = fields.find((candidate) => candidate.key === key && candidate.kind === 'image');
+                return field?.list_item ? { field, item: field.list_item.id, list: field.list_item.list } : null;
+            }).filter(Boolean);
+        const imageList = lists.find((list) => list.key === images[0]?.list);
+        const captionList = lists.find((list) => list.name === imageList?.pair && list.pair === imageList?.name);
+        const slides = images.map(({ field: image, item, list }) => {
+            const caption = [...section.querySelectorAll('[data-xf-cap][data-edit]')]
+                .map((element) => {
+                    const key = keyOf(element.getAttribute('data-edit'));
+                    return fields.find((candidate) => candidate.key === key && candidate.kind === 'text');
+                })
+                .find((candidate) => candidate?.list_item?.list === captionList?.key && candidate.list_item.id === item);
+
+            return {
+                item,
+                image: image.key,
+                caption: caption?.key ?? null,
+                caption_item: caption?.list_item?.id ?? null,
+                text: caption?.value ?? null,
+            };
+        });
+        if (slides.length < 2) return null;
+        const controls = section.querySelector('[data-carousel-controls]');
+        if (!imageList || !captionList) return null;
+
+        return {
+            list: imageList?.key ?? null,
+            caption_list: captionList?.key ?? null,
+            section: sectionOf(section),
+            slides,
+            captions_editable: slides.every((slide) => typeof slide.caption === 'string'),
+            navigation: controls ? 'existing' : 'not_detected',
+        };
+    }).filter((carousel) => carousel?.list && carousel.caption_list);
+
     return {
         page: { title: cut(doc.title || '', 200), path: (doc.defaultView?.location?.pathname) || '/' },
         fields,
         sections,
         lists,
+        carousels,
         sectionsList,
         business: businessOf(doc, root),
         tables: tablesOf(root),

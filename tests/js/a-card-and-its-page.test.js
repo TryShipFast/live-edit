@@ -141,6 +141,22 @@ describe('which key became which', () => {
 });
 
 describe('a copied card gets a full copy of its page', () => {
+    it('rewrites inherited self-links to the new page and preserves other destinations', async () => {
+        const { host, copy } = site();
+        const original = host.draw(ASTER.id);
+        host.save(keyOf(original, '.self-link', 'data-edit-href'), '../products/aster-veil/?source=inherit#details');
+        host.save(keyOf(original, '.other-page-link', 'data-edit-href'), '../products/blue-hour/');
+        host.save(keyOf(original, '.external-link', 'data-edit-href'), 'https://vendor.example.test/catalog/');
+
+        const id = await copy(ASTER, host.draw('shop').querySelector('[data-edit-item="aster"]'), 'Fig Archive');
+        const inherited = host.draw(id);
+        const savedHref = (selector) => host.settings[keyOf(inherited, selector, 'data-edit-href')];
+
+        expect(savedHref('.self-link')).toBe('../fig-archive/?source=inherit#details');
+        expect(savedHref('.other-page-link')).toBe('../products/blue-hour/');
+        expect(savedHref('.external-link')).toBe('https://vendor.example.test/catalog/');
+    });
+
     it('copies a product page with every edit, options included, onto keys of its own', async () => {
         const { host, builder, copy } = site();
         editAsterVeil(host);

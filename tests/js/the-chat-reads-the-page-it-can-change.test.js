@@ -106,16 +106,73 @@ describe('the page the chat sends', () => {
         const read = pageForTheChat(document);
         expect(read.sectionsList).toBe('structure:page:home');
         expect(read.lists.find((list) => list.key === 'structure:page:home')).toEqual({
-            key: 'structure:page:home', label: 'Page sections', max: null,
+            key: 'structure:page:home', label: 'Page sections', max: null, pair: null,
             items: [{ id: 's1', label: 'Reviews' }, { id: 's2', label: 'Visit us' }],
         });
     });
 
     it('gives each list its items and the most its design holds', () => {
         expect(pageForTheChat(document).lists).toEqual([{
-            key: 'tpl:faq', label: 'Questions', max: 6, section: 'Questions',
+            key: 'tpl:faq', label: 'Questions', max: 6, pair: null, section: 'Questions',
             items: [{ id: 'q1', label: 'Do you deliver?' }, { id: 'q2', label: 'Can I return?' }],
         }]);
+    });
+
+    it('maps each editable carousel caption to its slide and image', () => {
+        document.body.innerHTML = `
+            <section data-edit-section="hero" data-edit-section-label="Opening">
+                <div data-crossfade>
+                    <div data-list="hero-slides" data-edit-list="tpl:hero.slides" data-edit-list-pair="hero-captions" data-edit-list-label="Hero slides">
+                        <article data-edit-item="slide-a">
+                            <img data-edit-img="setting:tpl:hero.image-a" src="/one.jpg" alt="Studio">
+                        </article>
+                        <article data-edit-item="slide-b">
+                            <img data-edit-img="setting:tpl:hero.image-b" src="/two.jpg" alt="Team">
+                        </article>
+                    </div>
+                    <div data-list="hero-captions" data-edit-list="tpl:hero.captions" data-edit-list-pair="hero-slides" data-edit-list-label="Hero captions">
+                        <p data-edit-item="slide-a"><span data-xf-cap="0" data-edit="setting:tpl:hero.caption-a">A bright studio</span></p>
+                        <p data-edit-item="slide-b"><span data-xf-cap="1" data-edit="setting:tpl:hero.caption-b">A welcoming team</span></p>
+                    </div>
+                    <nav data-carousel-controls aria-label="Hero slide navigation"><button data-carousel-next aria-label="Next slide">Next</button></nav>
+                </div>
+            </section>`;
+
+        const page = pageForTheChat(document);
+
+        expect(page.fields.filter((field) => field.key.startsWith('tpl:hero.caption-'))).toMatchObject([
+            { key: 'tpl:hero.caption-a', kind: 'text', value: 'A bright studio', list_item: { list: 'tpl:hero.captions', id: 'slide-a' } },
+            { key: 'tpl:hero.caption-b', kind: 'text', value: 'A welcoming team', list_item: { list: 'tpl:hero.captions', id: 'slide-b' } },
+        ]);
+        expect(page.lists.find((list) => list.key === 'tpl:hero.slides')).toMatchObject({ name: 'hero-slides', pair: 'hero-captions' });
+        expect(page.lists.find((list) => list.key === 'tpl:hero.captions')).toMatchObject({ name: 'hero-captions', pair: 'hero-slides' });
+        expect(page.carousels).toEqual([{
+            list: 'tpl:hero.slides', caption_list: 'tpl:hero.captions', section: 'Opening',
+            slides: [
+                { item: 'slide-a', image: 'tpl:hero.image-a', caption: 'tpl:hero.caption-a', caption_item: 'slide-a', text: 'A bright studio' },
+                { item: 'slide-b', image: 'tpl:hero.image-b', caption: 'tpl:hero.caption-b', caption_item: 'slide-b', text: 'A welcoming team' },
+            ],
+            captions_editable: true,
+            navigation: 'existing',
+        }]);
+    });
+
+    it('does not map a carousel when its caption list is not paired with its image list', () => {
+        document.body.innerHTML = `
+            <section>
+                <div data-crossfade>
+                    <div data-list="hero-slides" data-edit-list="tpl:hero.slides" data-edit-list-pair="other-captions">
+                        <article data-edit-item="slide-a"><img data-edit-img="setting:tpl:hero.image-a" src="/one.jpg" alt="Studio"></article>
+                        <article data-edit-item="slide-b"><img data-edit-img="setting:tpl:hero.image-b" src="/two.jpg" alt="Team"></article>
+                    </div>
+                    <div data-list="hero-captions" data-edit-list="tpl:hero.captions" data-edit-list-pair="hero-slides">
+                        <p data-edit-item="slide-a"><span data-xf-cap="0" data-edit="setting:tpl:hero.caption-a">Studio</span></p>
+                        <p data-edit-item="slide-b"><span data-xf-cap="1" data-edit="setting:tpl:hero.caption-b">Team</span></p>
+                    </div>
+                </div>
+            </section>`;
+
+        expect(pageForTheChat(document).carousels).toEqual([]);
     });
 
     it('says what was tapped, and nothing for a locked part', () => {

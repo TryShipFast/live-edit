@@ -606,7 +606,11 @@ export function createChat({ shadow, request, showSaved, openPhoto, openPublish,
                 entry.goTo = goTo;
                 // a file refused (too big, a kind that cannot be sold, no room left): its reason, as the Shop tab says it
                 const refusedFile = planned.length && planned.every((action) => action.type === 'download') ? entry.missed.find((missed) => missed.error) : null;
+                const refusedPage = planned.length === 1 && planned[0].type === 'page' && planned[0].do === 'add'
+                    ? entry.missed.find((missed) => missed.error)
+                    : null;
                 if (!entry.changes.length && refusedFile) entry.text = refusedFile.error;
+                else if (!entry.changes.length && refusedPage) entry.text = refusedPage.error;
                 else if (!entry.changes.length) entry.text = entry.missed.some((missed) => missed.locked)
                     ? 'I could not change that: someone else is working on that part right now.'
                     : 'I could not make that change on this page.';

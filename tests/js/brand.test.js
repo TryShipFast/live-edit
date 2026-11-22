@@ -115,5 +115,29 @@ describe('the Brand tab reads colours the way a browser reports them', () => {
         name.dispatchEvent(new Event('input'));
         expect(document.querySelector('header a').textContent).toBe('About Senior Jay Autocare');
     });
+
+    it('updates the site name in share metadata when the business name changes', () => {
+        const previousHead = document.head.innerHTML;
+        document.head.innerHTML = '<meta property="og:site_name" content="Tobi Adewale">';
+        document.body.innerHTML = '<header><span data-brand-name>Tobi Adewale</span></header>';
+        const container = document.createElement('div');
+        const panel = renderBrandPanel({
+            container,
+            config: { tokens: [], identity: { nameKey: 'brand.name', name: 'Tobi Adewale', contacts: [] } },
+            save: async () => {},
+            done: () => {},
+            notify: () => {},
+        });
+        const name = container.querySelector('[data-brand-field="brand.name"]');
+        name.value = 'Northstar Learning';
+        name.dispatchEvent(new Event('input'));
+
+        expect(document.querySelector('[data-brand-name]').textContent).toBe('Northstar Learning');
+        expect(document.querySelector('meta[property="og:site_name"]').content).toBe('Northstar Learning');
+
+        panel.unpreview();
+        expect(document.querySelector('meta[property="og:site_name"]').content).toBe('Tobi Adewale');
+        document.head.innerHTML = previousHead;
+    });
 });
 

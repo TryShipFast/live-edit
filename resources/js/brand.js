@@ -235,6 +235,7 @@ export const renderBrandPanel = ({ container, config, save, upload, done, notify
     const contacts = (identity.contacts ?? []).filter((contact) => doc.querySelector(`[${contact.marker}]`));
     const contactSelector = contacts.map((contact) => `[${contact.marker}]`).join(', ');
     const identityOriginal = new Map();
+    const originalSiteName = doc.querySelector('meta[property="og:site_name"]')?.getAttribute('content') ?? null;
     doc.querySelectorAll(['[data-brand-name]', '[data-logo]', contactSelector].filter(Boolean).join(', ')).forEach((node) => identityOriginal.set(node, {
         text: node.textContent, src: node.getAttribute('src'), alt: node.getAttribute('alt'), aria: node.getAttribute('aria-label'),
         href: (node.closest('a') ?? null)?.getAttribute('href') ?? null,
@@ -283,6 +284,15 @@ export const renderBrandPanel = ({ container, config, save, upload, done, notify
     const previewIdentity = () => {
         const name = identity.nameKey ? identityValue(identity.nameKey) : '';
         const logo = identity.logoKey ? identityValue(identity.logoKey) : '';
+        if (name) {
+            let siteName = doc.querySelector('meta[property="og:site_name"]');
+            if (!siteName) {
+                siteName = doc.createElement('meta');
+                siteName.setAttribute('property', 'og:site_name');
+                doc.head.append(siteName);
+            }
+            siteName.setAttribute('content', name.trim());
+        }
         brandHeaderOriginal.forEach((children, node) => node.replaceChildren(...children.map((child) => child.cloneNode(true))));
         identityOriginal.forEach(restore);
         contacts.forEach((contact) => {
@@ -354,6 +364,9 @@ export const renderBrandPanel = ({ container, config, save, upload, done, notify
         config.tokens.forEach((token) => html.style.removeProperty(token.property));
         identityOriginal.forEach(restore);
         brandHeaderOriginal.forEach((children, node) => node.replaceChildren(...children.map((child) => child.cloneNode(true))));
+        const siteName = doc.querySelector('meta[property="og:site_name"]');
+        if (originalSiteName === null) siteName?.remove();
+        else siteName?.setAttribute('content', originalSiteName);
     };
 
     const el = (tag, className, text) => {

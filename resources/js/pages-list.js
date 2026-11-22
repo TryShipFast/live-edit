@@ -54,6 +54,23 @@ export function pageKind(page = {}) {
 /** Whether a page may be offered as a kind of page to start a new one from. */
 export const aPageToStartFrom = (page) => page?.id === null || page?.id === undefined || pageKind(page) === 'page';
 
+/** An authored legal page the AI can copy, kept out of the ordinary New page choices. */
+export function legalPageStart(config = {}, requested = '') {
+    const words = String(requested).toLowerCase();
+    const term = /privacy|policy/.test(words) ? 'privacy'
+        : /cookie/.test(words) ? 'cookie'
+            : /terms|conditions/.test(words) ? 'terms'
+                : /disclaimer/.test(words) ? 'disclaimer' : null;
+    if (!term) return null;
+
+    return (config.starts ?? []).find((candidate) => {
+        const identity = `${candidate.id ?? ''} ${candidate.title ?? ''}`.toLowerCase();
+        const sections = candidate.own ?? candidate.sections;
+
+        return pageKind(candidate) === 'legal' && identity.includes(term) && Array.isArray(sections) && sections.length > 0;
+    }) ?? null;
+}
+
 /** The kinds of page New page offers: never a checkout, a bag, a brand sheet, a notice or one record. */
 export function startsOffered(config = {}) {
     const all = startingPoints(config);

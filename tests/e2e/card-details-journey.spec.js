@@ -173,7 +173,9 @@ test('a copied card gets its own page, a full copy, and the two never change eac
     await choose(page, `[data-edit-item="${copy}"] h3 a`);
     await typeAndSave(page, 'Fig Archive');
     await expect(page.locator(`[data-edit-item="${copy}"] h3 a`)).toHaveText('Fig Archive');
-    await expect(page.locator(`[data-edit-item="${copy}"] h3 a`)).toHaveAttribute('href', '../products/aster-veil/');
+    await expect(page.locator(`[data-edit-item="${copy}"] h3 a`)).toHaveAttribute('href', '../products/fig-archive/');
+    const renamedLinkKey = await page.locator(`[data-edit-item="${copy}"] h3 a`).getAttribute('data-edit-href');
+    expect(site.host.settings[renamedLinkKey.replace(/^setting:/, '')]).toBe('../products/fig-archive/');
 
     // Until it has a page of its own, the copy offers one before anything on it is edited.
     await openItsPage(page, copy, 'Give it its own page');
